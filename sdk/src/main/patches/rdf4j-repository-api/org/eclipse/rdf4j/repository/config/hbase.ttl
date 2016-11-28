@@ -1,0 +1,23 @@
+#
+# RDF4J configuration template for a Halyard HBase repository
+#
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix rep: <http://www.openrdf.org/config/repository#>.
+@prefix sr: <http://www.openrdf.org/config/repository/sail#>.
+@prefix sail: <http://www.openrdf.org/config/sail#>.
+@prefix hlyd: <http://gin.msd.com/halyard/sail/hbase#>.
+
+[] a rep:Repository ;
+   rep:repositoryID "{%Repository ID|%}" ;
+   rdfs:label "{%Repository title|%}" ;
+   rep:repositoryImpl [
+      rep:repositoryType "openrdf:SailRepository" ;
+      sr:sailImpl [
+         sail:sailType "openrdf:HBaseStore" ;
+         hlyd:tablespace "{%HBase Table Name|%}" ;
+         hlyd:create "{%Create HBase Table if missing|true|false%}" ;
+         hlyd:splitbits "{%HBase Table presplit bits|0%}" ;
+         hlyd:pushstrategy "{%Use Halyard Push Evaluation Strategy|true|false%}" ;
+         hlyd:evaluationtimeout "{%Query Evaluation Timeout|180%}" ;
+      ]
+   ].

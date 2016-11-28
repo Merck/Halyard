@@ -1,0 +1,5 @@
+#!/bin/sh
+lib="$(dirname "${0}")/lib"
+libjars="$(echo "$lib"/*.jar | tr ' ' ',')"
+export HADOOP_CLASSPATH=`hadoop classpath`:`hbase classpath`
+hadoop jar lib/halyard-tools-1.0-SNAPSHOT.jar com.msd.gin.halyard.tools.HalyardParallelExport -conf /etc/hbase/conf/hbase-site.xml -libjars $libjars "$@"

@@ -1,0 +1,12 @@
+<FindBugsFilter>
+  <Match>
+    <Class name="com.msd.gin.halyard.tools.HalyardExport$JDBCResultWriter"/>
+    <Method name="writeTupleQueryResult"/>
+    <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING"/>
+  </Match>
+  <Match>
+    <Class name="com.msd.gin.halyard.common.HalyardTableUtils"/>
+    <Method name="calculateSplits"/>
+    <Bug pattern="VA_PRIMITIVE_ARRAY_PASSED_TO_OBJECT_VARARG"/>
+  </Match>
+</FindBugsFilter>

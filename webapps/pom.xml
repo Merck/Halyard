@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <artifactId>halyard-webapps</artifactId>
+    <packaging>pom</packaging>
+    <parent>
+        <groupId>com.msd.gin.halyard</groupId>
+        <artifactId>halyard</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+    <dependencies>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>halyard-sdk</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>2.10</version>
+                <executions>
+                    <execution>
+                        <id>copy-depenndencies-for-patching</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.eclipse.rdf4j</groupId>
+                                    <artifactId>rdf4j-http-server</artifactId>
+                                    <version>${rdf4j.version}</version>
+                                    <type>war</type>
+                                    <destFileName>rdf4j-server.war</destFileName>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.eclipse.rdf4j</groupId>
+                                    <artifactId>rdf4j-http-workbench</artifactId>
+                                    <version>${rdf4j.version}</version>
+                                    <type>war</type>
+                                    <destFileName>rdf4j-workbench.war</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                            <outputDirectory>${project.build.directory}</outputDirectory>
+                            <overWriteReleases>true</overWriteReleases>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>1.8</version>
+                <executions>
+                    <execution>
+                        <id>patch-sesame-wars</id>
+                        <phase>package</phase>
+                        <configuration>
+                            <target>
+                                <zip destfile="${project.build.directory}/rdf4j-server.war" update="true">
+                                    <zipfileset dir="../common/target" includes="halyard-common-${project.version}.jar" prefix="WEB-INF/lib"/>
+                                    <zipfileset dir="../strategy/target" includes="halyard-strategy-${project.version}.jar" prefix="WEB-INF/lib"/>
+                                    <zipfileset dir="../sail/target" includes="halyard-sail-${project.version}.jar" prefix="WEB-INF/lib"/>
+                                    <zipfileset dir="../sdk/target" includes="rdf4j-repository-api-${rdf4j.version}.jar" prefix="WEB-INF/lib"/>
+                                </zip>
+                                <zip destfile="${project.build.directory}/rdf4j-workbench.war" update="true">
+                                    <fileset dir="src/main/patches/rdf4j-workbench"/>
+                                    <zipfileset dir="../common/target" includes="halyard-common-${project.version}.jar" prefix="WEB-INF/lib"/>
+                                    <zipfileset dir="../strategy/target" includes="halyard-strategy-${project.version}.jar" prefix="WEB-INF/lib"/>
+                                    <zipfileset dir="../sail/target" includes="halyard-sail-${project.version}.jar" prefix="WEB-INF/lib"/>
+                                    <zipfileset dir="../sdk/target" includes="rdf4j-repository-api-${rdf4j.version}.jar" prefix="WEB-INF/lib"/>
+                                </zip>
+                            </target>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
