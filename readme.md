@@ -594,7 +594,7 @@ HBase Shell Dataset Operations
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
 Type "exit<RETURN>" to leave the HBase Shell
-Version 0.98.4.2.2.0.0-2041-hadoop2
+Version 1.1.2.2.4.2.0-258
 
 hbase(main):001:0> snapshot 'testRepo', 'testRepo_my_snapshot'
 0 row(s) in 36.3380 seconds
@@ -607,7 +607,7 @@ hbase(main):001:0> snapshot 'testRepo', 'testRepo_my_snapshot'
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
 Type "exit<RETURN>" to leave the HBase Shell
-Version 0.98.4.2.2.0.0-2041-hadoop2
+Version 1.1.2.2.4.2.0-258
 
 hbase(main):001:0> clone_snapshot 'testRepo_my_snapshot', 'testRepo2'
 0 row(s) in 31.1590 seconds
@@ -669,7 +669,7 @@ As Halyard Dataset currently contains the only `e` column family, it can be achi
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
 Type "exit<RETURN>" to leave the HBase Shell
-Version 0.98.4.2.2.0.0-2041-hadoop2
+Version 1.1.2.2.4.2.0-258
 
 hbase(main):001:0> alter 'testRepo', READONLY => 'true'
 Updating all regions with the new schema...
@@ -686,7 +686,7 @@ Done.
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
 Type "exit<RETURN>" to leave the HBase Shell
-Version 0.98.4.2.2.0.0-2041-hadoop2
+Version 1.1.2.2.4.2.0-258
 
 hbase(main):001:0> disable 'testRepo'
 0 row(s) in 1.3040 seconds
@@ -696,7 +696,7 @@ hbase(main):001:0> disable 'testRepo'
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
 Type "exit<RETURN>" to leave the HBase Shell
-Version 0.98.4.2.2.0.0-2041-hadoop2
+Version 1.1.2.2.4.2.0-258
 
 hbase(main):001:0> enable 'testRepo'
 0 row(s) in 1.2130 seconds
@@ -710,7 +710,7 @@ hbase(main):001:0> enable 'testRepo'
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
 Type "exit<RETURN>" to leave the HBase Shell
-Version 0.98.4.2.2.0.0-2041-hadoop2
+Version 1.1.2.2.4.2.0-258
 
 hbase(main):001:0> disable 'testRepo'
 0 row(s) in 1.2750 seconds
