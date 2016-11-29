@@ -10,7 +10,8 @@
         <fileSet>
             <directory>${project.basedir}/..</directory>
             <includes>
-                <include>readme.*</include>
+                <include>readme.md</include>
+                <include>index.html</include>
                 <include>LICENSE*</include>
                 <include>img/*</include>
             </includes>
