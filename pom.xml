@@ -186,20 +186,4 @@
             </build>
         </profile>
     </profiles>
-    <distributionManagement>
-        <repository>
-            <uniqueVersion>true</uniqueVersion>
-            <id>bdas-releases</id>
-            <name>Big Data Analytics Support</name>
-            <url>http://nexus.gin.merck.com:8081/content/repositories/com.msd.gic.bdas-RELEASES/</url>
-            <layout>default</layout>
-        </repository>
-        <snapshotRepository>
-            <uniqueVersion>false</uniqueVersion>
-            <id>bdas-snapshots</id>
-            <name>Big Data Analytics Support</name>
-            <url>http://nexus.gin.merck.com:8081/content/repositories/com.msd.gic.bdas-SNAPSHOTS/</url>
-            <layout>default</layout>
-        </snapshotRepository>
-    </distributionManagement>
 </project>
