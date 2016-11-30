@@ -3,9 +3,12 @@ Halyard
 
 Halyard is an extremely horizontally scalable [Triplestore][] with support for [Named Graphs][], designed for integration of extremely large [Semantic Data Models][], and for storage and [SPARQL 1.1][] querying of the whole [Linked Data][] universe snapshots. Halyard implementation is based on [Eclipse RDF4J][] framework and [Apache HBase][] database, and it is completely written in Java. 
 
-*Author: [Adam Sotona](mailto:adam.sotona@merck.com)*  
 *Project Home: <https://merck.github.io/Halyard>*  
-*Project Repository: <https://github.com/Merck/Halyard>*
+*Project Repository: <https://github.com/Merck/Halyard>*  
+*Project Builds: <https://travis-ci.org/Merck/Halyard>* - actual status is [![Build Status](https://travis-ci.org/Merck/Halyard.svg?branch=master)](https://travis-ci.org/Merck/Halyard)
+
+*Author: [Adam Sotona](mailto:adam.sotona@merck.com)*  
+
 
 [Triplestore]: https://en.wikipedia.org/wiki/Triplestore
 [Named Graphs]: https://en.wikipedia.org/wiki/Named_graph
