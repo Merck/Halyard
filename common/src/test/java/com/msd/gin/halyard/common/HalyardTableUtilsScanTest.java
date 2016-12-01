@@ -16,7 +16,6 @@
  */
 package com.msd.gin.halyard.common;
 
-import java.io.StringReader;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -29,11 +28,6 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.eclipse.rdf4j.rio.RDFFormat;
-import org.eclipse.rdf4j.rio.RDFHandlerException;
-import org.eclipse.rdf4j.rio.RDFParser;
-import org.eclipse.rdf4j.rio.Rio;
-import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.junit.AfterClass;
 import org.junit.Test;
 import org.junit.BeforeClass;
@@ -55,37 +49,94 @@ public class HalyardTableUtilsScanTest {
     private static final String PRED2 = "http://whatever/pred2";
     private static final String EXPL1 = "whatever explicit value1";
     private static final String EXPL2 = "whatever explicit value2";
+    private static final String CTX1 = "http://whatever/ctx1";
+    private static final String CTX2 = "http://whatever/ctx2";
 
     @Parameters
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][] {
-                 {null, null, null, 2},
-                 {SUBJ1, null, null, 1},
-                 {SUBJ2, null, null, 1},
-                 {null, PRED1, null, 1},
-                 {null, PRED2, null, 1},
-                 {null, null, EXPL1, 1},
-                 {null, null, EXPL2, 1},
-                 {SUBJ1, PRED1, null, 1},
-                 {SUBJ1, PRED2, null, 0},
-                 {SUBJ2, PRED1, null, 0},
-                 {SUBJ2, PRED2, null, 1},
-                 {SUBJ1, null, EXPL1, 1},
-                 {SUBJ2, null, EXPL1, 0},
-                 {SUBJ1, null, EXPL2, 0},
-                 {SUBJ2, null, EXPL2, 1},
-                 {null, PRED1, EXPL1, 1},
-                 {null, PRED2, EXPL1, 0},
-                 {null, PRED1, EXPL2, 0},
-                 {null, PRED2, EXPL2, 1},
-                 {SUBJ1, PRED1, EXPL1, 1},
-                 {SUBJ2, PRED2, EXPL2, 1},
-                 {SUBJ1, PRED2, EXPL1, 0},
-                 {SUBJ2, PRED1, EXPL2, 0},
-                 {SUBJ1, PRED2, EXPL2, 0},
-                 {SUBJ2, PRED1, EXPL1, 0},
-                 {SUBJ1, PRED1, EXPL2, 0},
-                 {SUBJ2, PRED2, EXPL1, 0},
+
+                 {null,   null,  null, null, 2},
+                 {SUBJ1,  null,  null, null, 1},
+                 {SUBJ2,  null,  null, null, 1},
+                 {null,  PRED1,  null, null, 1},
+                 {null,  PRED2,  null, null, 1},
+                 {null,   null, EXPL1, null, 1},
+                 {null,   null, EXPL2, null, 1},
+                 {SUBJ1, PRED1,  null, null, 1},
+                 {SUBJ1, PRED2,  null, null, 0},
+                 {SUBJ2, PRED1,  null, null, 0},
+                 {SUBJ2, PRED2,  null, null, 1},
+                 {SUBJ1,  null, EXPL1, null, 1},
+                 {SUBJ2,  null, EXPL1, null, 0},
+                 {SUBJ1,  null, EXPL2, null, 0},
+                 {SUBJ2,  null, EXPL2, null, 1},
+                 {null,  PRED1, EXPL1, null, 1},
+                 {null,  PRED2, EXPL1, null, 0},
+                 {null,  PRED1, EXPL2, null, 0},
+                 {null,  PRED2, EXPL2, null, 1},
+                 {SUBJ1, PRED1, EXPL1, null, 1},
+                 {SUBJ2, PRED2, EXPL2, null, 1},
+                 {SUBJ1, PRED2, EXPL1, null, 0},
+                 {SUBJ2, PRED1, EXPL2, null, 0},
+                 {SUBJ1, PRED2, EXPL2, null, 0},
+                 {SUBJ2, PRED1, EXPL1, null, 0},
+                 {SUBJ1, PRED1, EXPL2, null, 0},
+                 {SUBJ2, PRED2, EXPL1, null, 0},
+                 {null,   null,  null, CTX1, 1},
+                 {SUBJ1,  null,  null, CTX1, 1},
+                 {SUBJ2,  null,  null, CTX1, 0},
+                 {null,  PRED1,  null, CTX1, 1},
+                 {null,  PRED2,  null, CTX1, 0},
+                 {null,   null, EXPL1, CTX1, 1},
+                 {null,   null, EXPL2, CTX1, 0},
+                 {SUBJ1, PRED1,  null, CTX1, 1},
+                 {SUBJ1, PRED2,  null, CTX1, 0},
+                 {SUBJ2, PRED1,  null, CTX1, 0},
+                 {SUBJ2, PRED2,  null, CTX1, 0},
+                 {SUBJ1,  null, EXPL1, CTX1, 1},
+                 {SUBJ2,  null, EXPL1, CTX1, 0},
+                 {SUBJ1,  null, EXPL2, CTX1, 0},
+                 {SUBJ2,  null, EXPL2, CTX1, 0},
+                 {null,  PRED1, EXPL1, CTX1, 1},
+                 {null,  PRED2, EXPL1, CTX1, 0},
+                 {null,  PRED1, EXPL2, CTX1, 0},
+                 {null,  PRED2, EXPL2, CTX1, 0},
+                 {SUBJ1, PRED1, EXPL1, CTX1, 1},
+                 {SUBJ2, PRED2, EXPL2, CTX1, 0},
+                 {SUBJ1, PRED2, EXPL1, CTX1, 0},
+                 {SUBJ2, PRED1, EXPL2, CTX1, 0},
+                 {SUBJ1, PRED2, EXPL2, CTX1, 0},
+                 {SUBJ2, PRED1, EXPL1, CTX1, 0},
+                 {SUBJ1, PRED1, EXPL2, CTX1, 0},
+                 {SUBJ2, PRED2, EXPL1, CTX1, 0},
+                 {null,   null,  null, CTX2, 1},
+                 {SUBJ1,  null,  null, CTX2, 0},
+                 {SUBJ2,  null,  null, CTX2, 1},
+                 {null,  PRED1,  null, CTX2, 0},
+                 {null,  PRED2,  null, CTX2, 1},
+                 {null,   null, EXPL1, CTX2, 0},
+                 {null,   null, EXPL2, CTX2, 1},
+                 {SUBJ1, PRED1,  null, CTX2, 0},
+                 {SUBJ1, PRED2,  null, CTX2, 0},
+                 {SUBJ2, PRED1,  null, CTX2, 0},
+                 {SUBJ2, PRED2,  null, CTX2, 1},
+                 {SUBJ1,  null, EXPL1, CTX2, 0},
+                 {SUBJ2,  null, EXPL1, CTX2, 0},
+                 {SUBJ1,  null, EXPL2, CTX2, 0},
+                 {SUBJ2,  null, EXPL2, CTX2, 1},
+                 {null,  PRED1, EXPL1, CTX2, 0},
+                 {null,  PRED2, EXPL1, CTX2, 0},
+                 {null,  PRED1, EXPL2, CTX2, 0},
+                 {null,  PRED2, EXPL2, CTX2, 1},
+                 {SUBJ1, PRED1, EXPL1, CTX2, 0},
+                 {SUBJ2, PRED2, EXPL2, CTX2, 1},
+                 {SUBJ1, PRED2, EXPL1, CTX2, 0},
+                 {SUBJ2, PRED1, EXPL2, CTX2, 0},
+                 {SUBJ1, PRED2, EXPL2, CTX2, 0},
+                 {SUBJ2, PRED1, EXPL1, CTX2, 0},
+                 {SUBJ1, PRED1, EXPL2, CTX2, 0},
+                 {SUBJ2, PRED2, EXPL1, CTX2, 0},
            });
     }
 
@@ -96,11 +147,12 @@ public class HalyardTableUtilsScanTest {
     public static void setup() throws Exception {
         table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testScan", true, 0, null);
 
-        allStatements = parseStatements(
-                  "<http://whatever/subj1> <http://whatever/pred1> \"whatever explicit value1\".\n"
-                + "<http://whatever/subj2> <http://whatever/pred2> \"whatever explicit value2\".\n");
+        allStatements = new HashSet<>();
+        SimpleValueFactory vf = SimpleValueFactory.getInstance();
+        allStatements.add(vf.createStatement(vf.createIRI(SUBJ1), vf.createIRI(PRED1), vf.createLiteral(EXPL1), vf.createIRI(CTX1)));
+        allStatements.add(vf.createStatement(vf.createIRI(SUBJ2), vf.createIRI(PRED2), vf.createLiteral(EXPL2), vf.createIRI(CTX2)));
         for (Statement st : allStatements) {
-            for (KeyValue kv : HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), null)) {
+            for (KeyValue kv : HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext())) {
                     table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
             }
         }
@@ -112,26 +164,14 @@ public class HalyardTableUtilsScanTest {
         table.close();
     }
 
-    private static Set<Statement> parseStatements(String statements) throws Exception {
-        final Set<Statement> stats = new HashSet<>();
-        RDFParser parser = Rio.createParser(RDFFormat.NTRIPLES, SimpleValueFactory.getInstance());
-        parser.setRDFHandler(new AbstractRDFHandler() {
-            @Override
-            public void handleStatement(Statement st) throws RDFHandlerException {
-                stats.add(st);
-            }
-        });
-        parser.parse(new StringReader(statements), "http://whatever/");
-        return stats;
-    }
-
-    private final String s, p, o;
+    private final String s, p, o, c;
     private final int expRes;
 
-    public HalyardTableUtilsScanTest(String s, String p, String o, int expRes) {
+    public HalyardTableUtilsScanTest(String s, String p, String o, String c, int expRes) {
         this.s = s;
         this.p = p;
         this.o = o;
+        this.c = c;
         this.expRes = expRes;
     }
 
@@ -139,7 +179,7 @@ public class HalyardTableUtilsScanTest {
     public void testScan() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
 
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s == null ? null : vf.createIRI(s), p == null ? null : vf.createIRI(p), o == null ? null : vf.createLiteral(o), null))) {
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s == null ? null : vf.createIRI(s), p == null ? null : vf.createIRI(p), o == null ? null : vf.createLiteral(o), c == null ? null : vf.createIRI(c)))) {
             Set<Statement> res = new HashSet<>();
             Result r;
             while ((r = rs.next()) != null) {

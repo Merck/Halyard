@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.common;
 
+import java.io.IOException;
 import java.util.List;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.hbase.HColumnDescriptor;
@@ -194,6 +195,23 @@ public class HalyardTableUtilsTest {
     @Test
     public void testNoResult() {
         assertEquals(0, HalyardTableUtils.parseStatements(Result.EMPTY_RESULT).size());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testNegativeSplitBits() {
+        HalyardTableUtils.calculateSplits(-1, null);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testTooBigSplitBits() {
+        HalyardTableUtils.calculateSplits(17, null);
+    }
+
+    @Test
+    public void testCreateTableWithNoSplits() throws Exception {
+        try (HTable table2 = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testNoSplits", true, -1, null)) {
+            assertNotNull(table2);
+        }
     }
 
 }
