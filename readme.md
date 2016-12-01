@@ -27,10 +27,12 @@ Important Links
 
 *Home Page: <https://merck.github.io/Halyard>*  
 *GitHub Repository: <https://github.com/Merck/Halyard>*  
+*Discussion Group: <https://groups.google.com/d/forum/halyard-users>*  
 *Integration Builds: <https://travis-ci.org/Merck/Halyard>*  
 *Test Coverage Reports: <https://codecov.io/gh/Merck/Halyard>*
 
 [&#9650;](#)
+
 
 License
 -------
