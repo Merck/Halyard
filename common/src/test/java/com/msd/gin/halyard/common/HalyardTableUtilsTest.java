@@ -21,9 +21,11 @@ import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.TableNotEnabledException;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
@@ -126,4 +128,72 @@ public class HalyardTableUtilsTest {
         }
         HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "InvalidTable", false, 0, null);
     }
+
+    @Test
+    public void testNewInstance() {
+        new HalyardTableUtils();
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void testGetInvalidMessageDigest() {
+        HalyardTableUtils.getMessageDigest("invalid");
+    }
+
+    @Test
+    public void testTableTwice() throws Exception {
+        try (HTable table2 = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, 0, null)) {
+            assertNotNull(table2);
+        }
+    }
+
+    @Test
+    public void testTruncateEmpty() throws Exception {
+        HTable table2 = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testTruncateEmpty", true, 0, null);
+        try (HTable table3 = HalyardTableUtils.truncateTable(table2)) {
+            assertNotNull(table3);
+        }
+    }
+
+    @Test(expected = TableNotEnabledException.class)
+    public void testTruncateDisabled() throws Exception {
+        HTable table2 = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testTruncateDisabled", true, 0, null);
+        try (HBaseAdmin admin = new HBaseAdmin(table2.getConfiguration())) {
+            admin.disableTable(table2.getTableName());
+        }
+        try (HTable table3 = HalyardTableUtils.truncateTable(table2)) {
+        }
+    }
+
+
+    @Test
+    public void testContext() throws Exception {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        Resource subj = vf.createIRI("http://testContext/subject/");
+        IRI pred = vf.createIRI("http://testContext/pred/");
+        Value obj = vf.createLiteral(RandomStringUtils.random(100000));
+        IRI ctx = vf.createIRI("http://testContext/ctx/");
+        for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx)) {
+                table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
+        }
+        table.flushCommits();
+
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, null))) {
+            assertEquals(obj, HalyardTableUtils.parseStatements(rs.next()).iterator().next().getObject());
+        }
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, null, null))) {
+            assertEquals(obj, HalyardTableUtils.parseStatements(rs.next()).iterator().next().getObject());
+        }
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, ctx))) {
+            assertEquals(obj, HalyardTableUtils.parseStatements(rs.next()).iterator().next().getObject());
+        }
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, null, ctx))) {
+            assertEquals(obj, HalyardTableUtils.parseStatements(rs.next()).iterator().next().getObject());
+        }
+    }
+
+    @Test
+    public void testNoResult() {
+        assertEquals(0, HalyardTableUtils.parseStatements(Result.EMPTY_RESULT).size());
+    }
+
 }

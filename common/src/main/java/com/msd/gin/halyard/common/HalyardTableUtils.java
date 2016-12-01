@@ -107,13 +107,17 @@ public final class HalyardTableUtils {
     private static final ThreadLocal<MessageDigest> MD = new ThreadLocal<MessageDigest>(){
         @Override
         protected MessageDigest initialValue() {
-            try {
-                return MessageDigest.getInstance(MD_ALGORITHM);
-            } catch (NoSuchAlgorithmException e) {
-                throw new RuntimeException(e);
-            }
+            return getMessageDigest(MD_ALGORITHM);
         }
     };
+
+    static MessageDigest getMessageDigest(String algorithm) {
+        try {
+            return MessageDigest.getInstance(algorithm);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     /**
      * Helper method which locates or creates and return HTable
