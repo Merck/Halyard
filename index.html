@@ -304,132 +304,131 @@ sup {
 </style>
 </head>
 <body>
-<h1 id="toc_0">Halyard</h1>
+<h1 id="toc_0">Halyard </h1>
 
 <p>Halyard is an extremely horizontally scalable <a href="https://en.wikipedia.org/wiki/Triplestore">Triplestore</a> with support for <a href="https://en.wikipedia.org/wiki/Named_graph">Named Graphs</a>, designed for integration of extremely large <a href="https://en.wikipedia.org/wiki/Semantic_data_model">Semantic Data Models</a>, and for storage and <a href="http://www.w3.org/TR/sparql11-query/">SPARQL 1.1</a> querying of the whole <a href="https://en.wikipedia.org/wiki/Linked_data">Linked Data</a> universe snapshots. Halyard implementation is based on <a href="http://rdf4j.org">Eclipse RDF4J</a> framework and <a href="http://hbase.apache.org">Apache HBase</a> database, and it is completely written in Java. </p>
 
-<p><em>Project Home: <a href="https://merck.github.io/Halyard">https://merck.github.io/Halyard</a></em><br>
-<em>Project Repository: <a href="https://github.com/Merck/Halyard">https://github.com/Merck/Halyard</a></em><br>
-<em>Project Builds: <a href="https://travis-ci.org/Merck/Halyard">https://travis-ci.org/Merck/Halyard</a></em> - actual status is <a href="https://travis-ci.org/Merck/Halyard"><img src="https://travis-ci.org/Merck/Halyard.svg?branch=master" alt="Build Status"></a></p>
-
-<p><em>Author: <a href="mailto:adam.sotona@merck.com">Adam Sotona</a></em>  </p>
+<p><em>Author: <a href="mailto:adam.sotona@merck.com">Adam Sotona</a></em></p>
 
 <hr>
 
 <ul class="toc">
 <li>
-<a href="#toc_0">Halyard</a>
+<a href="#toc_0">Halyard </a>
 <ul>
 <li>
-<a href="#toc_1">License</a>
+<a href="#toc_1">Important Links</a>
 </li>
 <li>
-<a href="#toc_2">Repository Content</a>
+<a href="#toc_2">License</a>
 </li>
 <li>
-<a href="#toc_3">Architecture Diagram</a>
+<a href="#toc_3">Repository Content</a>
 </li>
 <li>
-<a href="#toc_4">Build Instructions</a>
+<a href="#toc_4">Architecture Diagram</a>
 </li>
 <li>
-<a href="#toc_5">Runtime Requirements</a>
+<a href="#toc_5">Build Instructions</a>
 </li>
 <li>
-<a href="#toc_6">Halyard SDK</a>
+<a href="#toc_6">Runtime Requirements</a>
+</li>
+<li>
+<a href="#toc_7">Halyard SDK</a>
 <ul>
 <li>
-<a href="#toc_7">Installation</a>
+<a href="#toc_8">Installation</a>
 </li>
 <li>
-<a href="#toc_8">RDF4J Console</a>
+<a href="#toc_9">RDF4J Console</a>
 </li>
 <li>
-<a href="#toc_9">Halyard Bulk Load</a>
+<a href="#toc_10">Halyard Bulk Load</a>
 </li>
 <li>
-<a href="#toc_10">Halyard Hive Load</a>
+<a href="#toc_11">Halyard Hive Load</a>
 </li>
 <li>
-<a href="#toc_11">Halyard Update</a>
+<a href="#toc_12">Halyard Update</a>
 </li>
 <li>
-<a href="#toc_12">Halyard Export</a>
+<a href="#toc_13">Halyard Export</a>
 </li>
 <li>
-<a href="#toc_13">Halyard Parallel Export</a>
+<a href="#toc_14">Halyard Parallel Export</a>
 </li>
 </ul>
 </li>
 <li>
-<a href="#toc_14">RDF4J Web Applications</a>
+<a href="#toc_15">RDF4J Web Applications</a>
 <ul>
 <li>
-<a href="#toc_15">Installation</a>
+<a href="#toc_16">Installation</a>
 </li>
 <li>
-<a href="#toc_16">RDF4J Server</a>
+<a href="#toc_17">RDF4J Server</a>
 </li>
 <li>
-<a href="#toc_17">RDF4J Workbench</a>
+<a href="#toc_18">RDF4J Workbench</a>
 </li>
 </ul>
 </li>
 </ul>
 </li>
 <li>
-<a href="#toc_18">Standard Use Cases</a>
+<a href="#toc_19">Standard Use Cases</a>
 <ul>
 <li>
-<a href="#toc_19">Note about Repositories versus Datasets</a>
+<a href="#toc_20">Note about Repositories versus Datasets</a>
 </li>
 <li>
-<a href="#toc_20">HBase Repository Settings</a>
+<a href="#toc_21">HBase Repository Settings</a>
 </li>
 <li>
-<a href="#toc_21">Create Repository</a>
+<a href="#toc_22">Create Repository</a>
 </li>
 <li>
-<a href="#toc_22">Connect to Existing Repository</a>
+<a href="#toc_23">Connect to Existing Repository</a>
 </li>
 <li>
-<a href="#toc_23">Load RDF Data</a>
+<a href="#toc_24">Load RDF Data</a>
 </li>
 <li>
-<a href="#toc_24">SPARQL Update</a>
+<a href="#toc_25">SPARQL Update</a>
 </li>
 <li>
-<a href="#toc_25">SPARQL Query and Export Data</a>
+<a href="#toc_26">SPARQL Query and Export Data</a>
 </li>
 <li>
-<a href="#toc_26">Delete Statements</a>
+<a href="#toc_27">Delete Statements</a>
 </li>
 <li>
-<a href="#toc_27">Clear Repository</a>
+<a href="#toc_28">Clear Repository</a>
 </li>
 <li>
-<a href="#toc_28">HBase Shell Dataset Operations</a>
+<a href="#toc_29">HBase Shell Dataset Operations</a>
 <ul>
 <li>
-<a href="#toc_29">Snapshot Halyard Dataset</a>
+<a href="#toc_30">Snapshot Halyard Dataset</a>
 </li>
 <li>
-<a href="#toc_30">Clone Halyard Dataset from Snapshot</a>
+<a href="#toc_31">Clone Halyard Dataset from Snapshot</a>
 </li>
 <li>
-<a href="#toc_31">Export Halyard Dataset Snapshot</a>
+<a href="#toc_32">Export Halyard Dataset Snapshot</a>
 </li>
 <li>
-<a href="#toc_32">Bulk Merge of Multiple Datasets</a>
+<a href="#toc_33">Bulk Merge of Multiple Datasets</a>
 </li>
 <li>
-<a href="#toc_33">Boost Query Performance by Making the Dataset Read-only</a>
+<a href="#toc_34">Boost Query Performance by Making the Dataset Read-only</a>
 </li>
 <li>
-<a href="#toc_34">Disable/Enable Unused Dataset to Save HBase Resources</a>
+<a href="#toc_35">Disable/Enable Unused Dataset to Save HBase Resources</a>
 </li>
 <li>
-<a href="#toc_35">Delete Dataset</a>
+<a href="#toc_36">Delete Dataset</a>
 </li>
 </ul>
 </li>
@@ -442,7 +441,16 @@ sup {
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_1">License</h2>
+<h2 id="toc_1">Important Links</h2>
+
+<p><em>Home Page: <a href="https://merck.github.io/Halyard">https://merck.github.io/Halyard</a></em><br>
+<em>GitHub Repository: <a href="https://github.com/Merck/Halyard">https://github.com/Merck/Halyard</a></em><br>
+<em>Integration Builds: <a href="https://travis-ci.org/Merck/Halyard">https://travis-ci.org/Merck/Halyard</a></em><br>
+<em>Test Coverage Reports: <a href="https://codecov.io/gh/Merck/Halyard">https://codecov.io/gh/Merck/Halyard</a></em></p>
+
+<p><a href="#">&#9650;</a></p>
+
+<h2 id="toc_2">License</h2>
 
 <p>Copyright 2016 Merck Sharp &amp; Dohme Corp. a subsidiary of Merck &amp; Co.,
 Inc., Kenilworth, NJ, USA.</p>
@@ -461,7 +469,7 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_2">Repository Content</h2>
+<h2 id="toc_3">Repository Content</h2>
 
 <ul>
 <li><strong>Halyard-Common</strong> - a library for direct mapping between RDF data model and Apache HBase</li>
@@ -474,13 +482,13 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_3">Architecture Diagram</h2>
+<h2 id="toc_4">Architecture Diagram</h2>
 
 <p><img src="img/architecture.png" alt="Halyard Architecture Diagram"></p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_4">Build Instructions</h2>
+<h2 id="toc_5">Build Instructions</h2>
 
 <p>Build environment prerequisites are:</p>
 
@@ -496,7 +504,7 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_5">Runtime Requirements</h2>
+<h2 id="toc_6">Runtime Requirements</h2>
 
 <p>Halyard is expected to run on an Apache Hadoop cluster node with configured Apache HBase client. Apache Hadoop and Apache HBase components are not bundled with Halyard. The runtime requirements are:</p>
 
@@ -510,15 +518,15 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_6">Halyard SDK</h2>
+<h2 id="toc_7">Halyard SDK</h2>
 
-<h3 id="toc_7">Installation</h3>
+<h3 id="toc_8">Installation</h3>
 
 <p>Download and unzip the latest <code>halyard-sdk-&lt;version&gt;.zip</code> bundle to a Apache Hadoop cluster node with configured Apache HBase client.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_8">RDF4J Console</h3>
+<h3 id="toc_9">RDF4J Console</h3>
 
 <p>RDF4J Console is a command line interactive application providing set of commands to operate several supported RDF4J SAIL implementations. Halyard (HBase SAIL) is included in this distribution.</p>
 
@@ -542,7 +550,7 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_9">Halyard Bulk Load</h3>
+<h3 id="toc_10">Halyard Bulk Load</h3>
 
 <p>Halyard Bulk Load is a Map Reduce application designed to efficiently load RDF data from Hadoop Filesystem (HDFS) into HBase in a form of Halyard dataset.</p>
 
@@ -596,7 +604,7 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_10">Halyard Hive Load</h3>
+<h3 id="toc_11">Halyard Hive Load</h3>
 
 <p>Halyard Hive Load is a Map Reduce application designed to efficiently load RDF data from Apache Hive table into HBase in a form of Halyard dataset. It has similar functionality to Halyard Bulk Load, just instead of parsing files from HDFS it parses content of all cells from specified Hive table and column.</p>
 
@@ -639,7 +647,7 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_11">Halyard Update</h3>
+<h3 id="toc_12">Halyard Update</h3>
 
 <p>Halyard Update is a command line application designed to run SPARQL Update queries to update data in HBase Halyard dataset.</p>
 
@@ -655,7 +663,7 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_12">Halyard Export</h3>
+<h3 id="toc_13">Halyard Export</h3>
 
 <p>Halyard Export is a command line application designed to export data from HBase (from Halyard dataset) into various targets and in various forms.</p>
 
@@ -740,7 +748,7 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_13">Halyard Parallel Export</h3>
+<h3 id="toc_14">Halyard Parallel Export</h3>
 
 <p>Halyard Parallel Export is a MapReduce application executing multiple Halyard Exports in multiple Map tasks across Hadoop cluster. All the exports are instructed with the same SPARQL query, the same target and the same options. Parallelisation is done using a custom SPARQL filter function <code>parallel_split_by(?a_binding)</code>. The function takes one or more bindings as argument(s) and these bindings are used as a key(s) to randomly distribute the query evaluation across all mappers. </p>
 
@@ -766,9 +774,9 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_14">RDF4J Web Applications</h2>
+<h2 id="toc_15">RDF4J Web Applications</h2>
 
-<h3 id="toc_15">Installation</h3>
+<h3 id="toc_16">Installation</h3>
 
 <ol>
 <li>Install Apache Tomcat 8 (or similar) server on a configured Hadoop and HBase cluster node</li>
@@ -783,7 +791,7 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_16">RDF4J Server</h3>
+<h3 id="toc_17">RDF4J Server</h3>
 
 <p>RDF4J Server is a service server providing SPARQL Endpoint for each managed repository as well as the REST access to the repository management functions.</p>
 
@@ -791,7 +799,7 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_17">RDF4J Workbench</h3>
+<h3 id="toc_18">RDF4J Workbench</h3>
 
 <p><img src="img/workbench.png" alt="RDF4J Workbench"></p>
 
@@ -799,9 +807,9 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h1 id="toc_18">Standard Use Cases</h1>
+<h1 id="toc_19">Standard Use Cases</h1>
 
-<h2 id="toc_19">Note about Repositories versus Datasets</h2>
+<h2 id="toc_20">Note about Repositories versus Datasets</h2>
 
 <p>RDF4J repositories represent just configured connectors to the particular RDF storage. The repositories are always created and persisted within the actual context. RDF4J Console repository configuration is persisted under the actual user home directory. Repositories created through RDF4J Workbench exist within the actually connected RDF4J Server context only.</p>
 
@@ -815,7 +823,7 @@ limitations under the License.</p>
 
 <p><a name="settings"></a></p>
 
-<h2 id="toc_20">HBase Repository Settings</h2>
+<h2 id="toc_21">HBase Repository Settings</h2>
 
 <p><strong>Repository ID</strong> - is mandatory and may correspond to the HBase table name<br>
 <strong>Repository title</strong> - is optional<br>
@@ -827,7 +835,7 @@ limitations under the License.</p>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_21">Create Repository</h2>
+<h2 id="toc_22">Create Repository</h2>
 
 <p><strong>With RDF4J Console</strong></p>
 
@@ -848,7 +856,7 @@ Repository created</code></pre>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_22">Connect to Existing Repository</h2>
+<h2 id="toc_23">Connect to Existing Repository</h2>
 
 <p><strong>From RDF4J Console</strong></p>
 
@@ -863,7 +871,7 @@ Opened repository &#39;testRepo&#39;</code></pre>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_23">Load RDF Data</h2>
+<h2 id="toc_24">Load RDF Data</h2>
 
 <p><strong>With Halyard Bulk Load</strong></p>
 
@@ -910,7 +918,7 @@ Content-Type: application/rdf+xml;charset=UTF-8
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_24">SPARQL Update</h2>
+<h2 id="toc_25">SPARQL Update</h2>
 
 <p><strong>With Halyard Update</strong></p>
 
@@ -938,7 +946,7 @@ update=INSERT%20{?s%20?p%20?o}%20WHERE%20{?s%20?p%20?o}</code></pre>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_25">SPARQL Query and Export Data</h2>
+<h2 id="toc_26">SPARQL Query and Export Data</h2>
 
 <p><strong>With Halyard Export</strong></p>
 
@@ -994,7 +1002,7 @@ Accept: application/sparql-results+xml, */*;q=0.5</code></pre>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_26">Delete Statements</h2>
+<h2 id="toc_27">Delete Statements</h2>
 
 <p><strong>With RDF4J Update</strong></p>
 
@@ -1011,7 +1019,7 @@ Accept: application/sparql-results+xml, */*;q=0.5</code></pre>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_27">Clear Repository</h2>
+<h2 id="toc_28">Clear Repository</h2>
 
 <p><strong>With RDF4J Console</strong></p>
 
@@ -1029,9 +1037,9 @@ Clearing repository...</code></pre>
 
 <p><a href="#">&#9650;</a></p>
 
-<h2 id="toc_28">HBase Shell Dataset Operations</h2>
+<h2 id="toc_29">HBase Shell Dataset Operations</h2>
 
-<h3 id="toc_29">Snapshot Halyard Dataset</h3>
+<h3 id="toc_30">Snapshot Halyard Dataset</h3>
 
 <pre><code class="language-none">&gt; hbase shell
 HBase Shell; enter &#39;help&lt;RETURN&gt;&#39; for list of supported commands.
@@ -1043,7 +1051,7 @@ hbase(main):001:0&gt; snapshot &#39;testRepo&#39;, &#39;testRepo_my_snapshot&#39
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_30">Clone Halyard Dataset from Snapshot</h3>
+<h3 id="toc_31">Clone Halyard Dataset from Snapshot</h3>
 
 <pre><code class="language-none">&gt; hbase shell
 HBase Shell; enter &#39;help&lt;RETURN&gt;&#39; for list of supported commands.
@@ -1055,7 +1063,7 @@ hbase(main):001:0&gt; clone_snapshot &#39;testRepo_my_snapshot&#39;, &#39;testRe
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_31">Export Halyard Dataset Snapshot</h3>
+<h3 id="toc_32">Export Halyard Dataset Snapshot</h3>
 
 <pre><code class="language-none">&gt; hbase org.apache.hadoop.hbase.snapshot.ExportSnapshot -snapshot testRepo_my_snapshot -copy-to /my_hdfs_export_path
 2016-04-28 09:01:07,019 INFO  [main] snapshot.ExportSnapshot: Loading Snapshot hfile list
@@ -1073,7 +1081,7 @@ hbase(main):001:0&gt; clone_snapshot &#39;testRepo_my_snapshot&#39;, &#39;testRe
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_32">Bulk Merge of Multiple Datasets</h3>
+<h3 id="toc_33">Bulk Merge of Multiple Datasets</h3>
 
 <p><strong>1. Snapshot and Export all Halyard Datasets you want to merge</strong></p>
 
@@ -1101,7 +1109,7 @@ hbase(main):001:0&gt; clone_snapshot &#39;testRepo_my_snapshot&#39;, &#39;testRe
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_33">Boost Query Performance by Making the Dataset Read-only</h3>
+<h3 id="toc_34">Boost Query Performance by Making the Dataset Read-only</h3>
 
 <pre><code class="language-none">&gt; hbase shell
 HBase Shell; enter &#39;help&lt;RETURN&gt;&#39; for list of supported commands.
@@ -1117,7 +1125,7 @@ Done.
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_34">Disable/Enable Unused Dataset to Save HBase Resources</h3>
+<h3 id="toc_35">Disable/Enable Unused Dataset to Save HBase Resources</h3>
 
 <pre><code class="language-none">&gt; hbase shell
 HBase Shell; enter &#39;help&lt;RETURN&gt;&#39; for list of supported commands.
@@ -1137,7 +1145,7 @@ hbase(main):001:0&gt; enable &#39;testRepo&#39;
 
 <p><a href="#">&#9650;</a></p>
 
-<h3 id="toc_35">Delete Dataset</h3>
+<h3 id="toc_36">Delete Dataset</h3>
 
 <pre><code class="language-none">&gt; hbase shell
 HBase Shell; enter &#39;help&lt;RETURN&gt;&#39; for list of supported commands.
