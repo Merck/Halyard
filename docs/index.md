@@ -1,31 +1,52 @@
+---
+---
 # Halyard
 
-*codecov icon here*
-*travis icon here*
-
-Halyard is an extremely horizontally scalable triple store with support for named graphs, designed for integration of extremely large semantic data models and for storage and [SPARQL 1.1][] querying of complete Linked Data universe snapshots. Halyard implementation is based on [Eclipse RDF4J][] framework and [Apache HBase][] database, and it is completely written in Java.
+Halyard is an extremely horizontally scalable [Triplestore][] with support for [Named Graphs][], designed for integration of extremely large [Semantic Data Models][], and for storage and [SPARQL 1.1][] querying of the whole [Linked Data][] universe snapshots. Halyard implementation is based on [Eclipse RDF4J][] framework and [Apache HBase][] database, and it is completely written in Java.
 
 *Author: [Adam Sotona](mailto:adam.sotona@merck.com)*
 
+[Triplestore]: https://en.wikipedia.org/wiki/Triplestore
+[Named Graphs]: https://en.wikipedia.org/wiki/Named_graph
+[RDF]: https://en.wikipedia.org/wiki/Resource_Description_Framework
+[Semantic Data Models]: https://en.wikipedia.org/wiki/Semantic_data_model
 [SPARQL 1.1]: http://www.w3.org/TR/sparql11-query/
+[Linked Data]: https://en.wikipedia.org/wiki/Linked_data
 [Eclipse RDF4J]: http://rdf4j.org
 [Apache HBase]: http://hbase.apache.org
 
-## Get involved
+---
+Important Links
 
-*Discussion group: <https://groups.google.com/d/forum/halyard-users>*
+*Home Page: <https://merck.github.io/Halyard>*  
+*GitHub Repository: <https://github.com/Merck/Halyard>*  
+*Discussion Group: <https://groups.google.com/d/forum/halyard-users>*  
+*Integration Builds: <https://travis-ci.org/Merck/Halyard>*  
+*Test Coverage Reports: <https://codecov.io/gh/Merck/Halyard>*
 
-## Repository contents
+[&#9650;](#)
 
- * **Halyard-Common** - a library for direct mapping between an RDF data model and Apache HBase
+Repository Content
+------------------
+
+ * **Halyard-Common** - a library for direct mapping between RDF data model and Apache HBase
  * **Halyard-Strategy** - a generic parallel asynchronous implementation of RDF4J Evaluation Strategy
  * **Halyard-SAIL** - an implementation of the RDF4J Storage and Inference Layer on top of Apache HBase
  * **Halyard Tools** - a set of command line and Apache Hadoop MapReduce tools for loading, updating, querying, and exporting the data with maximum performance
- * **Halyard-SDK** - a distributable bundle of Eclipse RDF4J and Halyard for command line use on an Apache Hadoop cluster with configured HBase
+ * **Halyard-SDK** - a distributable bundle of Eclipse RDF4J and Halyard for command line use on an Apache Hadoop cluster with configured HBase.
  * **Halyard-WebApps** - a re-distribution of Eclipse RDF4J Web Applications (RDF4J-Server and RDF4J-Workbench), patched and enhanced to include Halyard as another RDF repository option
 
-## Build Instructions
+[&#9650;](#)
 
+Architecture Diagram
+--------------------
+
+![Halyard Architecture Diagram](img/architecture.png)
+
+[&#9650;](#)
+
+Build Instructions
+------------------
 Build environment prerequisites are:
 
  * Linux or Mac computer
@@ -36,54 +57,17 @@ In the Halyard project root directory execute command: `mvn package`
 
 Optionally you can build Halyard from NetBeans or other Java Development IDE.
 
-## Runtime Requirements
+[&#9650;](#)
 
+Runtime Requirements
+--------------------
 Halyard is expected to run on an Apache Hadoop cluster node with configured Apache HBase client. Apache Hadoop and Apache HBase components are not bundled with Halyard. The runtime requirements are:
 
  * Apache Hadoop version 2.5.1 or higher
  * Apache HBase version 1.1.2 or higher
  * Java 8 Runtime
 
-*Note: Recommended Apache Hadoop distribution is the latest version of Hortonworks Data Platform (HDP) or Amazon Elastic Map Reduce (EMR).*
-   
-[&#9650;](#)
-
-### Hortonworks Data Platform Sample Cluster Setup
-
-Hortonworks Data Platform is a Hadoop Distribution with all important parts of Hadoop included, however it does not directly provide hardware and core OS.
-
-The whole HDP stack installation through Amabari is very well described at [Hortonworks Data Platform - Apache Ambari Installation page](http://docs.hortonworks.com/HDPDocuments/Ambari-2.4.2.0/bk_ambari-installation/content/index.html).
-
-It is possible to strip down the set of Hadoop components to `HDFS`, `MapReduce2`, `YARN`, `HBase`, `ZooKeeper`, and optionally `Ambari Metrics` for cluster monitoring.
-
-Detailed documentation about Hortonworks Data Platform is accessible from <http://docs.hortonworks.com>
-
-
-[&#9650;](#)
-
-### Amazon EMR Sample Cluster Setup
-
-Amazon Elastic MapReduce is a service providing both - hardware and software stack to run Hadoop and Halyard on top of it.
-
-Sample Amazon EMR setup is very well described in [Amazon EMR Management Guide - Getting Started](http://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-gs.html).
-
-For Halyard purpose it is important to perform first two steps of the guide:
-
- - [Step 1: Set Up Prerequisites](http://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-gs-prerequisites.html)
- - [Step 2: Launch Your Sample Cluster](http://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-gs-launch-sample-cluster.html)
-
-It is possible to strip down the set of provided components during `Create Cluster` by clicking on `Go to advanced options` and selecting just `Hadoop`, `ZooKeeper`, `HBase` and optionally `Ganglia` for cluster monitoring.
-
-HBase for Halyard is possible to run in both Storage Modes - `HDFS` or `S3`.
-
-Instance types with redundant storage space (like for example `d2.xlarge`) are highly recommended when you plan to Bulk Load large datasets using Halyard.
-
-Instance types with enough memory and fast disks for local caching (for example `i2.xlarge`) are recommended when the cluster would mainly serve data through Halyard.
-
-Additional EMR Task Nodes can be used to host additional Halyard SPARQL Endpoints.
-
-Detailed documentation about Amazon EMR is available at <https://aws.amazon.com/documentation/emr/>
-
+*Note: Recommended Apache Hadoop distribution is Hortonworks Data Platform (HDP) version 2.4.2*
 
 [&#9650;](#)
 
