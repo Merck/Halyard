@@ -10,7 +10,7 @@
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
         <li {% if page.url == "/" %} class="active" {% endif %}><a href="{{ "/" | prepend: site.github.url }}">Home</a></li>
-        <li {% if page.layout == "doc" %} class="active" {% endif %}><a href="{{ "overview.html" | prepend: site.github.url }}">Documentation</a></li>
+        <li {% if page.layout == "doc" %} class="active" {% endif %}><a href="{{ "/overview.html" | prepend: site.github.url }}">Documentation</a></li>
         <li><a href="https://github.com/Merck/Halyard/releases">Download</a></li>
       </ul>
     </div><!--/.nav-collapse -->
