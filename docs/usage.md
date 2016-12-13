@@ -14,7 +14,6 @@ Multiple repositories configured in various RDF4J Servers or in multiple RDF4J C
 
 **Deletion of the repository** from one particular RDF4J Server or RDF4J Console does not delete Halyard Dataset and so it does not affect the data and other users. However **clearing** the repository or **deletion of the statements** has global effect for all users.
 
-<a name="settings"></a>
 ## HBase Repository Settings
 
 **Repository ID** - is mandatory and may correspond to the HBase table name
