@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.strategy;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -124,7 +125,7 @@ final class HalyardStatementPatternEvaluation {
 
     private final Dataset dataset;
     private final TripleSource tripleSource;
-    private static final Map<IdentityWrapper<QueryModelNode>, Integer> PRIORITY_MAP_CACHE = new WeakHashMap<>();
+    private static final Map<IdentityWrapper<QueryModelNode>, Integer> PRIORITY_MAP_CACHE = Collections.synchronizedMap(new WeakHashMap<>());
     private static final PriorityQueue<PipeAndIteration> PRIORITY_QUEUE = new PriorityQueue<>();
 
     static void enqueue(HalyardTupleExprEvaluation.BindingSetPipe pipe,  CloseableIteration<BindingSet, QueryEvaluationException> iter, QueryModelNode node) {
