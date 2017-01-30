@@ -86,7 +86,11 @@ public class HBaseSailHashConflictTest {
                 KeyValue kv = triple[i];
                 table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
                 for (int j=0; j<conflicts.length; j++) {
-                    KeyValue xkv = new KeyValue(kv.getRow(), kv.getFamily(), conflicts[j][i].getQualifier(), kv.getTimestamp(), conflicts[j][i].getValue());
+                    KeyValue xkv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(),
+                            kv.getFamilyArray(), kv.getFamilyOffset(), kv.getFamilyLength(),
+                            conflicts[j][i].getQualifierArray(), conflicts[j][i].getQualifierOffset(), conflicts[j][i].getQualifierLength(),
+                            kv.getTimestamp(), KeyValue.Type.Put,
+                            conflicts[j][i].getValueArray(), conflicts[j][i].getValueOffset(), conflicts[j][i].getValueLength());
                     table.put(new Put(xkv.getRowArray(), xkv.getRowOffset(), xkv.getRowLength(), xkv.getTimestamp()).add(xkv));
                 }
             }

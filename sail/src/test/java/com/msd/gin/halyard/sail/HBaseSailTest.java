@@ -19,6 +19,10 @@ package com.msd.gin.halyard.sail;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import java.util.List;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
@@ -66,10 +70,12 @@ public class HBaseSailTest {
         HTableDescriptor desc = sail.table.getTableDescriptor();
         assertTrue(sail.isWritable());
         sail.shutDown();
-        try (HBaseAdmin ha = new HBaseAdmin(HBaseServerTestInstance.getInstanceConfig())) {
-            desc = new HTableDescriptor(desc);
-            desc.setReadOnly(true);
-            ha.modifyTable(desc.getName(), desc);
+        try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
+            try (Admin ha = con.getAdmin()) {
+                desc = new HTableDescriptor(desc);
+                desc.setReadOnly(true);
+                ha.modifyTable(desc.getTableName(), desc);
+            }
         }
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), desc.getNameAsString(), true, 0, true, 0, null);
         sail.initialize();
@@ -83,10 +89,12 @@ public class HBaseSailTest {
         sail.initialize();
         try {
             HTableDescriptor desc = sail.table.getTableDescriptor();
-            try (HBaseAdmin ha = new HBaseAdmin(HBaseServerTestInstance.getInstanceConfig())) {
-                desc = new HTableDescriptor(desc);
-                desc.setReadOnly(true);
-                ha.modifyTable(desc.getTableName(), desc);
+            try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
+                try (Admin ha = con.getAdmin()) {
+                    desc = new HTableDescriptor(desc);
+                    desc.setReadOnly(true);
+                    ha.modifyTable(desc.getTableName(), desc);
+                }
             }
             ValueFactory vf = SimpleValueFactory.getInstance();
             sail.addStatement(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createLiteral("whatever"));
@@ -132,7 +140,11 @@ public class HBaseSailTest {
             sail.addStatement(vf.createIRI("http://whatever/subj/" + i), vf.createIRI("http://whatever/pred/" + i), vf.createLiteral(i));
         }
         sail.commit();
-        new HBaseAdmin(HBaseServerTestInstance.getInstanceConfig()).flush("whatevertablesize");
+        try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
+            try (Admin ha = con.getAdmin()) {
+                ha.flush(TableName.valueOf("whatevertablesize"));
+            }
+        }
         assertEquals(100, sail.size());
     }
 

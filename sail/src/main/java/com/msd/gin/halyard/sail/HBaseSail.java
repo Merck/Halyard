@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HRegionInfo;
+import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.HTable;
@@ -341,7 +342,8 @@ public final class HBaseSail implements Sail, SailConnection {
             Path tableDir = FSUtils.getTableDir(FSUtils.getRootDir(config), table.getName());
             PathFilter dirFilter = new FSUtils.DirFilter(fs);
             int divider = 1;
-            for (HRegionInfo hri : table.getRegionLocations().keySet()) {
+            for (HRegionLocation hrl : table.getRegionLocator().getAllRegionLocations()) {
+                HRegionInfo hri = hrl.getRegionInfo();
                 byte[] skey = hri.getStartKey();
                 if (skey.length == 0 || skey[0] == HalyardTableUtils.SPO_PREFIX) {
                     byte[] ekey = hri.getEndKey();
@@ -439,7 +441,7 @@ public final class HBaseSail implements Sail, SailConnection {
             List<Delete> deletes = new ArrayList<>();
             for (Resource ctx : normalizeContexts(contexts)) {
                 for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx)) {
-                    deletes.add(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).deleteColumn(kv.getFamily(), kv.getQualifier()));
+                    deletes.add(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(kv.getFamily(), kv.getQualifier()));
                 }
             }
             table.delete(deletes);

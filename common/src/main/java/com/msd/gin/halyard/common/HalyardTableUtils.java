@@ -32,8 +32,12 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeepDeletedCells;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
@@ -133,12 +137,14 @@ public final class HalyardTableUtils {
         Configuration cfg = HBaseConfiguration.create(config);
         cfg.setLong(HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD, 3600000l);
         if (create) {
-            try (HBaseAdmin admin = new HBaseAdmin(cfg)) {
-                if (!admin.tableExists(tableName)) {
-                    HTableDescriptor td = new HTableDescriptor(tableName);
-                    td.addFamily(createColumnFamily());
-                    td.setValue(HALYARD_VERSION_ATTRIBUTE, HALYARD_VERSION);
-                    admin.createTable(td, splitBits < 0 ? null : calculateSplits(splitBits, contextSplitBitsMap));
+            try (Connection con = ConnectionFactory.createConnection(config)) {
+                try (Admin admin = con.getAdmin()) {
+                    if (!admin.tableExists(TableName.valueOf(tableName))) {
+                        HTableDescriptor td = new HTableDescriptor(TableName.valueOf(tableName));
+                        td.addFamily(createColumnFamily());
+                        td.setValue(HALYARD_VERSION_ATTRIBUTE, HALYARD_VERSION);
+                        admin.createTable(td, splitBits < 0 ? null : calculateSplits(splitBits, contextSplitBitsMap));
+                    }
                 }
             }
         }
@@ -166,10 +172,12 @@ public final class HalyardTableUtils {
         }
         HTableDescriptor desc = table.getTableDescriptor();
         table.close();
-        try (HBaseAdmin admin = new HBaseAdmin(conf)) {
-            admin.disableTable(desc.getTableName());
-            admin.deleteTable(desc.getTableName());
-            admin.createTable(desc, presplits);
+        try (Connection con = ConnectionFactory.createConnection(conf)) {
+            try (Admin admin = con.getAdmin()) {
+                admin.disableTable(desc.getTableName());
+                admin.deleteTable(desc.getTableName());
+                admin.createTable(desc, presplits);
+            }
         }
         return HalyardTableUtils.getTable(conf, desc.getTableName().getNameAsString(), false, 0, null);
     }
@@ -397,7 +405,7 @@ public final class HalyardTableUtils {
                 .setCacheBloomsOnWrite(true)
                 .setCacheDataOnWrite(true)
                 .setCacheIndexesOnWrite(true)
-                .setKeepDeletedCells(false)
+                .setKeepDeletedCells(KeepDeletedCells.FALSE)
                 .setValue(HTableDescriptor.MAX_FILESIZE, REGION_MAX_FILESIZE)
                 .setValue(HTableDescriptor.SPLIT_POLICY, REGION_SPLIT_POLICY);
     }
