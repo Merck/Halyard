@@ -384,6 +384,10 @@ public final class HalyardExport {
                             Value v = bs.getValue(bn);
                             if (v instanceof Literal && DATE_TIME_TYPES.contains(columnTypes[i])) {
                                 ps.setTimestamp(i+1, new Timestamp(((Literal)v).calendarValue().toGregorianCalendar().getTimeInMillis()));
+                            } else if (v instanceof Literal && columnTypes[i] == Types.FLOAT) {
+                                ps.setFloat(i+1, ((Literal)v).floatValue());
+                            } else if (v instanceof Literal && columnTypes[i] == Types.DOUBLE) {
+                                ps.setDouble(i+1, ((Literal)v).doubleValue());
                             } else {
                                 ps.setObject(i+1, v == null ? null : v.stringValue(), columnTypes[i]);
                             }
