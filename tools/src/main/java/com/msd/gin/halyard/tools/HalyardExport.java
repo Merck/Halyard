@@ -152,7 +152,13 @@ public final class HalyardExport {
         public abstract void writeTupleQueryResult(TupleQueryResult queryResult) throws ExportException;
         public abstract void writeGraphQueryResult(GraphQueryResult queryResult) throws ExportException;
         @Override
-        public abstract void close() throws ExportException;
+        public final void close() throws ExportException {
+            long time = System.currentTimeMillis()+1;
+            long count = counter.get();
+            log.logStatus(MessageFormat.format("Export finished with {0} records/triples in average speed {1}/s", count, (1000 * count)/(time - startTime)));
+            closeWriter();
+        }
+        protected abstract void closeWriter() throws ExportException;
     }
 
     private static class CSVResultWriter extends QueryResultWriter {
@@ -242,7 +248,7 @@ public final class HalyardExport {
         }
 
         @Override
-        public void close() throws ExportException {
+        public void closeWriter() throws ExportException {
             try {
                 writer.close();
             } catch (IOException e) {
@@ -285,7 +291,7 @@ public final class HalyardExport {
         }
 
         @Override
-        public void close() throws ExportException {
+        public void closeWriter() throws ExportException {
             try {
                 out.close();
             } catch (IOException e) {
@@ -405,7 +411,7 @@ public final class HalyardExport {
         }
 
         @Override
-        public void close() throws ExportException {
+        public void closeWriter() throws ExportException {
             try {
                 con.close();
             } catch (SQLException e) {
