@@ -19,7 +19,6 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.tools.HalyardExport.ExportException;
 import java.io.DataInput;
 import java.io.DataOutput;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -319,10 +318,9 @@ public class HalyardParallelExport implements Tool {
             if (cp != null) {
                 String jars[] = cp.split(":");
                 for (int i=0; i<jars.length; i++) {
-                    File f = new File(jars[i]);
-                    if (!f.isFile()) throw new ExportException("Invalid JDBC driver classpath element: " + jars[i]);
-                    job.addFileToClassPath(new Path(f.toURI()));
-                    jars[i] = f.getName();
+                    Path p = new Path(jars[i]);
+                    job.addFileToClassPath(p);
+                    jars[i] = p.getName();
                 }
                 job.getConfiguration().setStrings(JDBC_CLASSPATH, jars);
             }
