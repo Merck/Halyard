@@ -17,7 +17,7 @@ Halyard is an extremely horizontally scalable Triplestore with support for Named
 
 To get started with Halyard, try deploying it on an Amazon Elastic MapReduce cluster.
 
-See [Amazon EMR Sample Cluster Setup](/overview.html#amazon-emr-sample-cluster-setup).
+See [Amazon EMR Sample Cluster Setup](/getting-started.html#amazon-emr-sample-cluster-setup).
 
   </div>
 

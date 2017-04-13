@@ -1,5 +1,5 @@
 ---
-title: Overview
+title: Getting Started
 layout: doc
 ---
 # Overview
@@ -70,6 +70,3 @@ Additional EMR Task Nodes can be used to host additional Halyard SPARQL Endpoint
 
 Detailed documentation about Amazon EMR is available at <https://aws.amazon.com/documentation/emr/>
 
-## Architecture Diagram
-
-![Halyard Architecture Diagram](img/architecture.png){:width="100%"}

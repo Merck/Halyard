@@ -1,8 +1,11 @@
-- page: overview
-  name: Overview
+- page: getting-started
+  name: Getting Started
 
 - page: tools
   name: Tools
 
 - page: usage
   name: Usage
+
+- page: architecture
+  name: Architecture

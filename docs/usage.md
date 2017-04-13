@@ -4,7 +4,7 @@ layout: doc
 ---
 # Usage
 
-## Note about Repositories versus Datasets
+## Before you begin
 
 RDF4J repositories represent just configured connectors to the particular RDF storage. The repositories are always created and persisted within the actual context. RDF4J Console repository configuration is persisted under the actual user home directory. Repositories created through RDF4J Workbench exist within the actually connected RDF4J Server context only.
 
@@ -14,17 +14,17 @@ Multiple repositories configured in various RDF4J Servers or in multiple RDF4J C
 
 **Deletion of the repository** from one particular RDF4J Server or RDF4J Console does not delete Halyard Dataset and so it does not affect the data and other users. However **clearing** the repository or **deletion of the statements** has global effect for all users.
 
-## HBase Repository Settings
-
-**Repository ID** - is mandatory and may correspond to the HBase table name
-**Repository title** - is optional
-**HBase Table Name** - may be left empty when the table name corresponds to the Rpository ID
-**Create HBase Table if missing** - table presplit bits are ignored in case the table is not created
-**HBase Table presplit bits** - keep the default 0 unless you expect a very big dataset
-**Use Halyard Push Evaluation Strategy** - may be set to false to fallback to the default RDF4J Evaluation Strategy implementation
-**Query Evaluation Timeout** - may be adjusted or set to 0, however it creates a risk of resources exhaustion
-
 ## Create Repository
+
+### HBase Repository Settings
+
+* **Repository ID** - is mandatory and may correspond to the HBase table name
+* **Repository title** - is optional
+* **HBase Table Name** - may be left empty when the table name corresponds to the Rpository ID
+* **Create HBase Table if missing** - table presplit bits are ignored in case the table is not created
+* **HBase Table presplit bits** - keep the default 0 unless you expect a very big dataset
+* **Use Halyard Push Evaluation Strategy** - may be set to false to fallback to the default RDF4J Evaluation Strategy implementation
+* **Query Evaluation Timeout** - may be adjusted or set to 0, however it creates a risk of resources exhaustion
 
 ### With RDF4J Console
 
