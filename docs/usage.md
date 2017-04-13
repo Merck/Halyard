@@ -246,9 +246,9 @@ DELETE /rdf4j-server/repositories/testRepo/statements HTTP/1.1
 
 ```
 
-### HBase Shell Dataset Operations
+## HBase Shell Dataset Operations
 
-#### Snapshot Halyard Dataset
+### Snapshot Halyard Dataset
 ```
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
@@ -259,7 +259,7 @@ hbase(main):001:0> snapshot 'testRepo', 'testRepo_my_snapshot'
 0 row(s) in 36.3380 seconds
 ```
 
-#### Clone Halyard Dataset from Snapshot
+### Clone Halyard Dataset from Snapshot
 ```
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
@@ -270,7 +270,7 @@ hbase(main):001:0> clone_snapshot 'testRepo_my_snapshot', 'testRepo2'
 0 row(s) in 31.1590 seconds
 ```
 
-#### Export Halyard Dataset Snapshot
+### Export Halyard Dataset Snapshot
 ```
 > hbase org.apache.hadoop.hbase.snapshot.ExportSnapshot -snapshot testRepo_my_snapshot -copy-to /my_hdfs_export_path
 2016-04-28 09:01:07,019 INFO  [main] snapshot.ExportSnapshot: Loading Snapshot hfile list
@@ -286,7 +286,7 @@ hbase(main):001:0> clone_snapshot 'testRepo_my_snapshot', 'testRepo2'
 ```
 Note: skipping a lot of debugging information from the Map Reduce excution
 
-#### Bulk Merge of Multiple Datasets
+### Bulk Merge of Multiple Datasets
 
 1. Snapshot and Export all Halyard Datasets you want to merge
 
@@ -316,7 +316,7 @@ Note: skipping a lot of debugging information from the Map Reduce excution
   > hbase org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles /my_hdfs_merged_path new_dataset_table_name
   ```
 
-#### Boost Query Performance by Making the Dataset Read-only
+### Boost Query Performance by Making the Dataset Read-only
 ```
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
@@ -331,7 +331,7 @@ Done.
 0 row(s) in 2.2210 seconds
 ```
 
-#### Disable/Enable Unused Dataset to Save HBase Resources
+### Disable/Enable Unused Dataset to Save HBase Resources
 ```
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
@@ -352,7 +352,7 @@ hbase(main):001:0> enable 'testRepo'
 0 row(s) in 1.2130 seconds
 ```
 
-#### Delete Dataset
+### Delete Dataset
 
 ```
 > hbase shell
