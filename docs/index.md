@@ -13,19 +13,16 @@ Halyard is an extremely horizontally scalable Triplestore with support for Named
 
 <div class="row">
   <div class="col-md-4">
-## Build
+## Run in Amazon EMR
 
-Build environment prerequisites are:
+To get started with Halyard, try deploying it on an Amazon Elastic MapReduce cluster.
 
-* Linux or Mac computer
-* Java SE Development Kit 8
-* Apache Maven software project management and comprehension tool
+See [Amazon EMR Sample Cluster Setup](/overview.html#amazon-emr-sample-cluster-setup).
 
-In the Halyard project root directory execute command: `mvn package` Optionally you can build Halyard from NetBeans or other Java Development IDE.
   </div>
 
   <div class="col-md-4">
-## Install and run
+## Run Locally
 
 Download and unzip the latest `halyard-sdk-<version>.zip` bundle from [Releases page](https://github.com/Merck/Halyard/releases) to a Apache Hadoop cluster node with configured Apache HBase client.
 
@@ -35,7 +32,7 @@ Halyard is expected to run on an Apache Hadoop cluster node with configured Apac
 * Apache HBase version 1.1.2 or higher
 * Java 8 Runtime
 
-*Note: Recommended Apache Hadoop distribution is Hortonworks Data Platform (HDP) version 2.4.2*
+*Note: Recommended Apache Hadoop distribution is Hortonworks Data Platform (HDP) version 2.4.2 or Amazon Elastic MapReduce (EMR).*
   </div>
 
   <div class="col-md-4">
