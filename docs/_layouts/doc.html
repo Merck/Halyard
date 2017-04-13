@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  {% include header.html %}
+
+  <body data-spy="scroll" data-target="#toc">
+
+    {% include nav.html %}
+
+    <div class="container">
+
+      <div class="row">
+
+        <div class="col-md-3">
+
+          <nav>
+            <ul class="nav nav-pills nav-stacked sidenav" data-spy="affix">
+              {% for docpage in site.data.docs %}
+                {% capture currentpageurl %}{{ docpage.page | prepend: '/' | append: '.html' }}{% endcapture %}
+                <li {% if page.url == currentpageurl %} class='active' {% endif %}>
+                  <a href="{{ docpage.page | prepend: '/' | prepend: site.github.url | append: '.html' }}">{{ docpage.name }}</a>
+                  {% if page.url == currentpageurl %}
+                    <nav id="toc" data-toggle="toc"></nav>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </nav>
+
+        </div>
+
+        <div class="col-md-9">
+          {{ content }}
+        </div>
+      </div>
+
+    </div> <!-- /container -->
+
+    {% include footer.html %}
+
+  </body>
+</html>
