@@ -197,29 +197,30 @@ public class HalyardStats implements Tool {
                 }
             }
             lastRegion = region;
-            if ((counter++ % 1000) == 0) {
+            if ((counter++ % 100000) == 0) {
                 switch (region) {
                     case HalyardTableUtils.SPO_PREFIX:
-                        output.setStatus(MessageFormat.format("c:{0} SPO t:{1} s:{2}", counter, root.triples, root.subjects));
+                        output.setStatus(MessageFormat.format("SPO {0} t:{1} s:{2}", counter, root.triples, root.subjects));
                         break;
                     case HalyardTableUtils.POS_PREFIX:
-                        output.setStatus(MessageFormat.format("c:{0} POS t:{1} p:{2} cls:{3}", counter, root.triples, root.predicates, root.classes));
+                        output.setStatus(MessageFormat.format("POS {0} p:{1} cls:{2}", counter, root.predicates, root.classes));
                         break;
                     case HalyardTableUtils.OSP_PREFIX:
-                        output.setStatus(MessageFormat.format("c:{0} OSP t:{1} o:{2}", counter, root.triples, root.objects));
+                        output.setStatus(MessageFormat.format("OSP {0} o:{1}", counter, root.objects));
                         break;
                     case HalyardTableUtils.CSPO_PREFIX:
-                        output.setStatus(MessageFormat.format("c:{0} CSPO t:{1} s:{2} ctx:<{3}>", counter, ctxGraph.triples, ctxGraph.subjects, ctxGraph.graph));
+                        output.setStatus(MessageFormat.format("CSPO {0} t:{1} s:{2} ctx:<{3}>", counter, ctxGraph.triples, ctxGraph.subjects, ctxGraph.graph));
                         break;
                     case HalyardTableUtils.CPOS_PREFIX:
-                        output.setStatus(MessageFormat.format("c:{0} CPOS t:{1} p:{2} cls:{3} ctx:<{4}>", counter, ctxGraph.triples, ctxGraph.predicates, ctxGraph.classes, ctxGraph.graph));
+                        output.setStatus(MessageFormat.format("CPOS {0} p:{1} cls:{2} ctx:<{3}>", counter, ctxGraph.predicates, ctxGraph.classes, ctxGraph.graph));
                         break;
                     case HalyardTableUtils.COSP_PREFIX:
-                        output.setStatus(MessageFormat.format("c:{0} COSP t:{1} o:{2} ctx:<{3}>", counter, ctxGraph.triples, ctxGraph.objects, ctxGraph.graph));
+                        output.setStatus(MessageFormat.format("COSP {0} o:{1} ctx:<{2}>", counter, ctxGraph.objects, ctxGraph.graph));
                         break;
                     default:
-                        output.setStatus(MessageFormat.format("c:{0} invalid region {1}", counter, region));
+                        output.setStatus(MessageFormat.format("{0} invalid region {1}", counter, region));
                 }
+                Runtime.getRuntime().gc();
             }
         }
 
