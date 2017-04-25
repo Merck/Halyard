@@ -115,7 +115,7 @@ public class HalyardStats implements Tool {
             }
         }
 
-        byte[] lastKeyFragment = new byte[20], lastCtxFragment = new byte[20], lastClassFragment = new byte[20];
+        final byte[] lastKeyFragment = new byte[20], lastCtxFragment = new byte[20], lastClassFragment = new byte[20];
         GraphCounter root, ctxGraph;
         byte lastRegion = -1;
 
@@ -322,8 +322,6 @@ public class HalyardStats implements Tool {
             TableMapReduceUtil.initCredentials(job);
 
             Scan scan = new Scan();
-            scan.setCaching(500);
-            scan.setCacheBlocks(false);
             scan.addFamily("e".getBytes(UTF8));
             scan.setMaxVersions(1);
 
