@@ -32,7 +32,7 @@ import org.junit.Test;
 public class HalyardParallelExportTest {
 
     @Test
-    public void testBulkLoad() throws Exception {
+    public void testExport() throws Exception {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "exportTable", true, 0, true, 0, null);
         sail.initialize();
         ValueFactory vf = SimpleValueFactory.getInstance();

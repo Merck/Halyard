@@ -410,7 +410,7 @@ public final class HalyardTableUtils {
                 .setValue(HTableDescriptor.SPLIT_POLICY, REGION_SPLIT_POLICY);
     }
 
-    private static byte[] hashKey(byte[] key) {
+    public static byte[] hashKey(byte[] key) {
         MessageDigest md = MD.get();
         try {
             md.update(key);
