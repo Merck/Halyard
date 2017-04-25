@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.Properties;
@@ -118,6 +119,7 @@ public class HalyardStats implements Tool {
         final byte[] lastKeyFragment = new byte[20], lastCtxFragment = new byte[20], lastClassFragment = new byte[20];
         GraphCounter root, ctxGraph;
         byte lastRegion = -1;
+        long counter = 0;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -195,7 +197,30 @@ public class HalyardStats implements Tool {
                 }
             }
             lastRegion = region;
-            output.progress();
+            if ((counter++ % 1000) == 0) {
+                switch (region) {
+                    case HalyardTableUtils.SPO_PREFIX:
+                        output.setStatus(MessageFormat.format("c:{0} SPO t:{1} s:{2}", counter, root.triples, root.subjects));
+                        break;
+                    case HalyardTableUtils.POS_PREFIX:
+                        output.setStatus(MessageFormat.format("c:{0} POS t:{1} p:{2} cls:{3}", counter, root.triples, root.predicates, root.classes));
+                        break;
+                    case HalyardTableUtils.OSP_PREFIX:
+                        output.setStatus(MessageFormat.format("c:{0} OSP t:{1} o:{2}", counter, root.triples, root.objects));
+                        break;
+                    case HalyardTableUtils.CSPO_PREFIX:
+                        output.setStatus(MessageFormat.format("c:{0} CSPO t:{1} s:{2} ctx:<{3}>", counter, ctxGraph.triples, ctxGraph.subjects, ctxGraph.graph));
+                        break;
+                    case HalyardTableUtils.CPOS_PREFIX:
+                        output.setStatus(MessageFormat.format("c:{0} CPOS t:{1} p:{2} cls:{3} ctx:<{4}>", counter, ctxGraph.triples, ctxGraph.predicates, ctxGraph.classes, ctxGraph.graph));
+                        break;
+                    case HalyardTableUtils.COSP_PREFIX:
+                        output.setStatus(MessageFormat.format("c:{0} COSP t:{1} o:{2} ctx:<{3}>", counter, ctxGraph.triples, ctxGraph.objects, ctxGraph.graph));
+                        break;
+                    default:
+                        output.setStatus(MessageFormat.format("c:{0} invalid region {1}", counter, region));
+                }
+            }
         }
 
         @Override
