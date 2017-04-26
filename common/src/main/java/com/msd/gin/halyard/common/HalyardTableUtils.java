@@ -269,7 +269,7 @@ public final class HalyardTableUtils {
             if (subj == null) {
                 if (pred == null) {
                     if (obj == null) {
-                        return scan(concat(SPO_PREFIX, false), concat(SPO_PREFIX, true, STOP_KEY, STOP_KEY, STOP_KEY), false);
+                        return scan(concat(SPO_PREFIX, false), concat(SPO_PREFIX, true, STOP_KEY, STOP_KEY, STOP_KEY));
                     } else {
                         return scan(OSP_PREFIX, hashKey(NTriplesUtil.toNTriplesString(obj).getBytes(UTF8)));
                     }
@@ -355,10 +355,9 @@ public final class HalyardTableUtils {
      * Helper method constructing a custom HBase Scan from given arguments
      * @param startRow start row key byte array
      * @param stopRow stop row key byte array
-     * @param smallScan boolean indication of a small scan
      * @return HBase Scan instance
      */
-    public static Scan scan(byte[] startRow, byte[] stopRow, boolean smallScan) {
+    public static Scan scan(byte[] startRow, byte[] stopRow) {
         Scan scan = new Scan();
         scan.addFamily(CF_NAME);
         scan.setMaxVersions(1);
@@ -366,7 +365,6 @@ public final class HalyardTableUtils {
         scan.setBatch(10);
         scan.setStartRow(startRow);
         scan.setStopRow(stopRow);
-        scan.setSmall(smallScan);
         return scan;
     }
 
@@ -423,18 +421,18 @@ public final class HalyardTableUtils {
     }
 
     private static Scan scan(byte prefix, byte[] key1) {
-        return scan(concat(prefix, false, key1), concat(prefix, true, key1, STOP_KEY, STOP_KEY, STOP_KEY), false);
+        return scan(concat(prefix, false, key1), concat(prefix, true, key1, STOP_KEY, STOP_KEY, STOP_KEY));
     }
 
     private static Scan scan(byte prefix, byte[] key1, byte[] key2) {
-        return scan(concat(prefix, false, key1, key2), concat(prefix, true, key1, key2, STOP_KEY, STOP_KEY), true);
+        return scan(concat(prefix, false, key1, key2), concat(prefix, true, key1, key2, STOP_KEY, STOP_KEY));
     }
 
     private static Scan scan(byte prefix, byte[] key1, byte[] key2, byte[] key3) {
-        return scan(concat(prefix, false, key1, key2, key3), concat(prefix, true, key1, key2, key3, STOP_KEY), true);
+        return scan(concat(prefix, false, key1, key2, key3), concat(prefix, true, key1, key2, key3, STOP_KEY));
     }
 
     private static Scan scan(byte prefix, byte[] key1, byte[] key2, byte[] key3, byte[] key4) {
-        return scan(concat(prefix, false, key1, key2, key3, key4), concat(prefix, true, key1, key2, key3, key4), true);
+        return scan(concat(prefix, false, key1, key2, key3, key4), concat(prefix, true, key1, key2, key3, key4));
     }
 }
