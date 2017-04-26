@@ -363,6 +363,7 @@ public final class HalyardTableUtils {
         scan.addFamily(CF_NAME);
         scan.setMaxVersions(1);
         scan.setAllowPartialResults(true);
+        scan.setBatch(10);
         scan.setStartRow(startRow);
         scan.setStopRow(stopRow);
         scan.setSmall(smallScan);

@@ -350,6 +350,7 @@ public class HalyardStats implements Tool {
             Scan scan = new Scan();
             scan.addFamily("e".getBytes(UTF8));
             scan.setMaxVersions(1);
+            scan.setBatch(10);
             scan.setAllowPartialResults(true);
 
             TableMapReduceUtil.initTableMapperJob(
