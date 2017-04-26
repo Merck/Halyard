@@ -26,8 +26,10 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.WeakHashMap;
 import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
@@ -58,6 +60,7 @@ import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
+import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.rio.RDFFormat;
@@ -232,14 +235,24 @@ public class HalyardStats implements Tool {
 
     }
 
+    static final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
     static final String VOID_PREFIX = "http://rdfs.org/ns/void#";
     static final String SD_PREFIX = "http://www.w3.org/ns/sparql-service-description#";
+    static final IRI VOID_DATASET_TYPE = ssf.createIRI(VOID_PREFIX, "Dataset");
+    static final IRI SD_DATASET_TYPE = ssf.createIRI(SD_PREFIX, "Dataset");
+    static final IRI SD_GRAPH_PRED = ssf.createIRI(SD_PREFIX, "graph");
+    static final IRI SD_GRAPH_TYPE = ssf.createIRI(SD_PREFIX, "Graph");
+    static final IRI SD_DEFAULT_GRAPH_PRED = ssf.createIRI(SD_PREFIX, "defaultGraph");
+    static final IRI SD_NAMED_GRAPH_PRED = ssf.createIRI(SD_PREFIX, "namedGraph");
+    static final IRI SD_NAMED_GRAPH_TYPE = ssf.createIRI(SD_PREFIX, "NamedGraph");
+    static final IRI SD_NAME_PRED = ssf.createIRI(SD_PREFIX, "name");
 
     static class StatsReducer extends Reducer<Text, LongWritable, NullWritable, NullWritable>  {
 
-        final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
         OutputStream out;
         RDFWriter writer;
+        IRI rootIRI;
+        Map<String, Boolean> graphs;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -265,6 +278,11 @@ public class HalyardStats implements Tool {
             writer.handleNamespace("sd", SD_PREFIX);
             writer.handleNamespace("void", VOID_PREFIX);
             writer.startRDF();
+            rootIRI = ssf.createIRI(root);
+            writer.handleStatement(ssf.createStatement(rootIRI, RDF.TYPE, VOID_DATASET_TYPE));
+            writer.handleStatement(ssf.createStatement(rootIRI, RDF.TYPE, SD_DATASET_TYPE));
+            graphs = new WeakHashMap<>();
+            graphs.put(root, false);
         }
 
         @Override
@@ -275,9 +293,19 @@ public class HalyardStats implements Tool {
             }
             String kp = key.toString();
             int split = kp.lastIndexOf(':');
+            String graph = kp.substring(0, split);
+            IRI graphIRI = ssf.createIRI(graph);
+            if (graphs.putIfAbsent(graph, false) == null) {
+                writer.handleStatement(ssf.createStatement(rootIRI, SD_NAMED_GRAPH_PRED, graphIRI));
+                writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, VOID_DATASET_TYPE));
+                writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, SD_GRAPH_TYPE));
+                writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, SD_NAMED_GRAPH_TYPE));
+                writer.handleStatement(ssf.createStatement(graphIRI, SD_NAME_PRED, graphIRI));
+                writer.handleStatement(ssf.createStatement(graphIRI, SD_GRAPH_PRED, graphIRI));
+            }
             writer.handleStatement(
                 ssf.createStatement(
-                    ssf.createIRI(kp.substring(0, split)),
+                    graphIRI,
                     ssf.createIRI(VOID_PREFIX, kp.substring(split+1)),
                     ssf.createLiteral(i)));
 	}
