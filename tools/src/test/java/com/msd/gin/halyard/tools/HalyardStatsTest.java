@@ -20,6 +20,7 @@ import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.File;
 import java.io.FileInputStream;
+import java.net.URLEncoder;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
@@ -62,8 +63,8 @@ public class HalyardStatsTest {
             String defaultPrefix =  HBaseServerTestInstance.getInstanceConfig().getTrimmed("hbase.rootdir");
             if (!defaultPrefix.endsWith("/")) defaultPrefix = defaultPrefix + "/";
             IRI statsTable = vf.createIRI(defaultPrefix, "statsTable");
-            IRI graph0 = vf.createIRI("http://whatever/graph0");
-            IRI graph1 = vf.createIRI("http://whatever/graph1");
+            IRI graph0 = vf.createIRI(statsTable.stringValue() + '/' + URLEncoder.encode("http://whatever/graph0","UTF-8"));
+            IRI graph1 = vf.createIRI(statsTable.stringValue() + '/' + URLEncoder.encode("http://whatever/graph1","UTF-8"));
             String voidd = "http://rdfs.org/ns/void#";
             IRI triples = vf.createIRI(voidd, "triples");
             IRI distinctSubjects = vf.createIRI(voidd, "distinctSubjects");
@@ -71,40 +72,35 @@ public class HalyardStatsTest {
             IRI distinctObjects = vf.createIRI(voidd, "distinctObjects");
             IRI classes = vf.createIRI(voidd, "classes");
             Model m = Rio.parse(in, defaultPrefix, RDFFormat.TURTLE);
-            assertTrue(m.contains(statsTable, distinctSubjects, vf.createLiteral(100)));
-            assertTrue(m.contains(statsTable, properties, vf.createLiteral(14)));
-            assertTrue(m.contains(statsTable, distinctObjects, vf.createLiteral(2000)));
-            assertTrue(m.contains(statsTable, triples, vf.createLiteral(2000)));
-            assertTrue(m.contains(statsTable, classes, vf.createLiteral(1000)));
-            assertTrue(m.contains(graph0, distinctSubjects, vf.createLiteral(50)));
-            assertTrue(m.contains(graph0, properties, vf.createLiteral(14)));
-            assertTrue(m.contains(graph0, distinctObjects, vf.createLiteral(900)));
-            assertTrue(m.contains(graph0, triples, vf.createLiteral(900)));
-            assertTrue(m.contains(graph0, classes, vf.createLiteral(450)));
-            assertTrue(m.contains(graph1, distinctSubjects, vf.createLiteral(50)));
-            assertTrue(m.contains(graph1, properties, vf.createLiteral(14)));
-            assertTrue(m.contains(graph1, distinctObjects, vf.createLiteral(900)));
-            assertTrue(m.contains(graph1, triples, vf.createLiteral(900)));
-            assertTrue(m.contains(graph1, classes, vf.createLiteral(450)));
-
-//:statsTable void:classes "1000"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:distinctObjects "2000"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:distinctSubjects "100"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:properties "14"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:triples "2000"^^<http://www.w3.org/2001/XMLSchema#int> .
-//
-//<http://whatever/graph0> void:classes "450"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:distinctObjects "900"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:distinctSubjects "50"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:properties "14"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:triples "900"^^<http://www.w3.org/2001/XMLSchema#int> .
-//
-//<http://whatever/graph1> void:classes "450"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:distinctObjects "900"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:distinctSubjects "50"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:properties "14"^^<http://www.w3.org/2001/XMLSchema#int> ;
-//	void:triples "900"^^<http://www.w3.org/2001/XMLSchema#int> .
-
+            assertTrue(m.contains(statsTable, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE));
+            assertTrue(m.contains(statsTable, RDF.TYPE, HalyardStats.SD_DATASET_TYPE));
+            assertTrue(m.contains(statsTable, distinctSubjects, vf.createLiteral(100l)));
+            assertTrue(m.contains(statsTable, properties, vf.createLiteral(14l)));
+            assertTrue(m.contains(statsTable, distinctObjects, vf.createLiteral(2000l)));
+            assertTrue(m.contains(statsTable, triples, vf.createLiteral(2000l)));
+            assertTrue(m.contains(statsTable, classes, vf.createLiteral(1000l)));
+            assertTrue(m.contains(statsTable, HalyardStats.SD_NAMED_GRAPH_PRED, graph0));
+            assertTrue(m.contains(statsTable, HalyardStats.SD_NAMED_GRAPH_PRED, graph1));
+            assertTrue(m.contains(graph0, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE));
+            assertTrue(m.contains(graph0, RDF.TYPE, HalyardStats.SD_GRAPH_TYPE));
+            assertTrue(m.contains(graph0, RDF.TYPE, HalyardStats.SD_NAMED_GRAPH_TYPE));
+            assertTrue(m.contains(graph0, HalyardStats.SD_GRAPH_PRED, graph0));
+            assertTrue(m.contains(graph0, HalyardStats.SD_NAME_PRED, vf.createIRI("http://whatever/graph0")));
+            assertTrue(m.contains(graph0, distinctSubjects, vf.createLiteral(50l)));
+            assertTrue(m.contains(graph0, properties, vf.createLiteral(14l)));
+            assertTrue(m.contains(graph0, distinctObjects, vf.createLiteral(900l)));
+            assertTrue(m.contains(graph0, triples, vf.createLiteral(900l)));
+            assertTrue(m.contains(graph0, classes, vf.createLiteral(450l)));
+            assertTrue(m.contains(graph1, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE));
+            assertTrue(m.contains(graph1, RDF.TYPE, HalyardStats.SD_GRAPH_TYPE));
+            assertTrue(m.contains(graph1, RDF.TYPE, HalyardStats.SD_NAMED_GRAPH_TYPE));
+            assertTrue(m.contains(graph1, HalyardStats.SD_GRAPH_PRED, graph1));
+            assertTrue(m.contains(graph1, HalyardStats.SD_NAME_PRED, vf.createIRI("http://whatever/graph1")));
+            assertTrue(m.contains(graph1, distinctSubjects, vf.createLiteral(50l)));
+            assertTrue(m.contains(graph1, properties, vf.createLiteral(14l)));
+            assertTrue(m.contains(graph1, distinctObjects, vf.createLiteral(900l)));
+            assertTrue(m.contains(graph1, triples, vf.createLiteral(900l)));
+            assertTrue(m.contains(graph1, classes, vf.createLiteral(450l)));
         }
     }
 

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.text.MessageFormat;
@@ -120,13 +121,13 @@ public class HalyardStats implements Tool {
         }
 
         final byte[] lastKeyFragment = new byte[20], lastCtxFragment = new byte[20], lastClassFragment = new byte[20];
-        GraphCounter root, ctxGraph;
+        GraphCounter rootCounter, ctxCounter;
         byte lastRegion = -1;
         long counter = 0;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
-            this.root = new GraphCounter(getRoot(context.getConfiguration()));
+            this.rootCounter = new GraphCounter(getRoot(context.getConfiguration()));
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, byte[] target) {
@@ -148,27 +149,27 @@ public class HalyardStats implements Tool {
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 1, lastKeyFragment) || region != lastRegion) {
                     switch (region) {
                         case HalyardTableUtils.SPO_PREFIX:
-                            root.subjects++;
+                            rootCounter.subjects++;
                             break;
                         case HalyardTableUtils.POS_PREFIX:
-                            root.predicates++;
+                            rootCounter.predicates++;
                             break;
                         case HalyardTableUtils.OSP_PREFIX:
-                            root.objects++;
+                            rootCounter.objects++;
                             break;
                     }
                 }
                 if (region == HalyardTableUtils.SPO_PREFIX) {
-                    root.triples += value.rawCells().length;
+                    rootCounter.triples += value.rawCells().length;
                 } else if (region == HalyardTableUtils.POS_PREFIX
                         && Arrays.equals(TYPE_HASH, lastKeyFragment)
                         && (!matchAndCopyKey(key.get(), key.getOffset() + 21, lastClassFragment) || region != lastRegion)) {
-                    root.classes++;
+                    rootCounter.classes++;
                 }
             } else {
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 1, lastCtxFragment) || region != lastRegion) {
-                    if (ctxGraph != null) {
-                        ctxGraph.report(output);
+                    if (ctxCounter != null) {
+                        ctxCounter.report(output);
                     }
                     Cell c[] = value.rawCells();
                     ByteBuffer bb = ByteBuffer.wrap(c[0].getQualifierArray(), c[0].getQualifierOffset(), c[0].getQualifierLength());
@@ -176,49 +177,49 @@ public class HalyardStats implements Tool {
                     bb.position(bb.position() + skip);
                     byte[] cb = new byte[bb.remaining()];
                     bb.get(cb);
-                    ctxGraph = new GraphCounter(NTriplesUtil.parseURI(new String(cb,UTF8), ssf).stringValue());
+                    ctxCounter = new GraphCounter(NTriplesUtil.parseURI(new String(cb,UTF8), ssf).stringValue());
                 }
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 21, lastKeyFragment) || region != lastRegion) {
                     switch (region) {
                         case HalyardTableUtils.CSPO_PREFIX:
-                            ctxGraph.subjects++;
+                            ctxCounter.subjects++;
                             break;
                         case HalyardTableUtils.CPOS_PREFIX:
-                            ctxGraph.predicates++;
+                            ctxCounter.predicates++;
                             break;
                         case HalyardTableUtils.COSP_PREFIX:
-                            ctxGraph.objects++;
+                            ctxCounter.objects++;
                             break;
                     }
                 }
                 if (region == HalyardTableUtils.CSPO_PREFIX) {
-                    ctxGraph.triples += value.rawCells().length;
+                    ctxCounter.triples += value.rawCells().length;
                 } else if (region == HalyardTableUtils.CPOS_PREFIX
                     && Arrays.equals(TYPE_HASH, lastKeyFragment)
                     && (!matchAndCopyKey(key.get(), key.getOffset() + 41, lastClassFragment) || region != lastRegion)) {
-                        ctxGraph.classes++;
+                        ctxCounter.classes++;
                 }
             }
             lastRegion = region;
             if ((counter++ % 100000) == 0) {
                 switch (region) {
                     case HalyardTableUtils.SPO_PREFIX:
-                        output.setStatus(MessageFormat.format("SPO {0} t:{1} s:{2}", counter, root.triples, root.subjects));
+                        output.setStatus(MessageFormat.format("SPO {0} t:{1} s:{2}", counter, rootCounter.triples, rootCounter.subjects));
                         break;
                     case HalyardTableUtils.POS_PREFIX:
-                        output.setStatus(MessageFormat.format("POS {0} p:{1} cls:{2}", counter, root.predicates, root.classes));
+                        output.setStatus(MessageFormat.format("POS {0} p:{1} cls:{2}", counter, rootCounter.predicates, rootCounter.classes));
                         break;
                     case HalyardTableUtils.OSP_PREFIX:
-                        output.setStatus(MessageFormat.format("OSP {0} o:{1}", counter, root.objects));
+                        output.setStatus(MessageFormat.format("OSP {0} o:{1}", counter, rootCounter.objects));
                         break;
                     case HalyardTableUtils.CSPO_PREFIX:
-                        output.setStatus(MessageFormat.format("CSPO {0} t:{1} s:{2} ctx:<{3}>", counter, ctxGraph.triples, ctxGraph.subjects, ctxGraph.graph));
+                        output.setStatus(MessageFormat.format("CSPO {0} t:{1} s:{2} ctx:<{3}>", counter, ctxCounter.triples, ctxCounter.subjects, ctxCounter.graph));
                         break;
                     case HalyardTableUtils.CPOS_PREFIX:
-                        output.setStatus(MessageFormat.format("CPOS {0} p:{1} cls:{2} ctx:<{3}>", counter, ctxGraph.predicates, ctxGraph.classes, ctxGraph.graph));
+                        output.setStatus(MessageFormat.format("CPOS {0} p:{1} cls:{2} ctx:<{3}>", counter, ctxCounter.predicates, ctxCounter.classes, ctxCounter.graph));
                         break;
                     case HalyardTableUtils.COSP_PREFIX:
-                        output.setStatus(MessageFormat.format("COSP {0} o:{1} ctx:<{2}>", counter, ctxGraph.objects, ctxGraph.graph));
+                        output.setStatus(MessageFormat.format("COSP {0} o:{1} ctx:<{2}>", counter, ctxCounter.objects, ctxCounter.graph));
                         break;
                     default:
                         output.setStatus(MessageFormat.format("{0} invalid region {1}", counter, region));
@@ -229,8 +230,8 @@ public class HalyardStats implements Tool {
 
         @Override
         protected void cleanup(Context output) throws IOException, InterruptedException {
-            root.report(output);
-            if (ctxGraph != null) ctxGraph.report(output);
+            rootCounter.report(output);
+            if (ctxCounter != null) ctxCounter.report(output);
         }
 
     }
@@ -275,6 +276,7 @@ public class HalyardStats implements Tool {
             writer = Rio.createWriter(form.get(), out);
             String root = getRoot(conf);
             writer.handleNamespace("", root.substring(0, root.lastIndexOf('/') + 1));
+            writer.handleNamespace("graph", root + '/');
             writer.handleNamespace("sd", SD_PREFIX);
             writer.handleNamespace("void", VOID_PREFIX);
             writer.startRDF();
@@ -287,27 +289,32 @@ public class HalyardStats implements Tool {
 
         @Override
 	public void reduce(Text key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
-            int i = 0;
+            long count = 0;
             for (LongWritable val : values) {
-                    i += val.get();
+                    count += val.get();
             }
             String kp = key.toString();
             int split = kp.lastIndexOf(':');
             String graph = kp.substring(0, split);
-            IRI graphIRI = ssf.createIRI(graph);
-            if (graphs.putIfAbsent(graph, false) == null) {
-                writer.handleStatement(ssf.createStatement(rootIRI, SD_NAMED_GRAPH_PRED, graphIRI));
-                writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, VOID_DATASET_TYPE));
-                writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, SD_GRAPH_TYPE));
-                writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, SD_NAMED_GRAPH_TYPE));
-                writer.handleStatement(ssf.createStatement(graphIRI, SD_NAME_PRED, graphIRI));
-                writer.handleStatement(ssf.createStatement(graphIRI, SD_GRAPH_PRED, graphIRI));
+            IRI graphIRI;
+            if (graph.equals(rootIRI.stringValue())) {
+                graphIRI = rootIRI;
+            } else {
+                graphIRI = ssf.createIRI(rootIRI.stringValue() + '/' + URLEncoder.encode(graph, UTF8.name()));
+                if (graphs.putIfAbsent(graph, false) == null) {
+                    writer.handleStatement(ssf.createStatement(rootIRI, SD_NAMED_GRAPH_PRED, graphIRI));
+                    writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, VOID_DATASET_TYPE));
+                    writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, SD_GRAPH_TYPE));
+                    writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, SD_NAMED_GRAPH_TYPE));
+                    writer.handleStatement(ssf.createStatement(graphIRI, SD_NAME_PRED, ssf.createIRI(graph)));
+                    writer.handleStatement(ssf.createStatement(graphIRI, SD_GRAPH_PRED, graphIRI));
+                }
             }
             writer.handleStatement(
                 ssf.createStatement(
                     graphIRI,
                     ssf.createIRI(VOID_PREFIX, kp.substring(split+1)),
-                    ssf.createLiteral(i)));
+                    ssf.createLiteral(count)));
 	}
 
         @Override
