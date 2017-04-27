@@ -121,13 +121,14 @@ public class HalyardStats implements Tool {
         }
 
         final byte[] lastKeyFragment = new byte[20], lastCtxFragment = new byte[20], lastClassFragment = new byte[20];
-        GraphCounter rootCounter, ctxCounter;
+        GraphCounter rootCounter, defaultCounter, ctxCounter;
         byte lastRegion = -1;
         long counter = 0;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             this.rootCounter = new GraphCounter(getRoot(context.getConfiguration()));
+            this.defaultCounter = new GraphCounter("defaultGraph");
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, byte[] target) {
@@ -146,25 +147,46 @@ public class HalyardStats implements Tool {
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
             if (region < 3) {
+                int defCtxCount = 0;
+                for (Cell c : value.rawCells()) {
+                    ByteBuffer bb = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
+                    int skip = bb.getInt() + bb.getInt() + bb.getInt();
+                    if (bb.remaining() == skip) {
+                        defCtxCount++;
+                    }
+                }
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 1, lastKeyFragment) || region != lastRegion) {
                     switch (region) {
                         case HalyardTableUtils.SPO_PREFIX:
                             rootCounter.subjects++;
+                            if (defCtxCount > 0) {
+                                defaultCounter.subjects++;
+                            }
                             break;
                         case HalyardTableUtils.POS_PREFIX:
                             rootCounter.predicates++;
+                            if (defCtxCount > 0) {
+                                defaultCounter.predicates++;
+                            }
                             break;
                         case HalyardTableUtils.OSP_PREFIX:
                             rootCounter.objects++;
+                            if (defCtxCount > 0) {
+                                defaultCounter.objects++;
+                            }
                             break;
                     }
                 }
                 if (region == HalyardTableUtils.SPO_PREFIX) {
                     rootCounter.triples += value.rawCells().length;
+                    defaultCounter.triples += defCtxCount;
                 } else if (region == HalyardTableUtils.POS_PREFIX
                         && Arrays.equals(TYPE_HASH, lastKeyFragment)
                         && (!matchAndCopyKey(key.get(), key.getOffset() + 21, lastClassFragment) || region != lastRegion)) {
                     rootCounter.classes++;
+                    if (defCtxCount > 0) {
+                        defaultCounter.classes++;
+                    }
                 }
             } else {
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 1, lastCtxFragment) || region != lastRegion) {
@@ -204,13 +226,13 @@ public class HalyardStats implements Tool {
             if ((counter++ % 100000) == 0) {
                 switch (region) {
                     case HalyardTableUtils.SPO_PREFIX:
-                        output.setStatus(MessageFormat.format("SPO {0} t:{1} s:{2}", counter, rootCounter.triples, rootCounter.subjects));
+                        output.setStatus(MessageFormat.format("SPO {0} t:{1} s:{2} dt:{3} ds:{4}", counter, rootCounter.triples, rootCounter.subjects, defaultCounter.triples, defaultCounter.subjects));
                         break;
                     case HalyardTableUtils.POS_PREFIX:
-                        output.setStatus(MessageFormat.format("POS {0} p:{1} cls:{2}", counter, rootCounter.predicates, rootCounter.classes));
+                        output.setStatus(MessageFormat.format("POS {0} p:{1} cls:{2} dp:{3} dcls:{4}", counter, rootCounter.predicates, rootCounter.classes, defaultCounter.predicates, defaultCounter.classes));
                         break;
                     case HalyardTableUtils.OSP_PREFIX:
-                        output.setStatus(MessageFormat.format("OSP {0} o:{1}", counter, rootCounter.objects));
+                        output.setStatus(MessageFormat.format("OSP {0} o:{1} do:{2}", counter, rootCounter.objects, defaultCounter.objects));
                         break;
                     case HalyardTableUtils.CSPO_PREFIX:
                         output.setStatus(MessageFormat.format("CSPO {0} t:{1} s:{2} ctx:<{3}>", counter, ctxCounter.triples, ctxCounter.subjects, ctxCounter.graph));
@@ -231,6 +253,7 @@ public class HalyardStats implements Tool {
         @Override
         protected void cleanup(Context output) throws IOException, InterruptedException {
             rootCounter.report(output);
+            defaultCounter.report(output);
             if (ctxCounter != null) ctxCounter.report(output);
         }
 
@@ -239,6 +262,7 @@ public class HalyardStats implements Tool {
     static final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
     static final String VOID_PREFIX = "http://rdfs.org/ns/void#";
     static final String SD_PREFIX = "http://www.w3.org/ns/sparql-service-description#";
+    static final String DEFAULT_GRAPH_NAME = "defaultGraph";
     static final IRI VOID_DATASET_TYPE = ssf.createIRI(VOID_PREFIX, "Dataset");
     static final IRI SD_DATASET_TYPE = ssf.createIRI(SD_PREFIX, "Dataset");
     static final IRI SD_GRAPH_PRED = ssf.createIRI(SD_PREFIX, "graph");
@@ -302,12 +326,16 @@ public class HalyardStats implements Tool {
             } else {
                 graphIRI = ssf.createIRI(rootIRI.stringValue() + '/' + URLEncoder.encode(graph, UTF8.name()));
                 if (graphs.putIfAbsent(graph, false) == null) {
-                    writer.handleStatement(ssf.createStatement(rootIRI, SD_NAMED_GRAPH_PRED, graphIRI));
-                    writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, VOID_DATASET_TYPE));
+                    if (DEFAULT_GRAPH_NAME.equals(graph)) {
+                        writer.handleStatement(ssf.createStatement(rootIRI, SD_DEFAULT_GRAPH_PRED, graphIRI));
+                    } else {
+                        writer.handleStatement(ssf.createStatement(rootIRI, SD_NAMED_GRAPH_PRED, graphIRI));
+                        writer.handleStatement(ssf.createStatement(graphIRI, SD_NAME_PRED, ssf.createIRI(graph)));
+                        writer.handleStatement(ssf.createStatement(graphIRI, SD_GRAPH_PRED, graphIRI));
+                        writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, SD_NAMED_GRAPH_TYPE));
+                    }
                     writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, SD_GRAPH_TYPE));
-                    writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, SD_NAMED_GRAPH_TYPE));
-                    writer.handleStatement(ssf.createStatement(graphIRI, SD_NAME_PRED, ssf.createIRI(graph)));
-                    writer.handleStatement(ssf.createStatement(graphIRI, SD_GRAPH_PRED, graphIRI));
+                    writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, VOID_DATASET_TYPE));
                 }
             }
             writer.handleStatement(
