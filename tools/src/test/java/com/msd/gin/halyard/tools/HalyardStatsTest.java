@@ -60,10 +60,11 @@ public class HalyardStatsTest {
         root.mkdirs();
 
         assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(),
-                new String[]{"-s", "statsTable", "-t", root.toURI().toURL().toString() + "stats.ttl"}));
+                new String[]{"-s", "statsTable", "-t", root.toURI().toURL().toString() + "stats.trig"}));
 
-        File f = new File(root, "stats.ttl");
+        File f = new File(root, "stats.trig");
         assertTrue(f.isFile());
+        System.out.println(f.getAbsolutePath());
         String content =new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
         try (FileInputStream in = new FileInputStream(f)) {
             String defaultPrefix =  HBaseServerTestInstance.getInstanceConfig().getTrimmed("hbase.rootdir");
@@ -78,7 +79,7 @@ public class HalyardStatsTest {
             IRI properties = vf.createIRI(voidd, "properties");
             IRI distinctObjects = vf.createIRI(voidd, "distinctObjects");
             IRI classes = vf.createIRI(voidd, "classes");
-            Model m = Rio.parse(in, defaultPrefix, RDFFormat.TURTLE);
+            Model m = Rio.parse(in, defaultPrefix, RDFFormat.TRIG);
 
             assertContains(m, content, statsTable, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE);
             assertContains(m, content, statsTable, RDF.TYPE, HalyardStats.SD_DATASET_TYPE);
@@ -124,7 +125,7 @@ public class HalyardStatsTest {
     }
 
     private static void assertContains(Model model, String content, Resource subj, IRI pred, Value obj) {
-        if (!model.contains(subj, pred, obj)) {
+        if (!model.contains(subj, pred, obj, HalyardStats.STATS_GRAPH_CONTEXT)) {
             fail(MessageFormat.format("Expected {0} {1} {2} in:\n{3}\n", subj, pred, obj, content));
         }
     }
