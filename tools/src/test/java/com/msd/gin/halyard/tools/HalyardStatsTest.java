@@ -70,7 +70,6 @@ public class HalyardStatsTest {
             String defaultPrefix =  HBaseServerTestInstance.getInstanceConfig().getTrimmed("hbase.rootdir");
             if (!defaultPrefix.endsWith("/")) defaultPrefix = defaultPrefix + "/";
             IRI statsTable = vf.createIRI(defaultPrefix, "statsTable");
-            IRI defaultGraph = vf.createIRI(statsTable.stringValue() + "/defaultGraph");
             IRI graph0 = vf.createIRI(statsTable.stringValue() + '/' + URLEncoder.encode("http://whatever/graph0","UTF-8"));
             IRI graph1 = vf.createIRI(statsTable.stringValue() + '/' + URLEncoder.encode("http://whatever/graph1","UTF-8"));
             String voidd = "http://rdfs.org/ns/void#";
@@ -83,22 +82,15 @@ public class HalyardStatsTest {
 
             assertContains(m, content, statsTable, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE);
             assertContains(m, content, statsTable, RDF.TYPE, HalyardStats.SD_DATASET_TYPE);
+            assertContains(m, content, statsTable, RDF.TYPE, HalyardStats.SD_GRAPH_TYPE);
             assertContains(m, content, statsTable, distinctSubjects, vf.createLiteral(100l));
             assertContains(m, content, statsTable, properties, vf.createLiteral(14l));
             assertContains(m, content, statsTable, distinctObjects, vf.createLiteral(2000l));
             assertContains(m, content, statsTable, triples, vf.createLiteral(2000l));
             assertContains(m, content, statsTable, classes, vf.createLiteral(1000l));
-            assertContains(m, content, statsTable, HalyardStats.SD_DEFAULT_GRAPH_PRED, defaultGraph);
+            assertContains(m, content, statsTable, HalyardStats.SD_DEFAULT_GRAPH_PRED, statsTable);
             assertContains(m, content, statsTable, HalyardStats.SD_NAMED_GRAPH_PRED, graph0);
             assertContains(m, content, statsTable, HalyardStats.SD_NAMED_GRAPH_PRED, graph1);
-
-            assertContains(m, content, defaultGraph, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE);
-            assertContains(m, content, defaultGraph, RDF.TYPE, HalyardStats.SD_GRAPH_TYPE);
-            assertContains(m, content, defaultGraph, distinctSubjects, vf.createLiteral(8l));
-            assertContains(m, content, defaultGraph, properties, vf.createLiteral(4l));
-            assertContains(m, content, defaultGraph, distinctObjects, vf.createLiteral(200l));
-            assertContains(m, content, defaultGraph, triples, vf.createLiteral(200l));
-            assertContains(m, content, defaultGraph, classes, vf.createLiteral(100l));
 
             assertContains(m, content, graph0, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE);
             assertContains(m, content, graph0, RDF.TYPE, HalyardStats.SD_GRAPH_TYPE);
