@@ -127,7 +127,18 @@ public class HBaseSailTest {
 
     @Test
     public void testGetContextIDs() throws Exception {
-        assertFalse(new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null).getContextIDs().hasNext());
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        Configuration cfg = HBaseServerTestInstance.getInstanceConfig();
+        HBaseSail sail = new HBaseSail(cfg, "whatevertablectx", true, 0, true, 0, null);
+        sail.initialize();
+        String hbaseRoot = cfg.getTrimmed("hbase.rootdir");
+        if (!hbaseRoot.endsWith("/")) hbaseRoot = hbaseRoot + "/";
+        sail.addStatement(vf.createIRI(hbaseRoot + "whatevertablectx"), HBaseSail.SD_NAMED_GRAPH_PRED, vf.createIRI("http://whatever/ctx"), HBaseSail.STATS_GRAPH_CONTEXT);
+        sail.commit();
+        try (CloseableIteration<? extends Resource, SailException> ctxIt = sail.getContextIDs()) {
+            assertTrue(ctxIt.hasNext());
+            assertEquals("http://whatever/ctx", ctxIt.next().stringValue());
+        }
     }
 
     @Test

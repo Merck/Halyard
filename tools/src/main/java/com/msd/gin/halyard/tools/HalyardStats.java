@@ -246,7 +246,7 @@ public class HalyardStats implements Tool {
     static final IRI SD_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "graph");
     static final IRI SD_GRAPH_TYPE = SVF.createIRI(SD_PREFIX, "Graph");
     static final IRI SD_DEFAULT_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "defaultGraph");
-    static final IRI SD_NAMED_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "namedGraph");
+    static final IRI SD_NAMED_GRAPH_PRED = HBaseSail.SD_NAMED_GRAPH_PRED;
     static final IRI SD_NAMED_GRAPH_TYPE = SVF.createIRI(SD_PREFIX, "NamedGraph");
     static final IRI SD_NAME_PRED = SVF.createIRI(SD_PREFIX, "name");
 
