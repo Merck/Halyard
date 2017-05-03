@@ -63,6 +63,8 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.rio.RDFFormat;
@@ -257,38 +259,45 @@ public class HalyardStats implements Tool {
         IRI rootIRI;
         Map<String, Boolean> graphs;
         IRI statsGraphContext;
+        HBaseSail sail;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             statsGraphContext = SVF.createIRI(conf.get(GRAPH_CONTEXT, HBaseSail.STATS_GRAPH_CONTEXT.stringValue()));
             String targetUrl = conf.get(TARGET);
-            out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
-            try {
-                if (targetUrl.endsWith(".bz2")) {
-                    out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.BZIP2, out);
-                    targetUrl = targetUrl.substring(0, targetUrl.length() - 4);
-                } else if (targetUrl.endsWith(".gz")) {
-                    out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.GZIP, out);
-                    targetUrl = targetUrl.substring(0, targetUrl.length() - 3);
-                }
-            } catch (CompressorException ce) {
-                throw new IOException(ce);
-            }
-            Optional<RDFFormat> form = Rio.getWriterFormatForFileName(targetUrl);
-            if (!form.isPresent()) throw new IOException("Unsupported target file format extension: " + targetUrl);
-            writer = Rio.createWriter(form.get(), out);
             String root = getRoot(conf);
-            writer.handleNamespace("", root.substring(0, root.lastIndexOf('/') + 1));
-            writer.handleNamespace("graph", root + '/');
-            writer.handleNamespace("sd", SD_PREFIX);
-            writer.handleNamespace("void", VOID_PREFIX);
-            writer.startRDF();
+            if (targetUrl == null) {
+                sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null);
+                sail.initialize();
+                sail.clear(statsGraphContext);
+            } else {
+                out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
+                try {
+                    if (targetUrl.endsWith(".bz2")) {
+                        out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.BZIP2, out);
+                        targetUrl = targetUrl.substring(0, targetUrl.length() - 4);
+                    } else if (targetUrl.endsWith(".gz")) {
+                        out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.GZIP, out);
+                        targetUrl = targetUrl.substring(0, targetUrl.length() - 3);
+                    }
+                } catch (CompressorException ce) {
+                    throw new IOException(ce);
+                }
+                Optional<RDFFormat> form = Rio.getWriterFormatForFileName(targetUrl);
+                if (!form.isPresent()) throw new IOException("Unsupported target file format extension: " + targetUrl);
+                writer = Rio.createWriter(form.get(), out);
+                writer.handleNamespace("", root.substring(0, root.lastIndexOf('/') + 1));
+                writer.handleNamespace("namedGraph", root + '/');
+                writer.handleNamespace("sd", SD_PREFIX);
+                writer.handleNamespace("void", VOID_PREFIX);
+                writer.startRDF();
+            }
             rootIRI = SVF.createIRI(root);
-            writer.handleStatement(SVF.createStatement(rootIRI, RDF.TYPE, VOID_DATASET_TYPE, statsGraphContext));
-            writer.handleStatement(SVF.createStatement(rootIRI, RDF.TYPE, SD_DATASET_TYPE, statsGraphContext));
-            writer.handleStatement(SVF.createStatement(rootIRI, RDF.TYPE, SD_GRAPH_TYPE, statsGraphContext));
-            writer.handleStatement(SVF.createStatement(rootIRI, SD_DEFAULT_GRAPH_PRED, rootIRI, statsGraphContext));
+            writeStatement(rootIRI, RDF.TYPE, VOID_DATASET_TYPE);
+            writeStatement(rootIRI, RDF.TYPE, SD_DATASET_TYPE);
+            writeStatement(rootIRI, RDF.TYPE, SD_GRAPH_TYPE);
+            writeStatement(rootIRI, SD_DEFAULT_GRAPH_PRED, rootIRI);
             graphs = new WeakHashMap<>();
             graphs.put(root, false);
         }
@@ -308,24 +317,36 @@ public class HalyardStats implements Tool {
             } else {
                 graphIRI = SVF.createIRI(rootIRI.stringValue() + '/' + URLEncoder.encode(graph, UTF8.name()));
                 if (graphs.putIfAbsent(graph, false) == null) {
-                    writer.handleStatement(SVF.createStatement(rootIRI, SD_NAMED_GRAPH_PRED, graphIRI, statsGraphContext));
-                    writer.handleStatement(SVF.createStatement(graphIRI, SD_NAME_PRED, SVF.createIRI(graph), statsGraphContext));
-                    writer.handleStatement(SVF.createStatement(graphIRI, SD_GRAPH_PRED, graphIRI, statsGraphContext));
-                    writer.handleStatement(SVF.createStatement(graphIRI, RDF.TYPE, SD_NAMED_GRAPH_TYPE, statsGraphContext));
-                    writer.handleStatement(SVF.createStatement(graphIRI, RDF.TYPE, SD_GRAPH_TYPE, statsGraphContext));
-                    writer.handleStatement(SVF.createStatement(graphIRI, RDF.TYPE, VOID_DATASET_TYPE, statsGraphContext));
+                    writeStatement(rootIRI, SD_NAMED_GRAPH_PRED, graphIRI);
+                    writeStatement(graphIRI, SD_NAME_PRED, SVF.createIRI(graph));
+                    writeStatement(graphIRI, SD_GRAPH_PRED, graphIRI);
+                    writeStatement(graphIRI, RDF.TYPE, SD_NAMED_GRAPH_TYPE);
+                    writeStatement(graphIRI, RDF.TYPE, SD_GRAPH_TYPE);
+                    writeStatement(graphIRI, RDF.TYPE, VOID_DATASET_TYPE);
                 }
             }
-            writer.handleStatement(SVF.createStatement(graphIRI,
+            writeStatement(graphIRI,
                     SVF.createIRI(VOID_PREFIX, kp.substring(split+1)),
-                    SVF.createLiteral(count),
-                    statsGraphContext));
+                    SVF.createLiteral(count));
 	}
+
+        private void writeStatement(Resource subj, IRI pred, Value obj) {
+            if (writer == null) {
+                sail.addStatement(subj, pred, obj, statsGraphContext);
+            } else {
+                writer.handleStatement(SVF.createStatement(subj, pred, obj, statsGraphContext));
+            }
+        }
 
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
-            writer.endRDF();
-            out.close();
+            if (writer == null) {
+                sail.commit();
+                sail.close();
+            } else {
+                writer.endRDF();
+                out.close();
+            }
         }
     }
     private static Option newOption(String opt, String argName, String description) {
@@ -335,7 +356,7 @@ public class HalyardStats implements Tool {
     }
 
     private static void printHelp(Options options) {
-        new HelpFormatter().printHelp(100, "stats", "...", options, "Example: stats [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + GRAPH_CONTEXT + "='http://whatever/mystats'] -s my_dataset -t hdfs:/my_folder/my_stats.trig", true);
+        new HelpFormatter().printHelp(100, "stats", "...", options, "Example: stats [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + GRAPH_CONTEXT + "='http://whatever/mystats'] -s my_dataset [-t hdfs:/my_folder/my_stats.trig]", true);
     }
 
     @Override
@@ -360,7 +381,7 @@ public class HalyardStats implements Tool {
                 return 0;
             }
             if (!cmd.getArgList().isEmpty()) throw new ExportException("Unknown arguments: " + cmd.getArgList().toString());
-            for (char c : "st".toCharArray()) {
+            for (char c : "s".toCharArray()) {
                 if (!cmd.hasOption(c))  throw new ExportException("Missing mandatory option: " + c);
             }
             for (char c : "st".toCharArray()) {
@@ -369,8 +390,6 @@ public class HalyardStats implements Tool {
             }
             String source = cmd.getOptionValue('s');
             String target = cmd.getOptionValue('t');
-            getConf().set(SOURCE, source);
-            getConf().set(TARGET, target);
             TableMapReduceUtil.addDependencyJars(getConf(),
                    HalyardExport.class,
                    NTriplesUtil.class,
@@ -383,7 +402,9 @@ public class HalyardStats implements Tool {
                    AuthenticationProtos.class,
                    Trace.class);
             HBaseConfiguration.addHbaseResources(getConf());
-            Job job = Job.getInstance(getConf(), "HalyardStats " + source + " -> " + target);
+            Job job = Job.getInstance(getConf(), "HalyardStats " + source + (target == null ? " update" : " -> " + target));
+            job.getConfiguration().set(SOURCE, source);
+            if (target != null) job.getConfiguration().set(TARGET, target);
             job.setJarByClass(HalyardStats.class);
             TableMapReduceUtil.initCredentials(job);
 
