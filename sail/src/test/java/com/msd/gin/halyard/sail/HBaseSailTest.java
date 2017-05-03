@@ -17,6 +17,8 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -133,7 +135,7 @@ public class HBaseSailTest {
         sail.initialize();
         String hbaseRoot = cfg.getTrimmed("hbase.rootdir");
         if (!hbaseRoot.endsWith("/")) hbaseRoot = hbaseRoot + "/";
-        sail.addStatement(vf.createIRI(hbaseRoot + "whatevertablectx"), HBaseSail.SD_NAMED_GRAPH_PRED, vf.createIRI("http://whatever/ctx"), HBaseSail.STATS_GRAPH_CONTEXT);
+        sail.addStatement(vf.createIRI(hbaseRoot + "whatevertablectx"), HBaseSail.SD_NAMED_GRAPH_PRED, vf.createIRI(hbaseRoot + "whatevertablectx/" + URLEncoder.encode("http://whatever/ctx", StandardCharsets.UTF_8.name())), HBaseSail.STATS_GRAPH_CONTEXT);
         sail.commit();
         try (CloseableIteration<? extends Resource, SailException> ctxIt = sail.getContextIDs()) {
             assertTrue(ctxIt.hasNext());

@@ -330,7 +330,7 @@ public final class HBaseSail implements Sail, SailConnection {
             public Resource next() throws SailException {
                 try {
                     return SVF.createIRI(URLDecoder.decode(scanner.next().getObject().stringValue().substring(trim), StandardCharsets.UTF_8.name()));
-                } catch (UnsupportedEncodingException ex) {
+                } catch (Exception ex) {
                     throw new SailException(ex);
                 }
             }
