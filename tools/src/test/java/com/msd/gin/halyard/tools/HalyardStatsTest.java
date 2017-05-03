@@ -117,7 +117,7 @@ public class HalyardStatsTest {
     }
 
     private static void assertContains(Model model, String content, Resource subj, IRI pred, Value obj) {
-        if (!model.contains(subj, pred, obj, HalyardStats.STATS_GRAPH_CONTEXT)) {
+        if (!model.contains(subj, pred, obj, HBaseSail.STATS_GRAPH_CONTEXT)) {
             fail(MessageFormat.format("Expected {0} {1} {2} in:\n{3}\n", subj, pred, obj, content));
         }
     }

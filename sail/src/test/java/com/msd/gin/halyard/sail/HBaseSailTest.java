@@ -18,12 +18,11 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import java.util.List;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -134,18 +133,14 @@ public class HBaseSailTest {
     @Test
     public void testSize() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertablesize", true, 0, true, 0, null);
+        Configuration cfg = HBaseServerTestInstance.getInstanceConfig();
+        HBaseSail sail = new HBaseSail(cfg, "whatevertablesize", true, 0, true, 0, null);
         sail.initialize();
-        for (int i=0; i<100; i++) {
-            sail.addStatement(vf.createIRI("http://whatever/subj/" + i), vf.createIRI("http://whatever/pred/" + i), vf.createLiteral(i));
-        }
+        String hbaseRoot = cfg.getTrimmed("hbase.rootdir");
+        if (!hbaseRoot.endsWith("/")) hbaseRoot = hbaseRoot + "/";
+        sail.addStatement(vf.createIRI(hbaseRoot + "whatevertablesize"), HBaseSail.VOID_TRIPLES, vf.createLiteral(567), HBaseSail.STATS_GRAPH_CONTEXT);
         sail.commit();
-        try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
-            try (Admin ha = con.getAdmin()) {
-                ha.flush(TableName.valueOf("whatevertablesize"));
-            }
-        }
-        assertEquals(100, sail.size());
+        assertEquals(567, sail.size());
     }
 
     @Test(expected = UnknownSailTransactionStateException.class)

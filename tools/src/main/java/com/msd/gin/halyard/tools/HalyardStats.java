@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.tools.HalyardExport.ExportException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -79,6 +80,7 @@ public class HalyardStats implements Tool {
 
     private static final String SOURCE = "halyard.stats.source";
     private static final String TARGET = "halyard.stats.target";
+    private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
     private static final Logger LOG = Logger.getLogger(HalyardStats.class.getName());
     private static final Charset UTF8 = Charset.forName("UTF-8");
@@ -236,18 +238,17 @@ public class HalyardStats implements Tool {
 
     }
 
-    static final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
+    static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
     static final String VOID_PREFIX = "http://rdfs.org/ns/void#";
     static final String SD_PREFIX = "http://www.w3.org/ns/sparql-service-description#";
-    static final IRI STATS_GRAPH_CONTEXT = ssf.createIRI("http://gin.msd.com/halyard/stats");
-    static final IRI VOID_DATASET_TYPE = ssf.createIRI(VOID_PREFIX, "Dataset");
-    static final IRI SD_DATASET_TYPE = ssf.createIRI(SD_PREFIX, "Dataset");
-    static final IRI SD_GRAPH_PRED = ssf.createIRI(SD_PREFIX, "graph");
-    static final IRI SD_GRAPH_TYPE = ssf.createIRI(SD_PREFIX, "Graph");
-    static final IRI SD_DEFAULT_GRAPH_PRED = ssf.createIRI(SD_PREFIX, "defaultGraph");
-    static final IRI SD_NAMED_GRAPH_PRED = ssf.createIRI(SD_PREFIX, "namedGraph");
-    static final IRI SD_NAMED_GRAPH_TYPE = ssf.createIRI(SD_PREFIX, "NamedGraph");
-    static final IRI SD_NAME_PRED = ssf.createIRI(SD_PREFIX, "name");
+    static final IRI VOID_DATASET_TYPE = SVF.createIRI(VOID_PREFIX, "Dataset");
+    static final IRI SD_DATASET_TYPE = SVF.createIRI(SD_PREFIX, "Dataset");
+    static final IRI SD_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "graph");
+    static final IRI SD_GRAPH_TYPE = SVF.createIRI(SD_PREFIX, "Graph");
+    static final IRI SD_DEFAULT_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "defaultGraph");
+    static final IRI SD_NAMED_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "namedGraph");
+    static final IRI SD_NAMED_GRAPH_TYPE = SVF.createIRI(SD_PREFIX, "NamedGraph");
+    static final IRI SD_NAME_PRED = SVF.createIRI(SD_PREFIX, "name");
 
     static class StatsReducer extends Reducer<Text, LongWritable, NullWritable, NullWritable>  {
 
@@ -255,10 +256,12 @@ public class HalyardStats implements Tool {
         RDFWriter writer;
         IRI rootIRI;
         Map<String, Boolean> graphs;
+        IRI statsGraphContext;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
+            statsGraphContext = SVF.createIRI(conf.get(GRAPH_CONTEXT, HBaseSail.STATS_GRAPH_CONTEXT.stringValue()));
             String targetUrl = conf.get(TARGET);
             out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
             try {
@@ -281,11 +284,11 @@ public class HalyardStats implements Tool {
             writer.handleNamespace("sd", SD_PREFIX);
             writer.handleNamespace("void", VOID_PREFIX);
             writer.startRDF();
-            rootIRI = ssf.createIRI(root);
-            writer.handleStatement(ssf.createStatement(rootIRI, RDF.TYPE, VOID_DATASET_TYPE, STATS_GRAPH_CONTEXT));
-            writer.handleStatement(ssf.createStatement(rootIRI, RDF.TYPE, SD_DATASET_TYPE, STATS_GRAPH_CONTEXT));
-            writer.handleStatement(ssf.createStatement(rootIRI, RDF.TYPE, SD_GRAPH_TYPE, STATS_GRAPH_CONTEXT));
-            writer.handleStatement(ssf.createStatement(rootIRI, SD_DEFAULT_GRAPH_PRED, rootIRI, STATS_GRAPH_CONTEXT));
+            rootIRI = SVF.createIRI(root);
+            writer.handleStatement(SVF.createStatement(rootIRI, RDF.TYPE, VOID_DATASET_TYPE, statsGraphContext));
+            writer.handleStatement(SVF.createStatement(rootIRI, RDF.TYPE, SD_DATASET_TYPE, statsGraphContext));
+            writer.handleStatement(SVF.createStatement(rootIRI, RDF.TYPE, SD_GRAPH_TYPE, statsGraphContext));
+            writer.handleStatement(SVF.createStatement(rootIRI, SD_DEFAULT_GRAPH_PRED, rootIRI, statsGraphContext));
             graphs = new WeakHashMap<>();
             graphs.put(root, false);
         }
@@ -303,20 +306,20 @@ public class HalyardStats implements Tool {
             if (graph.equals(rootIRI.stringValue())) {
                 graphIRI = rootIRI;
             } else {
-                graphIRI = ssf.createIRI(rootIRI.stringValue() + '/' + URLEncoder.encode(graph, UTF8.name()));
+                graphIRI = SVF.createIRI(rootIRI.stringValue() + '/' + URLEncoder.encode(graph, UTF8.name()));
                 if (graphs.putIfAbsent(graph, false) == null) {
-                    writer.handleStatement(ssf.createStatement(rootIRI, SD_NAMED_GRAPH_PRED, graphIRI, STATS_GRAPH_CONTEXT));
-                    writer.handleStatement(ssf.createStatement(graphIRI, SD_NAME_PRED, ssf.createIRI(graph), STATS_GRAPH_CONTEXT));
-                    writer.handleStatement(ssf.createStatement(graphIRI, SD_GRAPH_PRED, graphIRI, STATS_GRAPH_CONTEXT));
-                    writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, SD_NAMED_GRAPH_TYPE, STATS_GRAPH_CONTEXT));
-                    writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, SD_GRAPH_TYPE, STATS_GRAPH_CONTEXT));
-                    writer.handleStatement(ssf.createStatement(graphIRI, RDF.TYPE, VOID_DATASET_TYPE, STATS_GRAPH_CONTEXT));
+                    writer.handleStatement(SVF.createStatement(rootIRI, SD_NAMED_GRAPH_PRED, graphIRI, statsGraphContext));
+                    writer.handleStatement(SVF.createStatement(graphIRI, SD_NAME_PRED, SVF.createIRI(graph), statsGraphContext));
+                    writer.handleStatement(SVF.createStatement(graphIRI, SD_GRAPH_PRED, graphIRI, statsGraphContext));
+                    writer.handleStatement(SVF.createStatement(graphIRI, RDF.TYPE, SD_NAMED_GRAPH_TYPE, statsGraphContext));
+                    writer.handleStatement(SVF.createStatement(graphIRI, RDF.TYPE, SD_GRAPH_TYPE, statsGraphContext));
+                    writer.handleStatement(SVF.createStatement(graphIRI, RDF.TYPE, VOID_DATASET_TYPE, statsGraphContext));
                 }
             }
-            writer.handleStatement(ssf.createStatement(graphIRI,
-                    ssf.createIRI(VOID_PREFIX, kp.substring(split+1)),
-                    ssf.createLiteral(count),
-                    STATS_GRAPH_CONTEXT));
+            writer.handleStatement(SVF.createStatement(graphIRI,
+                    SVF.createIRI(VOID_PREFIX, kp.substring(split+1)),
+                    SVF.createLiteral(count),
+                    statsGraphContext));
 	}
 
         @Override
@@ -332,7 +335,7 @@ public class HalyardStats implements Tool {
     }
 
     private static void printHelp(Options options) {
-        new HelpFormatter().printHelp(100, "stats", "...", options, "Example: stats [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] -s my_dataset -t hdfs:/my_folder/my_stats.trig", true);
+        new HelpFormatter().printHelp(100, "stats", "...", options, "Example: stats [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + GRAPH_CONTEXT + "='http://whatever/mystats'] -s my_dataset -t hdfs:/my_folder/my_stats.trig", true);
     }
 
     @Override

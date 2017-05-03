@@ -20,36 +20,26 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HRegionInfo;
-import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.io.hfile.FixedFileTrailer;
-import org.apache.hadoop.hbase.util.FSUtils;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -118,6 +108,9 @@ public final class HBaseSail implements Sail, SailConnection {
     private static final IRI NAMESPACE_PREFIX_PREDICATE = SimpleValueFactory.getInstance().createIRI("http://gin.msd.com/halyard/namespace#prefix");
     private static final Logger LOG = Logger.getLogger(HBaseSail.class.getName());
     private static final long STATUS_CACHING_TIMEOUT = 60000l;
+    private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
+    static final IRI VOID_TRIPLES = SVF.createIRI("http://rdfs.org/ns/void#triples");
+    public static final IRI STATS_GRAPH_CONTEXT = SVF.createIRI("http://gin.msd.com/halyard/stats");
 
     private final Configuration config;
     final String tableName;
@@ -126,7 +119,6 @@ public final class HBaseSail implements Sail, SailConnection {
     final int splitBits;
     private final EvaluationStatistics statistics;
     final int evaluationTimeout;
-    private long size = 0, sizeTimestamp = -1;
     private boolean readOnly = false;
     private long readOnlyTimestamp = -1;
     private final Ticker ticker;
@@ -328,47 +320,32 @@ public final class HBaseSail implements Sail, SailConnection {
 
     @Override
     public synchronized long size(Resource... contexts) throws SailException {
+        String hbaseRoot = config.getTrimmed("hbase.rootdir");
+        if (!hbaseRoot.endsWith("/")) hbaseRoot = hbaseRoot + "/";
+        hbaseRoot = hbaseRoot + tableName.replace(':', '/');
+        long size = 0;
         if (contexts != null && contexts.length > 0 && contexts[0] != null) {
-            throw new SailException("Size calculation is not supported for named graphs");
-        }
-        if (sizeTimestamp < 0 || (isWritable() && sizeTimestamp + STATUS_CACHING_TIMEOUT < System.currentTimeMillis())) try {
-            long entries = 0;
-            FileSystem fs = FileSystem.get(config);
-            Collection<HColumnDescriptor> families = table.getTableDescriptor().getFamilies();
-            Set<String> familyNames = new HashSet<>(families.size());
-            for (HColumnDescriptor hcd : families) {
-                familyNames.add(hcd.getNameAsString());
-            }
-            Path tableDir = FSUtils.getTableDir(FSUtils.getRootDir(config), table.getName());
-            PathFilter dirFilter = new FSUtils.DirFilter(fs);
-            int divider = 1;
-            for (HRegionLocation hrl : table.getRegionLocator().getAllRegionLocations()) {
-                HRegionInfo hri = hrl.getRegionInfo();
-                byte[] skey = hri.getStartKey();
-                if (skey.length == 0 || skey[0] == HalyardTableUtils.SPO_PREFIX) {
-                    byte[] ekey = hri.getEndKey();
-                    if (ekey.length == 0 || ekey[0] > HalyardTableUtils.POS_PREFIX) {
-                        divider = 3;
+            for (Resource ctx : contexts) {
+                try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(SVF.createIRI(hbaseRoot+ '/' + URLEncoder.encode(ctx.stringValue(), StandardCharsets.UTF_8.name())), VOID_TRIPLES, null, true, STATS_GRAPH_CONTEXT)) {
+                    if (scanner.hasNext()) {
+                        size += ((Literal)scanner.next().getObject()).longValue();
                     }
-                    for (FileStatus familyDir : fs.listStatus(new Path(tableDir, hri.getEncodedName()), dirFilter)) {
-                        if (familyNames.contains(familyDir.getPath().getName())) {
-                            for (FileStatus file : fs.listStatus(familyDir.getPath())) {
-                                if (file.isFile()) {
-                                    try (FSDataInputStream in = fs.open(file.getPath())) {
-                                        entries += FixedFileTrailer.readFromStream(in, file.getLen()).getEntryCount();
-                                    } catch (Exception e) {
-                                        LOG.log(Level.WARNING, "Exception while reading trailer from hfile: " + file.getPath(), e);
-                                    }
-                                }
-                            }
-                        }
+                    if (scanner.hasNext()) {
+                        throw new SailException("Multiple different values");
                     }
+                } catch (UnsupportedEncodingException uee) {
+                    throw new SailException(uee);
                 }
             }
-            size = entries / divider;
-            sizeTimestamp = System.currentTimeMillis();
-        } catch (IOException e) {
-            throw new SailException(e);
+        } else {
+            try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(SVF.createIRI(hbaseRoot), VOID_TRIPLES, null, true, STATS_GRAPH_CONTEXT)) {
+                if (scanner.hasNext()) {
+                    size += ((Literal)scanner.next().getObject()).longValue();
+                }
+                if (scanner.hasNext()) {
+                    throw new SailException("Multiple different values");
+                }
+            }
         }
         return size;
     }
