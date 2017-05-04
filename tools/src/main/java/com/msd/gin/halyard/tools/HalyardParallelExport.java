@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.tools.HalyardExport.ExportException;
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -75,12 +76,12 @@ public class HalyardParallelExport implements Tool {
     /**
      * String name of the custom SPARQL parallel split filter function
      */
-    public static final String PARALLEL_SPLIT_FUNCTION_NAME = "parallel_split_by";
+    public static final String PARALLEL_SPLIT_FUNCTION_NAME = "parallelSplitBy";
 
     /**
      * String full URI of the custom SPARQL parallel split filter function
      */
-    public static final String PARALLEL_SPLIT_FUNCTION_URI = "http://gin.msd.com/halyard/" + PARALLEL_SPLIT_FUNCTION_NAME;
+    public static final String PARALLEL_SPLIT_FUNCTION_URI = HBaseSail.HALYARD_NAMESPACE + PARALLEL_SPLIT_FUNCTION_NAME;
     private static final String SOURCE = "halyard.parallelexport.source";
     private static final String QUERY = "halyard.parallelexport.query";
     private static final String TARGET = "halyard.parallelexport.target";
@@ -242,7 +243,7 @@ public class HalyardParallelExport implements Tool {
     }
 
     private static void printHelp(Options options) {
-        new HelpFormatter().printHelp(100, "pexport", "Exports graph or table data from Halyard RDF store, using parallalel SPARQL query", options, "Example: pexport [-D" + MRJobConfig.NUM_MAPS + "=10] [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] -s my_dataset -q '\nPREFIX hlyd: <http://gin.msd.com/halyard/>\nselect * where {?s ?p ?o .\nFILTER (hlyd:parallel_split_by (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz", true);
+        new HelpFormatter().printHelp(100, "pexport", "Exports graph or table data from Halyard RDF store, using parallalel SPARQL query", options, "Example: pexport [-D" + MRJobConfig.NUM_MAPS + "=10] [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] -s my_dataset -q '\nPREFIX halyard: <" + HBaseSail.HALYARD_NAMESPACE + ">\nselect * where {?s ?p ?o .\nFILTER (halyard:" + PARALLEL_SPLIT_FUNCTION_NAME + " (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz", true);
     }
 
     @Override

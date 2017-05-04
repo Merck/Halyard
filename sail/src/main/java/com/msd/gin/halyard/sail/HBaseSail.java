@@ -20,10 +20,6 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -45,7 +41,6 @@ import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteratorIteration;
-import org.eclipse.rdf4j.common.iteration.EmptyIteration;
 import org.eclipse.rdf4j.common.iteration.ExceptionConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.TimeLimitIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -106,13 +101,15 @@ public final class HBaseSail implements Sail, SailConnection {
         public void tick();
     }
 
-    private static final IRI NAMESPACE_PREFIX_PREDICATE = SimpleValueFactory.getInstance().createIRI("http://gin.msd.com/halyard/namespace#prefix");
+    public static final String HALYARD_NAMESPACE = "http://merck.github.io/Halyard/ns#";
+    private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
+    public static final IRI STATS_ROOT_NODE = SVF.createIRI(HALYARD_NAMESPACE, "statsRoot");
+    public static final IRI STATS_GRAPH_CONTEXT = SVF.createIRI(HALYARD_NAMESPACE, "statsContext");
+    private static final IRI NAMESPACE_PREFIX_PREDICATE = SVF.createIRI(HALYARD_NAMESPACE, "namespacePrefix");
     private static final Logger LOG = Logger.getLogger(HBaseSail.class.getName());
     private static final long STATUS_CACHING_TIMEOUT = 60000l;
-    private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
     static final IRI VOID_TRIPLES = SVF.createIRI("http://rdfs.org/ns/void#triples");
     public static final IRI SD_NAMED_GRAPH_PRED = SVF.createIRI("http://www.w3.org/ns/sparql-service-description#namedGraph");
-    public static final IRI STATS_GRAPH_CONTEXT = SVF.createIRI("http://gin.msd.com/halyard/stats");
 
     private final Configuration config;
     final String tableName;
@@ -312,9 +309,7 @@ public final class HBaseSail implements Sail, SailConnection {
 
     @Override
     public CloseableIteration<? extends Resource, SailException> getContextIDs() throws SailException {
-        final String root = getRoot();
-        final int trim = root.length() + 1;
-        final CloseableIteration<? extends Statement, SailException> scanner = getStatements(SVF.createIRI(root), SD_NAMED_GRAPH_PRED, null, true, STATS_GRAPH_CONTEXT);
+        final CloseableIteration<? extends Statement, SailException> scanner = getStatements(STATS_ROOT_NODE, SD_NAMED_GRAPH_PRED, null, true, STATS_GRAPH_CONTEXT);
         return new CloseableIteration<Resource, SailException>() {
             @Override
             public void close() throws SailException {
@@ -328,11 +323,7 @@ public final class HBaseSail implements Sail, SailConnection {
 
             @Override
             public Resource next() throws SailException {
-                try {
-                    return SVF.createIRI(URLDecoder.decode(scanner.next().getObject().stringValue().substring(trim), StandardCharsets.UTF_8.name()));
-                } catch (Exception ex) {
-                    throw new SailException(ex);
-                }
+                return (IRI)scanner.next().getObject();
             }
 
             @Override
@@ -350,23 +341,20 @@ public final class HBaseSail implements Sail, SailConnection {
 
     @Override
     public synchronized long size(Resource... contexts) throws SailException {
-        String root = getRoot();
         long size = 0;
         if (contexts != null && contexts.length > 0 && contexts[0] != null) {
             for (Resource ctx : contexts) {
-                try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(SVF.createIRI(root+ '/' + URLEncoder.encode(ctx.stringValue(), StandardCharsets.UTF_8.name())), VOID_TRIPLES, null, true, STATS_GRAPH_CONTEXT)) {
+                try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(ctx, VOID_TRIPLES, null, true, STATS_GRAPH_CONTEXT)) {
                     if (scanner.hasNext()) {
                         size += ((Literal)scanner.next().getObject()).longValue();
                     }
                     if (scanner.hasNext()) {
                         throw new SailException("Multiple different values");
                     }
-                } catch (UnsupportedEncodingException uee) {
-                    throw new SailException(uee);
                 }
             }
         } else {
-            try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(SVF.createIRI(root), VOID_TRIPLES, null, true, STATS_GRAPH_CONTEXT)) {
+            try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(STATS_ROOT_NODE, VOID_TRIPLES, null, true, STATS_GRAPH_CONTEXT)) {
                 if (scanner.hasNext()) {
                     size += ((Literal)scanner.next().getObject()).longValue();
                 }
@@ -376,12 +364,6 @@ public final class HBaseSail implements Sail, SailConnection {
             }
         }
         return size;
-    }
-
-    private String getRoot() {
-        String hbaseRoot = config.getTrimmed("hbase.rootdir");
-        if (!hbaseRoot.endsWith("/")) hbaseRoot = hbaseRoot + "/";
-        return hbaseRoot + tableName.replace(':', '/');
     }
 
     @Override

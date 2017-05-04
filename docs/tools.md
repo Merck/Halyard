@@ -169,7 +169,7 @@ RDF4J RIO supported RDF formats are:
 
 ### Halyard Parallel Export
 
-Halyard Parallel Export is a MapReduce application executing multiple Halyard Exports in multiple Map tasks across Hadoop cluster. All the exports are instructed with the same SPARQL query, the same target and the same options. Parallelisation is done using a custom SPARQL filter function `parallel_split_by(?a_binding)`. The function takes one or more bindings as argument(s) and these bindings are used as a key(s) to randomly distribute the query evaluation across all mappers.
+Halyard Parallel Export is a MapReduce application executing multiple Halyard Exports in multiple Map tasks across Hadoop cluster. All the exports are instructed with the same SPARQL query, the same target and the same options. Parallelisation is done using a custom SPARQL filter function `halyard:parallelSplitBy(?a_binding)`. The function takes one or more bindings as argument(s) and these bindings are used as a key(s) to randomly distribute the query evaluation across all mappers.
 
 ![Halyard Parallel Export](img/pexport.png)
 

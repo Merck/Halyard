@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.text.MessageFormat;
@@ -88,14 +87,19 @@ public class HalyardStats implements Tool {
     private static final Charset UTF8 = Charset.forName("UTF-8");
     private static final byte[] TYPE_HASH = HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(RDF.TYPE).getBytes(UTF8));
 
+    static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
+    static final String VOID_PREFIX = "http://rdfs.org/ns/void#";
+    static final String SD_PREFIX = "http://www.w3.org/ns/sparql-service-description#";
+    static final IRI VOID_DATASET_TYPE = SVF.createIRI(VOID_PREFIX, "Dataset");
+    static final IRI SD_DATASET_TYPE = SVF.createIRI(SD_PREFIX, "Dataset");
+    static final IRI SD_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "graph");
+    static final IRI SD_GRAPH_TYPE = SVF.createIRI(SD_PREFIX, "Graph");
+    static final IRI SD_DEFAULT_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "defaultGraph");
+    static final IRI SD_NAMED_GRAPH_PRED = HBaseSail.SD_NAMED_GRAPH_PRED;
+    static final IRI SD_NAMED_GRAPH_TYPE = SVF.createIRI(SD_PREFIX, "NamedGraph");
+    static final IRI SD_NAME_PRED = SVF.createIRI(SD_PREFIX, "name");
 
     private Configuration conf;
-
-    static String getRoot(Configuration cfg) {
-        String hbaseRoot = cfg.getTrimmed("hbase.rootdir");
-        if (!hbaseRoot.endsWith("/")) hbaseRoot = hbaseRoot + "/";
-        return hbaseRoot + cfg.getTrimmed(SOURCE).replace(':', '/');
-    }
 
     static class StatsMapper extends TableMapper<Text, LongWritable>  {
 
@@ -131,7 +135,7 @@ public class HalyardStats implements Tool {
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
-            this.rootCounter = new GraphCounter(getRoot(context.getConfiguration()));
+            this.rootCounter = new GraphCounter(HBaseSail.STATS_ROOT_NODE.stringValue());
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, byte[] target) {
@@ -240,23 +244,10 @@ public class HalyardStats implements Tool {
 
     }
 
-    static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
-    static final String VOID_PREFIX = "http://rdfs.org/ns/void#";
-    static final String SD_PREFIX = "http://www.w3.org/ns/sparql-service-description#";
-    static final IRI VOID_DATASET_TYPE = SVF.createIRI(VOID_PREFIX, "Dataset");
-    static final IRI SD_DATASET_TYPE = SVF.createIRI(SD_PREFIX, "Dataset");
-    static final IRI SD_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "graph");
-    static final IRI SD_GRAPH_TYPE = SVF.createIRI(SD_PREFIX, "Graph");
-    static final IRI SD_DEFAULT_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "defaultGraph");
-    static final IRI SD_NAMED_GRAPH_PRED = HBaseSail.SD_NAMED_GRAPH_PRED;
-    static final IRI SD_NAMED_GRAPH_TYPE = SVF.createIRI(SD_PREFIX, "NamedGraph");
-    static final IRI SD_NAME_PRED = SVF.createIRI(SD_PREFIX, "name");
-
     static class StatsReducer extends Reducer<Text, LongWritable, NullWritable, NullWritable>  {
 
         OutputStream out;
         RDFWriter writer;
-        IRI rootIRI;
         Map<String, Boolean> graphs;
         IRI statsGraphContext;
         HBaseSail sail;
@@ -266,11 +257,13 @@ public class HalyardStats implements Tool {
             Configuration conf = context.getConfiguration();
             statsGraphContext = SVF.createIRI(conf.get(GRAPH_CONTEXT, HBaseSail.STATS_GRAPH_CONTEXT.stringValue()));
             String targetUrl = conf.get(TARGET);
-            String root = getRoot(conf);
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null);
                 sail.initialize();
                 sail.clear(statsGraphContext);
+                sail.setNamespace("sd", SD_PREFIX);
+                sail.setNamespace("void", VOID_PREFIX);
+                sail.setNamespace("halyard", HBaseSail.HALYARD_NAMESPACE);
             } else {
                 out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
                 try {
@@ -287,19 +280,16 @@ public class HalyardStats implements Tool {
                 Optional<RDFFormat> form = Rio.getWriterFormatForFileName(targetUrl);
                 if (!form.isPresent()) throw new IOException("Unsupported target file format extension: " + targetUrl);
                 writer = Rio.createWriter(form.get(), out);
-                writer.handleNamespace("", root.substring(0, root.lastIndexOf('/') + 1));
-                writer.handleNamespace("namedGraph", root + '/');
                 writer.handleNamespace("sd", SD_PREFIX);
                 writer.handleNamespace("void", VOID_PREFIX);
+                writer.handleNamespace("halyard", HBaseSail.HALYARD_NAMESPACE);
                 writer.startRDF();
             }
-            rootIRI = SVF.createIRI(root);
-            writeStatement(rootIRI, RDF.TYPE, VOID_DATASET_TYPE);
-            writeStatement(rootIRI, RDF.TYPE, SD_DATASET_TYPE);
-            writeStatement(rootIRI, RDF.TYPE, SD_GRAPH_TYPE);
-            writeStatement(rootIRI, SD_DEFAULT_GRAPH_PRED, rootIRI);
+            writeStatement(HBaseSail.STATS_ROOT_NODE, RDF.TYPE, VOID_DATASET_TYPE);
+            writeStatement(HBaseSail.STATS_ROOT_NODE, RDF.TYPE, SD_DATASET_TYPE);
+            writeStatement(HBaseSail.STATS_ROOT_NODE, RDF.TYPE, SD_GRAPH_TYPE);
+            writeStatement(HBaseSail.STATS_ROOT_NODE, SD_DEFAULT_GRAPH_PRED, HBaseSail.STATS_ROOT_NODE);
             graphs = new WeakHashMap<>();
-            graphs.put(root, false);
         }
 
         @Override
@@ -311,21 +301,21 @@ public class HalyardStats implements Tool {
             String kp = key.toString();
             int split = kp.lastIndexOf(':');
             String graph = kp.substring(0, split);
-            IRI graphIRI;
-            if (graph.equals(rootIRI.stringValue())) {
-                graphIRI = rootIRI;
+            IRI graphNode;
+            if (graph.equals(HBaseSail.STATS_ROOT_NODE.stringValue())) {
+                graphNode = HBaseSail.STATS_ROOT_NODE;
             } else {
-                graphIRI = SVF.createIRI(rootIRI.stringValue() + '/' + URLEncoder.encode(graph, UTF8.name()));
+                graphNode = SVF.createIRI(graph);
                 if (graphs.putIfAbsent(graph, false) == null) {
-                    writeStatement(rootIRI, SD_NAMED_GRAPH_PRED, graphIRI);
-                    writeStatement(graphIRI, SD_NAME_PRED, SVF.createIRI(graph));
-                    writeStatement(graphIRI, SD_GRAPH_PRED, graphIRI);
-                    writeStatement(graphIRI, RDF.TYPE, SD_NAMED_GRAPH_TYPE);
-                    writeStatement(graphIRI, RDF.TYPE, SD_GRAPH_TYPE);
-                    writeStatement(graphIRI, RDF.TYPE, VOID_DATASET_TYPE);
+                    writeStatement(HBaseSail.STATS_ROOT_NODE, SD_NAMED_GRAPH_PRED, graphNode);
+                    writeStatement(graphNode, SD_NAME_PRED, SVF.createIRI(graph));
+                    writeStatement(graphNode, SD_GRAPH_PRED, graphNode);
+                    writeStatement(graphNode, RDF.TYPE, SD_NAMED_GRAPH_TYPE);
+                    writeStatement(graphNode, RDF.TYPE, SD_GRAPH_TYPE);
+                    writeStatement(graphNode, RDF.TYPE, VOID_DATASET_TYPE);
                 }
             }
-            writeStatement(graphIRI,
+            writeStatement(graphNode,
                     SVF.createIRI(VOID_PREFIX, kp.substring(split+1)),
                     SVF.createLiteral(count));
 	}
