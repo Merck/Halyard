@@ -9,3 +9,6 @@
 
 - page: architecture
   name: Architecture
+
+- page: ns
+  name: Namespace
