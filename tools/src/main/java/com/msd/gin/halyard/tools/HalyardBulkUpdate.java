@@ -82,7 +82,7 @@ public class HalyardBulkUpdate implements Tool {
     /**
      * String name of a custom SPARQL function to decimate parallel evaluation based on Mapper index
      */
-    public static final String DECIMATE_FUNCTION_NAME = "decimateby";
+    public static final String DECIMATE_FUNCTION_NAME = "decimateBy";
 
     /**
      * Full URI of a custom SPARQL function to decimate parallel evaluation based on Mapper index

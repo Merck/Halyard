@@ -48,14 +48,14 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
         TABLESPACE = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "tableName");
         SPLITBITS = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "splitBits");
         CREATE = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "createTable");
-        PUSH = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "pushstrategy");
-        TIMEOUT = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "evaluationtimeout");
+        PUSH = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "pushStrategy");
+        TIMEOUT = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "evaluationTimeout");
 
         BACK_COMPATIBILITY_MAP.put(TABLESPACE, factory.createIRI(OLD_NAMESPACE, "tablespace"));
         BACK_COMPATIBILITY_MAP.put(SPLITBITS, factory.createIRI(OLD_NAMESPACE, "splitbits"));
         BACK_COMPATIBILITY_MAP.put(CREATE, factory.createIRI(OLD_NAMESPACE, "create"));
-        BACK_COMPATIBILITY_MAP.put(PUSH, factory.createIRI(OLD_NAMESPACE, "pushStrategy"));
-        BACK_COMPATIBILITY_MAP.put(TIMEOUT, factory.createIRI(OLD_NAMESPACE, "evaluationTimeout"));
+        BACK_COMPATIBILITY_MAP.put(PUSH, factory.createIRI(OLD_NAMESPACE, "pushstrategy"));
+        BACK_COMPATIBILITY_MAP.put(TIMEOUT, factory.createIRI(OLD_NAMESPACE, "evaluationtimeout"));
     }
 
     private String tablespace = null;
