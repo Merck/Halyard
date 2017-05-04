@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.sail;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -36,20 +38,24 @@ import org.eclipse.rdf4j.sail.config.SailConfigSchema;
  */
 public final class HBaseSailConfig extends AbstractSailImplConfig {
 
-    /**
-     * HBaseSailConfig NAMESPACE IRI
-     */
-    public static final String NAMESPACE = "http://gin.msd.com/halyard/sail/hbase#";
-
     final static IRI TABLESPACE, SPLITBITS, CREATE, PUSH, TIMEOUT;
+
+    private static final Map<IRI, IRI> BACK_COMPATIBILITY_MAP = new HashMap<>();
+    private static final String OLD_NAMESPACE = "http://gin.msd.com/halyard/sail/hbase#";
 
     static {
         ValueFactory factory = SimpleValueFactory.getInstance();
-        TABLESPACE = factory.createIRI(NAMESPACE, "tablespace");
-        SPLITBITS = factory.createIRI(NAMESPACE, "splitbits");
-        CREATE = factory.createIRI(NAMESPACE, "create");
-        PUSH = factory.createIRI(NAMESPACE, "pushstrategy");
-        TIMEOUT = factory.createIRI(NAMESPACE, "evaluationtimeout");
+        TABLESPACE = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "tableName");
+        SPLITBITS = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "splitBits");
+        CREATE = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "createTable");
+        PUSH = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "pushstrategy");
+        TIMEOUT = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "evaluationtimeout");
+
+        BACK_COMPATIBILITY_MAP.put(TABLESPACE, factory.createIRI(OLD_NAMESPACE, "tablespace"));
+        BACK_COMPATIBILITY_MAP.put(SPLITBITS, factory.createIRI(OLD_NAMESPACE, "splitbits"));
+        BACK_COMPATIBILITY_MAP.put(CREATE, factory.createIRI(OLD_NAMESPACE, "create"));
+        BACK_COMPATIBILITY_MAP.put(PUSH, factory.createIRI(OLD_NAMESPACE, "pushStrategy"));
+        BACK_COMPATIBILITY_MAP.put(TIMEOUT, factory.createIRI(OLD_NAMESPACE, "evaluationTimeout"));
     }
 
     private String tablespace = null;
@@ -171,7 +177,7 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
     @Override
     public void parse(Model graph, Resource implNode) throws SailConfigException {
         super.parse(graph, implNode);
-        Optional<Literal> tablespaceValue = Models.objectLiteral(graph.filter(implNode, TABLESPACE, null));
+        Optional<Literal> tablespaceValue = backCompatibilityFilterObjectLiteral(graph, implNode, TABLESPACE);
         if (tablespaceValue.isPresent() && tablespaceValue.get().stringValue().length() > 0) {
             setTablespace(tablespaceValue.get().stringValue());
         } else {
@@ -188,29 +194,34 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
             }
 
         }
-        Optional<Literal> splitBitsValue = Models.objectLiteral(graph.filter(implNode, SPLITBITS, null));
+        Optional<Literal> splitBitsValue = backCompatibilityFilterObjectLiteral(graph, implNode, SPLITBITS);
         if (splitBitsValue.isPresent()) try {
             setSplitBits(splitBitsValue.get().intValue());
         } catch (NumberFormatException e) {
             throw new SailConfigException(e);
         }
-        Optional<Literal> createValue = Models.objectLiteral(graph.filter(implNode, CREATE, null));
+        Optional<Literal> createValue = backCompatibilityFilterObjectLiteral(graph, implNode, CREATE);
         if (createValue.isPresent()) try {
             setCreate(createValue.get().booleanValue());
         } catch (IllegalArgumentException e) {
             throw new SailConfigException(e);
         }
-        Optional<Literal> pushValue = Models.objectLiteral(graph.filter(implNode, PUSH, null));
+        Optional<Literal> pushValue = backCompatibilityFilterObjectLiteral(graph, implNode, PUSH);
         if (pushValue.isPresent()) try {
             setPush(pushValue.get().booleanValue());
         } catch (IllegalArgumentException e) {
             throw new SailConfigException(e);
         }
-        Optional<Literal> timeoutValue = Models.objectLiteral(graph.filter(implNode, TIMEOUT, null));
+        Optional<Literal> timeoutValue = backCompatibilityFilterObjectLiteral(graph, implNode, TIMEOUT);
         if (timeoutValue.isPresent()) try {
             setEvaluationTimeout(timeoutValue.get().intValue());
         } catch (NumberFormatException e) {
             throw new SailConfigException(e);
         }
+    }
+
+    private static Optional<Literal> backCompatibilityFilterObjectLiteral(Model graph, Resource subject, IRI predicate) {
+        Optional<Literal> value = Models.objectLiteral(graph.filter(subject, predicate, null));
+        return value.isPresent() ? value : Models.objectLiteral(graph.filter(subject, BACK_COMPATIBILITY_MAP.get(predicate), null));
     }
 }

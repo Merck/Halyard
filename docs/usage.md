@@ -158,7 +158,7 @@ Note: additional debugging information may appear in the output of the export ex
 ### With Halyard Parallel Export
 
 ```
-> ./pexport -Dmapreduce.job.maps=10 -s testRepo -q 'PREFIX hlyd: <http://gin.msd.com/halyard/> select * where {?s ?p ?o . FILTER (hlyd:parallel_split_by (?s))}' -t hdfs:///my_path/my_export{0}.csv
+> ./pexport -Dmapreduce.job.maps=10 -s testRepo -q 'PREFIX halyard: <http://merck.github.io/Halyard/ns#> select * where {?s ?p ?o . FILTER (halyard:parallelSplitBy (?s))}' -t hdfs:///my_path/my_export{0}.csv
 impl.YarnClientImpl: Submitted application application_1572718538572_94727
 mapreduce.Job: The url to track the job: http://my_app_master/proxy/application_1572718538572_94727/
 mapreduce.Job:  map 0% reduce 0%

@@ -5,7 +5,7 @@
 @prefix rep: <http://www.openrdf.org/config/repository#>.
 @prefix sr: <http://www.openrdf.org/config/repository/sail#>.
 @prefix sail: <http://www.openrdf.org/config/sail#>.
-@prefix hlyd: <http://gin.msd.com/halyard/sail/hbase#>.
+@prefix halyard: <http://merck.github.io/Halyard/ns#>.
 
 [] a rep:Repository ;
    rep:repositoryID "{%Repository ID|%}" ;
@@ -14,10 +14,10 @@
       rep:repositoryType "openrdf:SailRepository" ;
       sr:sailImpl [
          sail:sailType "openrdf:HBaseStore" ;
-         hlyd:tablespace "{%HBase Table Name|%}" ;
-         hlyd:create "{%Create HBase Table if missing|true|false%}" ;
-         hlyd:splitbits "{%HBase Table presplit bits|0%}" ;
-         hlyd:pushstrategy "{%Use Halyard Push Evaluation Strategy|true|false%}" ;
-         hlyd:evaluationtimeout "{%Query Evaluation Timeout|180%}" ;
+         halyard:tableName "{%HBase Table Name|%}" ;
+         halyard:createTable "{%Create HBase Table if missing|true|false%}" ;
+         halyard:splitBits "{%HBase Table presplit bits|0%}" ;
+         halyard:pushStrategy "{%Use Halyard Push Evaluation Strategy|true|false%}" ;
+         halyard:evaluationTimeout "{%Query Evaluation Timeout|180%}" ;
       ]
    ].

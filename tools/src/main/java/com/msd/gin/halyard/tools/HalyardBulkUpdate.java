@@ -82,12 +82,12 @@ public class HalyardBulkUpdate implements Tool {
     /**
      * String name of a custom SPARQL function to decimate parallel evaluation based on Mapper index
      */
-    public static final String DECIMATE_FUNCTION_NAME = "decimate_by";
+    public static final String DECIMATE_FUNCTION_NAME = "decimateby";
 
     /**
      * Full URI of a custom SPARQL function to decimate parallel evaluation based on Mapper index
      */
-    public static final String DECIMATE_FUNCTION_URI = "http://gin.msd.com/halyard/" + DECIMATE_FUNCTION_NAME;
+    public static final String DECIMATE_FUNCTION_URI = HBaseSail.HALYARD_NAMESPACE + DECIMATE_FUNCTION_NAME;
     private static final String TABLE_NAME_PROPERTY = "halyard.table.name";
     private static final String CHECK_BEFORE_WRITE_PROPERTY = "halyard.check.before.write";
     private static final Logger LOG = Logger.getLogger(HalyardBulkUpdate.class.getName());

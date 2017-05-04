@@ -18,3 +18,13 @@ Property used by Halyard to persist namespaces inside the datasets.
 
 ### <a name="parallelSplitBy"></a> halyard:parallelSplitBy
 Custom SPARQL function used in [Halyard Parallel Export](tools#Halyard Parallel Export).
+
+### <a name="tableName"></a> halyard:tableName
+
+### <a name="splitBits"></a> halyard:splitBits
+
+### <a name="createTable"></a> halyard:createTable
+
+### <a name="pushStrategy"></a> halyard:pushStrategy
+
+### <a name="evaluationTimeout"></a> halyard:evaluationTimeout
