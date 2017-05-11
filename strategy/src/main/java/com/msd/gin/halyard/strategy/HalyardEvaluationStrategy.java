@@ -28,6 +28,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
+import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
 
 /**
@@ -36,6 +37,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
  */
 public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 
+    private final FederatedServiceResolver serviceResolver;
     private final HalyardTupleExprEvaluation tupleEval;
     private final HalyardValueExprEvaluation valueEval;
 
@@ -47,7 +49,8 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
      * @param dataset Dataset
      * @param timeout long query evaluation timeout in seconds, negative values mean no timeout
      */
-    public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset, long timeout) {
+    public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset, FederatedServiceResolver serviceResolver, long timeout) {
+        this.serviceResolver = serviceResolver;
         this.tupleEval = new HalyardTupleExprEvaluation(this, tripleSource, dataset, timeout);
         this.valueEval = new HalyardValueExprEvaluation(this, tripleSource.getValueFactory());
         EvaluationStrategies.register(this);
@@ -55,12 +58,20 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 
     @Override
     public FederatedService getService(String serviceUrl) throws QueryEvaluationException {
-        throw new QueryEvaluationException("Unsupported operation");
+        return serviceResolver.getService(serviceUrl);
     }
 
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Service service, String serviceUri, CloseableIteration<BindingSet, QueryEvaluationException> bindings) throws QueryEvaluationException {
-        throw new QueryEvaluationException("Unsupported operation");
+        try {
+            return serviceResolver.getService(serviceUri).evaluate(service, bindings, service.getBaseURI());
+        } catch (QueryEvaluationException e) {
+            if (service.isSilent()) {
+                return bindings;
+            } else {
+                throw new QueryEvaluationException(e);
+            }
+        }
     }
 
     @Override

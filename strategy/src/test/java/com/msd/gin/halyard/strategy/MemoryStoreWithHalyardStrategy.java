@@ -36,7 +36,7 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
 
             @Override
             protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, TripleSource tripleSource) {
-                return new HalyardEvaluationStrategy(tripleSource, dataset, -1);
+                return new HalyardEvaluationStrategy(tripleSource, dataset, null, -1);
             }
 
         };

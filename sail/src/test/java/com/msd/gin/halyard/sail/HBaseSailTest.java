@@ -256,6 +256,29 @@ public class HBaseSailTest {
         rep.shutDown();
     }
 
+    @Test
+    public void testEvaluateService() throws Exception {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        Resource subj = vf.createIRI("http://whatever/subj/");
+        IRI pred = vf.createIRI("http://whatever/pred/");
+        Value obj = vf.createLiteral("whatever");
+        CloseableIteration<? extends Statement, SailException> iter;
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverservice", true, 0, true, 0, null);
+        SailRepository rep = new SailRepository(sail);
+        rep.initialize();
+        sail.addStatement(subj, pred, obj);
+        sail.commit();
+        rep.shutDown();
+
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverparent", true, 0, true, 0, null);
+        rep = new SailRepository(sail);
+        rep.initialize();
+        TupleQuery q = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "select * {SERVICE <" + HBaseSail.HALYARD_NAMESPACE +"whateverservice> {?s ?p ?o}}");
+        TupleQueryResult res = q.evaluate();
+        assertTrue(res.hasNext());
+        rep.shutDown();
+    }
+
     @Test(expected = UnsupportedOperationException.class)
     public void testStatementsIteratorRemove1() throws Exception {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null);

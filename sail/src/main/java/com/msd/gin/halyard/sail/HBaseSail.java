@@ -62,6 +62,9 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
+import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
+import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
+import org.eclipse.rdf4j.query.algebra.evaluation.federation.RepositoryFederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.BindingAssigner;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.CompareOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
@@ -76,6 +79,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
+import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
@@ -87,7 +91,7 @@ import org.eclipse.rdf4j.sail.UpdateContext;
  * It implements both interfaces - Sail and SailConnection.
  * @author Adam Sotona (MSD)
  */
-public final class HBaseSail implements Sail, SailConnection {
+public final class HBaseSail implements Sail, SailConnection, FederatedServiceResolver {
 
     /**
      * Ticker is a simple service interface that is notified when some data are processed.
@@ -124,8 +128,8 @@ public final class HBaseSail implements Sail, SailConnection {
 
     HTable table = null;
 
-    //TODO non-persistent namespaces
     private final Map<String, Namespace> namespaces = new HashMap<>();
+    private final Map<String, RepositoryFederatedService> federatedServices = new HashMap<>();
 
     /**
      * Construct HBaseSail object with given arguments.
@@ -191,12 +195,31 @@ public final class HBaseSail implements Sail, SailConnection {
     }
 
     @Override
+    public FederatedService getService(String serviceUrl) throws QueryEvaluationException {
+        if (serviceUrl.startsWith(HALYARD_NAMESPACE)) {
+            String federatedTable = serviceUrl.substring(HALYARD_NAMESPACE.length());
+            RepositoryFederatedService s = federatedServices.get(federatedTable);
+            if (s == null) {
+                s = new RepositoryFederatedService(new SailRepository(new HBaseSail(config, federatedTable, false, 0, true, evaluationTimeout, ticker)));
+                federatedServices.put(federatedTable, s);
+                s.initialize();
+            }
+            return s;
+        } else {
+            throw new QueryEvaluationException("Unsupported service URL: " + serviceUrl);
+        }
+    }
+
+    @Override
     public void shutDown() throws SailException {
         try {
             table.close();
             table = null;
         } catch (IOException ex) {
             throw new SailException(ex);
+        }
+        for (RepositoryFederatedService s : federatedServices.values()) {
+            s.shutdown();
         }
     }
 
@@ -279,7 +302,7 @@ public final class HBaseSail implements Sail, SailConnection {
             }
         };
 
-        EvaluationStrategy strategy = pushStrategy ? new HalyardEvaluationStrategy(source, dataset, evaluationTimeout) : new StrictEvaluationStrategy(source, dataset, null);
+        EvaluationStrategy strategy = pushStrategy ? new HalyardEvaluationStrategy(source, dataset, this, evaluationTimeout) : new StrictEvaluationStrategy(source, dataset, this);
 
         new BindingAssigner().optimize(tupleExpr, dataset, bindings);
         new ConstantOptimizer(strategy).optimize(tupleExpr, dataset, bindings);

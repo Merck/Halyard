@@ -34,6 +34,7 @@ import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteratorIteration;
 import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
@@ -76,16 +77,20 @@ import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
+import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.DescribeIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.GroupIterator;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.PathIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ProjectionIterator;
+import org.eclipse.rdf4j.query.algebra.evaluation.iterator.SilentIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ZeroLengthPathIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
+import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
+import org.eclipse.rdf4j.query.impl.MapBindingSet;
 
 /**
  *
@@ -488,7 +493,78 @@ final class HalyardTupleExprEvaluation {
     }
 
     private void evaluateService(BindingSetPipe parent, Service service, BindingSet bindings) {
-        parent.handleException(new UnsupportedOperationException("Service are not supported yet"));
+        Var serviceRef = service.getServiceRef();
+        String serviceUri;
+        if (serviceRef.hasValue()) {
+            serviceUri = serviceRef.getValue().stringValue();
+        } else if (bindings != null && bindings.hasBinding(serviceRef.getName())) {
+            serviceUri = bindings.getBinding(serviceRef.getName()).getValue().stringValue();
+        } else {
+            throw new QueryEvaluationException("SERVICE variables must be bound at evaluation time.");
+        }
+        try {
+            try {
+                FederatedService fs = parentStrategy.getService(serviceUri);
+                // create a copy of the free variables, and remove those for which
+                // bindings are available (we can set them as constraints!)
+                Set<String> freeVars = new HashSet<>(service.getServiceVars());
+                freeVars.removeAll(bindings.getBindingNames());
+                // Get bindings from values pre-bound into variables.
+                MapBindingSet allBindings = new MapBindingSet();
+                for (Binding binding : bindings) {
+                    allBindings.addBinding(binding.getName(), binding.getValue());
+                }
+                final Set<Var> boundVars = new HashSet<Var>();
+                new AbstractQueryModelVisitor<RuntimeException> (){
+                    @Override
+                    public void meet(Var var) {
+                        if (var.hasValue()) {
+                            boundVars.add(var);
+                        }
+                    }
+                }.meet(service);
+                for (Var boundVar : boundVars) {
+                    freeVars.remove(boundVar.getName());
+                    allBindings.addBinding(boundVar.getName(), boundVar.getValue());
+                }
+                bindings = allBindings;
+                String baseUri = service.getBaseURI();
+                // special case: no free variables => perform ASK query
+                if (freeVars.isEmpty()) {
+                    boolean exists = fs.ask(service, bindings, baseUri);
+                    // check if triples are available (with inserted bindings)
+                    if (exists) {
+                        parent.push(bindings);
+                    }
+                    parent.push(NULL);
+                    return;
+
+                }
+                // otherwise: perform a SELECT query
+                CloseableIteration<BindingSet, QueryEvaluationException> result = fs.select(service, freeVars, bindings, baseUri);
+                HalyardStatementPatternEvaluation.enqueue(parent, service.isSilent() ? new SilentIteration(result) : result, service);
+            } catch (QueryEvaluationException e) {
+                // suppress exceptions if silent
+                if (service.isSilent()) {
+                    parent.push(bindings);
+                    parent.push(NULL);
+                } else {
+                    throw e;
+                }
+            } catch (RuntimeException e) {
+                // suppress special exceptions (e.g. UndeclaredThrowable with
+                // wrapped
+                // QueryEval) if silent
+                if (service.isSilent()) {
+                    parent.push(bindings);
+                    parent.push(NULL);
+                } else {
+                    throw e;
+                }
+            }
+        } catch (InterruptedException ie) {
+            parent.handleException(ie);
+        }
     }
 
     private void evaluateBinaryTupleOperator(BindingSetPipe parent, BinaryTupleOperator expr, BindingSet bindings) {
