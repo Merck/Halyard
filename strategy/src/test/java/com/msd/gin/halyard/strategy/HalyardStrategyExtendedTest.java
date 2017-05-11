@@ -111,13 +111,13 @@ public class HalyardStrategyExtendedTest {
 
     @Test(expected = QueryEvaluationException.class)
     public void testService() throws Exception {
-        String sparql = "SELECT * WHERE {?s ?p ?o . SERVICE <http://whatever/> { ?s ?p ?o . }}";
+        String sparql = "SELECT * WHERE {SERVICE <http://whatever/> { ?s ?p ?o . }}";
         con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
     }
 
     @Test
     public void testServiceSilent() throws Exception {
-        String sparql = "SELECT * WHERE {?s ?p ?o . SERVICE SILENT <http://whatever/> { ?s ?p ?o . }}";
-        assertFalse(con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate().hasNext());
+        String sparql = "SELECT * WHERE {SERVICE SILENT <http://whatever/> { ?s ?p ?o . }}";
+        con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
     }
 }
