@@ -16,9 +16,10 @@
  */
 package com.msd.gin.halyard.strategy;
 
-import junit.framework.TestCase;
+import static junit.framework.TestCase.*;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.Repository;
@@ -32,13 +33,12 @@ import org.junit.Test;
 /**
  * @author Adam Sotona (MSD)
  */
-public class HalyardStrategyExtendedTest extends TestCase {
+public class HalyardStrategyExtendedTest {
 
     private Repository repo;
     private RepositoryConnection con;
 
     @Before
-    @Override
     public void setUp() throws Exception {
         repo = new SailRepository(new MemoryStoreWithHalyardStrategy());
         repo.initialize();
@@ -46,7 +46,6 @@ public class HalyardStrategyExtendedTest extends TestCase {
     }
 
     @After
-    @Override
     public void tearDown() throws Exception {
         con.close();
         repo.shutDown();
@@ -110,9 +109,15 @@ public class HalyardStrategyExtendedTest extends TestCase {
         assertEquals(2, ((Literal) res.next().getValue("val")).intValue());
     }
 
-    @Test(expected = UnsupportedOperationException.class)
+    @Test(expected = QueryEvaluationException.class)
     public void testService() throws Exception {
         String sparql = "SELECT * WHERE {?s ?p ?o . SERVICE <http://whatever/> { ?s ?p ?o . }}";
         con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
+    }
+
+    @Test
+    public void testServiceSilent() throws Exception {
+        String sparql = "SELECT * WHERE {?s ?p ?o . SERVICE SILENT <http://whatever/> { ?s ?p ?o . }}";
+        assertFalse(con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate().hasNext());
     }
 }

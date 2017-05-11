@@ -47,6 +47,7 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
      * Default constructor of HalyardEvaluationStrategy
      * @param tripleSource TripleSource
      * @param dataset Dataset
+     * @param serviceResolver FederatedServiceResolver
      * @param timeout long query evaluation timeout in seconds, negative values mean no timeout
      */
     public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset, FederatedServiceResolver serviceResolver, long timeout) {
@@ -58,12 +59,21 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 
     @Override
     public FederatedService getService(String serviceUrl) throws QueryEvaluationException {
+        if (serviceResolver == null) {
+            throw new QueryEvaluationException("No Service Resolver set.");
+        }
         return serviceResolver.getService(serviceUrl);
     }
 
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Service service, String serviceUri, CloseableIteration<BindingSet, QueryEvaluationException> bindings) throws QueryEvaluationException {
-        try {
+        if (serviceResolver == null) {
+            if (service.isSilent()) {
+                return bindings;
+            } else {
+                throw new QueryEvaluationException("No Service Resolver set.");
+            }
+        } else try {
             return serviceResolver.getService(serviceUri).evaluate(service, bindings, service.getBaseURI());
         } catch (QueryEvaluationException e) {
             if (service.isSilent()) {

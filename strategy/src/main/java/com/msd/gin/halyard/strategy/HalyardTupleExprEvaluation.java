@@ -536,7 +536,7 @@ final class HalyardTupleExprEvaluation {
                     if (exists) {
                         parent.push(bindings);
                     }
-                    parent.push(NULL);
+                    parent.push(null);
                     return;
 
                 }
@@ -547,7 +547,7 @@ final class HalyardTupleExprEvaluation {
                 // suppress exceptions if silent
                 if (service.isSilent()) {
                     parent.push(bindings);
-                    parent.push(NULL);
+                    parent.push(null);
                 } else {
                     throw e;
                 }
@@ -557,7 +557,7 @@ final class HalyardTupleExprEvaluation {
                 // QueryEval) if silent
                 if (service.isSilent()) {
                     parent.push(bindings);
-                    parent.push(NULL);
+                    parent.push(null);
                 } else {
                     throw e;
                 }
