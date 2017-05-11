@@ -192,7 +192,7 @@ Halyard Stats is a MapReduce application calculating dataset statistics and repo
 
 ![Halyard Stats](img/stats.png)
 
-**Sample statistic (in [TriG](http://www.w3.org/TR/trig/) format):**
+**Sample statistics (in [TriG](http://www.w3.org/TR/trig/) format):**
 
 ```
 @prefix sd: <http://www.w3.org/ns/sparql-service-description#> .
