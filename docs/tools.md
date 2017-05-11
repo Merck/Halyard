@@ -186,6 +186,60 @@ Halyard Parallel Export is a MapReduce application executing multiple Halyard Ex
 	* Option `-l <driver_classpath>` allows to specify additional Java classpath necessary to load particular JDBC driver for jdbc: targets.
 	* Options `-p <property=value>` allows to pass additional properties to JDBC connections for jdbc: targets. The most frequent JDBC connectin properties are: `-p user=<jdbc_connection_username>` and `-p password=<jdbc_connection_password>`.
 
+### Halyard Stats
+
+Halyard Stats is a MapReduce application calculating dataset statistics and reporting them back to the dataset (under `http://merck.github.io/Halyard/ns#statsContext` named graph). The statistics are generated according to [VoID Vocabulary - Providing statistics about datasets](http://www.w3.org/TR/void/#statistics) and [SPARQL 1.1 Service Description](http://www.w3.org/TR/sparql11-service-description/).
+
+![Halyard Stats](img/stats.png)
+
+**Sample statistic (in [TriG](http://www.w3.org/TR/trig/) format):**
+
+```
+@prefix sd: <http://www.w3.org/ns/sparql-service-description#> .
+@prefix void: <http://rdfs.org/ns/void#> .
+@prefix halyard: <http://merck.github.io/Halyard/ns#> .
+
+
+halyard:statsContext {
+	halyard:statsRoot a void:Dataset , sd:Dataset , sd:Graph ;
+		sd:defaultGraph halyard:statsRoot ;
+		void:classes "1000"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctObjects "2000"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctSubjects "100"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:properties "14"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:triples "2000"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		sd:namedGraph <http://whatever/graph0> .
+
+	<http://whatever/graph0> sd:name <http://whatever/graph0> ;
+		sd:graph <http://whatever/graph0> ;
+		a sd:NamedGraph , sd:Graph , void:Dataset ;
+		void:classes "450"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctObjects "900"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctSubjects "50"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:properties "14"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:triples "900"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+	halyard:statsRoot sd:namedGraph <http://whatever/graph1> .
+
+	<http://whatever/graph1> sd:name <http://whatever/graph1> ;
+		sd:graph <http://whatever/graph1> ;
+		a sd:NamedGraph , sd:Graph , void:Dataset ;
+		void:classes "450"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctObjects "900"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctSubjects "50"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:properties "14"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:triples "900"^^<http://www.w3.org/2001/XMLSchema#long> .
+}
+```
+
+**Halyard Stats Usage:**
+
+1. Open terminal on a Hadoop cluster node with configured HBase.
+2. On a secured cluster don't forget to `kinit` with your credentials.
+3. Execute `./stats -s <HBase_table_name>` to launch the statistics calculation. Following features are supported:
+	* Target file format and optional compression (for hdfs: targets) is determined from the target file extension. Statistics are stored back to the dataset when target file is not specified. 
+	* Option `-Dhalyard.stats.graph.context=<graph context url>` can override default statistics target graph context `http://merck.github.io/Halyard/ns#statsContext`.
+
 
 ### RDF4J Web Applications
 
