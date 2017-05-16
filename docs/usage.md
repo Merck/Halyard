@@ -116,19 +116,19 @@ Content-Type: application/rdf+xml;charset=UTF-8
 
 Each Halyard dataset represents isolated graph space (a standalone triplestore). To SPARQL query across multiple datasets it is possible to:
 
-1. Merge all the required datasets into on, as described later in this document.
+1. Merge all the required datasets into one, as described later in this document.
 2. Or use SPARQL SERVICE to construct federated queries across multiple datasets.
 
 Halyard resolves another directly accessible HBase tables (datasets) as federation services. Halyard service URL for each dataset is constructed from Halyard prefix `http://merck.github.io/Halyard/ns#` and table name.
 
-For example we have datasets `table1` and `table2`. While querying dataset `table1` we can use following SPARQL query to access also data from dataset `table2`:
+For example we have datasets `dataset1` and `dataset2`. While querying dataset `dataset1` we can use following SPARQL query to access also data from dataset `dataset2`:
 
 ```
 PREFIX halyard: <http://merck.github.io/Halyard/ns#>
 
 SELECT *
   WHERE {
-    SERVICE halyard:table2 {
+    SERVICE halyard:dataset2 {
       ?s ?p ?o.
     }
   }
