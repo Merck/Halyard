@@ -74,7 +74,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 /**
- * Map-only MapReduce tool providing parallel SPARQL export functionality
+ * MapReduce tool providing statistics about Halyard dataset
  * @author Adam Sotona (MSD)
  */
 public class HalyardStats implements Tool {
@@ -346,7 +346,7 @@ public class HalyardStats implements Tool {
     }
 
     private static void printHelp(Options options) {
-        new HelpFormatter().printHelp(100, "stats", "...", options, "Example: stats [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + GRAPH_CONTEXT + "='http://whatever/mystats'] -s my_dataset [-t hdfs:/my_folder/my_stats.trig]", true);
+        new HelpFormatter().printHelp(100, "stats", "Updates or exports statistics about Halyard dataset.", options, "Example: stats [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + GRAPH_CONTEXT + "='http://whatever/mystats'] -s my_dataset [-t hdfs:/my_folder/my_stats.trig]", true);
     }
 
     @Override
@@ -355,7 +355,7 @@ public class HalyardStats implements Tool {
         options.addOption(newOption("h", null, "Prints this help"));
         options.addOption(newOption("v", null, "Prints version"));
         options.addOption(newOption("s", "source_htable", "Source HBase table with Halyard RDF store"));
-        options.addOption(newOption("t", "target_url", "hdfs://<path>/<file_name>.<ext>"));
+        options.addOption(newOption("t", "target_url", "Optional target file to export the statistics (instead of update) hdfs://<path>/<file_name>.<RDF_ext>[.<compression>]"));
         try {
             CommandLine cmd = new PosixParser().parse(options, args);
             if (args.length == 0 || cmd.hasOption('h')) {
@@ -364,7 +364,7 @@ public class HalyardStats implements Tool {
             }
             if (cmd.hasOption('v')) {
                 Properties p = new Properties();
-                try (InputStream in = HalyardExport.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/hbasesail/pom.properties")) {
+                try (InputStream in = HalyardStats.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/halyard-tools/pom.properties")) {
                     if (in != null) p.load(in);
                 }
                 System.out.println("Halyard Stats version " + p.getProperty("version", "unknown"));

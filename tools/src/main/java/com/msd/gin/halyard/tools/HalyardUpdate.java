@@ -71,7 +71,7 @@ public final class HalyardUpdate {
             }
             if (cmd.hasOption('v')) {
                 Properties p = new Properties();
-                try (InputStream in = HalyardUpdate.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/hbasesail/pom.properties")) {
+                try (InputStream in = HalyardUpdate.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/halyard-tools/pom.properties")) {
                     if (in != null) p.load(in);
                 }
                 System.out.println("Halyard Update version " + p.getProperty("version", "unknown"));

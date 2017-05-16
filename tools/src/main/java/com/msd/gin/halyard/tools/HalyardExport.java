@@ -550,7 +550,7 @@ public final class HalyardExport {
             }
             if (cmd.hasOption('v')) {
                 Properties p = new Properties();
-                try (InputStream in = HalyardExport.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/hbasesail/pom.properties")) {
+                try (InputStream in = HalyardExport.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/halyard-tools/pom.properties")) {
                     if (in != null) p.load(in);
                 }
                 System.out.println("Halyard Export version " + p.getProperty("version", "unknown"));
