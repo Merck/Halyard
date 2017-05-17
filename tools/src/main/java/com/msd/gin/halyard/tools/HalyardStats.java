@@ -17,8 +17,14 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.sail.VOID_EXT;
 import com.msd.gin.halyard.tools.HalyardExport.ExportException;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -51,9 +57,9 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -64,8 +70,11 @@ import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.SD;
+import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.RDFWriter;
@@ -88,43 +97,60 @@ public class HalyardStats implements Tool {
     private static final byte[] TYPE_HASH = HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(RDF.TYPE).getBytes(UTF8));
 
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
-    static final String VOID_PREFIX = "http://rdfs.org/ns/void#";
-    static final String SD_PREFIX = "http://www.w3.org/ns/sparql-service-description#";
-    static final IRI VOID_DATASET_TYPE = SVF.createIRI(VOID_PREFIX, "Dataset");
-    static final IRI SD_DATASET_TYPE = SVF.createIRI(SD_PREFIX, "Dataset");
-    static final IRI SD_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "graph");
-    static final IRI SD_GRAPH_TYPE = SVF.createIRI(SD_PREFIX, "Graph");
-    static final IRI SD_DEFAULT_GRAPH_PRED = SVF.createIRI(SD_PREFIX, "defaultGraph");
-    static final IRI SD_NAMED_GRAPH_PRED = HBaseSail.SD_NAMED_GRAPH_PRED;
-    static final IRI SD_NAMED_GRAPH_TYPE = SVF.createIRI(SD_PREFIX, "NamedGraph");
-    static final IRI SD_NAME_PRED = SVF.createIRI(SD_PREFIX, "name");
 
     private Configuration conf;
 
-    static class StatsMapper extends TableMapper<Text, LongWritable>  {
+
+    static String[] parse(byte[] bytes) throws IOException {
+        try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(bytes))) {
+            String res[] = new String[dis.readInt()];
+            for (int i=0; i<res.length; i++) {
+                res[i] = dis.readUTF();
+            }
+            return res;
+        }
+    }
+
+    static byte[] serilize(String ... ss) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (DataOutputStream dos = new DataOutputStream(baos)) {
+            dos.writeInt(ss.length);
+            for (String s : ss) {
+                dos.writeUTF(s);
+            }
+        }
+        return baos.toByteArray();
+    }
+
+    static final class StatsMapper extends TableMapper<BytesWritable, LongWritable>  {
 
         final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
 
         class GraphCounter {
-            final String graph;
-            long triples, subjects, predicates, objects, classes;
+            private final String key[];
+            private long triples, distinctSubjects, properties, distinctObjects, classes;
+            private long distinctIRIReferenceSubjects, distinctIRIReferenceObjects, distinctBlankNodeObjects, distinctBlankNodeSubjects, distinctLiterals;
 
-            public GraphCounter(String graph) {
-                this.graph = graph;
+            public GraphCounter(String...path) {
+                this.key = Arrays.copyOf(path, path.length + 1);
             }
 
-            private void _report(Context output, String key, long value) throws IOException, InterruptedException {
-                if (value > 0) {
-                    output.write(new Text(key), new LongWritable(value));
-                }
+            private void _report(Context output, IRI property, long value) throws IOException, InterruptedException {
+                key[key.length - 1] = property.stringValue();
+                output.write(new BytesWritable(serilize(key)), new LongWritable(value));
             }
 
             public void report(Context output) throws IOException, InterruptedException {
-                _report(output, graph + ":triples", triples);
-                _report(output, graph + ":distinctSubjects", subjects);
-                _report(output, graph + ":properties", predicates);
-                _report(output, graph + ":distinctObjects", objects);
-                _report(output, graph + ":classes", classes);
+                _report(output, VOID.TRIPLES, triples);
+                _report(output, VOID.DISTINCT_SUBJECTS, distinctSubjects);
+                _report(output, VOID.PROPERTIES, properties);
+                _report(output, VOID.DISTINCT_OBJECTS, distinctObjects);
+                _report(output, VOID.CLASSES, classes);
+                _report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_OBJECTS, distinctIRIReferenceSubjects);
+                _report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_SUBJECTS, distinctIRIReferenceObjects);
+                _report(output, VOID_EXT.DISTINCT_BLANK_NODE_OBJECTS, distinctBlankNodeObjects);
+                _report(output, VOID_EXT.DISTINCT_BLANK_NODE_SUBJECTS, distinctBlankNodeSubjects);
+                _report(output, VOID_EXT.DISTINCT_LITERALS, distinctLiterals);
             }
         }
 
@@ -135,7 +161,7 @@ public class HalyardStats implements Tool {
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
-            this.rootCounter = new GraphCounter(HBaseSail.STATS_ROOT_NODE.stringValue());
+            this.rootCounter = new GraphCounter(HALYARD.STATS_ROOT_NODE.stringValue());
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, byte[] target) {
@@ -150,6 +176,21 @@ public class HalyardStats implements Tool {
             return match;
         }
 
+        private static String[] parseStatement(Result value) {
+            Cell c = value.rawCells()[0];
+            ByteBuffer bb = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
+            byte[] sb = new byte[bb.getInt()];
+            byte[] pb = new byte[bb.getInt()];
+            byte[] ob = new byte[bb.getInt()];
+            bb.get(sb);
+            bb.get(pb);
+            bb.get(ob);
+            byte[] cb = new byte[bb.remaining()];
+            bb.get(cb);
+            ValueFactory vf = SimpleValueFactory.getInstance();
+            return new String[]{new String(sb, UTF8), new String(pb, UTF8), new String(ob, UTF8), cb.length == 0 ? null : new String(cb,UTF8)};
+        }
+
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
@@ -157,13 +198,25 @@ public class HalyardStats implements Tool {
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 1, lastKeyFragment) || region != lastRegion) {
                     switch (region) {
                         case HalyardTableUtils.SPO_PREFIX:
-                            rootCounter.subjects++;
+                            rootCounter.distinctSubjects++;
+                            String s[] = parseStatement(value);
+                            if (s[0].charAt(0) == '<') {
+                                rootCounter.distinctIRIReferenceSubjects++;
+                            } else {
+                                rootCounter.distinctBlankNodeSubjects++;
+                            }
                             break;
                         case HalyardTableUtils.POS_PREFIX:
-                            rootCounter.predicates++;
+                            rootCounter.properties++;
                             break;
                         case HalyardTableUtils.OSP_PREFIX:
-                            rootCounter.objects++;
+                            rootCounter.distinctObjects++;
+                            s = parseStatement(value);
+                            if (s[2].charAt(0) == '<') {
+                                rootCounter.distinctIRIReferenceObjects++;
+                            } else {
+                                rootCounter.distinctLiterals++;
+                            }
                             break;
                     }
                 }
@@ -190,13 +243,25 @@ public class HalyardStats implements Tool {
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 21, lastKeyFragment) || region != lastRegion) {
                     switch (region) {
                         case HalyardTableUtils.CSPO_PREFIX:
-                            ctxCounter.subjects++;
+                            ctxCounter.distinctSubjects++;
+                            String s[] = parseStatement(value);
+                            if (s[0].charAt(0) == '<') {
+                                ctxCounter.distinctIRIReferenceSubjects++;
+                            } else {
+                                ctxCounter.distinctBlankNodeSubjects++;
+                            }
                             break;
                         case HalyardTableUtils.CPOS_PREFIX:
-                            ctxCounter.predicates++;
+                            ctxCounter.properties++;
                             break;
                         case HalyardTableUtils.COSP_PREFIX:
-                            ctxCounter.objects++;
+                            ctxCounter.distinctObjects++;
+                            s = parseStatement(value);
+                            if (s[2].charAt(0) == '<') {
+                                ctxCounter.distinctIRIReferenceObjects++;
+                            } else {
+                                ctxCounter.distinctLiterals++;
+                            }
                             break;
                     }
                 }
@@ -212,22 +277,22 @@ public class HalyardStats implements Tool {
             if ((counter++ % 100000) == 0) {
                 switch (region) {
                     case HalyardTableUtils.SPO_PREFIX:
-                        output.setStatus(MessageFormat.format("SPO {0} t:{1} s:{2}", counter, rootCounter.triples, rootCounter.subjects));
+                        output.setStatus(MessageFormat.format("SPO {0} t:{1} s:{2}", counter, rootCounter.triples, rootCounter.distinctSubjects));
                         break;
                     case HalyardTableUtils.POS_PREFIX:
-                        output.setStatus(MessageFormat.format("POS {0} p:{1} cls:{2}", counter, rootCounter.predicates, rootCounter.classes));
+                        output.setStatus(MessageFormat.format("POS {0} p:{1} cls:{2}", counter, rootCounter.properties, rootCounter.classes));
                         break;
                     case HalyardTableUtils.OSP_PREFIX:
-                        output.setStatus(MessageFormat.format("OSP {0} o:{1}", counter, rootCounter.objects));
+                        output.setStatus(MessageFormat.format("OSP {0} o:{1}", counter, rootCounter.distinctObjects));
                         break;
                     case HalyardTableUtils.CSPO_PREFIX:
-                        output.setStatus(MessageFormat.format("CSPO {0} t:{1} s:{2} ctx:<{3}>", counter, ctxCounter.triples, ctxCounter.subjects, ctxCounter.graph));
+                        output.setStatus(MessageFormat.format("CSPO {0} t:{1} s:{2}", counter, ctxCounter.triples, ctxCounter.distinctSubjects));
                         break;
                     case HalyardTableUtils.CPOS_PREFIX:
-                        output.setStatus(MessageFormat.format("CPOS {0} p:{1} cls:{2} ctx:<{3}>", counter, ctxCounter.predicates, ctxCounter.classes, ctxCounter.graph));
+                        output.setStatus(MessageFormat.format("CPOS {0} p:{1} cls:{2}", counter, ctxCounter.properties, ctxCounter.classes));
                         break;
                     case HalyardTableUtils.COSP_PREFIX:
-                        output.setStatus(MessageFormat.format("COSP {0} o:{1} ctx:<{2}>", counter, ctxCounter.objects, ctxCounter.graph));
+                        output.setStatus(MessageFormat.format("COSP {0} o:{1}", counter, ctxCounter.distinctObjects));
                         break;
                     default:
                         output.setStatus(MessageFormat.format("{0} invalid region {1}", counter, region));
@@ -244,7 +309,7 @@ public class HalyardStats implements Tool {
 
     }
 
-    static class StatsReducer extends Reducer<Text, LongWritable, NullWritable, NullWritable>  {
+    static class StatsReducer extends Reducer<BytesWritable, LongWritable, NullWritable, NullWritable>  {
 
         OutputStream out;
         RDFWriter writer;
@@ -255,15 +320,16 @@ public class HalyardStats implements Tool {
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            statsGraphContext = SVF.createIRI(conf.get(GRAPH_CONTEXT, HBaseSail.STATS_GRAPH_CONTEXT.stringValue()));
+            statsGraphContext = SVF.createIRI(conf.get(GRAPH_CONTEXT, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String targetUrl = conf.get(TARGET);
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null);
                 sail.initialize();
                 sail.clear(statsGraphContext);
-                sail.setNamespace("sd", SD_PREFIX);
-                sail.setNamespace("void", VOID_PREFIX);
-                sail.setNamespace("halyard", HBaseSail.HALYARD_NAMESPACE);
+                sail.setNamespace(SD.PREFIX, SD.NAMESPACE);
+                sail.setNamespace(VOID.PREFIX, VOID.NAMESPACE);
+                sail.setNamespace(VOID_EXT.PREFIX, VOID_EXT.NAMESPACE);
+                sail.setNamespace(HALYARD.PREFIX, HALYARD.NAMESPACE);
             } else {
                 out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
                 try {
@@ -280,43 +346,44 @@ public class HalyardStats implements Tool {
                 Optional<RDFFormat> form = Rio.getWriterFormatForFileName(targetUrl);
                 if (!form.isPresent()) throw new IOException("Unsupported target file format extension: " + targetUrl);
                 writer = Rio.createWriter(form.get(), out);
-                writer.handleNamespace("sd", SD_PREFIX);
-                writer.handleNamespace("void", VOID_PREFIX);
-                writer.handleNamespace("halyard", HBaseSail.HALYARD_NAMESPACE);
+                writer.handleNamespace(SD.PREFIX, SD.NAMESPACE);
+                writer.handleNamespace(VOID.PREFIX, VOID.NAMESPACE);
+                writer.handleNamespace(VOID_EXT.PREFIX, VOID_EXT.NAMESPACE);
+                writer.handleNamespace(HALYARD.PREFIX, HALYARD.NAMESPACE);
                 writer.startRDF();
             }
-            writeStatement(HBaseSail.STATS_ROOT_NODE, RDF.TYPE, VOID_DATASET_TYPE);
-            writeStatement(HBaseSail.STATS_ROOT_NODE, RDF.TYPE, SD_DATASET_TYPE);
-            writeStatement(HBaseSail.STATS_ROOT_NODE, RDF.TYPE, SD_GRAPH_TYPE);
-            writeStatement(HBaseSail.STATS_ROOT_NODE, SD_DEFAULT_GRAPH_PRED, HBaseSail.STATS_ROOT_NODE);
+            writeStatement(HALYARD.STATS_ROOT_NODE, RDF.TYPE, VOID.DATASET);
+            writeStatement(HALYARD.STATS_ROOT_NODE, RDF.TYPE, SD.DATASET);
+            writeStatement(HALYARD.STATS_ROOT_NODE, RDF.TYPE, SD.GRAPH_CLASS);
+            writeStatement(HALYARD.STATS_ROOT_NODE, SD.DEFAULT_GRAPH, HALYARD.STATS_ROOT_NODE);
             graphs = new WeakHashMap<>();
         }
 
         @Override
-	public void reduce(Text key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
+	public void reduce(BytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
             long count = 0;
             for (LongWritable val : values) {
                     count += val.get();
             }
-            String kp = key.toString();
-            int split = kp.lastIndexOf(':');
-            String graph = kp.substring(0, split);
+            String ks[] = parse(key.getBytes());
+            String graph = ks[0];
+            String predicate = ks[1];
             IRI graphNode;
-            if (graph.equals(HBaseSail.STATS_ROOT_NODE.stringValue())) {
-                graphNode = HBaseSail.STATS_ROOT_NODE;
+            if (graph.equals(HALYARD.STATS_ROOT_NODE.stringValue())) {
+                graphNode = HALYARD.STATS_ROOT_NODE;
             } else {
                 graphNode = SVF.createIRI(graph);
                 if (graphs.putIfAbsent(graph, false) == null) {
-                    writeStatement(HBaseSail.STATS_ROOT_NODE, SD_NAMED_GRAPH_PRED, graphNode);
-                    writeStatement(graphNode, SD_NAME_PRED, SVF.createIRI(graph));
-                    writeStatement(graphNode, SD_GRAPH_PRED, graphNode);
-                    writeStatement(graphNode, RDF.TYPE, SD_NAMED_GRAPH_TYPE);
-                    writeStatement(graphNode, RDF.TYPE, SD_GRAPH_TYPE);
-                    writeStatement(graphNode, RDF.TYPE, VOID_DATASET_TYPE);
+                    writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, graphNode);
+                    writeStatement(graphNode, SD.NAME, SVF.createIRI(graph));
+                    writeStatement(graphNode, SD.GRAPH_PROPERTY, graphNode);
+                    writeStatement(graphNode, RDF.TYPE, SD.NAMED_GRAPH_CLASS);
+                    writeStatement(graphNode, RDF.TYPE, SD.GRAPH_CLASS);
+                    writeStatement(graphNode, RDF.TYPE, VOID.DATASET);
                 }
             }
             writeStatement(graphNode,
-                    SVF.createIRI(VOID_PREFIX, kp.substring(split+1)),
+                    SVF.createIRI(predicate),
                     SVF.createLiteral(count));
 	}
 
@@ -408,7 +475,7 @@ public class HalyardStats implements Tool {
                     source,
                     scan,
                     StatsMapper.class,
-                    Text.class,
+                    BytesWritable.class,
                     LongWritable.class,
                     job);
             job.setReducerClass(StatsReducer.class);

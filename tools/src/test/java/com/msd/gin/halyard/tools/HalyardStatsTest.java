@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.File;
 import java.io.FileInputStream;
@@ -33,6 +34,8 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.SD;
+import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.sail.SailException;
@@ -79,34 +82,34 @@ public class HalyardStatsTest {
             IRI classes = vf.createIRI(voidd, "classes");
             Model m = Rio.parse(in, "", RDFFormat.TRIG);
 
-            assertContains(m, content, HBaseSail.STATS_ROOT_NODE, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE);
-            assertContains(m, content, HBaseSail.STATS_ROOT_NODE, RDF.TYPE, HalyardStats.SD_DATASET_TYPE);
-            assertContains(m, content, HBaseSail.STATS_ROOT_NODE, RDF.TYPE, HalyardStats.SD_GRAPH_TYPE);
-            assertContains(m, content, HBaseSail.STATS_ROOT_NODE, distinctSubjects, vf.createLiteral(100l));
-            assertContains(m, content, HBaseSail.STATS_ROOT_NODE, properties, vf.createLiteral(14l));
-            assertContains(m, content, HBaseSail.STATS_ROOT_NODE, distinctObjects, vf.createLiteral(2000l));
-            assertContains(m, content, HBaseSail.STATS_ROOT_NODE, triples, vf.createLiteral(2000l));
-            assertContains(m, content, HBaseSail.STATS_ROOT_NODE, classes, vf.createLiteral(1000l));
-            assertContains(m, content, HBaseSail.STATS_ROOT_NODE, HalyardStats.SD_DEFAULT_GRAPH_PRED, HBaseSail.STATS_ROOT_NODE);
-            assertContains(m, content, HBaseSail.STATS_ROOT_NODE, HalyardStats.SD_NAMED_GRAPH_PRED, graph0);
-            assertContains(m, content, HBaseSail.STATS_ROOT_NODE, HalyardStats.SD_NAMED_GRAPH_PRED, graph1);
+            assertContains(m, content, HALYARD.STATS_ROOT_NODE, RDF.TYPE, VOID.DATASET);
+            assertContains(m, content, HALYARD.STATS_ROOT_NODE, RDF.TYPE, SD.DATASET);
+            assertContains(m, content, HALYARD.STATS_ROOT_NODE, RDF.TYPE, SD.GRAPH_CLASS);
+            assertContains(m, content, HALYARD.STATS_ROOT_NODE, distinctSubjects, vf.createLiteral(100l));
+            assertContains(m, content, HALYARD.STATS_ROOT_NODE, properties, vf.createLiteral(14l));
+            assertContains(m, content, HALYARD.STATS_ROOT_NODE, distinctObjects, vf.createLiteral(2000l));
+            assertContains(m, content, HALYARD.STATS_ROOT_NODE, triples, vf.createLiteral(2000l));
+            assertContains(m, content, HALYARD.STATS_ROOT_NODE, classes, vf.createLiteral(1000l));
+            assertContains(m, content, HALYARD.STATS_ROOT_NODE, SD.DEFAULT_GRAPH, HALYARD.STATS_ROOT_NODE);
+            assertContains(m, content, HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, graph0);
+            assertContains(m, content, HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, graph1);
 
-            assertContains(m, content, graph0, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE);
-            assertContains(m, content, graph0, RDF.TYPE, HalyardStats.SD_GRAPH_TYPE);
-            assertContains(m, content, graph0, RDF.TYPE, HalyardStats.SD_NAMED_GRAPH_TYPE);
-            assertContains(m, content, graph0, HalyardStats.SD_GRAPH_PRED, graph0);
-            assertContains(m, content, graph0, HalyardStats.SD_NAME_PRED, graph0);
+            assertContains(m, content, graph0, RDF.TYPE, VOID.DATASET);
+            assertContains(m, content, graph0, RDF.TYPE, SD.GRAPH_CLASS);
+            assertContains(m, content, graph0, RDF.TYPE, SD.NAMED_GRAPH_CLASS);
+            assertContains(m, content, graph0, SD.GRAPH_PROPERTY, graph0);
+            assertContains(m, content, graph0, SD.NAME, graph0);
             assertContains(m, content, graph0, distinctSubjects, vf.createLiteral(50l));
             assertContains(m, content, graph0, properties, vf.createLiteral(14l));
             assertContains(m, content, graph0, distinctObjects, vf.createLiteral(900l));
             assertContains(m, content, graph0, triples, vf.createLiteral(900l));
             assertContains(m, content, graph0, classes, vf.createLiteral(450l));
 
-            assertContains(m, content, graph1, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE);
-            assertContains(m, content, graph1, RDF.TYPE, HalyardStats.SD_GRAPH_TYPE);
-            assertContains(m, content, graph1, RDF.TYPE, HalyardStats.SD_NAMED_GRAPH_TYPE);
-            assertContains(m, content, graph1, HalyardStats.SD_GRAPH_PRED, graph1);
-            assertContains(m, content, graph1, HalyardStats.SD_NAME_PRED, graph1);
+            assertContains(m, content, graph1, RDF.TYPE, VOID.DATASET);
+            assertContains(m, content, graph1, RDF.TYPE, SD.GRAPH_CLASS);
+            assertContains(m, content, graph1, RDF.TYPE, SD.NAMED_GRAPH_CLASS);
+            assertContains(m, content, graph1, SD.GRAPH_PROPERTY, graph1);
+            assertContains(m, content, graph1, SD.NAME, graph1);
             assertContains(m, content, graph1, distinctSubjects, vf.createLiteral(50l));
             assertContains(m, content, graph1, properties, vf.createLiteral(14l));
             assertContains(m, content, graph1, distinctObjects, vf.createLiteral(900l));
@@ -116,7 +119,7 @@ public class HalyardStatsTest {
     }
 
     private static void assertContains(Model model, String content, Resource subj, IRI pred, Value obj) {
-        if (!model.contains(subj, pred, obj, HBaseSail.STATS_GRAPH_CONTEXT)) {
+        if (!model.contains(subj, pred, obj, HALYARD.STATS_GRAPH_CONTEXT)) {
             fail(MessageFormat.format("Expected {0} {1} {2} in:\n{3}\n", subj, pred, obj, content));
         }
     }
@@ -141,52 +144,46 @@ public class HalyardStatsTest {
 
         IRI graph0 = vf.createIRI("http://whatever/graph0");
         IRI graph1 = vf.createIRI("http://whatever/graph1");
-        String voidd = "http://rdfs.org/ns/void#";
-        IRI triples = vf.createIRI(voidd, "triples");
-        IRI distinctSubjects = vf.createIRI(voidd, "distinctSubjects");
-        IRI properties = vf.createIRI(voidd, "properties");
-        IRI distinctObjects = vf.createIRI(voidd, "distinctObjects");
-        IRI classes = vf.createIRI(voidd, "classes");
 
-        assertContains(sail, HBaseSail.STATS_ROOT_NODE, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE);
-        assertContains(sail, HBaseSail.STATS_ROOT_NODE, RDF.TYPE, HalyardStats.SD_DATASET_TYPE);
-        assertContains(sail, HBaseSail.STATS_ROOT_NODE, RDF.TYPE, HalyardStats.SD_GRAPH_TYPE);
-        assertContains(sail, HBaseSail.STATS_ROOT_NODE, distinctSubjects, vf.createLiteral(100l));
-        assertContains(sail, HBaseSail.STATS_ROOT_NODE, properties, vf.createLiteral(14l));
-        assertContains(sail, HBaseSail.STATS_ROOT_NODE, distinctObjects, vf.createLiteral(2000l));
-        assertContains(sail, HBaseSail.STATS_ROOT_NODE, triples, vf.createLiteral(2000l));
-        assertContains(sail, HBaseSail.STATS_ROOT_NODE, classes, vf.createLiteral(1000l));
-        assertContains(sail, HBaseSail.STATS_ROOT_NODE, HalyardStats.SD_DEFAULT_GRAPH_PRED, HBaseSail.STATS_ROOT_NODE);
-        assertContains(sail, HBaseSail.STATS_ROOT_NODE, HalyardStats.SD_NAMED_GRAPH_PRED, graph0);
-        assertContains(sail, HBaseSail.STATS_ROOT_NODE, HalyardStats.SD_NAMED_GRAPH_PRED, graph1);
+        assertContains(sail, HALYARD.STATS_ROOT_NODE, RDF.TYPE, VOID.DATASET);
+        assertContains(sail, HALYARD.STATS_ROOT_NODE, RDF.TYPE, SD.DATASET);
+        assertContains(sail, HALYARD.STATS_ROOT_NODE, RDF.TYPE, SD.GRAPH_CLASS);
+        assertContains(sail, HALYARD.STATS_ROOT_NODE, VOID.DISTINCT_SUBJECTS, vf.createLiteral(100l));
+        assertContains(sail, HALYARD.STATS_ROOT_NODE, VOID.PROPERTIES, vf.createLiteral(14l));
+        assertContains(sail, HALYARD.STATS_ROOT_NODE, VOID.DISTINCT_OBJECTS, vf.createLiteral(2000l));
+        assertContains(sail, HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, vf.createLiteral(2000l));
+        assertContains(sail, HALYARD.STATS_ROOT_NODE, VOID.CLASSES, vf.createLiteral(1000l));
+        assertContains(sail, HALYARD.STATS_ROOT_NODE, SD.DEFAULT_GRAPH, HALYARD.STATS_ROOT_NODE);
+        assertContains(sail, HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, graph0);
+        assertContains(sail, HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, graph1);
 
-        assertContains(sail, graph0, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE);
-        assertContains(sail, graph0, RDF.TYPE, HalyardStats.SD_GRAPH_TYPE);
-        assertContains(sail, graph0, RDF.TYPE, HalyardStats.SD_NAMED_GRAPH_TYPE);
-        assertContains(sail, graph0, HalyardStats.SD_GRAPH_PRED, graph0);
-        assertContains(sail, graph0, HalyardStats.SD_NAME_PRED, graph0);
-        assertContains(sail, graph0, distinctSubjects, vf.createLiteral(50l));
-        assertContains(sail, graph0, properties, vf.createLiteral(14l));
-        assertContains(sail, graph0, distinctObjects, vf.createLiteral(900l));
-        assertContains(sail, graph0, triples, vf.createLiteral(900l));
-        assertContains(sail, graph0, classes, vf.createLiteral(450l));
+        assertContains(sail, graph0, RDF.TYPE, VOID.DATASET);
+        assertContains(sail, graph0, RDF.TYPE, SD.GRAPH_CLASS);
+        assertContains(sail, graph0, RDF.TYPE, SD.NAMED_GRAPH_CLASS);
+        assertContains(sail, graph0, SD.GRAPH_PROPERTY, graph0);
+        assertContains(sail, graph0, SD.NAME, graph0);
+        assertContains(sail, graph0, VOID.DISTINCT_SUBJECTS, vf.createLiteral(50l));
+        assertContains(sail, graph0, VOID.PROPERTIES, vf.createLiteral(14l));
+        assertContains(sail, graph0, VOID.DISTINCT_OBJECTS, vf.createLiteral(900l));
+        assertContains(sail, graph0, VOID.TRIPLES, vf.createLiteral(900l));
+        assertContains(sail, graph0, VOID.CLASSES, vf.createLiteral(450l));
 
-        assertContains(sail, graph1, RDF.TYPE, HalyardStats.VOID_DATASET_TYPE);
-        assertContains(sail, graph1, RDF.TYPE, HalyardStats.SD_GRAPH_TYPE);
-        assertContains(sail, graph1, RDF.TYPE, HalyardStats.SD_NAMED_GRAPH_TYPE);
-        assertContains(sail, graph1, HalyardStats.SD_GRAPH_PRED, graph1);
-        assertContains(sail, graph1, HalyardStats.SD_NAME_PRED, graph1);
-        assertContains(sail, graph1, distinctSubjects, vf.createLiteral(50l));
-        assertContains(sail, graph1, properties, vf.createLiteral(14l));
-        assertContains(sail, graph1, distinctObjects, vf.createLiteral(900l));
-        assertContains(sail, graph1, triples, vf.createLiteral(900l));
-        assertContains(sail, graph1, classes, vf.createLiteral(450l));
+        assertContains(sail, graph1, RDF.TYPE, VOID.DATASET);
+        assertContains(sail, graph1, RDF.TYPE, SD.GRAPH_CLASS);
+        assertContains(sail, graph1, RDF.TYPE, SD.NAMED_GRAPH_CLASS);
+        assertContains(sail, graph1, SD.GRAPH_PROPERTY, graph1);
+        assertContains(sail, graph1, SD.NAME, graph1);
+        assertContains(sail, graph1, VOID.DISTINCT_SUBJECTS, vf.createLiteral(50l));
+        assertContains(sail, graph1, VOID.PROPERTIES, vf.createLiteral(14l));
+        assertContains(sail, graph1, VOID.DISTINCT_OBJECTS, vf.createLiteral(900l));
+        assertContains(sail, graph1, VOID.TRIPLES, vf.createLiteral(900l));
+        assertContains(sail, graph1, VOID.CLASSES, vf.createLiteral(450l));
 
         sail.close();
     }
 
     private static void assertContains(HBaseSail sail, Resource subj, IRI pred, Value obj) {
-        try (CloseableIteration<? extends Statement,SailException> it = sail.getStatements(subj, pred, obj, true, HBaseSail.STATS_GRAPH_CONTEXT)) {
+        try (CloseableIteration<? extends Statement,SailException> it = sail.getStatements(subj, pred, obj, true, HALYARD.STATS_GRAPH_CONTEXT)) {
             if (!it.hasNext()) {
                 fail(MessageFormat.format("Expected {0} {1} {2}", subj, pred, obj));
             }

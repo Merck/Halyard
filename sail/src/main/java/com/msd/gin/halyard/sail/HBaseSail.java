@@ -53,6 +53,8 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.SD;
+import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
@@ -105,15 +107,8 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         public void tick();
     }
 
-    public static final String HALYARD_NAMESPACE = "http://merck.github.io/Halyard/ns#";
-    private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
-    public static final IRI STATS_ROOT_NODE = SVF.createIRI(HALYARD_NAMESPACE, "statsRoot");
-    public static final IRI STATS_GRAPH_CONTEXT = SVF.createIRI(HALYARD_NAMESPACE, "statsContext");
-    private static final IRI NAMESPACE_PREFIX_PREDICATE = SVF.createIRI(HALYARD_NAMESPACE, "namespacePrefix");
     private static final Logger LOG = Logger.getLogger(HBaseSail.class.getName());
     private static final long STATUS_CACHING_TIMEOUT = 60000l;
-    static final IRI VOID_TRIPLES = SVF.createIRI("http://rdfs.org/ns/void#triples");
-    public static final IRI SD_NAMED_GRAPH_PRED = SVF.createIRI("http://www.w3.org/ns/sparql-service-description#namedGraph");
 
     private final Configuration config;
     final String tableName;
@@ -179,7 +174,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     public void initialize() throws SailException {
         try {
             table = HalyardTableUtils.getTable(config, tableName, create, splitBits, null);
-            try (CloseableIteration<? extends Statement, SailException> nsIter = getStatements(null, NAMESPACE_PREFIX_PREDICATE, null, true)) {
+            try (CloseableIteration<? extends Statement, SailException> nsIter = getStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null, true)) {
                 while (nsIter.hasNext()) {
                     Statement st = nsIter.next();
                     if (st.getObject() instanceof Literal) {
@@ -196,8 +191,8 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public FederatedService getService(String serviceUrl) throws QueryEvaluationException {
-        if (serviceUrl.startsWith(HALYARD_NAMESPACE)) {
-            String federatedTable = serviceUrl.substring(HALYARD_NAMESPACE.length());
+        if (serviceUrl.startsWith(HALYARD.NAMESPACE)) {
+            String federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length());
             RepositoryFederatedService s = federatedServices.get(federatedTable);
             if (s == null) {
                 s = new RepositoryFederatedService(new SailRepository(new HBaseSail(config, federatedTable, false, 0, true, evaluationTimeout, ticker)));
@@ -332,7 +327,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public CloseableIteration<? extends Resource, SailException> getContextIDs() throws SailException {
-        final CloseableIteration<? extends Statement, SailException> scanner = getStatements(STATS_ROOT_NODE, SD_NAMED_GRAPH_PRED, null, true, STATS_GRAPH_CONTEXT);
+        final CloseableIteration<? extends Statement, SailException> scanner = getStatements(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, null, true, HALYARD.STATS_GRAPH_CONTEXT);
         return new CloseableIteration<Resource, SailException>() {
             @Override
             public void close() throws SailException {
@@ -367,7 +362,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         long size = 0;
         if (contexts != null && contexts.length > 0 && contexts[0] != null) {
             for (Resource ctx : contexts) {
-                try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(ctx, VOID_TRIPLES, null, true, STATS_GRAPH_CONTEXT)) {
+                try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(ctx, VOID.TRIPLES, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
                     if (scanner.hasNext()) {
                         size += ((Literal)scanner.next().getObject()).longValue();
                     }
@@ -377,7 +372,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                 }
             }
         } else {
-            try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(STATS_ROOT_NODE, VOID_TRIPLES, null, true, STATS_GRAPH_CONTEXT)) {
+            try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
                 if (scanner.hasNext()) {
                     size += ((Literal)scanner.next().getObject()).longValue();
                 }
@@ -521,9 +516,9 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         ValueFactory vf = SimpleValueFactory.getInstance();
         try {
             if (oldNS != null) {
-                removeStatement(null, vf.createIRI(oldNS.getName()), NAMESPACE_PREFIX_PREDICATE, vf.createLiteral(prefix));
+                removeStatement(null, vf.createIRI(oldNS.getName()), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix));
             }
-            addStatementInternal(vf.createIRI(name), NAMESPACE_PREFIX_PREDICATE, vf.createLiteral(prefix), null);
+            addStatementInternal(vf.createIRI(name), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), null);
         } catch (SailException e) {
             LOG.log(Level.WARNING, "Namespace prefix could not be presisted due to an exception", e);
         }
@@ -534,7 +529,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         ValueFactory vf = SimpleValueFactory.getInstance();
         Namespace ns = namespaces.remove(prefix);
         if (ns != null) try {
-            removeStatement(null, vf.createIRI(ns.getName()), NAMESPACE_PREFIX_PREDICATE, vf.createLiteral(prefix));
+            removeStatement(null, vf.createIRI(ns.getName()), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix));
         } catch (SailException e) {
             LOG.log(Level.WARNING, "Namespace prefix could not be removed due to an exception", e);
         }
@@ -543,7 +538,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     @Override
     public void clearNamespaces() throws SailException {
         try {
-            removeStatements(null, NAMESPACE_PREFIX_PREDICATE, null);
+            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null);
         } catch (SailException e) {
             LOG.log(Level.WARNING, "Namespaces could not be cleared due to an exception", e);
         }

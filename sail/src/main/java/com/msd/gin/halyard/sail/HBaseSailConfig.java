@@ -38,24 +38,16 @@ import org.eclipse.rdf4j.sail.config.SailConfigSchema;
  */
 public final class HBaseSailConfig extends AbstractSailImplConfig {
 
-    final static IRI TABLESPACE, SPLITBITS, CREATE, PUSH, TIMEOUT;
-
     private static final Map<IRI, IRI> BACK_COMPATIBILITY_MAP = new HashMap<>();
     private static final String OLD_NAMESPACE = "http://gin.msd.com/halyard/sail/hbase#";
 
     static {
         ValueFactory factory = SimpleValueFactory.getInstance();
-        TABLESPACE = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "tableName");
-        SPLITBITS = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "splitBits");
-        CREATE = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "createTable");
-        PUSH = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "pushStrategy");
-        TIMEOUT = factory.createIRI(HBaseSail.HALYARD_NAMESPACE, "evaluationTimeout");
-
-        BACK_COMPATIBILITY_MAP.put(TABLESPACE, factory.createIRI(OLD_NAMESPACE, "tablespace"));
-        BACK_COMPATIBILITY_MAP.put(SPLITBITS, factory.createIRI(OLD_NAMESPACE, "splitbits"));
-        BACK_COMPATIBILITY_MAP.put(CREATE, factory.createIRI(OLD_NAMESPACE, "create"));
-        BACK_COMPATIBILITY_MAP.put(PUSH, factory.createIRI(OLD_NAMESPACE, "pushstrategy"));
-        BACK_COMPATIBILITY_MAP.put(TIMEOUT, factory.createIRI(OLD_NAMESPACE, "evaluationtimeout"));
+        BACK_COMPATIBILITY_MAP.put(HALYARD.TABLE_NAME_PROPERTY, factory.createIRI(OLD_NAMESPACE, "tablespace"));
+        BACK_COMPATIBILITY_MAP.put(HALYARD.SPLITBITS_PROPERTY, factory.createIRI(OLD_NAMESPACE, "splitbits"));
+        BACK_COMPATIBILITY_MAP.put(HALYARD.CREATE_TABLE_PROPERTY, factory.createIRI(OLD_NAMESPACE, "create"));
+        BACK_COMPATIBILITY_MAP.put(HALYARD.PUSH_STRATEGY_PROPERTY, factory.createIRI(OLD_NAMESPACE, "pushstrategy"));
+        BACK_COMPATIBILITY_MAP.put(HALYARD.EVALUATION_TIMEOUT_PROPERTY, factory.createIRI(OLD_NAMESPACE, "evaluationtimeout"));
     }
 
     private String tablespace = null;
@@ -160,11 +152,11 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
     public Resource export(Model graph) {
         Resource implNode = super.export(graph);
         ValueFactory vf = SimpleValueFactory.getInstance();
-        if (tablespace != null) graph.add(implNode, TABLESPACE, vf.createLiteral(tablespace));
-        graph.add(implNode, SPLITBITS, vf.createLiteral(splitBits));
-        graph.add(implNode, CREATE, vf.createLiteral(create));
-        graph.add(implNode, PUSH, vf.createLiteral(push));
-        graph.add(implNode, TIMEOUT, vf.createLiteral(evaluationTimeout));
+        if (tablespace != null) graph.add(implNode, HALYARD.TABLE_NAME_PROPERTY, vf.createLiteral(tablespace));
+        graph.add(implNode, HALYARD.SPLITBITS_PROPERTY, vf.createLiteral(splitBits));
+        graph.add(implNode, HALYARD.CREATE_TABLE_PROPERTY, vf.createLiteral(create));
+        graph.add(implNode, HALYARD.PUSH_STRATEGY_PROPERTY, vf.createLiteral(push));
+        graph.add(implNode, HALYARD.EVALUATION_TIMEOUT_PROPERTY, vf.createLiteral(evaluationTimeout));
         return implNode;
     }
 
@@ -177,7 +169,7 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
     @Override
     public void parse(Model graph, Resource implNode) throws SailConfigException {
         super.parse(graph, implNode);
-        Optional<Literal> tablespaceValue = backCompatibilityFilterObjectLiteral(graph, implNode, TABLESPACE);
+        Optional<Literal> tablespaceValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.TABLE_NAME_PROPERTY);
         if (tablespaceValue.isPresent() && tablespaceValue.get().stringValue().length() > 0) {
             setTablespace(tablespaceValue.get().stringValue());
         } else {
@@ -194,25 +186,25 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
             }
 
         }
-        Optional<Literal> splitBitsValue = backCompatibilityFilterObjectLiteral(graph, implNode, SPLITBITS);
+        Optional<Literal> splitBitsValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.SPLITBITS_PROPERTY);
         if (splitBitsValue.isPresent()) try {
             setSplitBits(splitBitsValue.get().intValue());
         } catch (NumberFormatException e) {
             throw new SailConfigException(e);
         }
-        Optional<Literal> createValue = backCompatibilityFilterObjectLiteral(graph, implNode, CREATE);
+        Optional<Literal> createValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.CREATE_TABLE_PROPERTY);
         if (createValue.isPresent()) try {
             setCreate(createValue.get().booleanValue());
         } catch (IllegalArgumentException e) {
             throw new SailConfigException(e);
         }
-        Optional<Literal> pushValue = backCompatibilityFilterObjectLiteral(graph, implNode, PUSH);
+        Optional<Literal> pushValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.PUSH_STRATEGY_PROPERTY);
         if (pushValue.isPresent()) try {
             setPush(pushValue.get().booleanValue());
         } catch (IllegalArgumentException e) {
             throw new SailConfigException(e);
         }
-        Optional<Literal> timeoutValue = backCompatibilityFilterObjectLiteral(graph, implNode, TIMEOUT);
+        Optional<Literal> timeoutValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.EVALUATION_TIMEOUT_PROPERTY);
         if (timeoutValue.isPresent()) try {
             setEvaluationTimeout(timeoutValue.get().intValue());
         } catch (NumberFormatException e) {

@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.sail.HALYARD;
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_CONTEXT_PROPERTY;
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.OVERRIDE_CONTEXT_PROPERTY;
 import com.msd.gin.halyard.sail.HBaseSail;
@@ -87,7 +88,7 @@ public class HalyardBulkUpdate implements Tool {
     /**
      * Full URI of a custom SPARQL function to decimate parallel evaluation based on Mapper index
      */
-    public static final String DECIMATE_FUNCTION_URI = HBaseSail.HALYARD_NAMESPACE + DECIMATE_FUNCTION_NAME;
+    public static final String DECIMATE_FUNCTION_URI = HALYARD.NAMESPACE + DECIMATE_FUNCTION_NAME;
     private static final String TABLE_NAME_PROPERTY = "halyard.table.name";
     private static final String CHECK_BEFORE_WRITE_PROPERTY = "halyard.check.before.write";
     private static final Logger LOG = Logger.getLogger(HalyardBulkUpdate.class.getName());

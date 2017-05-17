@@ -32,6 +32,8 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.SD;
+import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
@@ -131,7 +133,7 @@ public class HBaseSailTest {
         Configuration cfg = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(cfg, "whatevertablectx", true, 0, true, 0, null);
         sail.initialize();
-        sail.addStatement(HBaseSail.STATS_ROOT_NODE, HBaseSail.SD_NAMED_GRAPH_PRED, vf.createIRI("http://whatever/ctx"), HBaseSail.STATS_GRAPH_CONTEXT);
+        sail.addStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, vf.createIRI("http://whatever/ctx"), HALYARD.STATS_GRAPH_CONTEXT);
         sail.commit();
         try (CloseableIteration<? extends Resource, SailException> ctxIt = sail.getContextIDs()) {
             assertTrue(ctxIt.hasNext());
@@ -145,7 +147,7 @@ public class HBaseSailTest {
         Configuration cfg = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(cfg, "whatevertablesize", true, 0, true, 0, null);
         sail.initialize();
-        sail.addStatement(HBaseSail.STATS_ROOT_NODE, HBaseSail.VOID_TRIPLES, vf.createLiteral(567), HBaseSail.STATS_GRAPH_CONTEXT);
+        sail.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, vf.createLiteral(567), HALYARD.STATS_GRAPH_CONTEXT);
         sail.commit();
         assertEquals(567, sail.size());
     }
@@ -273,7 +275,7 @@ public class HBaseSailTest {
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverparent", true, 0, true, 0, null);
         rep = new SailRepository(sail);
         rep.initialize();
-        TupleQuery q = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "select * {SERVICE <" + HBaseSail.HALYARD_NAMESPACE +"whateverservice> {?s ?p ?o}}");
+        TupleQuery q = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "select * {SERVICE <" + HALYARD.NAMESPACE +"whateverservice> {?s ?p ?o}}");
         TupleQueryResult res = q.evaluate();
         assertTrue(res.hasNext());
         rep.shutDown();
