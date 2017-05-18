@@ -29,4 +29,12 @@ public class VOID_EXT {
 
     public static final IRI DISTINCT_LITERALS = SVF.createIRI(NAMESPACE, "distinctLiterals");
 
+    public static final IRI SUBJECT = SVF.createIRI(NAMESPACE, "subject");
+
+    public static final IRI SUBJECT_PARTITION = SVF.createIRI(NAMESPACE, "subjectPartition");
+
+    public static final IRI OBJECT = SVF.createIRI(NAMESPACE, "object");
+
+    public static final IRI OBJECT_PARTITION = SVF.createIRI(NAMESPACE, "objectPartition");
+
 }

@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.text.MessageFormat;
@@ -70,7 +71,6 @@ import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
-import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SD;
@@ -90,6 +90,7 @@ public class HalyardStats implements Tool {
 
     private static final String SOURCE = "halyard.stats.source";
     private static final String TARGET = "halyard.stats.target";
+    static final String SUBSET_THRESHOLD = "halyard.stats.subset.threshold";
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
     private static final Logger LOG = Logger.getLogger(HalyardStats.class.getName());
@@ -111,6 +112,14 @@ public class HalyardStats implements Tool {
         IRI graph = HALYARD.STATS_ROOT_NODE;
         long triples, distinctSubjects, properties, distinctObjects, classes;
         long distinctIRIReferenceSubjects, distinctIRIReferenceObjects, distinctBlankNodeObjects, distinctBlankNodeSubjects, distinctLiterals;
+        IRI subsetType;
+        String subsetId;
+        long subsetThreshold, subsetCounter;
+
+        @Override
+        protected void setup(Context context) throws IOException, InterruptedException {
+            subsetThreshold = context.getConfiguration().getLong(SUBSET_THRESHOLD, 5000);
+        }
 
         private boolean matchAndCopyKey(byte[] source, int offset, byte[] target) {
             boolean match = true;
@@ -135,7 +144,6 @@ public class HalyardStats implements Tool {
             bb.get(ob);
             byte[] cb = new byte[bb.remaining()];
             bb.get(cb);
-            ValueFactory vf = SimpleValueFactory.getInstance();
             return new String[]{new String(sb, UTF8), new String(pb, UTF8), new String(ob, UTF8), cb.length == 0 ? null : new String(cb,UTF8)};
         }
 
@@ -170,6 +178,9 @@ public class HalyardStats implements Tool {
                         } else {
                             distinctBlankNodeSubjects++;
                         }
+                        cleanupSubset(output);
+                        subsetType = VOID_EXT.SUBJECT;
+                        subsetId = s[0];
                     }
                     triples += value.rawCells().length;
                     break;
@@ -177,63 +188,79 @@ public class HalyardStats implements Tool {
                 case HalyardTableUtils.CPOS_PREFIX:
                     if (hashChange) {
                         properties++;
+                        cleanupSubset(output);
+                        subsetType = VOID.PROPERTY;
+                        subsetId = parseStatement(value)[1];
                     }
                     if (Arrays.equals(TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + 20, lastClassFragment) || hashChange)) {
                             classes++;
                     }
                     break;
-                    case HalyardTableUtils.OSP_PREFIX:
-                    case HalyardTableUtils.COSP_PREFIX:
-                        if (hashChange) {
-                            distinctObjects++;
-                            String s[] = parseStatement(value);
-                            if (s[2].charAt(0) == '<') {
-                                distinctIRIReferenceObjects++;
-                            } else if (s[2].startsWith("_:")) {
-                                distinctBlankNodeObjects++;
-                            } else {
-                                distinctLiterals++;
-                            }
+                case HalyardTableUtils.OSP_PREFIX:
+                case HalyardTableUtils.COSP_PREFIX:
+                    if (hashChange) {
+                        distinctObjects++;
+                        String s[] = parseStatement(value);
+                        if (s[2].charAt(0) == '<') {
+                            distinctIRIReferenceObjects++;
+                        } else if (s[2].startsWith("_:")) {
+                            distinctBlankNodeObjects++;
+                        } else {
+                            distinctLiterals++;
                         }
-                        break;
+                        cleanupSubset(output);
+                        subsetType = VOID_EXT.OBJECT;
+                        subsetId = s[2];
+                    }
+                    break;
             }
+            subsetCounter += value.rawCells().length;
             lastRegion = region;
             if ((counter++ % 100000) == 0) {
                 output.setStatus(MessageFormat.format("reg:{0} {1} t:{2} s:{3} p:{4} o:{5} c:{6}", region, counter, triples, distinctSubjects, properties, distinctObjects, classes));
             }
         }
 
-        private void report(Context output, IRI property, long value) throws IOException, InterruptedException {
+        private void report(Context output, IRI property, String partitionId, long value) throws IOException, InterruptedException {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             try (DataOutputStream dos = new DataOutputStream(baos)) {
                 dos.writeUTF(graph.stringValue());
                 dos.writeUTF(property.stringValue());
+                dos.writeUTF(partitionId == null ? "" : partitionId);
             }
             output.write(new BytesWritable(baos.toByteArray()), new LongWritable(value));
         }
 
+        protected void cleanupSubset(Context output) throws IOException, InterruptedException {
+            if (subsetCounter >= subsetThreshold) {
+                report(output, subsetType, subsetId, subsetCounter);
+            }
+            subsetCounter = 0;
+        }
+
         @Override
         protected void cleanup(Context output) throws IOException, InterruptedException {
-            report(output, VOID.TRIPLES, triples);
+            report(output, VOID.TRIPLES, null, triples);
             triples = 0;
-            report(output, VOID.DISTINCT_SUBJECTS, distinctSubjects);
+            report(output, VOID.DISTINCT_SUBJECTS, null, distinctSubjects);
             distinctSubjects = 0;
-            report(output, VOID.PROPERTIES, properties);
+            report(output, VOID.PROPERTIES, null, properties);
             properties = 0;
-            report(output, VOID.DISTINCT_OBJECTS, distinctObjects);
+            report(output, VOID.DISTINCT_OBJECTS, null, distinctObjects);
             distinctObjects = 0;
-            report(output, VOID.CLASSES, classes);
+            report(output, VOID.CLASSES, null, classes);
             classes = 0;
-            report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_OBJECTS, distinctIRIReferenceObjects);
+            report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_OBJECTS, null, distinctIRIReferenceObjects);
             distinctIRIReferenceObjects = 0;
-            report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_SUBJECTS, distinctIRIReferenceSubjects);
+            report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_SUBJECTS, null, distinctIRIReferenceSubjects);
             distinctIRIReferenceSubjects = 0;
-            report(output, VOID_EXT.DISTINCT_BLANK_NODE_OBJECTS, distinctBlankNodeObjects);
+            report(output, VOID_EXT.DISTINCT_BLANK_NODE_OBJECTS, null, distinctBlankNodeObjects);
             distinctBlankNodeObjects = 0;
-            report(output, VOID_EXT.DISTINCT_BLANK_NODE_SUBJECTS, distinctBlankNodeSubjects);
+            report(output, VOID_EXT.DISTINCT_BLANK_NODE_SUBJECTS, null, distinctBlankNodeSubjects);
             distinctBlankNodeSubjects = 0;
-            report(output, VOID_EXT.DISTINCT_LITERALS, distinctLiterals);
+            report(output, VOID_EXT.DISTINCT_LITERALS, null, distinctLiterals);
             distinctLiterals = 0;
+            cleanupSubset(output);
         }
 
     }
@@ -296,9 +323,11 @@ public class HalyardStats implements Tool {
             }
             String graph;
             String predicate;
+            String partitionId;
             try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.getBytes()))) {
                 graph = dis.readUTF();
                 predicate = dis.readUTF();
+                partitionId = dis.readUTF();
             }
             IRI graphNode;
             if (graph.equals(HALYARD.STATS_ROOT_NODE.stringValue())) {
@@ -314,9 +343,16 @@ public class HalyardStats implements Tool {
                     writeStatement(graphNode, RDF.TYPE, VOID.DATASET);
                 }
             }
-            writeStatement(graphNode,
-                    SVF.createIRI(predicate),
-                    SVF.createLiteral(count));
+            if (partitionId.length() > 0) {
+                IRI pred = SVF.createIRI(predicate);
+                IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + URLEncoder.encode(partitionId, "UTF-8"));
+                writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);
+                writeStatement(subset, RDF.TYPE, VOID.DATASET);
+                writeStatement(subset, pred, NTriplesUtil.parseValue(partitionId, SVF));
+                writeStatement(subset, VOID.TRIPLES, SVF.createLiteral(count));
+            } else {
+                writeStatement(graphNode, SVF.createIRI(predicate), SVF.createLiteral(count));
+            }
 	}
 
         private void writeStatement(Resource subj, IRI pred, Value obj) {
