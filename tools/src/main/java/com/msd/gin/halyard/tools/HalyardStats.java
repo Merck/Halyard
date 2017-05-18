@@ -133,20 +133,6 @@ public class HalyardStats implements Tool {
             return match;
         }
 
-        private static String[] parseStatement(Result value) {
-            Cell c = value.rawCells()[0];
-            ByteBuffer bb = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
-            byte[] sb = new byte[bb.getInt()];
-            byte[] pb = new byte[bb.getInt()];
-            byte[] ob = new byte[bb.getInt()];
-            bb.get(sb);
-            bb.get(pb);
-            bb.get(ob);
-            byte[] cb = new byte[bb.remaining()];
-            bb.get(cb);
-            return new String[]{new String(sb, UTF8), new String(pb, UTF8), new String(ob, UTF8), cb.length == 0 ? null : new String(cb,UTF8)};
-        }
-
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
@@ -167,50 +153,59 @@ public class HalyardStats implements Tool {
                 }
             }
             boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, lastKeyFragment) || region != lastRegion;
-            switch (region) {
-                case HalyardTableUtils.SPO_PREFIX:
-                case HalyardTableUtils.CSPO_PREFIX:
-                    if (hashChange) {
+            if (hashChange) {
+                cleanupSubset(output);
+                Cell c = value.rawCells()[0];
+                ByteBuffer bb = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
+                byte[] sb = new byte[bb.getInt()];
+                byte[] pb = new byte[bb.getInt()];
+                byte[] ob = new byte[bb.getInt()];
+                bb.get(sb);
+                bb.get(pb);
+                bb.get(ob);
+                switch (region) {
+                    case HalyardTableUtils.SPO_PREFIX:
+                    case HalyardTableUtils.CSPO_PREFIX:
                         distinctSubjects++;
-                        String s[] = parseStatement(value);
-                        if (s[0].charAt(0) == '<') {
+                        if (sb[0] == '<') {
                             distinctIRIReferenceSubjects++;
                         } else {
                             distinctBlankNodeSubjects++;
                         }
-                        cleanupSubset(output);
                         subsetType = VOID_EXT.SUBJECT;
-                        subsetId = s[0];
-                    }
-                    triples += value.rawCells().length;
-                    break;
-                case HalyardTableUtils.POS_PREFIX:
-                case HalyardTableUtils.CPOS_PREFIX:
-                    if (hashChange) {
+                        subsetId = new String(sb, UTF8);
+                        break;
+                    case HalyardTableUtils.POS_PREFIX:
+                    case HalyardTableUtils.CPOS_PREFIX:
                         properties++;
-                        cleanupSubset(output);
                         subsetType = VOID.PROPERTY;
-                        subsetId = parseStatement(value)[1];
-                    }
-                    if (Arrays.equals(TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + 20, lastClassFragment) || hashChange)) {
-                            classes++;
-                    }
-                    break;
-                case HalyardTableUtils.OSP_PREFIX:
-                case HalyardTableUtils.COSP_PREFIX:
-                    if (hashChange) {
+                        subsetId = new String(pb, UTF8);
+                        break;
+                    case HalyardTableUtils.OSP_PREFIX:
+                    case HalyardTableUtils.COSP_PREFIX:
                         distinctObjects++;
-                        String s[] = parseStatement(value);
-                        if (s[2].charAt(0) == '<') {
+                        String obj = new String(ob, UTF8);
+                        if (ob[0] == '<') {
                             distinctIRIReferenceObjects++;
-                        } else if (s[2].startsWith("_:")) {
+                        } else if (obj.startsWith("_:")) {
                             distinctBlankNodeObjects++;
                         } else {
                             distinctLiterals++;
                         }
-                        cleanupSubset(output);
                         subsetType = VOID_EXT.OBJECT;
-                        subsetId = s[2];
+                        subsetId = obj;
+                        break;
+                }
+            }
+            switch (region) {
+                case HalyardTableUtils.SPO_PREFIX:
+                case HalyardTableUtils.CSPO_PREFIX:
+                    triples += value.rawCells().length;
+                    break;
+                case HalyardTableUtils.POS_PREFIX:
+                case HalyardTableUtils.CPOS_PREFIX:
+                    if (Arrays.equals(TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + 20, lastClassFragment) || hashChange)) {
+                            classes++;
                     }
                     break;
             }
