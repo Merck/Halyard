@@ -188,7 +188,7 @@ Halyard Parallel Export is a MapReduce application executing multiple Halyard Ex
 
 ### Halyard Stats
 
-Halyard Stats is a MapReduce application calculating dataset statistics and reporting them back to the dataset (under `http://merck.github.io/Halyard/ns#statsContext` named graph). The statistics are generated according to [VoID Vocabulary - Providing statistics about datasets](http://www.w3.org/TR/void/#statistics) and [SPARQL 1.1 Service Description](http://www.w3.org/TR/sparql11-service-description/).
+Halyard Stats is a MapReduce application calculating dataset statistics and reporting them back to the dataset (under `http://merck.github.io/Halyard/ns#statsContext` named graph). The statistics are generated according to [VoID Vocabulary - Providing statistics about datasets](http://www.w3.org/TR/void/#statistics), [Extensions to the Vocabulary of Interlinked Datasets (VoID)](http://ldf.fi/void-ext), and [SPARQL 1.1 Service Description](http://www.w3.org/TR/sparql11-service-description/).
 
 ![Halyard Stats](img/stats.png)
 
@@ -197,38 +197,113 @@ Halyard Stats is a MapReduce application calculating dataset statistics and repo
 ```
 @prefix sd: <http://www.w3.org/ns/sparql-service-description#> .
 @prefix void: <http://rdfs.org/ns/void#> .
+@prefix void-ext: <http://ldf.fi/void-ext#> .
 @prefix halyard: <http://merck.github.io/Halyard/ns#> .
 
-
 halyard:statsContext {
-	halyard:statsRoot a void:Dataset , sd:Dataset , sd:Graph ;
-		sd:defaultGraph halyard:statsRoot ;
-		void:classes "1000"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:distinctObjects "2000"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:distinctSubjects "100"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:properties "14"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:triples "2000"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		sd:namedGraph <http://whatever/graph0> .
+    halyard:statsRoot a void:Dataset , sd:Dataset , sd:Graph ;
+        sd:defaultGraph halyard:statsRoot ;
+        void:classes "1000"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:triples "2300"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:properties "112"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctLiterals "889"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:distinctObjects "1991"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:distinctSubjects "229"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctBlankNodeObjects "101"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctBlankNodeSubjects "78"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctIRIReferenceObjects "1001"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctIRIReferenceSubjects "151"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        sd:namedGraph <http://whatever/graph0> ;
+        sd:namedGraph <http://whatever/graph1> ;
+        void-ext:subjectPartition halyard:statsRoot_subject__%3Abnodeid ;
+        void-ext:subjectPartition halyard:statsRoot_subject_%3Chttp%3A%2F%2Ffrequent%2Firi%3E ;
+        void:propertyPartition halyard:statsRoot_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E ;
+        void-ext:objectPartition halyard:statsRoot_object__%3Abnodeid ;
+        void-ext:objectPartition halyard:statsRoot_object_%3Chttp%3A%2F%2Ffrequent%2Firi%3E ;
+        void-ext:objectPartition halyard:statsRoot_object_%2242%22%5E%5E%3Chttp%3A%2F%2Fwww.w3.org%2F2001%2FXMLSchema%23int%3E .
 
-	<http://whatever/graph0> sd:name <http://whatever/graph0> ;
-		sd:graph <http://whatever/graph0> ;
-		a sd:NamedGraph , sd:Graph , void:Dataset ;
-		void:classes "450"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:distinctObjects "900"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:distinctSubjects "50"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:properties "14"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:triples "900"^^<http://www.w3.org/2001/XMLSchema#long> .
+    <http://whatever/graph0> sd:name <http://whatever/graph0> ;
+        sd:graph <http://whatever/graph0> ;
+        a sd:NamedGraph , sd:Graph , void:Dataset ;
+        void:properties "112"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctLiterals "356"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:distinctObjects "801"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:distinctSubjects "107"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctBlankNodeObjects "44"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctBlankNodeSubjects "32"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctIRIReferenceObjects "401"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctIRIReferenceSubjects "75"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:classes "400"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:triples "900"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:subjectPartition <http://whatever/graph0_subject__%3Abnodeid> ;
+        void:propertyPartition <http://whatever/graph0_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E> ;
+        void-ext:objectPartition <http://whatever/graph0_object_%3Chttp%3A%2F%2Ffrequent%2Firi%3E> .
 
-	halyard:statsRoot sd:namedGraph <http://whatever/graph1> .
+    <http://whatever/graph1> sd:name <http://whatever/graph1> ;
+        sd:graph <http://whatever/graph1> ;
+        a sd:NamedGraph , sd:Graph , void:Dataset ;
+        void:classes "400"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:triples "900"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:properties "112"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctLiterals "355"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:distinctObjects "801"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void:distinctSubjects "106"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctBlankNodeObjects "46"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctBlankNodeSubjects "30"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctIRIReferenceObjects "400"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:distinctIRIReferenceSubjects "76"^^<http://www.w3.org/2001/XMLSchema#long> ;
+        void-ext:subjectPartition <http://whatever/graph1_subject_%3Chttp%3A%2F%2Ffrequent%2Firi%3E> ;
+        void:propertyPartition <http://whatever/graph1_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E> ;
+        void-ext:objectPartition <http://whatever/graph1_object__%3Abnodeid> .
 
-	<http://whatever/graph1> sd:name <http://whatever/graph1> ;
-		sd:graph <http://whatever/graph1> ;
-		a sd:NamedGraph , sd:Graph , void:Dataset ;
-		void:classes "450"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:distinctObjects "900"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:distinctSubjects "50"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:properties "14"^^<http://www.w3.org/2001/XMLSchema#long> ;
-		void:triples "900"^^<http://www.w3.org/2001/XMLSchema#long> .
+    halyard:statsRoot_object__%3Abnodeid a void:Dataset ;
+        void-ext:object _:bnodeid ;
+        void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+    halyard:statsRoot_object_%3Chttp%3A%2F%2Ffrequent%2Firi%3E a void:Dataset ;
+        void-ext:object <http://frequent/iri> ;
+        void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+    halyard:statsRoot_object_%2242%22%5E%5E%3Chttp%3A%2F%2Fwww.w3.org%2F2001%2FXMLSchema%23int%3E a void:Dataset ;
+        void-ext:object "42"^^<http://www.w3.org/2001/XMLSchema#int> ;
+        void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+    halyard:statsRoot_subject__%3Abnodeid a void:Dataset ;
+        void-ext:subject _:bnodeid ;
+        void:triples "200"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+    halyard:statsRoot_subject_%3Chttp%3A%2F%2Ffrequent%2Firi%3E a void:Dataset ;
+        void-ext:subject <http://frequent/iri> ;
+        void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+    halyard:statsRoot_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E a void:Dataset ;
+        void:property <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ;
+        void:triples "1000"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+    <http://whatever/graph0_object_%3Chttp%3A%2F%2Ffrequent%2Firi%3E> a void:Dataset ;
+        void-ext:object <http://frequent/iri> ;
+        void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+    <http://whatever/graph0_subject__%3Abnodeid> a void:Dataset ;
+        void-ext:subject _:bnodeid ;
+        void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+    <http://whatever/graph0_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E> a void:Dataset ;
+        void:property <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ;
+        void:triples "400"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+
+    <http://whatever/graph1_object__%3Abnodeid> a void:Dataset ;
+        void-ext:object _:bnodeid ;
+        void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+    <http://whatever/graph1_subject_%3Chttp%3A%2F%2Ffrequent%2Firi%3E> a void:Dataset ;
+        void-ext:subject <http://frequent/iri> ;
+        void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+    <http://whatever/graph1_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E> a void:Dataset ;
+        void:property <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ;
+        void:triples "400"^^<http://www.w3.org/2001/XMLSchema#long> .
 }
 ```
 
@@ -239,6 +314,7 @@ halyard:statsContext {
 3. Execute `./stats -s <HBase_table_name>` to launch the statistics calculation. Following features are supported:
 	* Target file format and optional compression (for hdfs: targets) is determined from the target file extension. Statistics are stored back to the dataset when target file is not specified. 
 	* Option `-Dhalyard.stats.graph.context=<graph context url>` can override default statistics target graph context `http://merck.github.io/Halyard/ns#statsContext`.
+	* Option `-Dhalyard.stats.subset.threshold=<long value>` can override default threshold value `1000` for generation of subsets in statistics. Statistics will include virtual partitions for all subjects, properties and objects with cardinality higher than given threshold. Lower value may mess the statistics with many virtual partitions.
 
 
 ### RDF4J Web Applications
