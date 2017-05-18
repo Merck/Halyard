@@ -1,0 +1,110 @@
+@prefix sd: <http://www.w3.org/ns/sparql-service-description#> .
+@prefix void: <http://rdfs.org/ns/void#> .
+@prefix void-ext: <http://ldf.fi/void-ext#> .
+@prefix halyard: <http://merck.github.io/Halyard/ns#> .
+
+halyard:statsContext {
+	halyard:statsRoot a void:Dataset , sd:Dataset , sd:Graph ;
+		sd:defaultGraph halyard:statsRoot ;
+	    void:classes "1000"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:triples "2300"^^<http://www.w3.org/2001/XMLSchema#long> ;
+	    void:properties "112"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctLiterals "889"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctObjects "1991"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctSubjects "229"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctBlankNodeObjects "101"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctBlankNodeSubjects "78"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctIRIReferenceObjects "1001"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctIRIReferenceSubjects "151"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		sd:namedGraph <http://whatever/graph0> ;
+	    sd:namedGraph <http://whatever/graph1> ;
+	    void-ext:subjectPartition halyard:statsRoot_subject__%3Abnodeid ;
+	    void-ext:subjectPartition halyard:statsRoot_subject_%3Chttp%3A%2F%2Ffrequent%2Firi%3E ;
+		void:propertyPartition halyard:statsRoot_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E ;
+	    void-ext:objectPartition halyard:statsRoot_object__%3Abnodeid ;
+	    void-ext:objectPartition halyard:statsRoot_object_%3Chttp%3A%2F%2Ffrequent%2Firi%3E ;
+	    void-ext:objectPartition halyard:statsRoot_object_%2242%22%5E%5E%3Chttp%3A%2F%2Fwww.w3.org%2F2001%2FXMLSchema%23int%3E .
+
+	<http://whatever/graph0> sd:name <http://whatever/graph0> ;
+		sd:graph <http://whatever/graph0> ;
+		a sd:NamedGraph , sd:Graph , void:Dataset ;
+	    void:properties "112"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctLiterals "356"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctObjects "801"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctSubjects "107"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctBlankNodeObjects "44"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctBlankNodeSubjects "32"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctIRIReferenceObjects "401"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctIRIReferenceSubjects "75"^^<http://www.w3.org/2001/XMLSchema#long> ;
+	    void:classes "400"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:triples "900"^^<http://www.w3.org/2001/XMLSchema#long> ;
+	    void-ext:subjectPartition <http://whatever/graph0_subject__%3Abnodeid> ;
+		void:propertyPartition <http://whatever/graph0_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E> ;
+		void-ext:objectPartition <http://whatever/graph0_object_%3Chttp%3A%2F%2Ffrequent%2Firi%3E> .
+
+	<http://whatever/graph1> sd:name <http://whatever/graph1> ;
+		sd:graph <http://whatever/graph1> ;
+		a sd:NamedGraph , sd:Graph , void:Dataset ;
+	    void:classes "400"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:triples "900"^^<http://www.w3.org/2001/XMLSchema#long> ;
+	    void:properties "112"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctLiterals "355"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctObjects "801"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void:distinctSubjects "106"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctBlankNodeObjects "46"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctBlankNodeSubjects "30"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctIRIReferenceObjects "400"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:distinctIRIReferenceSubjects "76"^^<http://www.w3.org/2001/XMLSchema#long> ;
+		void-ext:subjectPartition <http://whatever/graph1_subject_%3Chttp%3A%2F%2Ffrequent%2Firi%3E> ;
+		void:propertyPartition <http://whatever/graph1_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E> ;
+		void-ext:objectPartition <http://whatever/graph1_object__%3Abnodeid> .
+
+	halyard:statsRoot_object__%3Abnodeid a void:Dataset ;
+		void-ext:object _:bnodeid ;
+		void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+	halyard:statsRoot_object_%3Chttp%3A%2F%2Ffrequent%2Firi%3E a void:Dataset ;
+		void-ext:object <http://frequent/iri> ;
+		void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+	halyard:statsRoot_object_%2242%22%5E%5E%3Chttp%3A%2F%2Fwww.w3.org%2F2001%2FXMLSchema%23int%3E a void:Dataset ;
+		void-ext:object "42"^^<http://www.w3.org/2001/XMLSchema#int> ;
+		void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+	halyard:statsRoot_subject__%3Abnodeid a void:Dataset ;
+		void-ext:subject _:bnodeid ;
+		void:triples "200"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+	halyard:statsRoot_subject_%3Chttp%3A%2F%2Ffrequent%2Firi%3E a void:Dataset ;
+		void-ext:subject <http://frequent/iri> ;
+		void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+	halyard:statsRoot_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E a void:Dataset ;
+		void:property <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ;
+		void:triples "1000"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+	<http://whatever/graph0_object_%3Chttp%3A%2F%2Ffrequent%2Firi%3E> a void:Dataset ;
+		void-ext:object <http://frequent/iri> ;
+		void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+	<http://whatever/graph0_subject__%3Abnodeid> a void:Dataset ;
+		void-ext:subject _:bnodeid ;
+		void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+	<http://whatever/graph0_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E> a void:Dataset ;
+		void:property <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ;
+		void:triples "400"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+
+	<http://whatever/graph1_object__%3Abnodeid> a void:Dataset ;
+		void-ext:object _:bnodeid ;
+		void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+	<http://whatever/graph1_subject_%3Chttp%3A%2F%2Ffrequent%2Firi%3E> a void:Dataset ;
+		void-ext:subject <http://frequent/iri> ;
+		void:triples "100"^^<http://www.w3.org/2001/XMLSchema#long> .
+
+	<http://whatever/graph1_property_%3Chttp%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23type%3E> a void:Dataset ;
+		void:property <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ;
+		void:triples "400"^^<http://www.w3.org/2001/XMLSchema#long> .
+}
