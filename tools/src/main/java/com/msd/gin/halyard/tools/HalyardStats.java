@@ -100,69 +100,17 @@ public class HalyardStats implements Tool {
 
     private Configuration conf;
 
-
-    static String[] parse(byte[] bytes) throws IOException {
-        try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(bytes))) {
-            String res[] = new String[dis.readInt()];
-            for (int i=0; i<res.length; i++) {
-                res[i] = dis.readUTF();
-            }
-            return res;
-        }
-    }
-
-    static byte[] serilize(String ... ss) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (DataOutputStream dos = new DataOutputStream(baos)) {
-            dos.writeInt(ss.length);
-            for (String s : ss) {
-                dos.writeUTF(s);
-            }
-        }
-        return baos.toByteArray();
-    }
-
     static final class StatsMapper extends TableMapper<BytesWritable, LongWritable>  {
 
         final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
 
-        class GraphCounter {
-            private final String key[];
-            private long triples, distinctSubjects, properties, distinctObjects, classes;
-            private long distinctIRIReferenceSubjects, distinctIRIReferenceObjects, distinctBlankNodeObjects, distinctBlankNodeSubjects, distinctLiterals;
-
-            public GraphCounter(String...path) {
-                this.key = Arrays.copyOf(path, path.length + 1);
-            }
-
-            private void _report(Context output, IRI property, long value) throws IOException, InterruptedException {
-                key[key.length - 1] = property.stringValue();
-                output.write(new BytesWritable(serilize(key)), new LongWritable(value));
-            }
-
-            public void report(Context output) throws IOException, InterruptedException {
-                _report(output, VOID.TRIPLES, triples);
-                _report(output, VOID.DISTINCT_SUBJECTS, distinctSubjects);
-                _report(output, VOID.PROPERTIES, properties);
-                _report(output, VOID.DISTINCT_OBJECTS, distinctObjects);
-                _report(output, VOID.CLASSES, classes);
-                _report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_OBJECTS, distinctIRIReferenceObjects);
-                _report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_SUBJECTS, distinctIRIReferenceSubjects);
-                _report(output, VOID_EXT.DISTINCT_BLANK_NODE_OBJECTS, distinctBlankNodeObjects);
-                _report(output, VOID_EXT.DISTINCT_BLANK_NODE_SUBJECTS, distinctBlankNodeSubjects);
-                _report(output, VOID_EXT.DISTINCT_LITERALS, distinctLiterals);
-            }
-        }
-
         final byte[] lastKeyFragment = new byte[20], lastCtxFragment = new byte[20], lastClassFragment = new byte[20];
-        GraphCounter rootCounter, ctxCounter;
         byte lastRegion = -1;
         long counter = 0;
 
-        @Override
-        protected void setup(Context context) throws IOException, InterruptedException {
-            this.rootCounter = new GraphCounter(HALYARD.STATS_ROOT_NODE.stringValue());
-        }
+        IRI graph = HALYARD.STATS_ROOT_NODE;
+        long triples, distinctSubjects, properties, distinctObjects, classes;
+        long distinctIRIReferenceSubjects, distinctIRIReferenceObjects, distinctBlankNodeObjects, distinctBlankNodeSubjects, distinctLiterals;
 
         private boolean matchAndCopyKey(byte[] source, int offset, byte[] target) {
             boolean match = true;
@@ -194,121 +142,98 @@ public class HalyardStats implements Tool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
-            if (region < 3) {
-                if (!matchAndCopyKey(key.get(), key.getOffset() + 1, lastKeyFragment) || region != lastRegion) {
-                    switch (region) {
-                        case HalyardTableUtils.SPO_PREFIX:
-                            rootCounter.distinctSubjects++;
-                            String s[] = parseStatement(value);
-                            if (s[0].charAt(0) == '<') {
-                                rootCounter.distinctIRIReferenceSubjects++;
-                            } else {
-                                rootCounter.distinctBlankNodeSubjects++;
-                            }
-                            break;
-                        case HalyardTableUtils.POS_PREFIX:
-                            rootCounter.properties++;
-                            break;
-                        case HalyardTableUtils.OSP_PREFIX:
-                            rootCounter.distinctObjects++;
-                            s = parseStatement(value);
-                            if (s[2].charAt(0) == '<') {
-                                rootCounter.distinctIRIReferenceObjects++;
-                            } else if (s[2].startsWith("_:")) {
-                                rootCounter.distinctBlankNodeObjects++;
-                            } else {
-                                rootCounter.distinctLiterals++;
-                            }
-                            break;
-                    }
-                }
-                if (region == HalyardTableUtils.SPO_PREFIX) {
-                    rootCounter.triples += value.rawCells().length;
-                } else if (region == HalyardTableUtils.POS_PREFIX
-                        && Arrays.equals(TYPE_HASH, lastKeyFragment)
-                        && (!matchAndCopyKey(key.get(), key.getOffset() + 21, lastClassFragment) || region != lastRegion)) {
-                    rootCounter.classes++;
-                }
+            int hashShift;
+            if (region < HalyardTableUtils.CSPO_PREFIX) {
+                hashShift = 1;
             } else {
+                hashShift = 21;
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 1, lastCtxFragment) || region != lastRegion) {
-                    if (ctxCounter != null) {
-                        ctxCounter.report(output);
-                    }
+                    cleanup(output);
                     Cell c[] = value.rawCells();
                     ByteBuffer bb = ByteBuffer.wrap(c[0].getQualifierArray(), c[0].getQualifierOffset(), c[0].getQualifierLength());
                     int skip = bb.getInt() + bb.getInt() + bb.getInt();
                     bb.position(bb.position() + skip);
                     byte[] cb = new byte[bb.remaining()];
                     bb.get(cb);
-                    ctxCounter = new GraphCounter(NTriplesUtil.parseURI(new String(cb,UTF8), ssf).stringValue());
+                    graph = NTriplesUtil.parseURI(new String(cb,UTF8), ssf);
                 }
-                if (!matchAndCopyKey(key.get(), key.getOffset() + 21, lastKeyFragment) || region != lastRegion) {
-                    switch (region) {
-                        case HalyardTableUtils.CSPO_PREFIX:
-                            ctxCounter.distinctSubjects++;
-                            String s[] = parseStatement(value);
-                            if (s[0].charAt(0) == '<') {
-                                ctxCounter.distinctIRIReferenceSubjects++;
-                            } else {
-                                ctxCounter.distinctBlankNodeSubjects++;
-                            }
-                            break;
-                        case HalyardTableUtils.CPOS_PREFIX:
-                            ctxCounter.properties++;
-                            break;
-                        case HalyardTableUtils.COSP_PREFIX:
-                            ctxCounter.distinctObjects++;
-                            s = parseStatement(value);
-                            if (s[2].charAt(0) == '<') {
-                                ctxCounter.distinctIRIReferenceObjects++;
-                            } else if (s[2].startsWith("_:")) {
-                                ctxCounter.distinctBlankNodeObjects++;
-                            } else {
-                                ctxCounter.distinctLiterals++;
-                            }
-                            break;
+            }
+            boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, lastKeyFragment) || region != lastRegion;
+            switch (region) {
+                case HalyardTableUtils.SPO_PREFIX:
+                case HalyardTableUtils.CSPO_PREFIX:
+                    if (hashChange) {
+                        distinctSubjects++;
+                        String s[] = parseStatement(value);
+                        if (s[0].charAt(0) == '<') {
+                            distinctIRIReferenceSubjects++;
+                        } else {
+                            distinctBlankNodeSubjects++;
+                        }
                     }
-                }
-                if (region == HalyardTableUtils.CSPO_PREFIX) {
-                    ctxCounter.triples += value.rawCells().length;
-                } else if (region == HalyardTableUtils.CPOS_PREFIX
-                    && Arrays.equals(TYPE_HASH, lastKeyFragment)
-                    && (!matchAndCopyKey(key.get(), key.getOffset() + 41, lastClassFragment) || region != lastRegion)) {
-                        ctxCounter.classes++;
-                }
+                    triples += value.rawCells().length;
+                    break;
+                case HalyardTableUtils.POS_PREFIX:
+                case HalyardTableUtils.CPOS_PREFIX:
+                    if (hashChange) {
+                        properties++;
+                    }
+                    if (Arrays.equals(TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + 20, lastClassFragment) || hashChange)) {
+                            classes++;
+                    }
+                    break;
+                    case HalyardTableUtils.OSP_PREFIX:
+                    case HalyardTableUtils.COSP_PREFIX:
+                        if (hashChange) {
+                            distinctObjects++;
+                            String s[] = parseStatement(value);
+                            if (s[2].charAt(0) == '<') {
+                                distinctIRIReferenceObjects++;
+                            } else if (s[2].startsWith("_:")) {
+                                distinctBlankNodeObjects++;
+                            } else {
+                                distinctLiterals++;
+                            }
+                        }
+                        break;
             }
             lastRegion = region;
             if ((counter++ % 100000) == 0) {
-                switch (region) {
-                    case HalyardTableUtils.SPO_PREFIX:
-                        output.setStatus(MessageFormat.format("SPO {0} t:{1} s:{2}", counter, rootCounter.triples, rootCounter.distinctSubjects));
-                        break;
-                    case HalyardTableUtils.POS_PREFIX:
-                        output.setStatus(MessageFormat.format("POS {0} p:{1} cls:{2}", counter, rootCounter.properties, rootCounter.classes));
-                        break;
-                    case HalyardTableUtils.OSP_PREFIX:
-                        output.setStatus(MessageFormat.format("OSP {0} o:{1}", counter, rootCounter.distinctObjects));
-                        break;
-                    case HalyardTableUtils.CSPO_PREFIX:
-                        output.setStatus(MessageFormat.format("CSPO {0} t:{1} s:{2}", counter, ctxCounter.triples, ctxCounter.distinctSubjects));
-                        break;
-                    case HalyardTableUtils.CPOS_PREFIX:
-                        output.setStatus(MessageFormat.format("CPOS {0} p:{1} cls:{2}", counter, ctxCounter.properties, ctxCounter.classes));
-                        break;
-                    case HalyardTableUtils.COSP_PREFIX:
-                        output.setStatus(MessageFormat.format("COSP {0} o:{1}", counter, ctxCounter.distinctObjects));
-                        break;
-                    default:
-                        output.setStatus(MessageFormat.format("{0} invalid region {1}", counter, region));
-                }
-                Runtime.getRuntime().gc();
+                output.setStatus(MessageFormat.format("reg:{0} {1} t:{2} s:{3} p:{4} o:{5} c:{6}", region, counter, triples, distinctSubjects, properties, distinctObjects, classes));
             }
+        }
+
+        private void report(Context output, IRI property, long value) throws IOException, InterruptedException {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try (DataOutputStream dos = new DataOutputStream(baos)) {
+                dos.writeUTF(graph.stringValue());
+                dos.writeUTF(property.stringValue());
+            }
+            output.write(new BytesWritable(baos.toByteArray()), new LongWritable(value));
         }
 
         @Override
         protected void cleanup(Context output) throws IOException, InterruptedException {
-            rootCounter.report(output);
-            if (ctxCounter != null) ctxCounter.report(output);
+            report(output, VOID.TRIPLES, triples);
+            triples = 0;
+            report(output, VOID.DISTINCT_SUBJECTS, distinctSubjects);
+            distinctSubjects = 0;
+            report(output, VOID.PROPERTIES, properties);
+            properties = 0;
+            report(output, VOID.DISTINCT_OBJECTS, distinctObjects);
+            distinctObjects = 0;
+            report(output, VOID.CLASSES, classes);
+            classes = 0;
+            report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_OBJECTS, distinctIRIReferenceObjects);
+            distinctIRIReferenceObjects = 0;
+            report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_SUBJECTS, distinctIRIReferenceSubjects);
+            distinctIRIReferenceSubjects = 0;
+            report(output, VOID_EXT.DISTINCT_BLANK_NODE_OBJECTS, distinctBlankNodeObjects);
+            distinctBlankNodeObjects = 0;
+            report(output, VOID_EXT.DISTINCT_BLANK_NODE_SUBJECTS, distinctBlankNodeSubjects);
+            distinctBlankNodeSubjects = 0;
+            report(output, VOID_EXT.DISTINCT_LITERALS, distinctLiterals);
+            distinctLiterals = 0;
         }
 
     }
@@ -369,9 +294,12 @@ public class HalyardStats implements Tool {
             for (LongWritable val : values) {
                     count += val.get();
             }
-            String ks[] = parse(key.getBytes());
-            String graph = ks[0];
-            String predicate = ks[1];
+            String graph;
+            String predicate;
+            try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.getBytes()))) {
+                graph = dis.readUTF();
+                predicate = dis.readUTF();
+            }
             IRI graphNode;
             if (graph.equals(HALYARD.STATS_ROOT_NODE.stringValue())) {
                 graphNode = HALYARD.STATS_ROOT_NODE;
