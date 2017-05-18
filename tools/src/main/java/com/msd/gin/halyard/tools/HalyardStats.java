@@ -118,7 +118,7 @@ public class HalyardStats implements Tool {
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
-            subsetThreshold = context.getConfiguration().getLong(SUBSET_THRESHOLD, 5000);
+            subsetThreshold = context.getConfiguration().getLong(SUBSET_THRESHOLD, 1000);
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, byte[] target) {
