@@ -146,8 +146,8 @@ public class HalyardStats implements Tool {
                 _report(output, VOID.PROPERTIES, properties);
                 _report(output, VOID.DISTINCT_OBJECTS, distinctObjects);
                 _report(output, VOID.CLASSES, classes);
-                _report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_OBJECTS, distinctIRIReferenceSubjects);
-                _report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_SUBJECTS, distinctIRIReferenceObjects);
+                _report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_OBJECTS, distinctIRIReferenceObjects);
+                _report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_SUBJECTS, distinctIRIReferenceSubjects);
                 _report(output, VOID_EXT.DISTINCT_BLANK_NODE_OBJECTS, distinctBlankNodeObjects);
                 _report(output, VOID_EXT.DISTINCT_BLANK_NODE_SUBJECTS, distinctBlankNodeSubjects);
                 _report(output, VOID_EXT.DISTINCT_LITERALS, distinctLiterals);
@@ -214,6 +214,8 @@ public class HalyardStats implements Tool {
                             s = parseStatement(value);
                             if (s[2].charAt(0) == '<') {
                                 rootCounter.distinctIRIReferenceObjects++;
+                            } else if (s[2].startsWith("_:")) {
+                                rootCounter.distinctBlankNodeObjects++;
                             } else {
                                 rootCounter.distinctLiterals++;
                             }
@@ -259,6 +261,8 @@ public class HalyardStats implements Tool {
                             s = parseStatement(value);
                             if (s[2].charAt(0) == '<') {
                                 ctxCounter.distinctIRIReferenceObjects++;
+                            } else if (s[2].startsWith("_:")) {
+                                ctxCounter.distinctBlankNodeObjects++;
                             } else {
                                 ctxCounter.distinctLiterals++;
                             }
