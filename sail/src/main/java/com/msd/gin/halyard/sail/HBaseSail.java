@@ -118,7 +118,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     final boolean create;
     final boolean pushStrategy;
     final int splitBits;
-    private final EvaluationStatistics statistics;
+    final EvaluationStatistics statistics;
     final int evaluationTimeout;
     private boolean readOnly = false;
     private long readOnlyTimestamp = -1;
@@ -155,10 +155,10 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                         IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI)contextVar.getValue();
                         long triples = getTriplesCount(graphNode, -1l);
                         if (triples > 0) {
-                            long subjCount = subsetTriplesCount(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar());
-                            long predCount = subsetTriplesCount(graphNode, VOID.PROPERTY, sp.getPredicateVar());
-                            long objCount = subsetTriplesCount(graphNode, VOID_EXT.OBJECT, sp.getObjectVar());
-                            return super.getCardinality(sp) * Math.min(Math.min(triples, subjCount), Math.min(predCount, objCount)) / triples;
+                            return triples
+                                    * subsetTriplesPart(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar(), triples)
+                                    * subsetTriplesPart(graphNode, VOID.PROPERTY, sp.getPredicateVar(), triples)
+                                    * subsetTriplesPart(graphNode, VOID_EXT.OBJECT, sp.getObjectVar(), triples);
                         } else {
                             return super.getCardinality(sp);
                         }
@@ -177,11 +177,11 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                         return defaultValue;
                     }
 
-                    private long subsetTriplesCount(IRI graph, IRI partitionType, Var partitionVar) {
+                    private double subsetTriplesPart(IRI graph, IRI partitionType, Var partitionVar, double total) {
                         if (partitionVar == null || !partitionVar.hasValue()) {
-                            return Long.MAX_VALUE;
+                            return 1.0;
                         } else {
-                            return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(partitionVar.getValue()).getBytes()))), DEFAULT_THRESHOLD);
+                            return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(partitionVar.getValue()).getBytes()))), DEFAULT_THRESHOLD) /total;
                         }
                     }
                 };

@@ -37,6 +37,8 @@ import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
+import org.eclipse.rdf4j.query.algebra.TupleExpr;
+import org.eclipse.rdf4j.query.parser.QueryParserUtil;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
@@ -328,5 +330,24 @@ public class HBaseSailTest {
         } finally {
             sail.shutDown();
         }
+    }
+
+    @Test
+    public void testCardinalityCalculator() throws Exception {
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "cardinalitytable", true, 0, true, 0, null);
+        sail.initialize();
+        SimpleValueFactory f = SimpleValueFactory.getInstance();
+        TupleExpr q1 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s a ?o}", "http://whatever/").getTupleExpr();
+        TupleExpr q2 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {graph <http://whatevercontext> {?s a ?o}}", "http://whatever/").getTupleExpr();
+        assertEquals(100.0, sail.statistics.getCardinality(q1), 0.01);
+        assertEquals(100.0, sail.statistics.getCardinality(q2), 0.01);
+        sail.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
+        sail.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_v0EPmHVxqhkyM3Yh_Wfu7gMOZGU"), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
+        sail.addStatement(f.createIRI("http://whatevercontext"), VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
+        sail.addStatement(f.createIRI("http://whatevercontext_property_v0EPmHVxqhkyM3Yh_Wfu7gMOZGU"), VOID.TRIPLES, f.createLiteral(20l), HALYARD.STATS_GRAPH_CONTEXT);
+        sail.commit();
+        assertEquals(5000.0, sail.statistics.getCardinality(q1), 0.01);
+        assertEquals(20.0, sail.statistics.getCardinality(q2), 0.01);
+        sail.shutDown();
     }
 }
