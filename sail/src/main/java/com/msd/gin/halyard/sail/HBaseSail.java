@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -52,7 +53,6 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SD;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -82,6 +82,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
+import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
@@ -109,6 +110,8 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     private static final Logger LOG = Logger.getLogger(HBaseSail.class.getName());
     private static final long STATUS_CACHING_TIMEOUT = 60000l;
+    private static final Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
+    private static final long DEFAULT_THRESHOLD = 1000l;
 
     private final Configuration config;
     final String tableName;
@@ -148,11 +151,38 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                 return new CardinalityCalculator() {
                     @Override
                     protected double getCardinality(StatementPattern sp) {
-			List<Var> vars = sp.getVarList();
-			int constantVarCount = countConstantVars(vars);
-                        double shift = RDF.TYPE.equals(sp.getPredicateVar().getValue()) ? 0.1 : 0.0;
-			double unboundVarFactor = (vars.size() - constantVarCount + shift) / vars.size();
-			return Math.pow(1000.0, unboundVarFactor);
+                        Var contextVar = sp.getContextVar();
+                        IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI)contextVar.getValue();
+                        long triples = getTriplesCount(graphNode, -1l);
+                        if (triples > 0) {
+                            long subjCount = subsetTriplesCount(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar());
+                            long predCount = subsetTriplesCount(graphNode, VOID.PROPERTY, sp.getPredicateVar());
+                            long objCount = subsetTriplesCount(graphNode, VOID_EXT.OBJECT, sp.getObjectVar());
+                            return super.getCardinality(sp) * Math.min(Math.min(triples, subjCount), Math.min(predCount, objCount)) / triples;
+                        } else {
+                            return super.getCardinality(sp);
+                        }
+                    }
+
+                    private long getTriplesCount(IRI subjectNode, long defaultValue) {
+                        try (CloseableIteration<? extends Statement, SailException> ci = getStatements(subjectNode, VOID.TRIPLES, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
+                            if (ci.hasNext()) {
+                                Value v = ci.next().getObject();
+                                if (v instanceof Literal) try {
+                                    return ((Literal)v).longValue();
+                                } catch (NumberFormatException ignore) {}
+                                LOG.log(Level.WARNING, "Invalid statistics for:" + subjectNode);
+                            }
+                        }
+                        return defaultValue;
+                    }
+
+                    private long subsetTriplesCount(IRI graph, IRI partitionType, Var partitionVar) {
+                        if (partitionVar == null || !partitionVar.hasValue()) {
+                            return Long.MAX_VALUE;
+                        } else {
+                            return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(partitionVar.getValue()).getBytes()))), DEFAULT_THRESHOLD);
+                        }
                     }
                 };
             }
