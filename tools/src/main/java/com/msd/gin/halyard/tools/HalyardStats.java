@@ -29,11 +29,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
@@ -68,8 +68,10 @@ import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
+import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
@@ -81,6 +83,7 @@ import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+import org.eclipse.rdf4j.sail.SailException;
 
 /**
  * MapReduce tool providing statistics about Halyard dataset
@@ -221,7 +224,13 @@ public class HalyardStats implements Tool {
             try (DataOutputStream dos = new DataOutputStream(baos)) {
                 dos.writeUTF(graph.stringValue());
                 dos.writeUTF(property.stringValue());
-                dos.writeUTF(partitionId == null ? "" : partitionId);
+                if (partitionId == null) {
+                    dos.write(0);
+                } else {
+                    byte b[] = partitionId.getBytes(UTF8);
+                    dos.write(b.length);
+                    dos.write(b);
+                }
             }
             output.write(new BytesWritable(baos.toByteArray()), new LongWritable(value));
         }
@@ -262,11 +271,14 @@ public class HalyardStats implements Tool {
 
     static class StatsReducer extends Reducer<BytesWritable, LongWritable, NullWritable, NullWritable>  {
 
+        final static Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
+
         OutputStream out;
         RDFWriter writer;
         Map<String, Boolean> graphs;
         IRI statsGraphContext;
         HBaseSail sail;
+        long removed = 0, added = 0;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -276,7 +288,15 @@ public class HalyardStats implements Tool {
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null);
                 sail.initialize();
-                sail.clear(statsGraphContext);
+                try (CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(null, null, null, true, statsGraphContext)) {
+                    while (iter.hasNext()) {
+                        Statement st = iter.next();
+                        sail.removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+                        if ((removed++ % 1000) == 0) {
+                            context.setStatus(MessageFormat.format("statements removed: {0}", removed));
+                        }
+                    }
+                }
                 sail.setNamespace(SD.PREFIX, SD.NAMESPACE);
                 sail.setNamespace(VOID.PREFIX, VOID.NAMESPACE);
                 sail.setNamespace(VOID_EXT.PREFIX, VOID_EXT.NAMESPACE);
@@ -318,11 +338,12 @@ public class HalyardStats implements Tool {
             }
             String graph;
             String predicate;
-            String partitionId;
+            byte partitionId[];
             try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.getBytes()))) {
                 graph = dis.readUTF();
                 predicate = dis.readUTF();
-                partitionId = dis.readUTF();
+                partitionId = new byte[dis.read()];
+                dis.readFully(partitionId);
             }
             IRI graphNode;
             if (graph.equals(HALYARD.STATS_ROOT_NODE.stringValue())) {
@@ -338,15 +359,18 @@ public class HalyardStats implements Tool {
                     writeStatement(graphNode, RDF.TYPE, VOID.DATASET);
                 }
             }
-            if (partitionId.length() > 0) {
+            if (partitionId.length > 0) {
                 IRI pred = SVF.createIRI(predicate);
-                IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + URLEncoder.encode(partitionId, "UTF-8"));
+                IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(partitionId)));
                 writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);
                 writeStatement(subset, RDF.TYPE, VOID.DATASET);
-                writeStatement(subset, pred, NTriplesUtil.parseValue(partitionId, SVF));
+                writeStatement(subset, pred, NTriplesUtil.parseValue(new String(partitionId, UTF8), SVF));
                 writeStatement(subset, VOID.TRIPLES, SVF.createLiteral(count));
             } else {
                 writeStatement(graphNode, SVF.createIRI(predicate), SVF.createLiteral(count));
+            }
+            if ((added % 1000) == 0) {
+                context.setStatus(MessageFormat.format("statements removed: {0} added: {1}", removed, added));
             }
 	}
 
@@ -356,6 +380,7 @@ public class HalyardStats implements Tool {
             } else {
                 writer.handleStatement(SVF.createStatement(subj, pred, obj, statsGraphContext));
             }
+            added++;
         }
 
         @Override
