@@ -339,8 +339,10 @@ public class HBaseSailTest {
         SimpleValueFactory f = SimpleValueFactory.getInstance();
         TupleExpr q1 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s a ?o}", "http://whatever/").getTupleExpr();
         TupleExpr q2 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {graph <http://whatevercontext> {?s a ?o}}", "http://whatever/").getTupleExpr();
+        TupleExpr q3 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s <http://whatever/> ?o}", "http://whatever/").getTupleExpr();
         assertEquals(100.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q2), 0.01);
+        assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);
         sail.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
         sail.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_v0EPmHVxqhkyM3Yh_Wfu7gMOZGU"), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
         sail.addStatement(f.createIRI("http://whatevercontext"), VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
@@ -348,6 +350,7 @@ public class HBaseSailTest {
         sail.commit();
         assertEquals(5000.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(20.0, sail.statistics.getCardinality(q2), 0.01);
+        assertEquals(1000.0, sail.statistics.getCardinality(q3), 0.01);
         sail.shutDown();
     }
 }
