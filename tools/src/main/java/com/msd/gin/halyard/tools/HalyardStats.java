@@ -228,7 +228,7 @@ public class HalyardStats implements Tool {
                     dos.write(0);
                 } else {
                     byte b[] = partitionId.getBytes(UTF8);
-                    dos.write(b.length);
+                    dos.writeInt(b.length);
                     dos.write(b);
                 }
             }
@@ -342,7 +342,7 @@ public class HalyardStats implements Tool {
             try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.getBytes()))) {
                 graph = dis.readUTF();
                 predicate = dis.readUTF();
-                partitionId = new byte[dis.read()];
+                partitionId = new byte[dis.readInt()];
                 dis.readFully(partitionId);
             }
             IRI graphNode;
