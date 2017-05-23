@@ -225,7 +225,7 @@ public class HalyardStats implements Tool {
                 dos.writeUTF(graph.stringValue());
                 dos.writeUTF(property.stringValue());
                 if (partitionId == null) {
-                    dos.write(0);
+                    dos.writeInt(0);
                 } else {
                     byte b[] = partitionId.getBytes(UTF8);
                     dos.writeInt(b.length);
