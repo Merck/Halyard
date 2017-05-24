@@ -165,7 +165,7 @@ public class HalyardPreSplit implements Tool {
         job.setJarByClass(HalyardPreSplit.class);
         job.setMapperClass(RDFDecimatingMapper.class);
         job.setMapOutputKeyClass(ImmutableBytesWritable.class);
-        job.setMapOutputValueClass(KeyValue.class);
+        job.setMapOutputValueClass(LongWritable.class);
         job.setInputFormatClass(RioFileInputFormat.class);
         FileInputFormat.setInputDirRecursive(job, true);
         FileInputFormat.setInputPaths(job, args[0]);
