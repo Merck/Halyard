@@ -144,7 +144,7 @@ public class HalyardPreSplit implements Tool {
 
     @Override
     public int run(String[] args) throws Exception {
-        if (args.length != 3) {
+        if (args.length != 2) {
             System.err.println("Usage: presplit [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + SKIP_INVALID_PROPERTY + "=true] [-D" + DEFAULT_CONTEXT_PROPERTY + "=http://new_context] [-D" + OVERRIDE_CONTEXT_PROPERTY + "=true] <input_path(s)> <table_name>");
             return -1;
         }
