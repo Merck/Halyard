@@ -102,7 +102,7 @@ public final class HalyardTableUtils {
     }
     private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
-    public static final String REGION_MAX_FILESIZE = "10000000000";
+    private static final String REGION_MAX_FILESIZE = "10000000000";
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
     private static final String HALYARD_VERSION_ATTRIBUTE = "HALYARD_VERSION";
     private static final String HALYARD_VERSION = "1";

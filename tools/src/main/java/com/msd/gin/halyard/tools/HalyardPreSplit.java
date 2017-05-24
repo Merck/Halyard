@@ -61,11 +61,11 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  */
 public class HalyardPreSplit implements Tool {
 
-    public static final String DECIMATION_PROPERTY = "halyard.presplit.decimation";
-
-    public static final String RANDOM_SEED_PROPERTY = "halyard.presplit.random.seed";
-
     public static final String TABLE_PROPERTY = "halyard.presplit.table";
+
+    private static final long SPLIT_LIMIT = 100000000l;
+
+    private static final int DECIMATION_FACTOR = 1000;
 
     private static final Logger LOG = Logger.getLogger(HalyardPreSplit.class.getName());
 
@@ -78,8 +78,7 @@ public class HalyardPreSplit implements Tool {
 
         private IRI defaultRdfContext;
         private boolean overrideRdfContext;
-        private Random random;
-        private int decimation;
+        private final Random random = new Random(0);
         private long counter = 0, next = 0;
 
         @Override
@@ -88,16 +87,12 @@ public class HalyardPreSplit implements Tool {
             overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
             String defCtx = conf.get(DEFAULT_CONTEXT_PROPERTY);
             defaultRdfContext = defCtx == null ? null : SimpleValueFactory.getInstance().createIRI(defCtx);
-            String seed = conf.get(RANDOM_SEED_PROPERTY);
-            random = seed == null ? new Random() : new Random(Long.parseLong(seed));
-            decimation = conf.getInt(DECIMATION_PROPERTY, 1000);
-            if (decimation > 1000) throw new IllegalArgumentException("Value of " + DECIMATION_PROPERTY + " property is over 1000");
         }
 
         @Override
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
             if (counter++ == next) {
-                next = counter + random.nextInt(decimation);
+                next = counter + random.nextInt(DECIMATION_FACTOR);
                 Resource rdfContext;
                 if (overrideRdfContext || (rdfContext = value.getContext()) == null) {
                     rdfContext = defaultRdfContext;
@@ -111,19 +106,14 @@ public class HalyardPreSplit implements Tool {
 
     static class PreSplitReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
 
-        private long splitLimit, size = 0;
+        private long size = 0;
         private byte lastRegion = 0;
-        private List<byte[]> splits = new ArrayList<>();
-
-        @Override
-        protected void setup(Context context) throws IOException, InterruptedException {
-            splitLimit = 2 * Long.parseLong(HalyardTableUtils.REGION_MAX_FILESIZE) / context.getConfiguration().getInt(DECIMATION_PROPERTY, 1000);
-        }
+        private final List<byte[]> splits = new ArrayList<>();
 
         @Override
 	public void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
-            if (lastRegion != region || size > splitLimit) {
+            if (lastRegion != region || size > SPLIT_LIMIT) {
                 byte[] split = lastRegion != region ? new byte[]{region} : key.copyBytes();
                 splits.add(split);
                 context.setStatus("#" + splits.size() + " " + Arrays.toString(split));
