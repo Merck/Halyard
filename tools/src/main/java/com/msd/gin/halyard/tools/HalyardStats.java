@@ -58,7 +58,6 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
-import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
@@ -104,7 +103,7 @@ public class HalyardStats implements Tool {
 
     private Configuration conf;
 
-    static final class StatsMapper extends TableMapper<BytesWritable, LongWritable>  {
+    static final class StatsMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
 
         final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
 
@@ -232,7 +231,7 @@ public class HalyardStats implements Tool {
                     dos.write(b);
                 }
             }
-            output.write(new BytesWritable(baos.toByteArray()), new LongWritable(value));
+            output.write(new ImmutableBytesWritable(baos.toByteArray()), new LongWritable(value));
         }
 
         protected void cleanupSubset(Context output) throws IOException, InterruptedException {
@@ -269,7 +268,7 @@ public class HalyardStats implements Tool {
 
     }
 
-    static class StatsReducer extends Reducer<BytesWritable, LongWritable, NullWritable, NullWritable>  {
+    static class StatsReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
 
         final static Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
 
@@ -331,7 +330,7 @@ public class HalyardStats implements Tool {
         }
 
         @Override
-	public void reduce(BytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
+	public void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
             long count = 0;
             for (LongWritable val : values) {
                     count += val.get();
@@ -339,7 +338,7 @@ public class HalyardStats implements Tool {
             String graph;
             String predicate;
             byte partitionId[];
-            try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.getBytes()))) {
+            try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
                 graph = dis.readUTF();
                 predicate = dis.readUTF();
                 partitionId = new byte[dis.readInt()];
@@ -463,7 +462,7 @@ public class HalyardStats implements Tool {
                     source,
                     scan,
                     StatsMapper.class,
-                    BytesWritable.class,
+                    ImmutableBytesWritable.class,
                     LongWritable.class,
                     job);
             job.setReducerClass(StatsReducer.class);
