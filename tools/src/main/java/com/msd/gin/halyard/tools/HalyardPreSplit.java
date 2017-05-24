@@ -63,7 +63,7 @@ public class HalyardPreSplit implements Tool {
 
     public static final String TABLE_PROPERTY = "halyard.presplit.table";
 
-    private static final long SPLIT_LIMIT = 100000000l;
+    private static final long SPLIT_LIMIT = 80000000l;
 
     private static final int DECIMATION_FACTOR = 1000;
 
@@ -87,6 +87,9 @@ public class HalyardPreSplit implements Tool {
             overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
             String defCtx = conf.get(DEFAULT_CONTEXT_PROPERTY);
             defaultRdfContext = defCtx == null ? null : SimpleValueFactory.getInstance().createIRI(defCtx);
+            for (byte b = 1; b < 6; b++) {
+                context.write(new ImmutableBytesWritable(new byte[] {b}), new LongWritable(1));
+            }
         }
 
         @Override
