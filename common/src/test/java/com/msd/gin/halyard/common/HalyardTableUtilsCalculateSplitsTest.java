@@ -36,37 +36,24 @@ public class HalyardTableUtilsCalculateSplitsTest {
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][] {
-            {0, null, new String[]{"01", "02", "03", "04", "05"}},
-            {1, null, new String[]{"008000", "01", "018000", "02", "028000", "03", "04", "05"}},
-            {2, null, new String[]{"004000", "008000", "00c000", "01", "014000", "018000", "01c000", "02", "024000", "028000", "02c000", "03", "04", "05"}},
-            {0, "http://whatever/context", new String[]{"01", "02",
-                "03", "03ab270f5f299a28ac333669b62455b9b06972c48c", "03ab270f5f299a28ac333669b62455b9b06972c48cffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
-                "04", "04ab270f5f299a28ac333669b62455b9b06972c48c", "04ab270f5f299a28ac333669b62455b9b06972c48cffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
-                "05", "05ab270f5f299a28ac333669b62455b9b06972c48c", "05ab270f5f299a28ac333669b62455b9b06972c48cffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00"}},
-            {1, "http://whatever/context", new String[]{"008000", "01", "018000", "02", "028000",
-                "03", "03ab270f5f299a28ac333669b62455b9b06972c48c", "03ab270f5f299a28ac333669b62455b9b06972c48c8000", "03ab270f5f299a28ac333669b62455b9b06972c48cffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
-                "04", "04ab270f5f299a28ac333669b62455b9b06972c48c", "04ab270f5f299a28ac333669b62455b9b06972c48c8000", "04ab270f5f299a28ac333669b62455b9b06972c48cffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
-                "05", "05ab270f5f299a28ac333669b62455b9b06972c48c", "05ab270f5f299a28ac333669b62455b9b06972c48c8000", "05ab270f5f299a28ac333669b62455b9b06972c48cffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00"}},
+            {0, new String[]{"01", "02", "03", "04", "05"}},
+            {1, new String[]{"008000", "01", "018000", "02", "028000", "03", "04", "05"}},
+            {2, new String[]{"004000", "008000", "00c000", "01", "014000", "018000", "01c000", "02", "024000", "028000", "02c000", "03", "04", "05"}},
         });
     }
 
     private final int splits;
-    private final String context;
     private final String[] expected;
 
-    public HalyardTableUtilsCalculateSplitsTest(int splits, String context, String[] expected) {
+    public HalyardTableUtilsCalculateSplitsTest(int splits, String[] expected) {
         this.splits = splits;
-        this.context = context;
         this.expected = expected;
     }
 
     @Test
     public void testCalculateSplits() {
         Map<String, Integer> cMap = new HashMap<>();
-        if (context != null) {
-            cMap.put(context, splits);
-        }
-        byte bb[][] = HalyardTableUtils.calculateSplits(splits, cMap);
+        byte bb[][] = HalyardTableUtils.calculateSplits(splits);
         if (expected == null) {
             assertNull(bb);
         } else {

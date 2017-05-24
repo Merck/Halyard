@@ -145,7 +145,7 @@ public class HalyardTableUtilsScanTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testScan", true, 0, null);
+        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testScan", true, 0);
 
         allStatements = new HashSet<>();
         SimpleValueFactory vf = SimpleValueFactory.getInstance();

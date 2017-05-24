@@ -50,7 +50,7 @@ public class HalyardTableUtilsTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, 0, null);
+        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, 0);
     }
 
     @AfterClass
@@ -133,7 +133,7 @@ public class HalyardTableUtilsTest {
                 admin.createTable(desc);
             }
         }
-        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "InvalidTable", false, 0, null);
+        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "InvalidTable", false, 0);
     }
 
     @Test
@@ -153,11 +153,11 @@ public class HalyardTableUtilsTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void testNegativeSplitBits() {
-        HalyardTableUtils.calculateSplits(-1, null);
+        HalyardTableUtils.calculateSplits(-1);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testTooBigSplitBits() {
-        HalyardTableUtils.calculateSplits(17, null);
+        HalyardTableUtils.calculateSplits(17);
     }
 }

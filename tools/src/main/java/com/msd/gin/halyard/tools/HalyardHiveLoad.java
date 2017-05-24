@@ -19,9 +19,6 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.StringTokenizer;
 import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -155,15 +152,7 @@ public class HalyardHiveLoad implements Tool {
         job.setInputFormatClass(HCatInputFormat.class);
         job.setSpeculativeExecution(false);
         job.setReduceSpeculativeExecution(false);
-        Map<String, Integer> contextSplitsMap = new HashMap<>();
-        for (Map.Entry<String, String> me : getConf().getValByRegex(HalyardBulkLoad.CONTEXT_SPLIT_REGEXP).entrySet()) {
-            int splits = Integer.parseInt(me.getKey().substring(me.getKey().lastIndexOf('.') + 1));
-            StringTokenizer stk = new StringTokenizer(me.getValue(), ",");
-            while (stk.hasMoreTokens()) {
-                contextSplitsMap.put(stk.nextToken(), splits);
-            }
-        }
-        try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], true, getConf().getInt(HalyardBulkLoad.SPLIT_BITS_PROPERTY, 3), contextSplitsMap)) {
+        try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], true, getConf().getInt(HalyardBulkLoad.SPLIT_BITS_PROPERTY, 3))) {
             HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
             FileInputFormat.setInputDirRecursive(job, true);
             FileInputFormat.setInputPaths(job, args[0]);

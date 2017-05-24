@@ -203,7 +203,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     @Override
     public void initialize() throws SailException {
         try {
-            table = HalyardTableUtils.getTable(config, tableName, create, splitBits, null);
+            table = HalyardTableUtils.getTable(config, tableName, create, splitBits);
             try (CloseableIteration<? extends Statement, SailException> nsIter = getStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null, true)) {
                 while (nsIter.hasNext()) {
                     Statement st = nsIter.next();

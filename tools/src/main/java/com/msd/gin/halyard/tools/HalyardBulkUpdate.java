@@ -229,7 +229,7 @@ public class HalyardBulkUpdate implements Tool {
         job.setInputFormatClass(NLineInputFormat.class);
         job.setSpeculativeExecution(false);
         job.setReduceSpeculativeExecution(false);
-        try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], false, 0, null)) {
+        try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], false, 0)) {
             HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
             FileInputFormat.setInputPaths(job, args[0]);
             FileOutputFormat.setOutputPath(job, new Path(args[1]));

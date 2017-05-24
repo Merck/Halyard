@@ -24,7 +24,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeSet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
@@ -103,7 +102,7 @@ public final class HalyardTableUtils {
     }
     private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
-    private static final String REGION_MAX_FILESIZE = "10000000000";
+    public static final String REGION_MAX_FILESIZE = "10000000000";
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
     private static final String HALYARD_VERSION_ATTRIBUTE = "HALYARD_VERSION";
     private static final String HALYARD_VERSION = "1";
@@ -129,11 +128,23 @@ public final class HalyardTableUtils {
      * @param tableName String table name
      * @param create boolean option to create the table if does not exists
      * @param splitBits int number of bits used for calculation of HTable region pre-splits (applies for new tables only)
-     * @param contextSplitBitsMap Map between contexts and number of bits used for calculation of HTable region contextual pre-splits (applies for new tables only)
+     * @throws IOException throws IOException in case of any HBase IO problems
+     * @return the org.apache.hadoop.hbase.client.HTable
+     */
+    public static HTable getTable(Configuration config, String tableName, boolean create, int splitBits) throws IOException {
+        return getTable(config, tableName, create, splitBits < 0 ? null : calculateSplits(splitBits));
+    }
+
+    /**
+     * Helper method which locates or creates and return HTable
+     * @param config Hadoop Configuration
+     * @param tableName String table name
+     * @param create boolean option to create the table if does not exists
+     * @param splits array of keys used to pre-split new table, may be null
      * @return HTable
      * @throws IOException throws IOException in case of any HBase IO problems
      */
-    public static HTable getTable(Configuration config, String tableName, boolean create, int splitBits, Map<String, Integer> contextSplitBitsMap) throws IOException {
+    public static HTable getTable(Configuration config, String tableName, boolean create, byte[][] splits) throws IOException {
         Configuration cfg = HBaseConfiguration.create(config);
         cfg.setLong(HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD, 3600000l);
         if (create) {
@@ -143,7 +154,7 @@ public final class HalyardTableUtils {
                         HTableDescriptor td = new HTableDescriptor(TableName.valueOf(tableName));
                         td.addFamily(createColumnFamily());
                         td.setValue(HALYARD_VERSION_ATTRIBUTE, HALYARD_VERSION);
-                        admin.createTable(td, splitBits < 0 ? null : calculateSplits(splitBits, contextSplitBitsMap));
+                        admin.createTable(td, splits);
                     }
                 }
             }
@@ -179,10 +190,10 @@ public final class HalyardTableUtils {
                 admin.createTable(desc, presplits);
             }
         }
-        return HalyardTableUtils.getTable(conf, desc.getTableName().getNameAsString(), false, 0, null);
+        return HalyardTableUtils.getTable(conf, desc.getTableName().getNameAsString(), false, 0);
     }
 
-    static byte[][] calculateSplits(int splitBits, Map<String, Integer> contextSplitBitsMap) {
+    static byte[][] calculateSplits(int splitBits) {
         TreeSet<byte[]> splitKeys = new TreeSet<>(Bytes.BYTES_COMPARATOR);
         //basic presplits
         splitKeys.add(new byte[]{POS_PREFIX});
@@ -194,23 +205,6 @@ public final class HalyardTableUtils {
         addSplits(splitKeys, new byte[]{SPO_PREFIX}, splitBits);
         addSplits(splitKeys, new byte[]{POS_PREFIX}, splitBits);
         addSplits(splitKeys, new byte[]{OSP_PREFIX}, splitBits);
-        //context presplits
-        if (contextSplitBitsMap != null) {
-            for (Map.Entry<String, Integer> me : contextSplitBitsMap.entrySet()) {
-                byte[] context = hashKey(me.getKey().getBytes(UTF8));
-                //context boundaries
-                splitKeys.add(concat(CSPO_PREFIX, false, context));
-                splitKeys.add(concat(CPOS_PREFIX, false, context));
-                splitKeys.add(concat(COSP_PREFIX, false, context));
-                splitKeys.add(concat(CSPO_PREFIX, true, context, STOP_KEY, STOP_KEY, STOP_KEY));
-                splitKeys.add(concat(CPOS_PREFIX, true, context, STOP_KEY, STOP_KEY, STOP_KEY));
-                splitKeys.add(concat(COSP_PREFIX, true, context, STOP_KEY, STOP_KEY, STOP_KEY));
-                //context internal presplits
-                addSplits(splitKeys, concat(CSPO_PREFIX, false, context), me.getValue());
-                addSplits(splitKeys, concat(CPOS_PREFIX, false, context), me.getValue());
-                addSplits(splitKeys, concat(COSP_PREFIX, false, context), me.getValue());
-            }
-        }
         return splitKeys.toArray(new byte[splitKeys.size()][]);
     }
 

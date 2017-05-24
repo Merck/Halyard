@@ -22,11 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.StringTokenizer;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -84,11 +81,6 @@ public class HalyardBulkLoad implements Tool {
      * Property defining number of bits used for HBase region pre-splits calculation for new table
      */
     public static final String SPLIT_BITS_PROPERTY = "halyard.table.splitbits";
-
-    /**
-     * Properties defining number of bits used for HBase context region pre-splits calculation for new table
-     */
-    public static final String CONTEXT_SPLIT_REGEXP = "halyard\\.table\\.context\\.splitbits\\.[0-9]+";
 
     /**
      * Boolean property skipping RDF parsing errors
@@ -167,15 +159,7 @@ public class HalyardBulkLoad implements Tool {
         job.setInputFormatClass(RioFileInputFormat.class);
         job.setSpeculativeExecution(false);
         job.setReduceSpeculativeExecution(false);
-        Map<String, Integer> contextSplitsMap = new HashMap<>();
-        for (Map.Entry<String, String> me : getConf().getValByRegex(CONTEXT_SPLIT_REGEXP).entrySet()) {
-            int splits = Integer.parseInt(me.getKey().substring(me.getKey().lastIndexOf('.') + 1));
-            StringTokenizer stk = new StringTokenizer(me.getValue(), ",");
-            while (stk.hasMoreTokens()) {
-                contextSplitsMap.put(stk.nextToken(), splits);
-            }
-        }
-        try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], true, getConf().getInt(SPLIT_BITS_PROPERTY, 3), contextSplitsMap)) {
+        try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], true, getConf().getInt(SPLIT_BITS_PROPERTY, 3))) {
             HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
             FileInputFormat.setInputDirRecursive(job, true);
             FileInputFormat.setInputPaths(job, args[0]);

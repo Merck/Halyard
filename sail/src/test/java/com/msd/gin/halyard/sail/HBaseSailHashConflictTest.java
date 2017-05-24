@@ -71,7 +71,7 @@ public class HBaseSailHashConflictTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        try (HTable table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", true, 0, null)) {
+        try (HTable table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", true, 0)) {
             KeyValue triple[] = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null);
             KeyValue conflicts[][] = new KeyValue[][] {
                 HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null),
