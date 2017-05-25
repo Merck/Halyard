@@ -71,6 +71,28 @@ All the supported RDF formats can be also compressed with one of the compression
 	* Optional property `-Dhalyard.parser.context.override=true` can override graph context of the loaded RDF quads with the default graph context
 5. Executed process will inform you about the tracking URL of the Map Reduce application and about the bulk load progress.
 
+### Halyard PreSplit
+
+Halyard PreSplit is a Map Reduce application designed to estimate optimal HBase region splits for big datasets before the Bulk Load. Halyard PreSplit creates an empty HBase table based on calculations from the dataset sources sampling. For very large datasets it is wise to calculate the pre-splits before the HBase table is created to allow more efficient following Bulk Load process of the data. Optional definition or override of the graph context should be specified exactly the same as for the following Bulk Load proces so the region presplits estimations are precise.   
+
+Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.
+
+![Halyard PreSplit](img/presplit.png)
+
+**PreSplit Usage:**
+
+1. Open terminal on a Hadoop cluster node with configured HBase.
+2. On a secured cluster don't forget to `kinit` with your credentials.
+3. You may optionally execute `hdfs dfs -ls -R <path_to_RDF_files>` command to verify your RDF files location and access.
+4. Execute `./presplit <input_path(s)_of_the_RDF_files> <HBase_table_name>` to launch the Bulk Load application. Following features are supported:
+	* More input paths can be delimited by comma.
+	* The input paths are searched for the supported files recurrently.
+	* Optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify YARN queue to be used by the application.
+	* Optional property `-Dhalyard.parser.skipinvalid=true` can be used to continue the Bulk Load process even in case of RDF parsing exceptions for particular files.
+	* Optional property `-Dhalyard.parser.context.default=<default graph context>` can specify default graph context for the ingested RDF triples
+	* Optional property `-Dhalyard.parser.context.override=true` can override graph context of the loaded RDF quads with the default graph context
+5. Executed process will inform you about the tracking URL of the Map Reduce application and about the presplit progress.
+
 ### Halyard Hive Load
 
 Halyard Hive Load is a Map Reduce application designed to efficiently load RDF data from Apache Hive table into HBase in a form of Halyard dataset. It has similar functionality to Halyard Bulk Load, just instead of parsing files from HDFS it parses content of all cells from specified Hive table and column.

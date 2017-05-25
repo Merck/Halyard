@@ -75,7 +75,7 @@ mapreduce.Job:  map 100% reduce 100%
 mapreduce.Job: Job job_1458475483810_40875 completed successfully
 INFO: Bulk Load Completed..
 ```
-Note: skipping a lot of debugging information from the Map Reduce execution
+Note: Before Bulk Load of a very large datasets into a new HBase table it is wise to use Halyard PreSplit. Halyard PreSplit calculates HBase table region splits and creates HBase table for optimal following Bulk Load process. 
 
 ### With Halyard Hive Load
 
