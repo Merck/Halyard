@@ -17,7 +17,6 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.sail.HALYARD;
-import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.tools.HalyardExport.ExportException;
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -98,6 +97,12 @@ public class HalyardParallelExport implements Tool {
 
     static class IndexedInputSplit extends InputSplit implements Writable {
 
+        public static IndexedInputSplit read(DataInput in) throws IOException {
+            IndexedInputSplit iis = new IndexedInputSplit();
+            iis.readFields(in);
+            return iis;
+        }
+
         public int index, size;
 
         public IndexedInputSplit() {
@@ -145,6 +150,7 @@ public class HalyardParallelExport implements Tool {
         @Override
         public void run(final Context context) throws IOException, InterruptedException {
             final IndexedInputSplit iis = (IndexedInputSplit)context.getInputSplit();
+            if (iis.size == 0) throw new IllegalArgumentException("Invalid IndexedInputSplit instance.");
             FunctionRegistry.getInstance().add(new Function() {
                 @Override
                 public String getURI() {
@@ -153,6 +159,14 @@ public class HalyardParallelExport implements Tool {
 
                 @Override
                 public Value evaluate(ValueFactory valueFactory, Value... args) throws ValueExprEvaluationException {
+                    if (args == null || args.length == 0) {
+                        throw new ValueExprEvaluationException("paralelSplitBy function has at least one mandatory argument");
+                    }
+                    for (Value v : args) {
+                        if (v == null) {
+                            throw new ValueExprEvaluationException("paralelSplitBy function does not allow null values");
+                        }
+                    }
                     return valueFactory.createLiteral(Arrays.hashCode(args) % iis.size == iis.index);
                 }
             });
