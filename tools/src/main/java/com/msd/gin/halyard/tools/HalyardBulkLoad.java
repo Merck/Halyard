@@ -53,8 +53,9 @@ import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.lib.input.CombineFileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.CombineFileSplit;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -178,7 +179,7 @@ public class HalyardBulkLoad implements Tool {
     /**
      * MapReduce FileInputFormat reading and parsing any RDF4J RIO supported RDF format into Statements
      */
-    public static final class RioFileInputFormat extends FileInputFormat<LongWritable, Statement> {
+    public static final class RioFileInputFormat extends CombineFileInputFormat<LongWritable, Statement> {
 
         /**
          * Default constructor of RioFileInputFormat
@@ -234,18 +235,17 @@ public class HalyardBulkLoad implements Tool {
 
                 @Override
                 public void initialize(InputSplit split, TaskAttemptContext context) throws IOException, InterruptedException {
-                    context.setStatus("Parsing " + ((FileSplit)split).getPath().toString());
                     skipInvalid = context.getConfiguration().getBoolean(SKIP_INVALID_PROPERTY, false);
                     close();
                     pump = null;
                     try {
-                        pump = new ParserPump((FileSplit)split, context.getConfiguration());
+                        pump = new ParserPump((CombineFileSplit)split, context);
                         pumpThread = new Thread(pump);
                         pumpThread.setDaemon(true);
                         pumpThread.start();
                     } catch (IOException e) {
                         if (skipInvalid) {
-                            LOG.log(Level.WARNING, "Exception while initalising RDF parser for " + ((FileSplit)split).getPath().toString(), e);
+                            LOG.log(Level.WARNING, "Exception while initalising RDF parser for " + pump.baseUri, e);
                         } else {
                             throw e;
                         }
@@ -303,28 +303,23 @@ public class HalyardBulkLoad implements Tool {
     private static final Statement END_STATEMENT = SimpleValueFactory.getInstance().createStatement(NOP, NOP, NOP);
 
     private static final class ParserPump extends AbstractRDFHandler implements Closeable, Runnable {
-        private final String baseUri;
-        private final Seekable seek;
-        private final InputStream in;
+        private final TaskAttemptContext context;
+        private final Path paths[];
         private final long size;
         private final SynchronousQueue<Statement> queue = new SynchronousQueue<>();
         private final boolean skipInvalid;
         private Exception ex = null;
+        private long finishedSize = 0;
 
-        public ParserPump(FileSplit split, Configuration conf) throws IOException {
+        private String baseUri = "";
+        private Seekable seek;
+        private InputStream in;
+
+        public ParserPump(CombineFileSplit split, TaskAttemptContext context) throws IOException {
+            this.context = context;
+            this.paths = split.getPaths();
             this.size = split.getLength();
-            Path file = split.getPath();
-            this.baseUri = file.toString();
-            FileSystem fs = file.getFileSystem(conf);
-            FSDataInputStream fileIn = fs.open(file);
-            this.seek = fileIn;
-            CompressionCodec codec = new CompressionCodecFactory(conf).getCodec(file);
-            if (codec != null) {
-                this.in = codec.createInputStream(fileIn, CodecPool.getDecompressor(codec));
-            } else {
-                this.in = fileIn;
-            }
-            this.skipInvalid = conf.getBoolean(SKIP_INVALID_PROPERTY, false);
+            this.skipInvalid = context.getConfiguration().getBoolean(SKIP_INVALID_PROPERTY, false);
         }
 
         public Statement getNext() throws IOException, InterruptedException {
@@ -335,17 +330,38 @@ public class HalyardBulkLoad implements Tool {
             return s == END_STATEMENT ? null : s;
         }
 
-        public float getProgress() throws IOException {
-            return (float)seek.getPos() / (float)size;
+        public synchronized float getProgress() throws IOException {
+            return (float)(finishedSize + seek.getPos()) / (float)size;
         }
 
         @Override
         public void run() {
             try {
-                RDFParser parser = Rio.createParser(Rio.getParserFormatForFileName(baseUri).get());
-                parser.setRDFHandler(this);
-                parser.setStopAtFirstError(!skipInvalid);
-                parser.parse(in, baseUri);
+                Configuration conf = context.getConfiguration();
+                for (Path file : paths) {
+                    RDFParser parser;
+                    synchronized (this) {
+                        if (seek != null) {
+                            finishedSize += seek.getPos();
+                        }
+                        close();
+                        this.baseUri = file.toString();
+                        context.setStatus("Parsing " + baseUri);
+                        FileSystem fs = file.getFileSystem(conf);
+                        FSDataInputStream fileIn = fs.open(file);
+                        this.seek = fileIn;
+                        CompressionCodec codec = new CompressionCodecFactory(conf).getCodec(file);
+                        if (codec != null) {
+                            this.in = codec.createInputStream(fileIn, CodecPool.getDecompressor(codec));
+                        } else {
+                            this.in = fileIn;
+                        }
+                        parser = Rio.createParser(Rio.getParserFormatForFileName(baseUri).get());
+                        parser.setRDFHandler(this);
+                        parser.setStopAtFirstError(!skipInvalid);
+                    }
+                    parser.parse(in, baseUri);
+                }
             } catch (Exception e) {
                 ex = e;
             } finally {
@@ -365,8 +381,11 @@ public class HalyardBulkLoad implements Tool {
         }
 
         @Override
-        public void close() throws IOException {
-            in.close();
+        public synchronized void close() throws IOException {
+            if (in != null) {
+                in.close();
+                in = null;
+            }
         }
     }
 
