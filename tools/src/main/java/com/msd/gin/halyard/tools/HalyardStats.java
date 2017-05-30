@@ -502,7 +502,6 @@ public class HalyardStats implements Tool {
                     job);
             job.setPartitionerClass(StatsPartitioner.class);
             job.setReducerClass(StatsReducer.class);
-            job.setNumReduceTasks(1);
             job.setOutputFormatClass(NullOutputFormat.class);
             if (job.waitForCompletion(true)) {
                 LOG.info("Stats Generation Completed..");
