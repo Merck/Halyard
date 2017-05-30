@@ -84,9 +84,9 @@ public class HalyardStatsTest {
         root.mkdirs();
 
         assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(),
-                new String[]{ "-D" + HalyardStats.SUBSET_THRESHOLD + "=100", "-s", "statsTable", "-t", root.toURI().toURL().toString() + "stats.trig"}));
+                new String[]{ "-D" + HalyardStats.SUBSET_THRESHOLD + "=100", "-s", "statsTable", "-t", root.toURI().toURL().toString() + "stats{0}.trig"}));
 
-        File f = new File(root, "stats.trig");
+        File f = new File(root, "stats0.trig");
         assertTrue(f.isFile());
         System.out.println(f.getAbsolutePath());
         String content =new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);

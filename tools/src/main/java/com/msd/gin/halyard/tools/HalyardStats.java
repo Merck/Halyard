@@ -62,12 +62,12 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
-import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
@@ -82,7 +82,6 @@ import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
-import org.eclipse.rdf4j.sail.SailException;
 
 /**
  * MapReduce tool providing statistics about Halyard dataset
@@ -108,19 +107,27 @@ public class HalyardStats implements Tool {
         final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
 
         final byte[] lastKeyFragment = new byte[20], lastCtxFragment = new byte[20], lastClassFragment = new byte[20];
+        IRI statsContext;
+        byte[] statsContextHash;
         byte lastRegion = -1;
         long counter = 0;
+        boolean update;
 
         IRI graph = HALYARD.STATS_ROOT_NODE;
-        long triples, distinctSubjects, properties, distinctObjects, classes;
+        long triples, distinctSubjects, properties, distinctObjects, classes, removed;
         long distinctIRIReferenceSubjects, distinctIRIReferenceObjects, distinctBlankNodeObjects, distinctBlankNodeSubjects, distinctLiterals;
         IRI subsetType;
         String subsetId;
         long subsetThreshold, subsetCounter;
+        HBaseSail sail;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
-            subsetThreshold = context.getConfiguration().getLong(SUBSET_THRESHOLD, 1000);
+            Configuration conf = context.getConfiguration();
+            update = conf.get(TARGET) == null;
+            subsetThreshold = conf.getLong(SUBSET_THRESHOLD, 1000);
+            statsContext = ssf.createIRI(conf.get(GRAPH_CONTEXT, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
+            statsContextHash = HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(statsContext).getBytes(UTF8));
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, byte[] target) {
@@ -138,6 +145,9 @@ public class HalyardStats implements Tool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
+            if ((counter++ % 100000) == 0) {
+                output.setStatus(MessageFormat.format("reg:{0} {1} t:{2} s:{3} p:{4} o:{5} c:{6} r:{7}", region, counter, triples, distinctSubjects, properties, distinctObjects, classes, removed));
+            }
             int hashShift;
             if (region < HalyardTableUtils.CSPO_PREFIX) {
                 hashShift = 1;
@@ -152,6 +162,26 @@ public class HalyardStats implements Tool {
                     byte[] cb = new byte[bb.remaining()];
                     bb.get(cb);
                     graph = NTriplesUtil.parseURI(new String(cb,UTF8), ssf);
+                }
+                if (update && region == HalyardTableUtils.CSPO_PREFIX) {
+                    if (Arrays.equals(statsContextHash, lastCtxFragment)) {
+                        if (sail == null) {
+                            Configuration conf = output.getConfiguration();
+                            sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null);
+                            sail.initialize();
+                        }
+                        for (Statement st : HalyardTableUtils.parseStatements(value)) {
+                            if (statsContext.equals(st.getContext())) {
+                                sail.removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+                                removed++;
+                            }
+                        }
+                        return; //do no count removed statements
+                    }
+                } else if (sail != null) {
+                    sail.commit();
+                    sail.close();
+                    sail = null;
                 }
             }
             boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, lastKeyFragment) || region != lastRegion;
@@ -213,9 +243,6 @@ public class HalyardStats implements Tool {
             }
             subsetCounter += value.rawCells().length;
             lastRegion = region;
-            if ((counter++ % 100000) == 0) {
-                output.setStatus(MessageFormat.format("reg:{0} {1} t:{2} s:{3} p:{4} o:{5} c:{6}", region, counter, triples, distinctSubjects, properties, distinctObjects, classes));
-            }
         }
 
         private void report(Context output, IRI property, String partitionId, long value) throws IOException, InterruptedException {
@@ -264,8 +291,24 @@ public class HalyardStats implements Tool {
             report(output, VOID_EXT.DISTINCT_LITERALS, null, distinctLiterals);
             distinctLiterals = 0;
             cleanupSubset(output);
+            if (sail != null) {
+                sail.commit();
+                sail.close();
+                sail = null;
+            }
         }
 
+    }
+
+    static class StatsPartitioner extends Partitioner<ImmutableBytesWritable, LongWritable> {
+        @Override
+        public int getPartition(ImmutableBytesWritable key, LongWritable value, int numPartitions) {
+            try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
+                return (dis.readUTF().hashCode() & Integer.MAX_VALUE) % numPartitions;
+            } catch (IOException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
     }
 
     static class StatsReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
@@ -287,20 +330,12 @@ public class HalyardStats implements Tool {
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null);
                 sail.initialize();
-                try (CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(null, null, null, true, statsGraphContext)) {
-                    while (iter.hasNext()) {
-                        Statement st = iter.next();
-                        sail.removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
-                        if ((removed++ % 1000) == 0) {
-                            context.setStatus(MessageFormat.format("statements removed: {0}", removed));
-                        }
-                    }
-                }
                 sail.setNamespace(SD.PREFIX, SD.NAMESPACE);
                 sail.setNamespace(VOID.PREFIX, VOID.NAMESPACE);
                 sail.setNamespace(VOID_EXT.PREFIX, VOID_EXT.NAMESPACE);
                 sail.setNamespace(HALYARD.PREFIX, HALYARD.NAMESPACE);
             } else {
+                targetUrl = MessageFormat.format(targetUrl, context.getTaskAttemptID().getTaskID().getId());
                 out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
                 try {
                     if (targetUrl.endsWith(".bz2")) {
@@ -409,7 +444,7 @@ public class HalyardStats implements Tool {
         options.addOption(newOption("h", null, "Prints this help"));
         options.addOption(newOption("v", null, "Prints version"));
         options.addOption(newOption("s", "source_htable", "Source HBase table with Halyard RDF store"));
-        options.addOption(newOption("t", "target_url", "Optional target file to export the statistics (instead of update) hdfs://<path>/<file_name>.<RDF_ext>[.<compression>]"));
+        options.addOption(newOption("t", "target_url", "Optional target file to export the statistics (instead of update) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]"));
         try {
             CommandLine cmd = new PosixParser().parse(options, args);
             if (args.length == 0 || cmd.hasOption('h')) {
@@ -465,6 +500,7 @@ public class HalyardStats implements Tool {
                     ImmutableBytesWritable.class,
                     LongWritable.class,
                     job);
+            job.setPartitionerClass(StatsPartitioner.class);
             job.setReducerClass(StatsReducer.class);
             job.setNumReduceTasks(1);
             job.setOutputFormatClass(NullOutputFormat.class);
