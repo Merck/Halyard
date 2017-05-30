@@ -161,6 +161,7 @@ public class HalyardPreSplit implements Tool {
             getConf().setClass(MRJobConfig.MAP_OUTPUT_COMPRESS_CODEC, SnappyCodec.class, CompressionCodec.class);
         }
         getConf().setLong(MRJobConfig.TASK_TIMEOUT, 3600000l);
+        getConf().setInt(FileInputFormat.SPLIT_MAXSIZE, 1000000000);
         Job job = Job.getInstance(getConf(), "HalyardPreSplit -> " + args[1]);
          job.getConfiguration().set(TABLE_PROPERTY, args[1]);
         job.setJarByClass(HalyardPreSplit.class);
