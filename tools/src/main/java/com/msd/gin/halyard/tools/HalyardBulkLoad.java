@@ -228,43 +228,23 @@ public class HalyardBulkLoad implements Tool {
 
                 private final AtomicLong key = new AtomicLong();
 
-                private boolean skipInvalid = false;
                 private ParserPump pump = null;
                 private Statement current = null;
                 private Thread pumpThread = null;
 
                 @Override
                 public void initialize(InputSplit split, TaskAttemptContext context) throws IOException, InterruptedException {
-                    skipInvalid = context.getConfiguration().getBoolean(SKIP_INVALID_PROPERTY, false);
                     close();
-                    pump = null;
-                    try {
-                        pump = new ParserPump((CombineFileSplit)split, context);
-                        pumpThread = new Thread(pump);
-                        pumpThread.setDaemon(true);
-                        pumpThread.start();
-                    } catch (IOException e) {
-                        if (skipInvalid) {
-                            LOG.log(Level.WARNING, "Exception while initalising RDF parser for " + pump.baseUri, e);
-                        } else {
-                            throw e;
-                        }
-                    }
+                    pump = new ParserPump((CombineFileSplit)split, context);
+                    pumpThread = new Thread(pump);
+                    pumpThread.setDaemon(true);
+                    pumpThread.start();
                 }
 
                 @Override
                 public boolean nextKeyValue() throws IOException, InterruptedException {
                     if (pump == null) return false;
-                    current = null;
-                    try {
-                        current = pump.getNext();
-                    } catch (IOException e) {
-                        if (skipInvalid) {
-                            LOG.log(Level.WARNING, "Exception while parsing RDF", e);
-                        } else {
-                            throw e;
-                        }
-                    }
+                    current = pump.getNext();
                     key.incrementAndGet();
                     return current != null;
                 }
@@ -315,7 +295,7 @@ public class HalyardBulkLoad implements Tool {
         private Seekable seek;
         private InputStream in;
 
-        public ParserPump(CombineFileSplit split, TaskAttemptContext context) throws IOException {
+        public ParserPump(CombineFileSplit split, TaskAttemptContext context) {
             this.context = context;
             this.paths = split.getPaths();
             this.size = split.getLength();
@@ -338,7 +318,7 @@ public class HalyardBulkLoad implements Tool {
         public void run() {
             try {
                 Configuration conf = context.getConfiguration();
-                for (Path file : paths) {
+                for (Path file : paths) try {
                     RDFParser parser;
                     synchronized (this) {
                         if (seek != null) {
@@ -361,6 +341,12 @@ public class HalyardBulkLoad implements Tool {
                         parser.setStopAtFirstError(!skipInvalid);
                     }
                     parser.parse(in, baseUri);
+                } catch (Exception e) {
+                    if (skipInvalid) {
+                        LOG.log(Level.WARNING, "Exception while parsing RDF", e);
+                    } else {
+                        throw e;
+                    }
                 }
             } catch (Exception e) {
                 ex = e;
