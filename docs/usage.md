@@ -312,33 +312,19 @@ Note: skipping a lot of debugging information from the Map Reduce excution
 
 ### Bulk Merge of Multiple Datasets
 
-1. Snapshot and Export all Halyard Datasets you want to merge
-
+1. Snapshot and Export all Halyard Datasets you want to merge <br>
   (see the above described processes)
-
-2. Merge the exported files
-
+2. Merge the exported files <br>
   Exported HBase files are organised under the target folder in the following structure:
   `/archive/data/<table_namespace>/<table_name>/<region_id>/<column_family>/<region_files>`
-
-  We need to merge the region files under each column family from all exports into a single structure.
-
-  As Halyard Dataset currently contains the only `e` column family, it can be achieved for example by following commands:
-
-  ```
-  > hdfs dfs -mkdir -p /my_hdfs_merged_path/e
-  > hdfs dfs -mv /my_hdfs_export_path/archive/data/*/*/*/e/* /my_hdfs_merged_path/e
-  ```
-
-3. Create a new Halyard Dataset
-
+  We need to merge the region files under each column family from all exports into a single structure. <br>
+  As Halyard Dataset currently contains the only `e` column family, it can be achieved for example by following commands: <br>
+  `> hdfs dfs -mkdir -p /my_hdfs_merged_path/e` <br>
+  `> hdfs dfs -mv /my_hdfs_export_path/archive/data/*/*/*/e/* /my_hdfs_merged_path/e`
+3. Create a new Halyard Dataset <br>
   (see the above described process)
-
-4. Load the merged files
-
-  ```
-  > hbase org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles /my_hdfs_merged_path new_dataset_table_name
-  ```
+4. Load the merged files <br>
+  `> hbase org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles /my_hdfs_merged_path new_dataset_table_name`
 
 ### Boost Query Performance by Making the Dataset Read-only
 ```
