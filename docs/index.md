@@ -19,7 +19,9 @@ To get started with Halyard, try deploying it on an Amazon Elastic MapReduce clu
 
 See [Amazon EMR Sample Cluster Setup](getting-started.html#amazon-emr-sample-cluster-setup).
 
+  </div>
 
+  <div class="col-md-4">
 ## Run Locally
 
 Download and unzip the latest `halyard-sdk-<version>.zip` bundle from [Releases page](https://github.com/Merck/Halyard/releases) to a Apache Hadoop cluster node with configured Apache HBase client.
@@ -31,6 +33,7 @@ Halyard is expected to run on an Apache Hadoop cluster node with configured Apac
 * Java 8 Runtime
 
 *Note: Recommended Apache Hadoop distribution is Hortonworks Data Platform (HDP) version 2.4.2 or Amazon Elastic MapReduce (EMR).*
+
   </div>
 
   <div class="col-md-4">
@@ -40,6 +43,7 @@ Halyard is expected to run on an Apache Hadoop cluster node with configured Apac
 * See [Open Issues](https://github.com/Merck/Halyard/issues)
 * Join [Discussion Group](https://groups.google.com/d/forum/halyard-users)
 * Contact author: [Adam Sotona](mailto:adam.sotona@merck.com)
+
   </div>
 
   <div class="col-md-4">
@@ -51,5 +55,6 @@ Halyard is expected to run on an Apache Hadoop cluster node with configured Apac
  * [Inside Halyard: 4. Bulk operations - shifting a mountain](https://www.linkedin.com/pulse/inside-halyard-4-bulk-operations-shifting-mountain-adam-sotona)
  * [Inside Halyard: 5. SPARQL Federation without border controls](https://www.linkedin.com/pulse/inside-halyard-5-sparql-federation-without-border-controls-sotona)
  * [Inside Halyard 6. Statistics-based acceleration of SPARQL queries](https://www.linkedin.com/pulse/inside-halyard-6-statistics-based-acceleration-sparql-adam-sotona)
+
   </div>
 </div>
