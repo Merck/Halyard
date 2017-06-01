@@ -37,6 +37,8 @@ Halyard is expected to run on an Apache Hadoop cluster node with configured Apac
   <div class="col-md-4">
 ## Get involved
 
+* Read [Documentation](https://merck.github.io/Halyard/getting-started.html)
+* Download [Binaries](https://github.com/Merck/Halyard/releases)
 * Clone [GitHub Repository](https://github.com/Merck/Halyard)
 * See [Open Issues](https://github.com/Merck/Halyard/issues)
 * Join [Discussion Group](https://groups.google.com/d/forum/halyard-users)
