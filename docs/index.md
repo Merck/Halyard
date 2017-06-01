@@ -19,9 +19,7 @@ To get started with Halyard, try deploying it on an Amazon Elastic MapReduce clu
 
 See [Amazon EMR Sample Cluster Setup](getting-started.html#amazon-emr-sample-cluster-setup).
 
-  </div>
 
-  <div class="col-md-4">
 ## Run Locally
 
 Download and unzip the latest `halyard-sdk-<version>.zip` bundle from [Releases page](https://github.com/Merck/Halyard/releases) to a Apache Hadoop cluster node with configured Apache HBase client.
