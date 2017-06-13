@@ -104,8 +104,6 @@ public final class HalyardTableUtils {
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
     private static final String REGION_MAX_FILESIZE = "10000000000";
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
-    private static final String HALYARD_VERSION_ATTRIBUTE = "HALYARD_VERSION";
-    private static final String HALYARD_VERSION = "1";
 
     private static final ThreadLocal<MessageDigest> MD = new ThreadLocal<MessageDigest>(){
         @Override
@@ -153,18 +151,12 @@ public final class HalyardTableUtils {
                     if (!admin.tableExists(TableName.valueOf(tableName))) {
                         HTableDescriptor td = new HTableDescriptor(TableName.valueOf(tableName));
                         td.addFamily(createColumnFamily());
-                        td.setValue(HALYARD_VERSION_ATTRIBUTE, HALYARD_VERSION);
                         admin.createTable(td, splits);
                     }
                 }
             }
         }
         HTable table = new HTable(cfg, tableName);
-        String version  = table.getTableDescriptor().getValue(HALYARD_VERSION_ATTRIBUTE);
-        if (!HALYARD_VERSION.equals(version)) {
-            table.close();
-            throw new IllegalArgumentException("Table " + tableName + " is not compatible, expected " + HALYARD_VERSION_ATTRIBUTE + "=" + HALYARD_VERSION + ", however received " + version);
-        }
         table.setAutoFlushTo(false);
         return table;
     }

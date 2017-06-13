@@ -124,18 +124,6 @@ public class HalyardTableUtilsTest {
         }
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void testInvalidHalyardVersion() throws Exception {
-        try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
-            try (Admin admin = con.getAdmin()) {
-                HTableDescriptor desc = new HTableDescriptor(TableName.valueOf("InvalidTable"));
-                desc.addFamily(new HColumnDescriptor("e"));
-                admin.createTable(desc);
-            }
-        }
-        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "InvalidTable", false, 0);
-    }
-
     @Test
     public void testNewInstance() {
         new HalyardTableUtils();
