@@ -150,7 +150,7 @@ public class HalyardBulkLoad implements Tool {
         getConf().setLong(MRJobConfig.TASK_TIMEOUT, 3600000l);
         getConf().setInt(MRJobConfig.IO_SORT_FACTOR, 100);
         getConf().setInt(MRJobConfig.IO_SORT_MB, 1000);
-        getConf().setInt(FileInputFormat.SPLIT_MAXSIZE, 1000000000);
+        getConf().setInt(FileInputFormat.SPLIT_MAXSIZE, 100000000);
         getConf().setInt(LoadIncrementalHFiles.MAX_FILES_PER_REGION_PER_FAMILY, 2048);
         Job job = Job.getInstance(getConf(), "HalyardBulkLoad -> " + args[1] + " -> " + args[2]);
         job.setJarByClass(HalyardBulkLoad.class);

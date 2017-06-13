@@ -60,6 +60,8 @@ import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Partitioner;
@@ -481,6 +483,12 @@ public class HalyardStats implements Tool {
                    AuthenticationProtos.class,
                    Trace.class);
             HBaseConfiguration.addHbaseResources(getConf());
+            if (SnappyCodec.isNativeCodeLoaded()) {
+                getConf().setBoolean(MRJobConfig.MAP_OUTPUT_COMPRESS, true);
+                getConf().setClass(MRJobConfig.MAP_OUTPUT_COMPRESS_CODEC, SnappyCodec.class, CompressionCodec.class);
+            }
+            getConf().setLong(MRJobConfig.TASK_TIMEOUT, 3600000l);
+            getConf().setDouble(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 1.0);
             Job job = Job.getInstance(getConf(), "HalyardStats " + source + (target == null ? " update" : " -> " + target));
             job.getConfiguration().set(SOURCE, source);
             if (target != null) job.getConfiguration().set(TARGET, target);
