@@ -20,7 +20,6 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -479,13 +478,11 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     public void removeStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
         if (!isWritable()) throw new SailException(tableName + " is read only");
         try {
-            List<Delete> deletes = new ArrayList<>();
             for (Resource ctx : normalizeContexts(contexts)) {
                 for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx)) {
-                    deletes.add(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(kv.getFamily(), kv.getQualifier()));
+                    table.delete(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(kv.getFamily(), kv.getQualifier()));
                 }
             }
-            table.delete(deletes);
         } catch (IOException e) {
             throw new SailException(e);
         }
