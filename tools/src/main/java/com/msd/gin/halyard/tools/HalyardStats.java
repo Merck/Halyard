@@ -178,12 +178,9 @@ public class HalyardStats implements Tool {
                                 removed++;
                             }
                         }
+                        lastRegion = region;
                         return; //do no count removed statements
                     }
-                } else if (sail != null) {
-                    sail.commit();
-                    sail.close();
-                    sail = null;
                 }
             }
             boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, lastKeyFragment) || region != lastRegion;
