@@ -23,7 +23,7 @@ import org.eclipse.rdf4j.sail.config.SailFactory;
 import org.eclipse.rdf4j.sail.config.SailImplConfig;
 
 /**
- * Factory for HBaseSail
+ * Factory for constructing an HBaseSail instance.
  * @author Adam Sotona (MSD)
  */
 public final class HBaseSailFactory implements SailFactory {
@@ -39,7 +39,7 @@ public final class HBaseSailFactory implements SailFactory {
     }
 
     /**
-     * Factory method for HBaseSailConfig
+     * Factory method for instantiating an HBaseSailConfig
      * @return new HBaseSailConfig instance
      */
     @Override
@@ -54,6 +54,7 @@ public final class HBaseSailFactory implements SailFactory {
         }
         if (config instanceof HBaseSailConfig) {
             HBaseSailConfig hconfig = (HBaseSailConfig) config;
+            //instantiate the sail
             HBaseSail sail = new HBaseSail(HBaseConfiguration.create(), hconfig.getTablespace(), hconfig.isCreate(), hconfig.getSplitBits(), hconfig.isPush(), hconfig.getEvaluationTimeout(), null);
             return sail;
         } else {

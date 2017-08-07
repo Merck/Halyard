@@ -53,7 +53,9 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 /**
- * Core Halyard utility class performing RDF to HBase mappings and base HBase table and keys management.
+ * Core Halyard utility class performing RDF to HBase mappings and base HBase table and key management. The methods of this class define how
+ * Halyard stores and finds data in HBase. This class also provides several constants that define the key encoding.
+ * 
  * @author Adam Sotona (MSD)
  */
 public final class HalyardTableUtils {
@@ -63,6 +65,11 @@ public final class HalyardTableUtils {
     private static final byte[] CF_NAME = "e".getBytes(UTF8);
     private static final String MD_ALGORITHM = "SHA1";
 
+    /*
+     * Triples/ quads are stored in multiple regions as different permutations.
+     * These values define the prefixes of the regions. 
+     */
+    
     /**
      * HBase key prefix for SPO regions
      */
@@ -98,7 +105,7 @@ public final class HalyardTableUtils {
     static final byte[] STOP_KEY = new byte[20];
     static {
         Arrays.fill(START_KEY, (byte)0);
-        Arrays.fill(STOP_KEY, (byte)0xff);
+        Arrays.fill(STOP_KEY, (byte)0xff); /* 0xff is 255 in decimal */
     }
     private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
@@ -121,10 +128,10 @@ public final class HalyardTableUtils {
     }
 
     /**
-     * Helper method which locates or creates and return HTable
-     * @param config Hadoop Configuration
+     * Helper method which locates or creates and returns the specified HTable used for triple/ quad storage
+     * @param config Hadoop Configuration of the cluster running HBase
      * @param tableName String table name
-     * @param create boolean option to create the table if does not exists
+     * @param create boolean option to create the table if does not exist
      * @param splitBits int number of bits used for calculation of HTable region pre-splits (applies for new tables only)
      * @throws IOException throws IOException in case of any HBase IO problems
      * @return the org.apache.hadoop.hbase.client.HTable
@@ -134,8 +141,8 @@ public final class HalyardTableUtils {
     }
 
     /**
-     * Helper method which locates or creates and return HTable
-     * @param config Hadoop Configuration
+     * Helper method which locates or creates and returns the specified HTable used for triple/ quad storage
+     * @param config Hadoop Configuration of the cluster running HBase
      * @param tableName String table name
      * @param create boolean option to create the table if does not exists
      * @param splits array of keys used to pre-split new table, may be null
@@ -147,7 +154,8 @@ public final class HalyardTableUtils {
         cfg.setLong(HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD, 3600000l);
         if (create) {
             try (Connection con = ConnectionFactory.createConnection(config)) {
-                try (Admin admin = con.getAdmin()) {
+                try (Admin admin = con.getAdmin()) { 
+                	    //check if the table exists and if it doesn't, make it 
                     if (!admin.tableExists(TableName.valueOf(tableName))) {
                         HTableDescriptor td = new HTableDescriptor(TableName.valueOf(tableName));
                         td.addFamily(createColumnFamily());
@@ -156,6 +164,8 @@ public final class HalyardTableUtils {
                 }
             }
         }
+        
+        //this is deprecated, the recommendation now is to use connection.getTable()
         HTable table = new HTable(cfg, tableName);
         table.setAutoFlushTo(false);
         return table;
@@ -221,15 +231,20 @@ public final class HalyardTableUtils {
      * @return array of KeyValues
      */
     public static KeyValue[] toKeyValues(Resource subj, IRI pred, Value obj, Resource context) {
-        byte[] sb = NTriplesUtil.toNTriplesString(subj).getBytes(UTF8);
-        byte[] pb = NTriplesUtil.toNTriplesString(pred).getBytes(UTF8);
-        byte[] ob = NTriplesUtil.toNTriplesString(obj).getBytes(UTF8);
-        byte[] cb = context == null ? new byte[0] : NTriplesUtil.toNTriplesString(context).getBytes(UTF8);
-        byte[] sKey = hashKey(sb);
-        byte[] pKey = hashKey(pb);
-        byte[] oKey = hashKey(ob);
+        byte[] sb = NTriplesUtil.toNTriplesString(subj).getBytes(UTF8); //subject bytes
+        byte[] pb = NTriplesUtil.toNTriplesString(pred).getBytes(UTF8); //predicate bytes
+        byte[] ob = NTriplesUtil.toNTriplesString(obj).getBytes(UTF8);  //object bytes
+        byte[] cb = context == null ? new byte[0] : NTriplesUtil.toNTriplesString(context).getBytes(UTF8); // context (graph) bytes
+        byte[] sKey = hashKey(sb);  //subject key
+        byte[] pKey = hashKey(pb);  //predicate key
+        byte[] oKey = hashKey(ob);  //object key
+        
+        //bytes to be used for the HBase column qualifier
         byte[] cq = ByteBuffer.allocate(sb.length + pb.length + ob.length + cb.length + 12).putInt(sb.length).putInt(pb.length).putInt(ob.length).put(sb).put(pb).put(ob).put(cb).array();
+        
         KeyValue kv[] =  new KeyValue[context == null ? PREFIXES : 2 * PREFIXES];
+        
+        //generate HBase key value pairs from: row, family, qualifier, value. Permutations of SPO (and if needed CSPO) are all stored. Values are actually empty.
         kv[0] = new KeyValue(concat(SPO_PREFIX, false, sKey, pKey, oKey), CF_NAME, cq, EMPTY);
         kv[1] = new KeyValue(concat(POS_PREFIX, false, pKey, oKey, sKey), CF_NAME, cq, EMPTY);
         kv[2] = new KeyValue(concat(OSP_PREFIX, false, oKey, sKey, pKey), CF_NAME, cq, EMPTY);

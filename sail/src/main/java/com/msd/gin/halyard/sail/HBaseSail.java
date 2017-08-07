@@ -31,6 +31,7 @@ import java.util.NoSuchElementException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.HTable;
@@ -89,15 +90,16 @@ import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.eclipse.rdf4j.sail.UpdateContext;
 
 /**
- * HBaseSail is RDF storage implementation on top of Apache HBase.
- * It implements both interfaces - Sail and SailConnection.
+ * HBaseSail is the RDF Storage And Inference Layer (SAIL) implementation on top of Apache HBase.
+ * It implements the interfaces - {@code Sail, SailConnection} and {@code FederatedServiceResolver}. Currently federated queries are
+ * only supported for queries across multiple graphs in one Halyard database.
  * @author Adam Sotona (MSD)
  */
 public final class HBaseSail implements Sail, SailConnection, FederatedServiceResolver {
 
     /**
      * Ticker is a simple service interface that is notified when some data are processed.
-     * It's purpose is to notify caller (for example MapReduce task) that the execution is still alive.
+     * It's purpose is to notify a caller (for example MapReduce task) that the execution is still alive.
      */
     public interface Ticker {
 
@@ -112,7 +114,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     private static final Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
     private static final long DEFAULT_THRESHOLD = 1000l;
 
-    private final Configuration config;
+    private final Configuration config; //the configuration of the HBase database
     final String tableName;
     final boolean create;
     final boolean pushStrategy;
@@ -131,9 +133,9 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     /**
      * Construct HBaseSail object with given arguments.
      * @param config Hadoop Configuration to access HBase
-     * @param tableName HBase table name
-     * @param create boolean option to create the table if does not exists
-     * @param splitBits int number of bits used for calculation of HTable region pre-splits (applies for new tables only)
+     * @param tableName HBase table name used to store data
+     * @param create boolean option to create the table if it does not exist
+     * @param splitBits int number of bits used for the calculation of HTable region pre-splits (applies for new tables only)
      * @param pushStrategy boolean option to use {@link com.msd.gin.halyard.strategy.HalyardEvaluationStrategy} instead of {@link org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy}
      * @param evaluationTimeout int timeout in seconds for each query evaluation, negative values mean no timeout
      * @param ticker optional Ticker callback for keep-alive notifications
@@ -144,12 +146,12 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         this.create = create;
         this.splitBits = splitBits;
         this.pushStrategy = pushStrategy;
-        this.statistics = new EvaluationStatistics() {
+        this.statistics = new EvaluationStatistics() { //Calculates values for query optimizations
             @Override
             protected EvaluationStatistics.CardinalityCalculator createCardinalityCalculator() {
                 return new CardinalityCalculator() {
                     @Override
-                    protected double getCardinality(StatementPattern sp) {
+                    protected double getCardinality(StatementPattern sp) { //get the cardinality of the Statement form VOID statistics
                         Var contextVar = sp.getContextVar();
                         IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI)contextVar.getValue();
                         long triples = getTriplesCount(graphNode, -1l);
@@ -163,6 +165,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                         }
                     }
 
+                    //get the Triples count for a giving subject from VOID statistics or return the default value
                     private long getTriplesCount(IRI subjectNode, long defaultValue) {
                         try (CloseableIteration<? extends Statement, SailException> ci = getStatements(subjectNode, VOID.TRIPLES, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
                             if (ci.hasNext()) {
@@ -176,6 +179,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                         return defaultValue;
                     }
 
+                    //calculate a multiplier for the triple count for this sub-part of the graph
                     private double subsetTriplesPart(IRI graph, IRI partitionType, Var partitionVar, double total) {
                         if (partitionVar == null || !partitionVar.hasValue()) {
                             return 1.0;
@@ -190,19 +194,28 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         this.ticker = ticker;
     }
 
+    /**
+     * Not used in Halyard
+     */
     @Override
     public void setDataDir(File dataDir) {
     }
 
+    /**
+     * Not used in Halyard
+     */
     @Override
     public File getDataDir() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void initialize() throws SailException {
-        try {
+    public void initialize() throws SailException { //initialize the SAIL
+        try { 
+        	    //get or create and get the HBase table
             table = HalyardTableUtils.getTable(config, tableName, create, splitBits);
+            
+            //Iterate over statements relating to namespaces and add them to the namespace map.
             try (CloseableIteration<? extends Statement, SailException> nsIter = getStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null, true)) {
                 while (nsIter.hasNext()) {
                     Statement st = nsIter.next();
@@ -220,6 +233,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public FederatedService getService(String serviceUrl) throws QueryEvaluationException {
+    		//provide a service to query over Halyard graphs. Remote service queries are not supported.
         if (serviceUrl.startsWith(HALYARD.NAMESPACE)) {
             String federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length());
             RepositoryFederatedService s = federatedServices.get(federatedTable);
@@ -235,16 +249,17 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     }
 
     @Override
-    public void shutDown() throws SailException {
+    public void shutDown() throws SailException { //release resources
         try {
-            table.close();
+            table.close(); //close the HTable
             table = null;
         } catch (IOException ex) {
             throw new SailException(ex);
         }
-        for (RepositoryFederatedService s : federatedServices.values()) {
+        for (RepositoryFederatedService s : federatedServices.values()) { //shutdown all federated services
             s.shutdown();
         }
+        federatedServices.clear(); // release the references to the services
     }
 
     @Override
@@ -270,7 +285,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public List<IsolationLevel> getSupportedIsolationLevels() {
-        return Collections.singletonList((IsolationLevel) IsolationLevels.NONE);
+        return Collections.singletonList((IsolationLevel) IsolationLevels.NONE); //limited by HBase's capabilities
     }
 
     @Override
@@ -280,13 +295,14 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public boolean isOpen() throws SailException {
-        return table != null;
+        return table != null;  //if the table exists the table is open
     }
 
     @Override
     public void close() throws SailException {
     }
 
+    //generates a Resource[] from 0 or more Resources
     private static Resource[] normalizeContexts(Resource... contexts) {
         if (contexts == null || contexts.length == 0) {
             return new Resource[] {null};
@@ -295,6 +311,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         }
     }
 
+    //evaluate queries/ subqueries
     @Override
     public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred) throws SailException {
         tupleExpr = tupleExpr.clone();
@@ -303,7 +320,9 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
             // optimizers to modify the actual root node
             tupleExpr = new QueryRoot(tupleExpr);
         }
+        
         final long startTime = System.currentTimeMillis();
+        
         TripleSource source = new TripleSource() {
             @Override
             public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
@@ -342,6 +361,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         new OrderLimitOptimizer().optimize(tupleExpr, dataset, bindings);
 
         try {
+        		//evaluate the expression against the TripleSource according to the EvaluationStrategy.
             CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = strategy.evaluate(tupleExpr, EmptyBindingSet.getInstance());
             return evaluationTimeout <= 0 ? iter : new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter, 1000l * evaluationTimeout) {
                 @Override
@@ -356,6 +376,8 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public CloseableIteration<? extends Resource, SailException> getContextIDs() throws SailException {
+    	
+        //generate an iterator over the identifiers of the contexts available in Halyard.
         final CloseableIteration<? extends Statement, SailException> scanner = getStatements(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, null, true, HALYARD.STATS_GRAPH_CONTEXT);
         return new CloseableIteration<Resource, SailException>() {
             @Override
@@ -391,12 +413,13 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         long size = 0;
         if (contexts != null && contexts.length > 0 && contexts[0] != null) {
             for (Resource ctx : contexts) {
+            		//examine the VOID statistics for the count of triples in this context
                 try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(ctx, VOID.TRIPLES, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
                     if (scanner.hasNext()) {
                         size += ((Literal)scanner.next().getObject()).longValue();
                     }
                     if (scanner.hasNext()) {
-                        throw new SailException("Multiple different values");
+                        throw new SailException("Multiple different values exist in VOID statistics for context: "+ctx.stringValue()+". Considering removing and recomputing statistics");
                     }
                 }
             }
@@ -406,7 +429,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                     size += ((Literal)scanner.next().getObject()).longValue();
                 }
                 if (scanner.hasNext()) {
-                    throw new SailException("Multiple different values");
+                    throw new SailException("Multiple different values exist in VOID statistics. Considering removing and recomputing statistics");
                 }
             }
         }
@@ -414,7 +437,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     }
 
     @Override
-    public void begin() throws SailException {
+    public void begin() throws SailException { //transactions are not supported
     }
 
     @Override
@@ -435,7 +458,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     @Override
     public void commit() throws SailException {
         try {
-            table.flushCommits();
+            table.flushCommits(); //execute all buffered puts in HBase
         } catch (IOException ex) {
             throw new SailException(ex);
         }
@@ -466,7 +489,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     private void addStatementInternal(Resource subj, IRI pred, Value obj, Resource context) throws SailException {
         if (!isWritable()) throw new SailException(tableName + " is read only");
         try {
-            for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, context)) {
+            for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, context)) { //serialize the key value pairs relating to the statement in HBase
                 table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
             }
         } catch (IOException e) {
@@ -476,11 +499,19 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public void removeStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
+    	    //should we be defensive about nulls for subj, pre and obj? removeStatements is where you would use nulls, not here.
+    	
         if (!isWritable()) throw new SailException(tableName + " is read only");
         try {
             for (Resource ctx : normalizeContexts(contexts)) {
-                for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx)) {
-                    table.delete(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(kv.getFamily(), kv.getQualifier()));
+                for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx)) { //calculate the kv's corresponding to the quad (or triple)
+                    
+                	    //kv.getFamily and kv.getQualifier are deprecated CellUtil methods are recommended replacement.
+                	    //table.delete(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(kv.getFamily(), kv.getQualifier()));
+                	
+                	    byte[] fb= CellUtil.cloneFamily(kv);
+                	    byte[] qb = CellUtil.cloneQualifier(kv);
+                	    table.delete(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(fb, qb));
                 }
             }
         } catch (IOException e) {
@@ -514,13 +545,13 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public void clear(Resource... contexts) throws SailException {
-        removeStatements(null, null, null, contexts);
+        removeStatements(null, null, null, contexts); //remove all statements in the contexts.
     }
 
     private void clearAll() throws SailException {
         if (!isWritable()) throw new SailException(tableName + " is read only");
         try {
-            table = HalyardTableUtils.truncateTable(table);
+            table = HalyardTableUtils.truncateTable(table); //delete all triples, the whole DB but retains splits!
         } catch (IOException ex) {
             throw new SailException(ex);
         }
@@ -572,6 +603,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         namespaces.clear();
     }
 
+    //Scans the Halyard table for statements that match the specified pattern
     private class StatementScanner implements CloseableIteration<Statement, SailException> {
 
         private final Resource subj;
@@ -591,18 +623,21 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
             this.endTime = startTime + (1000l * evaluationTimeout);
         }
 
-        private Result nextResult() throws IOException {
+        private Result nextResult() throws IOException { //gets the next result to consider from the HBase Scan
             while (true) {
                 if (rs == null) {
                     if (contexts.hasNext()) {
-                        rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, contexts.next()));
+                    	
+                        //build a ResultScanner from an HBase Scan that finds potential matches
+                        rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, contexts.next())); 
+                        
                     } else {
                         return null;
                     }
                 }
                 Result res = rs.next();
-                if (ticker != null) ticker.tick();
-                if (res == null) {
+                if (ticker != null) ticker.tick(); //sends a tick for keep alive purposes
+                if (res == null) { // no more results from this ResultScanner, close and clean up.
                     rs.close();
                     rs = null;
                 } else {
@@ -623,12 +658,12 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
             if (evaluationTimeout > 0 && System.currentTimeMillis() > endTime) {
                 throw new SailException("Statements scanning exceeded specified timeout " + evaluationTimeout + "s");
             }
-            if (next == null) try {
+            if (next == null) try { //try and find the next result
                 while (true) {
                     if (iter == null) {
                         Result res = nextResult();
                         if (res == null) {
-                            return false;
+                            return false; //no more Results
                         } else {
                             iter = HalyardTableUtils.parseStatements(res).iterator();
                         }
@@ -636,8 +671,8 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                     while (iter.hasNext()) {
                         Statement s = iter.next();
                         if ((subj == null || subj.equals(s.getSubject())) && (pred == null || pred.equals(s.getPredicate())) && (obj == null || obj.equals(s.getObject()))) {
-                            next = s;
-                            return true;
+                            next = s;  //cache the next statement which will be returned with a call to next().
+                            return true; //there is another statement
                         }
                     }
                     iter = null;
@@ -651,7 +686,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
         @Override
         public synchronized Statement next() throws SailException {
-            if (hasNext()) {
+            if (hasNext()) { //return the next statement and set next to null so it can be refilled by the next call to hasNext()
                 Statement st = next;
                 next = null;
                 return st;

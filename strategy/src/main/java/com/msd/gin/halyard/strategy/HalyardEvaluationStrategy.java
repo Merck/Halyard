@@ -32,7 +32,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceRes
 import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
 
 /**
- * Asynchronous parallel push EvaluationStrategy implementation suitable for parallel remote RDF storage systems.
+ * Asynchronous parallel push {@code EvaluationStrategy} implementation suitable for parallel remote RDF storage systems.
  * @author Adam Sotona (MSD)
  */
 public final class HalyardEvaluationStrategy implements EvaluationStrategy {
@@ -45,10 +45,10 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 
     /**
      * Default constructor of HalyardEvaluationStrategy
-     * @param tripleSource TripleSource
-     * @param dataset Dataset
-     * @param serviceResolver FederatedServiceResolver
-     * @param timeout long query evaluation timeout in seconds, negative values mean no timeout
+     * @param tripleSource {@code TripleSource} to be queried for the existence of triples in a context
+     * @param dataset {@code Dataset} A dataset consists of a default graph for read and using operations, which is the RDF merge of one or more graphs, a set of named graphs, and a single update graph for INSERT and DELETE
+     * @param serviceResolver {@code FederatedServiceResolver} resolver for any federated services (graphs) required for the evaluation
+     * @param timeout {@code long} query evaluation timeout in seconds, negative values mean no timeout
      */
     public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset, FederatedServiceResolver serviceResolver, long timeout) {
         this.serviceResolver = serviceResolver;

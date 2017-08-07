@@ -33,7 +33,7 @@ import org.eclipse.rdf4j.sail.config.SailConfigException;
 import org.eclipse.rdf4j.sail.config.SailConfigSchema;
 
 /**
- *
+ * Configuration information for the HBase SAIL and methods to serialize/ deserialize the configuration.
  * @author Adam Sotona (MSD)
  */
 public final class HBaseSailConfig extends AbstractSailImplConfig {
