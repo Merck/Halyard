@@ -490,7 +490,12 @@ public final class HalyardExport {
     public static void export(Configuration conf, StatusLog log, String source, String query, String targetUrl, String driverClass, URL[] driverClasspath, String[] jdbcProperties, boolean trimTable) throws ExportException {
         try {
             QueryResultWriter writer = null;
-            if (targetUrl.startsWith("file:") || targetUrl.startsWith("hdfs:")) {
+            if (targetUrl.startsWith("jdbc:")) {
+                int i = targetUrl.lastIndexOf('/');
+                if (i < 0) throw new ExportException("Taret URL does not end with /<table_name>");
+                if (driverClass == null) throw new ExportException("Missing mandatory JDBC driver class name argument -c <driver_class>");
+                writer = new JDBCResultWriter(log, targetUrl.substring(0, i), targetUrl.substring(i+1), jdbcProperties, driverClass, driverClasspath, trimTable);
+            } else {
                 OutputStream out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
                 try {
                     if (targetUrl.endsWith(".bz2")) {
@@ -511,13 +516,6 @@ public final class HalyardExport {
                     if (!form.isPresent()) throw new ExportException("Unsupported target file format extension: " + targetUrl);
                     writer = new RIOResultWriter(log, form.get(), out);
                 }
-            } else if (targetUrl.startsWith("jdbc:")) {
-                int i = targetUrl.lastIndexOf('/');
-                if (i < 0) throw new ExportException("Taret URL does not end with /<table_name>");
-                if (driverClass == null) throw new ExportException("Missing mandatory JDBC driver class name argument -c <driver_class>");
-                writer = new JDBCResultWriter(log, targetUrl.substring(0, i), targetUrl.substring(i+1), jdbcProperties, driverClass, driverClasspath, trimTable);
-            } else {
-                throw new ExportException("Unsupported target URL protocol " + targetUrl);
             }
             new HalyardExport(source, query, writer, log).run(conf);
         } catch (IOException e) {
