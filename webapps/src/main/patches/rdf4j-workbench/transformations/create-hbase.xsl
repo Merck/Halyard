@@ -107,6 +107,16 @@
 						</td>
 						<td></td>
 					</tr>
+					<tr>
+						<th>
+							Optional ElasticSearch Index URL
+						</th>
+						<td>
+							<input type="text" id="elastic" name="Optional ElasticSearch Index URL" size="48"
+								value="" />
+						</td>
+						<td></td>
+					</tr>
                                         <tr>
 						<td></td>
 						<td>

@@ -35,7 +35,7 @@ public class HALYARD {
 
     public final static IRI EVALUATION_TIMEOUT_PROPERTY = SVF.createIRI(NAMESPACE, "evaluationTimeout");
 
-    public final static IRI ELASTIC_INDEX_URL_PROPERTY = SVF.createIRI(NAMESPACE, "elasticIndexUrl");
+    public final static IRI ELASTIC_INDEX_URL_PROPERTY = SVF.createIRI(NAMESPACE, "elasticIndexURL");
 
     public final static IRI SEARCH_TYPE = SVF.createIRI(NAMESPACE, "search");
 }
