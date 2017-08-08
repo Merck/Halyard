@@ -63,6 +63,7 @@ public final class HalyardUpdate {
         options.addOption(newOption("v", null, "Prints version"));
         options.addOption(newOption("s", "source_htable", "Source HBase table with Halyard RDF store"));
         options.addOption(newOption("q", "sparql_query", "SPARQL tuple or graph query executed to export the data"));
+        options.addOption(newOption("e", "elastic_index_url", "Optional ElasticSearch index URL"));
         try {
             CommandLine cmd = new PosixParser().parse(options, args);
             if (args.length == 0 || cmd.hasOption('h')) {
@@ -81,12 +82,12 @@ public final class HalyardUpdate {
             for (char c : "sq".toCharArray()) {
                 if (!cmd.hasOption(c))  throw new ParseException("Missing mandatory option: " + c);
             }
-            for (char c : "sq".toCharArray()) {
+            for (char c : "sqe".toCharArray()) {
                 String s[] = cmd.getOptionValues(c);
                 if (s != null && s.length > 1)  throw new ParseException("Multiple values for option: " + c);
             }
 
-            SailRepository rep = new SailRepository(new HBaseSail(conf, cmd.getOptionValue('s'), false, 0, true, 0, null));
+            SailRepository rep = new SailRepository(new HBaseSail(conf, cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('e'), null));
             rep.initialize();
             try {
                 Update u = rep.getConnection().prepareUpdate(QueryLanguage.SPARQL, cmd.getOptionValue('q'));

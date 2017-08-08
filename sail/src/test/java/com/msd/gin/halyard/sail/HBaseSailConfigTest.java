@@ -65,12 +65,20 @@ public class HBaseSailConfigTest {
     }
 
     @Test
+    public void testElasticIndex() {
+        HBaseSailConfig cfg = new HBaseSailConfig();
+        cfg.setElasticIndexURL("http://localhost:12345/index");
+        assertEquals("http://localhost:12345/index", cfg.getElasticIndexURL());
+    }
+
+    @Test
     public void testExportAndParse() throws Exception {
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.setTablespace("whatevertable");
         cfg.setSplitBits(7);
         cfg.setCreate(false);
         cfg.setPush(false);
+        cfg.setElasticIndexURL("http://whateverURL/index");
         TreeModel g = new TreeModel();
         cfg.export(g);
         cfg = new HBaseSailConfig();
@@ -79,5 +87,6 @@ public class HBaseSailConfigTest {
         assertEquals(7, cfg.getSplitBits());
         assertFalse(cfg.isCreate());
         assertFalse(cfg.isPush());
+        assertEquals("http://whateverURL/index", cfg.getElasticIndexURL());
     }
 }

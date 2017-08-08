@@ -429,18 +429,20 @@ public final class HalyardExport {
     private final String htableName;
     private final String sparqlQuery;
     private final QueryResultWriter writer;
+    private final String elasticIndexURL;
     private final StatusLog log;
 
-    HalyardExport(String htableName, String sparqlQuery, QueryResultWriter writer, StatusLog log) {
+    HalyardExport(String htableName, String sparqlQuery, QueryResultWriter writer, String elasticIndexURL, StatusLog log) {
         this.htableName = htableName;
         this.sparqlQuery = sparqlQuery;
         this.writer = writer;
+        this.elasticIndexURL = elasticIndexURL;
         this.log = log;
     }
 
     void run(Configuration configuration) throws ExportException {
         try {
-            SailRepository rep = new SailRepository(new HBaseSail(configuration, htableName, false, 0, true, 0, null));
+            SailRepository rep = new SailRepository(new HBaseSail(configuration, htableName, false, 0, true, 0, elasticIndexURL, null));
             rep.initialize();
             try {
                 writer.initTimer();
@@ -487,7 +489,7 @@ public final class HalyardExport {
      * @param trimTable boolean option to trim target JDBC table before export (for JDB export only)
      * @throws ExportException in case of an export problem
      */
-    public static void export(Configuration conf, StatusLog log, String source, String query, String targetUrl, String driverClass, URL[] driverClasspath, String[] jdbcProperties, boolean trimTable) throws ExportException {
+    public static void export(Configuration conf, StatusLog log, String source, String query, String targetUrl, String driverClass, URL[] driverClasspath, String[] jdbcProperties, boolean trimTable, String elasticIndexURL) throws ExportException {
         try {
             QueryResultWriter writer = null;
             if (targetUrl.startsWith("jdbc:")) {
@@ -517,7 +519,7 @@ public final class HalyardExport {
                     writer = new RIOResultWriter(log, form.get(), out);
                 }
             }
-            new HalyardExport(source, query, writer, log).run(conf);
+            new HalyardExport(source, query, writer, elasticIndexURL, log).run(conf);
         } catch (IOException e) {
             throw new ExportException(e);
         }
@@ -540,6 +542,7 @@ public final class HalyardExport {
         options.addOption(newOption("l", "driver_classpath", "JDBC driver classpath delimited by ':'"));
         options.addOption(newOption("c", "driver_class", "JDBC driver class name"));
         options.addOption(newOption("r", null, "Trim target table before export (apply for JDBC only)"));
+        options.addOption(newOption("e", "elastic_index_url", "Optional ElasticSearch index URL"));
         try {
             CommandLine cmd = new PosixParser().parse(options, args);
             if (args.length == 0 || cmd.hasOption('h')) {
@@ -558,7 +561,7 @@ public final class HalyardExport {
             for (char c : "sqt".toCharArray()) {
                 if (!cmd.hasOption(c))  throw new ExportException("Missing mandatory option: " + c);
             }
-            for (char c : "sqtlc".toCharArray()) {
+            for (char c : "sqtlce".toCharArray()) {
                 String s[] = cmd.getOptionValues(c);
                 if (s != null && s.length > 1)  throw new ExportException("Multiple values for option: " + c);
             }
@@ -583,7 +586,7 @@ public final class HalyardExport {
                     driverCP[j] = f.toURI().toURL();
                 }
             }
-            export(conf, log, cmd.getOptionValue('s'), cmd.getOptionValue('q'), cmd.getOptionValue('t'), cmd.getOptionValue('c'), driverCP, cmd.getOptionValues('p'), cmd.hasOption('r'));
+            export(conf, log, cmd.getOptionValue('s'), cmd.getOptionValue('q'), cmd.getOptionValue('t'), cmd.getOptionValue('c'), driverCP, cmd.getOptionValues('p'), cmd.hasOption('r'), cmd.getOptionValue('e'));
         } catch (RuntimeException exp) {
             System.out.println(exp.getMessage());
             printHelp(options);

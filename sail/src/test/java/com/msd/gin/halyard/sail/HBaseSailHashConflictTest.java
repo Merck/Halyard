@@ -96,7 +96,7 @@ public class HBaseSailHashConflictTest {
             }
             table.flushCommits();
         }
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", false, 0, true, 0, null);
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", false, 0, true, 0, null, null);
         sail.initialize();
     }
 

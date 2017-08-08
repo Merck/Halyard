@@ -121,6 +121,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     final int evaluationTimeout;
     private boolean readOnly = false;
     private long readOnlyTimestamp = -1;
+    final String elasticIndexURL;
     private final Ticker ticker;
 
     HTable table = null;
@@ -136,9 +137,10 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
      * @param splitBits int number of bits used for calculation of HTable region pre-splits (applies for new tables only)
      * @param pushStrategy boolean option to use {@link com.msd.gin.halyard.strategy.HalyardEvaluationStrategy} instead of {@link org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy}
      * @param evaluationTimeout int timeout in seconds for each query evaluation, negative values mean no timeout
+     * @param elasticIndexURL String optional ElasticSearch index URL
      * @param ticker optional Ticker callback for keep-alive notifications
      */
-    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, Ticker ticker) {
+    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker) {
         this.config = config;
         this.tableName = tableName;
         this.create = create;
@@ -187,6 +189,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
             }
         };
         this.evaluationTimeout = evaluationTimeout;
+        this.elasticIndexURL = elasticIndexURL;
         this.ticker = ticker;
     }
 
@@ -224,7 +227,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
             String federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length());
             RepositoryFederatedService s = federatedServices.get(federatedTable);
             if (s == null) {
-                s = new RepositoryFederatedService(new SailRepository(new HBaseSail(config, federatedTable, false, 0, true, evaluationTimeout, ticker)));
+                s = new RepositoryFederatedService(new SailRepository(new HBaseSail(config, federatedTable, false, 0, true, evaluationTimeout, null, ticker)));
                 federatedServices.put(federatedTable, s);
                 s.initialize();
             }

@@ -44,7 +44,7 @@ public class HalyardBulkUpdateTest {
     public void testBulkUpdate() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-        HBaseSail sail = new HBaseSail(conf, TABLE, true, -1, true, 0, null);
+        HBaseSail sail = new HBaseSail(conf, TABLE, true, -1, true, 0, null, null);
         sail.initialize();
         for (int i=0; i<5; i++) {
             for (int j=0; j<5; j++) {
@@ -63,7 +63,7 @@ public class HalyardBulkUpdateTest {
 
         assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ queries.toURI().toURL().toString(), htableDir.toURI().toURL().toString(), TABLE}));
 
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null);
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
         sail.initialize();
         try {
             int count;

@@ -73,7 +73,7 @@ public class HalyardExportTest {
             ROOT = ROOT + "/";
         }
         ValueFactory vf = SimpleValueFactory.getInstance();
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, true, 0, true, 0, null, null);
         sail.initialize();
         for (int i=0; i<10; i++) {
             for (int j=0; j<10; j++) {
