@@ -575,12 +575,51 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         namespaces.clear();
     }
 
+    private class LiteralSearchStatementScanner extends StatementScanner {
+
+        public LiteralSearchStatementScanner(long startTime, Resource subj, IRI pred, String literalSearchQuery, Resource... contexts) throws SailException {
+            super(startTime, subj, pred, null, contexts);
+            if (elasticIndexURL == null || elasticIndexURL.length() == 0) {
+                throw new SailException("ElasticSearch Index URL is not properly configured.");
+            }
+            //ToDo create ES connection
+        }
+
+        @Override
+        protected Result nextResult() throws IOException {
+            while (true) {
+                if (objHash == null) {
+                    // ToDo
+                    // get next hash from ES and set it to objHash
+                    // return null if there is no more;
+
+                    contexts = contextsList.iterator(); //reset iterator over contexts
+                }
+                Result res = super.nextResult();
+                if (res == null) {
+                    objHash = null;
+                } else {
+                    return res;
+                }
+            }
+        }
+
+        @Override
+        public void close() throws SailException {
+            super.close();
+            //ToDo close ES connection
+        }
+    }
+
     private class StatementScanner implements CloseableIteration<Statement, SailException> {
 
         private final Resource subj;
         private final IRI pred;
         private final Value obj;
-        private final Iterator<Resource> contexts;
+        private final byte[] subjHash, predHash;
+        protected final List<Resource> contextsList;
+        protected Iterator<Resource> contexts;
+        protected byte[] objHash;
         private ResultScanner rs = null;
         private final long endTime;
         private Statement next = null;
@@ -590,15 +629,19 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
             this.subj = subj;
             this.pred = pred;
             this.obj = obj;
-            this.contexts = Arrays.asList(normalizeContexts(contexts)).iterator();
+            this.subjHash = HalyardTableUtils.hashKey(subj);
+            this.predHash = HalyardTableUtils.hashKey(pred);
+            this.objHash = HalyardTableUtils.hashKey(obj);
+            this.contextsList = Arrays.asList(normalizeContexts(contexts));
+            this.contexts = contextsList.iterator();
             this.endTime = startTime + (1000l * evaluationTimeout);
         }
 
-        private Result nextResult() throws IOException {
+        protected Result nextResult() throws IOException {
             while (true) {
                 if (rs == null) {
                     if (contexts.hasNext()) {
-                        rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, contexts.next()));
+                        rs = table.getScanner(HalyardTableUtils.scan(subjHash, predHash, objHash, HalyardTableUtils.hashKey(contexts.next())));
                     } else {
                         return null;
                     }

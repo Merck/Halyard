@@ -242,6 +242,7 @@ public final class HalyardTableUtils {
         return kv;
     }
 
+
     /**
      * Method constructing HBase Scan from a Statement pattern, any of the arguments can be null
      * @param subj optional subject Resource
@@ -251,63 +252,74 @@ public final class HalyardTableUtils {
      * @return HBase Scan instance to retrieve all data potentially matching the Statement pattern
      */
     public static Scan scan(Resource subj, IRI pred, Value obj, Resource ctx) {
-        if (ctx == null) {
-            if (subj == null) {
-                if (pred == null) {
-                    if (obj == null) {
+        return scan(hashKey(subj), hashKey(pred), hashKey(obj), hashKey(ctx));
+    }
+    /**
+     * Method constructing HBase Scan from a Statement pattern hashes, any of the arguments can be null
+     * @param subjHash optional subject Resource hash
+     * @param predHash optional predicate IRI hash
+     * @param objHash optional object Value hash
+     * @param ctxHash optional context Resource hash
+     * @return HBase Scan instance to retrieve all data potentially matching the Statement pattern
+     */
+    public static Scan scan(byte[] subjHash, byte[] predHash, byte[] objHash, byte[] ctxHash) {
+        if (ctxHash == null) {
+            if (subjHash == null) {
+                if (predHash == null) {
+                    if (objHash == null) {
                         return scan(concat(SPO_PREFIX, false), concat(SPO_PREFIX, true, STOP_KEY, STOP_KEY, STOP_KEY));
                     } else {
-                        return scan(OSP_PREFIX, hashKey(NTriplesUtil.toNTriplesString(obj).getBytes(UTF8)));
+                        return scan(OSP_PREFIX, objHash);
                     }
                 } else {
-                    if (obj == null) {
-                        return scan(POS_PREFIX, hashKey(NTriplesUtil.toNTriplesString(pred).getBytes(UTF8)));
+                    if (objHash == null) {
+                        return scan(POS_PREFIX, predHash);
                     } else {
-                        return scan(POS_PREFIX, hashKey(NTriplesUtil.toNTriplesString(pred).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(obj).getBytes(UTF8)));
+                        return scan(POS_PREFIX, predHash, objHash);
                     }
                 }
             } else {
-                if (pred == null) {
-                    if (obj == null) {
-                        return scan(SPO_PREFIX, hashKey(NTriplesUtil.toNTriplesString(subj).getBytes(UTF8)));
+                if (predHash == null) {
+                    if (objHash == null) {
+                        return scan(SPO_PREFIX, subjHash);
                     } else {
-                        return scan(OSP_PREFIX, hashKey(NTriplesUtil.toNTriplesString(obj).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(subj).getBytes(UTF8)));
+                        return scan(OSP_PREFIX, objHash, subjHash);
                     }
                 } else {
-                    if (obj == null) {
-                        return scan(SPO_PREFIX, hashKey(NTriplesUtil.toNTriplesString(subj).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(pred).getBytes(UTF8)));
+                    if (objHash == null) {
+                        return scan(SPO_PREFIX, subjHash, predHash);
                     } else {
-                        return scan(SPO_PREFIX, hashKey(NTriplesUtil.toNTriplesString(subj).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(pred).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(obj).getBytes(UTF8)));
+                        return scan(SPO_PREFIX, subjHash, predHash, objHash);
                     }
                 }
             }
         } else {
-            if (subj == null) {
-                if (pred == null) {
-                    if (obj == null) {
-                        return scan(CSPO_PREFIX, hashKey(NTriplesUtil.toNTriplesString(ctx).getBytes(UTF8)));
+            if (subjHash == null) {
+                if (predHash == null) {
+                    if (objHash == null) {
+                        return scan(CSPO_PREFIX, ctxHash);
                     } else {
-                        return scan(COSP_PREFIX, hashKey(NTriplesUtil.toNTriplesString(ctx).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(obj).getBytes(UTF8)));
+                        return scan(COSP_PREFIX, ctxHash, objHash);
                     }
                 } else {
-                    if (obj == null) {
-                        return scan(CPOS_PREFIX, hashKey(NTriplesUtil.toNTriplesString(ctx).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(pred).getBytes(UTF8)));
+                    if (objHash == null) {
+                        return scan(CPOS_PREFIX, ctxHash, predHash);
                     } else {
-                        return scan(CPOS_PREFIX, hashKey(NTriplesUtil.toNTriplesString(ctx).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(pred).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(obj).getBytes(UTF8)));
+                        return scan(CPOS_PREFIX, ctxHash, predHash, objHash);
                     }
                 }
             } else {
-                if (pred == null) {
-                    if (obj == null) {
-                        return scan(CSPO_PREFIX, hashKey(NTriplesUtil.toNTriplesString(ctx).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(subj).getBytes(UTF8)));
+                if (predHash == null) {
+                    if (objHash == null) {
+                        return scan(CSPO_PREFIX, ctxHash, subjHash);
                     } else {
-                        return scan(COSP_PREFIX, hashKey(NTriplesUtil.toNTriplesString(ctx).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(obj).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(subj).getBytes(UTF8)));
+                        return scan(COSP_PREFIX, ctxHash, objHash, subjHash);
                     }
                 } else {
-                    if (obj == null) {
-                        return scan(CSPO_PREFIX, hashKey(NTriplesUtil.toNTriplesString(ctx).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(subj).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(pred).getBytes(UTF8)));
+                    if (objHash == null) {
+                        return scan(CSPO_PREFIX, ctxHash, subjHash, predHash);
                     } else {
-                        return scan(CSPO_PREFIX, hashKey(NTriplesUtil.toNTriplesString(ctx).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(subj).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(pred).getBytes(UTF8)), hashKey(NTriplesUtil.toNTriplesString(obj).getBytes(UTF8)));
+                        return scan(CSPO_PREFIX, ctxHash, subjHash, predHash, objHash);
                     }
                 }
             }
@@ -404,6 +416,10 @@ public final class HalyardTableUtils {
         } finally {
             md.reset();
         }
+    }
+
+    public static byte[] hashKey(Value v) {
+        return v == null ? null : hashKey(NTriplesUtil.toNTriplesString(v).getBytes(UTF8));
     }
 
     private static Scan scan(byte prefix, byte[] key1) {
