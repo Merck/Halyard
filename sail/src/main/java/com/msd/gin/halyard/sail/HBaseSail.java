@@ -20,6 +20,11 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -30,6 +35,8 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Delete;
@@ -87,6 +94,10 @@ import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.eclipse.rdf4j.sail.UpdateContext;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
 /**
  * HBaseSail is RDF storage implementation on top of Apache HBase.
@@ -311,7 +322,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
             @Override
             public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
                 try {
-                    return new ExceptionConvertingIteration<Statement, QueryEvaluationException>(new StatementScanner(startTime, subj, pred, obj, contexts)) {
+                    return new ExceptionConvertingIteration<Statement, QueryEvaluationException>(createScanner(startTime, subj, pred, obj, contexts)) {
                         @Override
                         protected QueryEvaluationException convert(Exception e) {
                             return new QueryEvaluationException(e);
@@ -386,7 +397,15 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public CloseableIteration<? extends Statement, SailException> getStatements(Resource subj, IRI pred, Value obj, boolean includeInferred, Resource... contexts) throws SailException {
-        return new StatementScanner(System.currentTimeMillis(), subj, pred, obj, contexts);
+        return createScanner(System.currentTimeMillis(), subj, pred, obj, contexts);
+    }
+
+    private StatementScanner createScanner(long startTime, Resource subj, IRI pred, Value obj, Resource...contexts) throws SailException {
+        if ((obj instanceof Literal) && (HALYARD.SEARCH_TYPE.equals(((Literal)obj).getDatatype()))) {
+            return new LiteralSearchStatementScanner(startTime, subj, pred, obj.stringValue(), contexts);
+        } else {
+            return new StatementScanner(startTime, subj, pred, obj, contexts);
+        }
     }
 
     @Override
@@ -577,22 +596,55 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     private class LiteralSearchStatementScanner extends StatementScanner {
 
+        Iterator<byte[]> objectHashes = null;
+        private final String literalSearchQuery;
+
         public LiteralSearchStatementScanner(long startTime, Resource subj, IRI pred, String literalSearchQuery, Resource... contexts) throws SailException {
             super(startTime, subj, pred, null, contexts);
             if (elasticIndexURL == null || elasticIndexURL.length() == 0) {
                 throw new SailException("ElasticSearch Index URL is not properly configured.");
             }
-            //ToDo create ES connection
+            this.literalSearchQuery = literalSearchQuery;
         }
 
         @Override
         protected Result nextResult() throws IOException {
             while (true) {
                 if (objHash == null) {
-                    // ToDo
-                    // get next hash from ES and set it to objHash
-                    // return null if there is no more;
-
+                    if (objectHashes == null) { //perform ES query and parse results
+                        List<byte[]> objectHashesList = new ArrayList<>();
+                        HttpURLConnection http = (HttpURLConnection)(new URL(elasticIndexURL + "/_search").openConnection());
+                        try {
+                            http.setRequestMethod("POST");
+                            http.setDoOutput(true);
+                            http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                            http.connect();
+                            try (PrintStream out = new PrintStream(http.getOutputStream(), true, "UTF-8")) {
+                                out.print("{\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"_source\":false,\"stored_fields\":\"_id\"}");
+                            }
+                            int response = http.getResponseCode();
+                            String msg = http.getResponseMessage();
+                            if (response != 200) {
+                                throw new IOException(msg);
+                            }
+                            try (InputStreamReader isr = new InputStreamReader(http.getInputStream(), "UTF-8")) {
+                                JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
+                                for (int i=0; i<hits.length(); i++) {
+                                    objectHashesList.add(Hex.decodeHex(hits.getJSONObject(i).getString("_id").toCharArray()));
+                                }
+                            }
+                        } catch (JSONException | DecoderException ex) {
+                            throw new IOException(ex);
+                        } finally {
+                            http.disconnect();
+                        }
+                        objectHashes = objectHashesList.iterator();
+                    }
+                    if (objectHashes.hasNext()) {
+                        objHash = objectHashes.next();
+                    } else {
+                        return null;
+                    }
                     contexts = contextsList.iterator(); //reset iterator over contexts
                 }
                 Result res = super.nextResult();
@@ -602,12 +654,6 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                     return res;
                 }
             }
-        }
-
-        @Override
-        public void close() throws SailException {
-            super.close();
-            //ToDo close ES connection
         }
     }
 
