@@ -120,7 +120,7 @@ public class HalyardElasticIndexer implements Tool {
 
         private void export(boolean flush) throws IOException {
             if (literals.size() > 0) {
-                batch.append("{\"index\":{\"_id\":\"").append(Hex.encodeHex(hash)).append("\"}}\n{");
+                batch.append("{\"index\":{\"_id\":\"").append(Hex.encodeHex(lastHash)).append("\"}}\n{");
                 for (int i = 0; i < literals.size(); i++) {
                     if (i > 0) {
                         batch.append(',');
