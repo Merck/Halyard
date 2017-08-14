@@ -38,12 +38,22 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
  */
 public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 
+	/**
+	 * Used to allow queries across more than one Halyard datasets
+	 */
     private final FederatedServiceResolver serviceResolver;
+    /**
+     * Evaluates TupleExpressions and all implementations of that interface
+     */
     private final HalyardTupleExprEvaluation tupleEval;
+    
+    /**
+     * Evaluates ValueExpr expressions and all implementations of that interface
+     */
     private final HalyardValueExprEvaluation valueEval;
 
     /**
-     * Ensures 'now' is the same across all parts of the query evaluation.
+     * Ensures 'now' is the same across all parts of the query evaluation chain.
      */
     Value sharedValueOfNow;
 
@@ -61,6 +71,9 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
         EvaluationStrategies.register(this);
     }
 
+    /**
+     * Get a service for a federated dataset.
+     */
     @Override
     public FederatedService getService(String serviceUrl) throws QueryEvaluationException {
         if (serviceResolver == null) {
@@ -69,6 +82,9 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
         return serviceResolver.getService(serviceUrl);
     }
 
+    /**
+     * Called by RDF4J to evaluate a query or part of a query using a service
+     */
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Service service, String serviceUri, CloseableIteration<BindingSet, QueryEvaluationException> bindings) throws QueryEvaluationException {
         if (serviceResolver == null) {
@@ -88,16 +104,25 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
         }
     }
 
+    /**
+     * Called by RDF4J to evaluate a tuple expression
+     */
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) throws QueryEvaluationException {
         return tupleEval.evaluate(expr, bindings);
     }
 
+    /**
+     * Called by RDF4J to evaluate a value expression
+     */
     @Override
     public Value evaluate(ValueExpr expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         return valueEval.evaluate(expr, bindings);
     }
 
+    /**
+     * Called by RDF4J to evaluate a binary expression
+     */
     @Override
     public boolean isTrue(ValueExpr expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         return valueEval.isTrue(expr, bindings);
