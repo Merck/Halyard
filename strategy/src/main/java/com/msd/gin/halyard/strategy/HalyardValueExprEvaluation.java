@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
+
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
@@ -77,7 +78,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.MathUtil;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 /**
- * Evaluates "value" expressions (low level language functions and operators) from SPARQL such as 'Regex', 'IsURI', math expressions etc.
+ * Evaluates "value" expressions (low level language functions and operators, instances of {@link ValueExpr}) from SPARQL such as 'Regex', 'IsURI', math expressions etc.
  *
  * @author Adam Sotona (MSD)
  */
@@ -91,6 +92,14 @@ class HalyardValueExprEvaluation {
         this.valueFactory = valueFactory;
     }
 
+    /**
+     * Determines the "effective boolean value" of the {@link Value} returned by evaluating the expression. 
+     * See {@link QueryEvaluationUtil#getEffectiveBooleanValue(Value)} for the definition of "effective boolean value.
+     * @param expr
+     * @param bindings
+     * @return
+     * @throws QueryEvaluationException
+     */
     boolean isTrue(ValueExpr expr, BindingSet bindings) throws QueryEvaluationException {
         try {
             Value value = evaluate(expr, bindings);
@@ -100,6 +109,14 @@ class HalyardValueExprEvaluation {
         }
     }
 
+    /**
+     * Determines which evaluate method to call based on the type of {@link ValueExpr}
+     * @param expr the expression to evaluate
+     * @param bindings the current named bindings
+     * @return the {@link Value} resulting from the evaluation
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     Value evaluate(ValueExpr expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         if (expr instanceof Var) {
             return evaluate((Var) expr, bindings);
@@ -174,6 +191,14 @@ class HalyardValueExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate a {@link Var} query model node. 
+     * @param var
+     * @param bindings
+     * @return the result of {@link Var#getValue()} from either {@code var}, or if {@code null}, from the {@ bindings}
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Var var, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value value = var.getValue();
         if (value == null) {
