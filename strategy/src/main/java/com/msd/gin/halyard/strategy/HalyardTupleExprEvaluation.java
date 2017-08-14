@@ -1004,6 +1004,12 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate {@link ZeroLengthPath} query model nodes
+     * @param parent
+     * @param zlp
+     * @param bindings
+     */
     private void evaluateZeroLengthPath(BindingSetPipe parent, ZeroLengthPath zlp, BindingSet bindings) {
         final Var subjectVar = zlp.getSubjectVar();
         final Var objVar = zlp.getObjectVar();
@@ -1025,6 +1031,12 @@ final class HalyardTupleExprEvaluation {
         HalyardStatementPatternEvaluation.enqueue(parent, new ZeroLengthPathIteration(parentStrategy, subjectVar, objVar, subj, obj, contextVar, bindings), zlp);
     }
 
+    /**
+     * Evaluate {@link ArbitraryLengthPath} query model nodes
+     * @param parent
+     * @param alp
+     * @param bindings
+     */
     private void evaluateArbitraryLengthPath(BindingSetPipe parent, ArbitraryLengthPath alp, BindingSet bindings) {
         final StatementPattern.Scope scope = alp.getScope();
         final Var subjectVar = alp.getSubjectVar();
@@ -1052,6 +1064,12 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate {@link BindingSetAssignment} query model nodes
+     * @param parent
+     * @param bsa
+     * @param bindings
+     */
     private void evaluateBindingSetAssignment(BindingSetPipe parent, BindingSetAssignment bsa, BindingSet bindings) {
         final Iterator<BindingSet> iter = bsa.getBindingSets().iterator();
         if (bindings.size() == 0) { // empty binding set
@@ -1120,6 +1138,12 @@ final class HalyardTupleExprEvaluation {
         return Long.MAX_VALUE;
     }
 
+    /**
+     * Determines if the parent of the node is an instance of {@link Distinct} or {@link Reduced}. 
+     * @param node the {@link QueryModelNode} to test
+     * @return {@code true} if the parent is and instance of {@link Distinct} or {@link Reduced} and {@code false} otherwise. If the parent is
+     * an instance of {@link Slice} then the parent is considered to be the first non-{@code Slice} node up the tree.
+     */
     private static boolean isReducedOrDistinct(QueryModelNode node) {
         QueryModelNode parent = node.getParentNode();
         if (parent instanceof Slice) {
@@ -1128,6 +1152,11 @@ final class HalyardTupleExprEvaluation {
         return parent instanceof Distinct || parent instanceof Reduced;
     }
 
+    /**
+     * Determines if a {@link QueryModelNode} is a {@link SubQueryValueOperator} or if it's parent node is
+     * @param node
+     * @return
+     */
     private boolean isPartOfSubQuery(QueryModelNode node) {
         if (node instanceof SubQueryValueOperator) {
             return true;
