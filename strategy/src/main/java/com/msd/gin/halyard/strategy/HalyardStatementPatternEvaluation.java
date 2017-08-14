@@ -44,19 +44,28 @@ import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 
 /**
- * This class evaluates statement patterns as part of query evaluations.
+ * This class evaluates statement patterns as part of query evaluations. It is a helper class for the {@code HalyardEvaluationStrategy}
  * @author Adam Sotona (MSD)
  */
 final class HalyardStatementPatternEvaluation {
 
     private static final int THREADS = 50;
 
+    /**
+     * A holder for the BindingSetPipe and the iterator over a tree of query sub-parts 
+     */
     private static class PipeAndIteration {
 
         private final HalyardTupleExprEvaluation.BindingSetPipe pipe;
         private final CloseableIteration<BindingSet, QueryEvaluationException> iter;
         private final int priority;
 
+        /**
+         * Constructor for the class with the supplied variables
+         * @param pipe The pipe to return evaluations to
+         * @param iter The iterator over the evaluation tree
+         * @param priority the 'level' of the evaluation in the over-all tree
+         */
         public PipeAndIteration(HalyardTupleExprEvaluation.BindingSetPipe pipe, CloseableIteration<BindingSet, QueryEvaluationException> iter, int priority) {
             this.pipe = pipe;
             this.iter = iter;
@@ -64,24 +73,38 @@ final class HalyardStatementPatternEvaluation {
         }
     }
 
+    /**
+     * Implementation of a priority queue as an array of typed {@code LinkedList}s, 
+     * used in this class to create priority queue of {@code PipeAndIteration} objects
+     */
     private static class PriorityQueue<E> {
 
         @SuppressWarnings("unchecked")
         private LinkedList<E>[] q = new LinkedList[64];
 
+        /**
+         * Add an object to the queue at the specified level. Putting an object in the queue will notify any threads that are waiting on a successful
+         * {@code this.take()} that they should wake up and try another call this {@code this.poll()}.
+         * @param level the level to add at (the index of the {@code LinkedList} that it is being added to)
+         * @param e the object to add
+         */
         public synchronized void put(int level, E e) {
-            if (q.length <= level) {
+            if (q.length <= level) { //need to extend the queue
                 q = Arrays.copyOf(q, level + 16);
             }
             LinkedList<E> subQueue = q[level];
-            if (subQueue == null) {
+            if (subQueue == null) { //create the sub-queue if it doesn't already exist
                 subQueue = new LinkedList<>();
                 q[level] = subQueue;
             }
-            subQueue.addLast(e);
-            notify();
+            subQueue.addLast(e); // add the object to the end of the subQueue
+            notify(); //notify any waiting threads that there is now data available
         }
 
+        /**
+         * Find the first non-null value in the array of Linked Lists searching in descending order of {@code level}.
+         * @return the first non-null value or {@codee null} if there is nothing in the {@code PriorityQueue}
+         */
         private E poll() {
             for (int i=q.length - 1; i >= 0; i--) {
                 LinkedList<E> subQueue = q[i];
@@ -91,6 +114,12 @@ final class HalyardStatementPatternEvaluation {
             return null;
         }
 
+        /**
+         * Find the first non-null value in the array of Linked Lists searching in descending order of {@code level} or block until something is available.
+         * Essentially, wait until {@code this.poll()} is non-null;
+         * @return The first {@code E} in the highest priority group 
+         * @throws InterruptedException
+         */
         public synchronized E take() throws InterruptedException {
             E e;
             while ((e = poll()) == null) {
@@ -100,6 +129,14 @@ final class HalyardStatementPatternEvaluation {
         }
     }
 
+    /**
+     * Wraps an object so that a call to {@code hashCode()} will return the {@code System.identityHashCode()} and not invoke any overridden 
+     * implementation of that method. Also overrides any custom implementation of {@code equals()}. The end result is that objects are compared for canonical 
+     * identity (they are references of the same object) and not logical identity (the objects are logically equivalent) and that calls to {@code hashCode()}
+     * and {@code equals()} return consistent results as required by JDK contract.
+     *
+     * @param <T>
+     */
     private static class IdentityWrapper<T> {
 
         int hash;
@@ -115,7 +152,8 @@ final class HalyardStatementPatternEvaluation {
             return hash;
         }
 
-        @Override
+        @SuppressWarnings("rawtypes")
+		@Override
         public boolean equals(Object o) {
             if (this == o) return true;
             return (o instanceof IdentityWrapper) && (this.o == ((IdentityWrapper)o).o);
@@ -125,14 +163,26 @@ final class HalyardStatementPatternEvaluation {
 
     private final Dataset dataset;
     private final TripleSource tripleSource;
+    //a map of query model nodes and their priority
     private static final Map<IdentityWrapper<QueryModelNode>, Integer> PRIORITY_MAP_CACHE = Collections.synchronizedMap(new WeakHashMap<>());
     private static final PriorityQueue<PipeAndIteration> PRIORITY_QUEUE = new PriorityQueue<>();
 
+    /**
+     * Queues a binding set and {@code QueryModelNode} for evaluation using the current priority.
+     * @param pipe the pipe that evaluation results are returned on
+     * @param iter 
+     * @param node an implementation of any {@QueryModelNode} sub-type, typically a {@code ValueExpression}, {@Code UpdateExpression} or {@TupleExpression}
+     */
     static void enqueue(HalyardTupleExprEvaluation.BindingSetPipe pipe,  CloseableIteration<BindingSet, QueryEvaluationException> iter, QueryModelNode node) {
         int priority = getPriorityForNode(node);
         PRIORITY_QUEUE.put(priority, new PipeAndIteration(pipe, iter, priority));
     }
 
+    /**
+     * Get the priority of this node from the PRIORITY_MAP_CACHE or determine the priority and then cache it. Also caches priority for sub-nodes of {@code node}
+     * @param node the node that you want the priority for
+     * @return the priority of the node, a count of the number of child nodes of {@code node}.
+     */
     private static int getPriorityForNode(final QueryModelNode node) {
         Integer p = PRIORITY_MAP_CACHE.get(new IdentityWrapper<>(node));
         if (p != null) {
@@ -141,7 +191,8 @@ final class HalyardStatementPatternEvaluation {
             final AtomicInteger counter = new AtomicInteger();
             final AtomicInteger ret = new AtomicInteger();
             QueryModelNode root = node;
-            while (root.getParentNode() != null) root = root.getParentNode();
+            while (root.getParentNode() != null) root = root.getParentNode(); //traverse to the root of the query model
+            
             new AbstractQueryModelVisitor<RuntimeException>() {
                 @Override
                 protected void meetNode(QueryModelNode n) throws RuntimeException {
@@ -162,16 +213,23 @@ final class HalyardStatementPatternEvaluation {
         }
     }
 
+    /**
+     * Static Initializer, sets up the thread group for execution of queries
+     */
     static {
         ThreadGroup tg = new ThreadGroup("Halyard Executors");
         for (int i = 0; i < THREADS; i++) {
             final int threadNum = i;
             Thread t = new Thread(tg, new Runnable() {
-                @Override
+                
+            		/**
+            		 * Defines the behavior of every evaluation thread
+            		 */
+            		@Override
                 public void run() {
                     try {
                         while (true) {
-                            PipeAndIteration pai = PRIORITY_QUEUE.take();
+                            PipeAndIteration pai = PRIORITY_QUEUE.take(); //take the highest priority PipeAndIteration object
                             if (pai.priority % THREADS == threadNum) {
                                 PRIORITY_QUEUE.put(pai.priority, pai); //always keep some threads out of execution to avoid thread exhaustion
                                 Thread.sleep(100);
@@ -180,11 +238,11 @@ final class HalyardStatementPatternEvaluation {
                                     pai.iter.close();
                                 } else {
                                     BindingSet bs = pai.iter.next();
-                                    if (pai.pipe.push(bs)) {
+                                    if (pai.pipe.push(bs)) { //true indicates more data is expected from this binding set, put it on the queue
                                         if (bs != null) {
                                             PRIORITY_QUEUE.put(pai.priority, pai);
                                         }
-                                    } else {
+                                    } else { //no more data from this binding set close the iterator of this PipeAndIteration
                                         pai.iter.close();
                                     }
                                 }
@@ -204,16 +262,28 @@ final class HalyardStatementPatternEvaluation {
         }
     }
 
+    /**
+     * Constructor
+     * @param dataset against which operations can be evaluated (e.g. INSERT, UPDATE)
+     * @param tripleSource against which the query is evaluated
+     */
     HalyardStatementPatternEvaluation(Dataset dataset, TripleSource tripleSource) {
         this.dataset = dataset;
         this.tripleSource = tripleSource;
     }
 
+    /**
+     * Evaluate the statement pattern using the supplied bindings	
+     * @param parent to push or enqueue evaluation results
+     * @param sp the {@code StatementPattern} to evaluate
+     * @param bindings the set of names to which values are bound. For example, select ?s, ?p, ?o has the names s, p and o and the values bound to them are the
+     * results of the evaluation of this statement pattern
+     */
     void evaluateStatementPattern(final HalyardTupleExprEvaluation.BindingSetPipe parent, final StatementPattern sp, final BindingSet bindings) {
-        final Var subjVar = sp.getSubjectVar();
-        final Var predVar = sp.getPredicateVar();
-        final Var objVar = sp.getObjectVar();
-        final Var conVar = sp.getContextVar();
+        final Var subjVar = sp.getSubjectVar(); //subject
+        final Var predVar = sp.getPredicateVar(); //predicate
+        final Var objVar = sp.getObjectVar(); //object
+        final Var conVar = sp.getContextVar(); //graph or target context
 
         final Value subjValue = getVarValue(subjVar, bindings);
         final Value predValue = getVarValue(predVar, bindings);
@@ -230,10 +300,10 @@ final class HalyardStatementPatternEvaluation {
                 boolean emptyGraph = false;
 
                 if (dataset != null) {
-                    if (sp.getScope() == StatementPattern.Scope.DEFAULT_CONTEXTS) {
+                    if (sp.getScope() == StatementPattern.Scope.DEFAULT_CONTEXTS) { //evaluate against the default graph(s)
                         graphs = dataset.getDefaultGraphs();
                         emptyGraph = graphs.isEmpty() && !dataset.getNamedGraphs().isEmpty();
-                    } else {
+                    } else { //evaluate against the named graphs
                         graphs = dataset.getNamedGraphs();
                         emptyGraph = graphs.isEmpty() && !dataset.getDefaultGraphs().isEmpty();
                     }
@@ -241,7 +311,7 @@ final class HalyardStatementPatternEvaluation {
 
                 if (emptyGraph) {
                     // Search zero contexts
-                    parent.push(null);
+                    parent.push(null); //no results from this statement pattern
                     return;
                 } else if (graphs == null || graphs.isEmpty()) {
                     // store default behaivour
@@ -260,7 +330,7 @@ final class HalyardStatementPatternEvaluation {
                     } else {
                         // Statement pattern specifies a context that is not part of
                         // the dataset
-                        parent.push(null);
+                        parent.push(null); //no results possible because the context is not available
                         return;
                     }
                 } else {
@@ -275,6 +345,7 @@ final class HalyardStatementPatternEvaluation {
                     }
                 }
 
+                //get an iterator over all triple statements that match the s, p, o specification in the contexts
                 stIter = tripleSource.getStatements((Resource) subjValue, (IRI) predValue, objValue, contexts);
 
                 if (contexts.length == 0 && sp.getScope() == StatementPattern.Scope.NAMED_CONTEXTS) {
@@ -342,7 +413,7 @@ final class HalyardStatementPatternEvaluation {
             }
         };
 
-        // Return an iterator that converts the statements to var bindings
+        // Return an iterator that converts the RDF statements (triples) to var bindings
         enqueue(parent, new ConvertingIteration<Statement, BindingSet, QueryEvaluationException>(stIter) {
 
             @Override
@@ -368,6 +439,13 @@ final class HalyardStatementPatternEvaluation {
         }, sp);
     }
 
+    /**
+     * Gets a value from a {@code Var} if it has a {@code Value}. If it does not then the method will attempt to get it 
+     * from the bindings using the name of the Var
+     * @param var
+     * @param bindings
+     * @return the matching {@code Value} or {@code null} if var is {@code null}
+     */
     private static Value getVarValue(Var var, BindingSet bindings) {
         if (var == null) {
             return null;

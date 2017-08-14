@@ -32,8 +32,8 @@ import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceRes
 import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
 
 /**
- * Asynchronous parallel push {@code EvaluationStrategy} implementation suitable for parallel remote RDF storage systems. An
- * alternative strategy is the {@code StrictEvaluationStrategy} from RDF4J. This class is used by default in Halyard.
+ * Provides an efficient asynchronous parallel push {@code EvaluationStrategy} implementation for query evaluation in Halyard. This is the default strategy
+ * in Halyard. An alternative strategy is the {@code StrictEvaluationStrategy} from RDF4J. 
  * @author Adam Sotona (MSD)
  */
 public final class HalyardEvaluationStrategy implements EvaluationStrategy {
