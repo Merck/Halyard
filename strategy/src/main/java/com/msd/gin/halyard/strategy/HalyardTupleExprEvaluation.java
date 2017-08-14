@@ -93,7 +93,7 @@ import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
 
 /**
- * Evaluates {@code TupleExpression}s and it's sub-interfaces and implementations. 
+ * Evaluates {@link TupleExpression}s and it's sub-interfaces and implementations. 
  * @author Adam Sotona (MSD)
  */
 final class HalyardTupleExprEvaluation {
@@ -148,7 +148,7 @@ final class HalyardTupleExprEvaluation {
     private final long startTime, timeout;
 
     /**
-     * Constructor used by {@code HalyardEvaluationStrategy} to create this helper class
+     * Constructor used by {@link HalyardEvaluationStrategy} to create this helper class
      * @param parentStrategy
      * @param tripleSource
      * @param dataset
@@ -174,8 +174,8 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Switch logic appropriate for each type of {@code TupleExpr}, sending each type to it's appropriate evaluation method. For example,
-     * {@code UnaryTupleOperator} is sent to {@code evaluateUnaryTupleOperator()}.
+     * Switch logic appropriate for each type of {@link TupleExpr} query model node, sending each type to it's appropriate evaluation method. For example,
+     * {@code UnaryTupleOperator} is sent to {@link evaluateUnaryTupleOperator()}.
      * @param parent
      * @param expr
      * @param bindings
@@ -206,6 +206,12 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
+    /**
+     * Switch logic for evaluation of any instance of a {@link UnaryTupleOperator} query model node
+     * @param parent
+     * @param expr
+     * @param bindings
+     */
     private void evaluateUnaryTupleOperator(BindingSetPipe parent, UnaryTupleOperator expr, BindingSet bindings) {
         if (expr instanceof Projection) {
             evaluateProjection(parent, (Projection) expr, bindings);
@@ -239,6 +245,12 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate a {@link Projection} query model nodes
+     * @param parent
+     * @param projection
+     * @param bindings
+     */
     private void evaluateProjection(BindingSetPipe parent, final Projection projection, final BindingSet bindings) {
         evaluateTupleExpr(new BindingSetPipe(parent) {
             @Override
@@ -248,6 +260,12 @@ final class HalyardTupleExprEvaluation {
         }, projection.getArg(), bindings);
     }
 
+    /**
+     * Evaluate a {@link MultiProjection} query model nodes
+     * @param parent
+     * @param multiProjection
+     * @param bindings
+     */
     private void evaluateMultiProjection(BindingSetPipe parent, final MultiProjection multiProjection, final BindingSet bindings) {
         final List<ProjectionElemList> projections = multiProjection.getProjections();
         final BindingSet prev[] = new BindingSet[projections.size()];
@@ -277,7 +295,7 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Evaluates filter {@code ExpressionTuple}s pushing the result to the parent BindingSetPipe.
+     * Evaluates filter {@link ExpressionTuple}s query model nodes pushing the result to the parent BindingSetPipe.
      * @param parent the pipe to which results are pushed
      * @param filter holds the details of any FILTER expression in a SPARQL query and any sub-chains.
      * @param bindings
@@ -320,10 +338,21 @@ final class HalyardTupleExprEvaluation {
         }, filter.getArg(), bindings);
     }
 
+    /**
+     * Evaluate {@link DescribeOperator} query model nodes
+     * @param parent
+     * @param operator
+     * @param bindings
+     */
     private void evaluateDescribeOperator(BindingSetPipe parent, DescribeOperator operator, BindingSet bindings) {
         HalyardStatementPatternEvaluation.enqueue(parent, new DescribeIteration(evaluate(operator.getArg(), bindings), parentStrategy, operator.getBindingNames(), bindings), operator);
     }
 
+    /**
+     * Makes a {@link BindingSet} comparable
+     * @author schremar
+     *
+     */
     private static class ComparableBindingSetWrapper implements Comparable<ComparableBindingSetWrapper>, Serializable {
 
         private static final long serialVersionUID = -7341340704807086829L;
@@ -376,6 +405,12 @@ final class HalyardTupleExprEvaluation {
 
     }
 
+    /**
+     * Evaluate {@link Order} query model nodes
+     * @param parent
+     * @param order
+     * @param bindings
+     */
     private void evaluateOrder(final BindingSetPipe parent, final Order order, BindingSet bindings) {
 //        try {
             final Sorter<ComparableBindingSetWrapper> sorter = new Sorter<>(getLimit(order), isReducedOrDistinct(order));
@@ -419,6 +454,12 @@ final class HalyardTupleExprEvaluation {
 //        }
     }
 
+    /**
+     * Evaluate {@link Group} query model nodes
+     * @param parent
+     * @param group
+     * @param bindings
+     */
     private void evaluateGroup(BindingSetPipe parent, Group group, BindingSet bindings) {
         //temporary solution using copy of the original iterator
         //re-writing this to push model is a bit more complex task
@@ -429,6 +470,12 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate {@link Reduced} query model nodes
+     * @param parent
+     * @param reduced
+     * @param bindings
+     */
     private void evaluateReduced(BindingSetPipe parent, Reduced reduced, BindingSet bindings) {
         evaluateTupleExpr(new BindingSetPipe(parent) {
             private BindingSet previous = null;
@@ -446,6 +493,12 @@ final class HalyardTupleExprEvaluation {
         }, reduced.getArg(), bindings);
     }
 
+    /**
+     * Evaluate {@link Distinct} query model nodes
+     * @param parent
+     * @param distinct
+     * @param bindings
+     */
     private void evaluateDistinct(BindingSetPipe parent, final Distinct distinct, BindingSet bindings) {
         evaluateTupleExpr(new BindingSetPipe(parent) {
             private final BigHashSet<BindingSet> set = new BigHashSet<>();
@@ -473,6 +526,12 @@ final class HalyardTupleExprEvaluation {
         }, distinct.getArg(), bindings);
     }
 
+	/**
+	 * Evaluate {@link Extension} query model nodes
+	 * @param parent
+	 * @param extension
+	 * @param bindings
+	 */
     private void evaluateExtension(BindingSetPipe parent, final Extension extension, BindingSet bindings) {
         evaluateTupleExpr(new BindingSetPipe(parent) {
             @Override
@@ -506,6 +565,12 @@ final class HalyardTupleExprEvaluation {
         }, extension.getArg(), bindings);
     }
 
+    /**
+     * Evaluate {@link Slice} query model nodes.
+     * @param parent
+     * @param slice
+     * @param bindings
+     */
     private void evaluateSlice(BindingSetPipe parent, Slice slice, BindingSet bindings) {
         final long offset = slice.hasOffset() ? slice.getOffset() : 0;
         final long limit = slice.hasLimit() ? offset + slice.getLimit() : Long.MAX_VALUE;
@@ -526,6 +591,12 @@ final class HalyardTupleExprEvaluation {
         }, slice.getArg(), bindings);
     }
 
+    /**
+     * Evaluate {@link Service} query model nodes
+     * @param parent
+     * @param service
+     * @param bindings
+     */
     private void evaluateService(BindingSetPipe parent, Service service, BindingSet bindings) {
         Var serviceRef = service.getServiceRef();
         String serviceUri;
@@ -601,6 +672,12 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate {@link BinaryTupleOperator} query model nodes
+     * @param parent
+     * @param expr
+     * @param bindings
+     */
     private void evaluateBinaryTupleOperator(BindingSetPipe parent, BinaryTupleOperator expr, BindingSet bindings) {
         if (expr instanceof Join) {
             evaluateJoin(parent, (Join) expr, bindings);
@@ -619,6 +696,12 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate {@link Join} query model nodes.
+     * @param topPipe
+     * @param join
+     * @param bindings
+     */
     private void evaluateJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
         final AtomicLong joinsInProgress = new AtomicLong(1);
         BindingSetPipe rightPipe = new BindingSetPipe(topPipe) {
@@ -648,6 +731,12 @@ final class HalyardTupleExprEvaluation {
         }, join.getLeftArg(), bindings);
     }
 
+    /**
+     * Evaluate {@link LeftJoin} query model nodes
+     * @param parentPipe
+     * @param leftJoin
+     * @param bindings
+     */
     private void evaluateLeftJoin(BindingSetPipe parentPipe, final LeftJoin leftJoin, final BindingSet bindings) {
         // Check whether optional join is "well designed" as defined in section
         // 4.2 of "Semantics and Complexity of SPARQL", 2006, Jorge Pérez et al.
@@ -743,6 +832,12 @@ final class HalyardTupleExprEvaluation {
             return filteredBindings;
     }
 
+    /**
+     * Evaluate {@link Union} query model nodes.
+     * @param parent
+     * @param union
+     * @param bindings
+     */
     private void evaluateUnion(BindingSetPipe parent, Union union, BindingSet bindings) {
         BindingSetPipe pipe = new BindingSetPipe(parent) {
             AtomicInteger args = new AtomicInteger(2);
@@ -763,6 +858,12 @@ final class HalyardTupleExprEvaluation {
         evaluateTupleExpr(pipe, union.getRightArg(), bindings);
     }
 
+    /**
+     * Evaluate {@link Intersection} query model nodes
+     * @param topPipe
+     * @param intersection
+     * @param bindings
+     */
     private void evaluateIntersection(final BindingSetPipe topPipe, final Intersection intersection, final BindingSet bindings) {
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
             private final BigHashSet<BindingSet> secondSet = new BigHashSet<>();
@@ -801,6 +902,12 @@ final class HalyardTupleExprEvaluation {
         }, intersection.getRightArg(), bindings);
     }
 
+    /**
+     * Evaluate {@link Difference} query model nodes
+     * @param topPipe
+     * @param difference
+     * @param bindings
+     */
     private void evaluateDifference(final BindingSetPipe topPipe, final Difference difference, final BindingSet bindings) {
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
             private final BigHashSet<BindingSet> excludeSet = new BigHashSet<>();
@@ -853,6 +960,12 @@ final class HalyardTupleExprEvaluation {
         }, difference.getRightArg(), bindings);
     }
 
+    /**
+     * Evaluate {@link SingletonSet} query model nodes
+     * @param parent
+     * @param singletonSet
+     * @param bindings
+     */
     private void evaluateSingletonSet(BindingSetPipe parent, SingletonSet singletonSet, BindingSet bindings) {
         try {
             if (parent.push(bindings)) {
@@ -863,6 +976,12 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate {@link EmptySet} query model nodes
+     * @param parent
+     * @param emptySet
+     * @param bindings
+     */
     private void evaluateEmptySet(BindingSetPipe parent, EmptySet emptySet, BindingSet bindings) {
         try {
             parent.push(null);
@@ -871,6 +990,12 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate {@link ExternalSet} query model nodes
+     * @param parent
+     * @param externalSet
+     * @param bindings
+     */
     private void evaluateExternalSet(BindingSetPipe parent, ExternalSet externalSet, BindingSet bindings) {
         try {
             HalyardStatementPatternEvaluation.enqueue(parent, externalSet.evaluate(bindings), externalSet);
