@@ -163,6 +163,11 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                 return new CardinalityCalculator() {
                     @Override
                     protected double getCardinality(StatementPattern sp) {
+                        Var objectVar = sp.getObjectVar();
+                        //always return cardinality 1.0 for HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
+                        if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal)objectVar.getValue()).getDatatype())) {
+                            return 1.0;
+                        }
                         Var contextVar = sp.getContextVar();
                         IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI)contextVar.getValue();
                         long triples = getTriplesCount(graphNode, -1l);
@@ -620,7 +625,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                             http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
                             http.connect();
                             try (PrintStream out = new PrintStream(http.getOutputStream(), true, "UTF-8")) {
-                                out.print("{\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"_source\":false,\"stored_fields\":\"_id\"}");
+                                out.print("{\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"_source\":false,\"stored_fields\":\"_id\",\"size\":10000}");
                             }
                             int response = http.getResponseCode();
                             String msg = http.getResponseMessage();
