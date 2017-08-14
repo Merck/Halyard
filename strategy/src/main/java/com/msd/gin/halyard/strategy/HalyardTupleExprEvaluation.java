@@ -93,17 +93,25 @@ import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
 
 /**
- *
+ * Evaluates {@code TupleExpression}s and it's sub-interfaces and implementations. 
  * @author Adam Sotona (MSD)
  */
 final class HalyardTupleExprEvaluation {
 
     private static final int MAX_QUEUE_SIZE = 1000;
 
+    /**
+     * Binding set pipes instances hold {@BindingSet}s (set of evaluated, un-evaluated and intermediate variables) that
+     * form part of the query evaluation (a query generates an evaluation tree).
+     */
     static abstract class BindingSetPipe {
 
         protected final BindingSetPipe parent;
 
+        /**
+         * Create a pipe
+         * @param parent the parent of this part of the evaluation chain
+         */
         protected BindingSetPipe(BindingSetPipe parent) {
             this.parent = parent;
         }
@@ -139,6 +147,13 @@ final class HalyardTupleExprEvaluation {
     private final HalyardStatementPatternEvaluation statementEvaluation;
     private final long startTime, timeout;
 
+    /**
+     * Constructor used by {@code HalyardEvaluationStrategy} to create this helper class
+     * @param parentStrategy
+     * @param tripleSource
+     * @param dataset
+     * @param timeout
+     */
     HalyardTupleExprEvaluation(HalyardEvaluationStrategy parentStrategy, TripleSource tripleSource, Dataset dataset, long timeout) {
         this.parentStrategy = parentStrategy;
         this.statementEvaluation = new HalyardStatementPatternEvaluation(dataset, tripleSource);
@@ -146,12 +161,25 @@ final class HalyardTupleExprEvaluation {
         this.timeout = timeout;
     }
 
+    /**
+     * Returns an iterator on the binding set pipe
+     * @param expr supplied by HalyardEvaluationStrategy
+     * @param bindings supplied by HalyardEvaluationStrategy
+     * @return an iterator on the binding set pipe
+     */
     CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) {
         BindingSetPipeIterator root = new BindingSetPipeIterator();
         evaluateTupleExpr(root.pipe, expr, bindings);
         return root;
     }
 
+    /**
+     * Switch logic appropriate for each type of {@code TupleExpr}, sending each type to it's appropriate evaluation method. For example,
+     * {@code UnaryTupleOperator} is sent to {@code evaluateUnaryTupleOperator()}.
+     * @param parent
+     * @param expr
+     * @param bindings
+     */
     private void evaluateTupleExpr(BindingSetPipe parent, TupleExpr expr, BindingSet bindings) {
         if (expr instanceof StatementPattern) {
             statementEvaluation.evaluateStatementPattern(parent, (StatementPattern) expr, bindings);
@@ -248,6 +276,12 @@ final class HalyardTupleExprEvaluation {
         }, multiProjection.getArg(), bindings);
     }
 
+    /**
+     * Evaluates filter {@code ExpressionTuple}s pushing the result to the parent BindingSetPipe.
+     * @param parent the pipe to which results are pushed
+     * @param filter holds the details of any FILTER expression in a SPARQL query and any sub-chains.
+     * @param bindings
+     */
     private void evaluateFilter(BindingSetPipe parent, final Filter filter, final BindingSet bindings) {
         final Set<String> scopeBindingNames = filter.getBindingNames();
         evaluateTupleExpr(new BindingSetPipe(parent) {
@@ -258,9 +292,9 @@ final class HalyardTupleExprEvaluation {
                 }
                 try {
                     if (accept(bs)) {
-                        return parent.push(bs);
+                        return parent.push(bs); //push results that pass the filter.
                     } else {
-                        return true;
+                        return true; //nothing passes the filter but processing continues.
                     }
                 } catch (QueryEvaluationException e) {
                     parent.handleException(e);

@@ -44,7 +44,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 
 /**
- *
+ * This class evaluates statement patterns as part of query evaluations.
  * @author Adam Sotona (MSD)
  */
 final class HalyardStatementPatternEvaluation {

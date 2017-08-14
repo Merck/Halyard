@@ -77,6 +77,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.MathUtil;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 /**
+ * Evaluates "value" expressions (low level language functions and operators) from SPARQL such as 'Regex', 'IsURI', math expressions etc.
  *
  * @author Adam Sotona (MSD)
  */
