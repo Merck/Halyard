@@ -128,11 +128,13 @@ public final class HalyardTableUtils {
     }
 
     /**
-     * Helper method which locates or creates and returns the specified HTable used for triple/ quad storage
+     * Helper method which locates or creates and returns the specified HTable used for triple/ quad storage. The table may be pre-split into regions (rather than HBase's default
+     * of starting with 1). For a discussion of pre-splits take a look at <a href="https://hortonworks.com/blog/apache-hbase-region-splitting-and-merging/">this article</a>
      * @param config Hadoop Configuration of the cluster running HBase
      * @param tableName String table name
      * @param create boolean option to create the table if does not exist
-     * @param splitBits int number of bits used for calculation of HTable region pre-splits (applies for new tables only)
+     * @param splitBits int number of bits used for calculation of HTable region pre-splits (applies for new tables only). Must be between 0 and 16. Higher values generate more
+     * splits.
      * @throws IOException throws IOException in case of any HBase IO problems
      * @return the org.apache.hadoop.hbase.client.HTable
      */
@@ -172,7 +174,7 @@ public final class HalyardTableUtils {
     }
 
     /**
-     * Truncates HTable with preserving the region pre-splits
+     * Truncates HTable while preserving the region pre-splits
      * @param table HTable to truncate
      * @return new instance of the truncated HTable
      * @throws IOException throws IOException in case of any HBase IO problems
@@ -195,6 +197,11 @@ public final class HalyardTableUtils {
         return HalyardTableUtils.getTable(conf, desc.getTableName().getNameAsString(), false, 0);
     }
 
+    /**
+     * Calculates the split keys (one for each purmutation of the CSPO HBase Key prefix).
+     * @param splitBits must be between 0 and 16, larger values result in more keys.
+     * @return An array of keys represented as {@code byte[]}s
+     */
     static byte[][] calculateSplits(int splitBits) {
         TreeSet<byte[]> splitKeys = new TreeSet<>(Bytes.BYTES_COMPARATOR);
         //basic presplits
@@ -210,13 +217,20 @@ public final class HalyardTableUtils {
         return splitKeys.toArray(new byte[splitKeys.size()][]);
     }
 
+    /**
+     * Generate the split key and add it to the collection
+     * @param splitKeys the {@code TreeSet} to add the collection to.
+     * @param prefix the prefix to calculate the key for
+     * @param splitBits between 0 and 16, larger values generate smaller split steps
+     */
     private static void addSplits(TreeSet<byte[]> splitKeys, byte[] prefix, int splitBits) {
         if (splitBits == 0) return;
         if (splitBits < 0 || splitBits > 16) throw new IllegalArgumentException("Illegal nunmber of split bits");
-        final int splitStep = 1 << (16 - splitBits);
-        for (int i = splitStep; i <= 0xFFFF; i += splitStep) {
+        
+        final int splitStep = 1 << (16 - splitBits); //1 splitBit gives a split step of 32768, 8 splitBits gives a split step of 256
+        for (int i = splitStep; i <= 0xFFFF; i += splitStep) { // 0xFFFF is 65535 so a split step of 32768 will give 2 iterations, larger split bits give more iterations
             byte bb[] = Arrays.copyOf(prefix, prefix.length + 2);
-            bb[prefix.length] = (byte)((i >> 8) & 0xff);
+            bb[prefix.length] = (byte)((i >> 8) & 0xff); //0xff = 255.
             bb[prefix.length + 1] = (byte)(i & 0xff);
             splitKeys.add(bb);
         }
