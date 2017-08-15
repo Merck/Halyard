@@ -86,7 +86,8 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 /**
- * MapReduce tool providing statistics about Halyard dataset
+ * MapReduce tool providing statistics about a Halyard dataset. Statistics about a dataset are reported in RDF using the VOID ontology. These statistics can be useful
+ * to summarize a graph and it implicitly shows how the subjects, predicates and objects are used. In the absence of schema information this information can be vital.
  * @author Adam Sotona (MSD)
  */
 public class HalyardStats implements Tool {

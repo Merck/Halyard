@@ -80,7 +80,8 @@ import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.Rio;
 
 /**
- * Command line tool exporting results of SPARQL queries into various target systems
+ * Command line tool to run SPARQL queries and export the results into various target systems. This class could be extended or modified to add new types of
+ * export targets.
  * @author Adam Sotona (MSD)
  */
 public final class HalyardExport {
@@ -424,7 +425,7 @@ public final class HalyardExport {
         }
     }
 
-    static Configuration conf = null; // this is a hook to pass cuustom configuration in tests
+    static Configuration conf = null; // this is a hook to pass custom configuration in tests
 
     private final String htableName;
     private final String sparqlQuery;
@@ -484,9 +485,9 @@ public final class HalyardExport {
      * @param query String SPARQL Graph query
      * @param targetUrl String URL of the target system (+folder or schema, +table or file name)
      * @param driverClass String JDBC Driver class name (for JDBC export only)
-     * @param driverClasspath Array of URLs with JDBC Driver classpath (for JDB export only)
-     * @param jdbcProperties Arrays of String JDBC connection properties (for JDB export only)
-     * @param trimTable boolean option to trim target JDBC table before export (for JDB export only)
+     * @param driverClasspath Array of URLs with JDBC Driver classpath (for DB export only)
+     * @param jdbcProperties Arrays of String JDBC connection properties (for DB export only)
+     * @param trimTable boolean option to trim target JDBC table before export (for DB export only)
      * @throws ExportException in case of an export problem
      */
     public static void export(Configuration conf, StatusLog log, String source, String query, String targetUrl, String driverClass, URL[] driverClasspath, String[] jdbcProperties, boolean trimTable, String elasticIndexURL) throws ExportException {

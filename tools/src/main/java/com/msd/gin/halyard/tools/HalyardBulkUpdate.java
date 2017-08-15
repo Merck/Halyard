@@ -75,7 +75,8 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.sail.SailException;
 
 /**
- * Apache Hadoop MapReduce tool performing SPARQL Graph queries and BulkLoading results back into HBase
+ * Apache Hadoop MapReduce tool for performing SPARQL Graph construct queries and then bulk loading the results back into HBase. Essentially, batch process queries
+ * and bulk load the results.
  * @author Adam Sotona (MSD)
  */
 public class HalyardBulkUpdate implements Tool {

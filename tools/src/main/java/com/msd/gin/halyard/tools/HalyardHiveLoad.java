@@ -55,7 +55,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 /**
- * MapReduce tool BulkLoading RDF data parsed (in any standard RDF form) from given Hive table and column
+ * MapReduce tool for bulk loading of RDF data (in any standard RDF form) from given Hive table and column
  * @author Adam Sotona (MSD)
  */
 public class HalyardHiveLoad implements Tool {

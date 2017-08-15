@@ -65,7 +65,7 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.json.JSONObject;
 
 /**
- * MapReduce tool indexing all literals in Elasticsearch
+ * MapReduce tool indexing all RDF literals in Elasticsearch
  * @author Adam Sotona (MSD)
  */
 public class HalyardElasticIndexer implements Tool {

@@ -73,7 +73,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 /**
- * Apache Hadoop MapReduce Tool BulkLoading RDF into HBase
+ * Apache Hadoop MapReduce Tool for bulk loading RDF into HBase
  * @author Adam Sotona (MSD)
  */
 public class HalyardBulkLoad implements Tool {

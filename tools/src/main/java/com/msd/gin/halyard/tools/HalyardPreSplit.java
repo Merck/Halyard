@@ -56,7 +56,8 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 /**
- * Apache Hadoop MapReduce Tool calculating pre-splits of HBase table for planned large dataset bulk-load
+ * Apache Hadoop MapReduce Tool for calculating pre-splits of an HBase table before a large dataset bulk-load. 
+ * Splits are based on the keys of a sample of the data to be loaded.
  * @author Adam Sotona (MSD)
  */
 public class HalyardPreSplit implements Tool {

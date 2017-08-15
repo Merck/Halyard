@@ -68,7 +68,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 /**
- * Map-only MapReduce tool providing parallel SPARQL export functionality
+ * Map-only MapReduce tool providing the ability to export the results of a SPARQL query. A parallel version of {@link HalyardExport}
  * @author Adam Sotona (MSD)
  */
 public class HalyardParallelExport implements Tool {
