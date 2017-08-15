@@ -26,6 +26,7 @@ import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
+//if URI is removed from RDF4J it should be replaceable with org.eclipse.rdf4j.model.IRI
 import org.eclipse.rdf4j.model.URI;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -96,7 +97,7 @@ class HalyardValueExprEvaluation {
      * Determines the "effective boolean value" of the {@link Value} returned by evaluating the expression. 
      * See {@link QueryEvaluationUtil#getEffectiveBooleanValue(Value)} for the definition of "effective boolean value.
      * @param expr
-     * @param bindings
+     * @param bindings the set of named value bindings
      * @return
      * @throws QueryEvaluationException
      */
@@ -112,7 +113,7 @@ class HalyardValueExprEvaluation {
     /**
      * Determines which evaluate method to call based on the type of {@link ValueExpr}
      * @param expr the expression to evaluate
-     * @param bindings the current named bindings
+     * @param bindings the set of named value bindings the set of named value bindings
      * @return the {@link Value} resulting from the evaluation
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
@@ -194,7 +195,7 @@ class HalyardValueExprEvaluation {
     /**
      * Evaluate a {@link Var} query model node. 
      * @param var
-     * @param bindings
+     * @param bindings the set of named value bindings
      * @return the result of {@link Var#getValue()} from either {@code var}, or if {@code null}, from the {@ bindings}
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
@@ -210,10 +211,26 @@ class HalyardValueExprEvaluation {
         return value;
     }
 
+    /**
+     * Evaluate a {@link ValueConstant} query model node.
+     * @param valueConstant
+     * @param bindings the set of named value bindings
+     * @return the {@link Value} of {@code valueConstant}
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(ValueConstant valueConstant, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         return valueConstant.getValue();
     }
 
+    /**
+     * Evaluate a {@link BNodeGenerator} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return the value of the evaluation
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(BNodeGenerator node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         ValueExpr nodeIdExpr = node.getNodeIdExpr();
         if (nodeIdExpr != null) {
@@ -228,6 +245,13 @@ class HalyardValueExprEvaluation {
         return valueFactory.createBNode();
     }
 
+    /**
+     * Evaluate a {@link Bound} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return {@link BooleanLiteral#TRUE} if the node can be evaluated or {@link BooleanLiteral#FALSE} if an exception occurs
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Bound node, BindingSet bindings) throws QueryEvaluationException {
         try {
             evaluate(node.getArg(), bindings);
@@ -237,6 +261,14 @@ class HalyardValueExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate a {@link Str} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return a literal representation of the evaluation: a URI, the value of a simple literal or the label of any other literal
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Str node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value argValue = evaluate(node.getArg(), bindings);
         if (argValue instanceof URI) {
@@ -253,6 +285,14 @@ class HalyardValueExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate a {@link Label} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return the {@link Literal} resulting from the evaluation of the argument of the {@code Label}.
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Label node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         // FIXME: deprecate Label in favour of Str(?)
         Value argValue = evaluate(node.getArg(), bindings);
@@ -268,6 +308,15 @@ class HalyardValueExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate a {@link Lang} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return a {@link Literal} of the language tag of the {@code Literal} returned by evaluating the argument of the {@code node} or a 
+     * {code Literal} representing an empty {@code String} if there is no tag 
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Lang node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value argValue = evaluate(node.getArg(), bindings);
         if (argValue instanceof Literal) {
@@ -281,6 +330,14 @@ class HalyardValueExprEvaluation {
         throw new ValueExprEvaluationException();
     }
 
+    /**
+     * Evaluate a {@link Datatype} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return a {@link Literal} representing the evaluation of the argument of the {@link Datatype}. 
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Datatype node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value v = evaluate(node.getArg(), bindings);
         if (v instanceof Literal) {
@@ -298,6 +355,14 @@ class HalyardValueExprEvaluation {
         throw new ValueExprEvaluationException();
     }
 
+    /**
+     * Evaluate a {@link Namespace} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return the {@link Literal} of the URI of {@link URI} returned by evaluating the argument of the {@code node}
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Namespace node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value argValue = evaluate(node.getArg(), bindings);
         if (argValue instanceof URI) {
@@ -308,6 +373,14 @@ class HalyardValueExprEvaluation {
         }
     }
 
+    /**
+     * Evaluate a LocalName node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return the {@link Literal} of the  {@link URI} returned by evaluating the argument of the {@code node}
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(LocalName node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value argValue = evaluate(node.getArg(), bindings);
         if (argValue instanceof URI) {
@@ -383,8 +456,8 @@ class HalyardValueExprEvaluation {
     /**
      * Creates a URI from the operand value (a plain literal or a URI).
      *
-     * @param node represents an invocation of the SPARQL IRI function
-     * @param bindings used to generate the value that the URI is based on
+     * @param node the node to evaluate, represents an invocation of the SPARQL IRI function
+     * @param bindings the set of named value bindings used to generate the value that the URI is based on
      * @return a URI generated from the given arguments
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
@@ -475,6 +548,14 @@ class HalyardValueExprEvaluation {
         throw new ValueExprEvaluationException();
     }
 
+    /**
+     * Determines whether the language tag or the node matches the language argument of the node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(LangMatches node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value langTagValue = evaluate(node.getLeftArg(), bindings);
         Value langRangeValue = evaluate(node.getRightArg(), bindings);
@@ -594,6 +675,14 @@ class HalyardValueExprEvaluation {
         return function.get().evaluate(valueFactory, argValues);
     }
 
+    /**
+     * Evaluate an {@link And} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(And node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         try {
             Value leftValue = evaluate(node.getLeftArg(), bindings);
@@ -618,6 +707,14 @@ class HalyardValueExprEvaluation {
         return BooleanLiteral.valueOf(QueryEvaluationUtil.getEffectiveBooleanValue(rightValue));
     }
 
+    /**
+     * Evaluate an {@link And} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Or node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         try {
             Value leftValue = evaluate(node.getLeftArg(), bindings);
@@ -642,12 +739,28 @@ class HalyardValueExprEvaluation {
         return BooleanLiteral.valueOf(QueryEvaluationUtil.getEffectiveBooleanValue(rightValue));
     }
 
+    /**
+     * Evaluate a {@link Not} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Not node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value argValue = evaluate(node.getArg(), bindings);
         boolean argBoolean = QueryEvaluationUtil.getEffectiveBooleanValue(argValue);
         return BooleanLiteral.valueOf(!argBoolean);
     }
 
+    /**
+     * Evaluate a {@link Now} node. the value of 'now' is shared across the whole query and evaluation strategy
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Now node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         if (parentStrategy.sharedValueOfNow == null) {
             parentStrategy.sharedValueOfNow = node.evaluate(valueFactory);
@@ -655,12 +768,27 @@ class HalyardValueExprEvaluation {
         return parentStrategy.sharedValueOfNow;
     }
 
+    /**
+     * Evaluate if the left and right arguments of the {@link SameTerm} node are equal
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(SameTerm node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value leftVal = evaluate(node.getLeftArg(), bindings);
         Value rightVal = evaluate(node.getRightArg(), bindings);
         return BooleanLiteral.valueOf(leftVal != null && leftVal.equals(rightVal));
     }
 
+    /**
+     * Evaluate a {@link Coalesce} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return the first {@link Value} that doesn't produce an error on evaluation
+     * @throws ValueExprEvaluationException
+     */
     private Value evaluate(Coalesce node, BindingSet bindings) throws ValueExprEvaluationException {
         for (ValueExpr expr : node.getArguments()) {
             try {
@@ -673,12 +801,29 @@ class HalyardValueExprEvaluation {
         throw new ValueExprEvaluationException("COALESCE arguments do not evaluate to a value: " + node.getSignature());
     }
 
+    /**
+     * Evaluates a Compare node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return the {@link Value} resulting from the comparison of the left and right arguments of the {@code node} using the comparison operator
+     * of the {@code node}.
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Compare node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value leftVal = evaluate(node.getLeftArg(), bindings);
         Value rightVal = evaluate(node.getRightArg(), bindings);
         return BooleanLiteral.valueOf(QueryEvaluationUtil.compare(leftVal, rightVal, node.getOperator()));
     }
 
+    /**
+     * Evaluate a {@link MathExpr}
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return the {@link Value} of the math operation on the {@link Value}s return from evaluating the left and right arguments of the node
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(MathExpr node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         // Do the math
         Value leftVal = evaluate(node.getLeftArg(), bindings);
@@ -689,6 +834,13 @@ class HalyardValueExprEvaluation {
         throw new ValueExprEvaluationException("Both arguments must be numeric literals");
     }
 
+    /**
+     * Evaluate an {@link If} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(If node, BindingSet bindings) throws QueryEvaluationException {
         Value result;
         boolean conditionIsTrue;
@@ -708,6 +860,14 @@ class HalyardValueExprEvaluation {
         return result;
     }
 
+    /**
+     * Evaluate an {@link In} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(In node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value leftValue = evaluate(node.getArg(), bindings);
         // Result is false until a match has been found
@@ -725,6 +885,14 @@ class HalyardValueExprEvaluation {
         return BooleanLiteral.valueOf(result);
     }
 
+    /**
+     * Evaluate a {@link ListMemberOperator}
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(ListMemberOperator node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         List<ValueExpr> args = node.getArguments();
         Value leftValue = evaluate(args.get(0), bindings);
@@ -754,6 +922,14 @@ class HalyardValueExprEvaluation {
         return BooleanLiteral.valueOf(result);
     }
 
+    /**
+     * Evaluate a {@link CompareAny} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(CompareAny node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value leftValue = evaluate(node.getArg(), bindings);
         // Result is false until a match has been found
@@ -774,6 +950,14 @@ class HalyardValueExprEvaluation {
         return BooleanLiteral.valueOf(result);
     }
 
+    /**
+     * Evaluate a {@link CompareAll} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(CompareAll node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value leftValue = evaluate(node.getArg(), bindings);
         // Result is true until a mismatch has been found
@@ -795,6 +979,14 @@ class HalyardValueExprEvaluation {
         return BooleanLiteral.valueOf(result);
     }
 
+    /**
+     * Evaluate a {@link Exists} node
+     * @param node the node to evaluate
+     * @param bindings the set of named value bindings
+     * @return
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
     private Value evaluate(Exists node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         try (CloseableIteration<BindingSet, QueryEvaluationException> iter = parentStrategy.evaluate(node.getSubQuery(), bindings)) {
             return BooleanLiteral.valueOf(iter.hasNext());
