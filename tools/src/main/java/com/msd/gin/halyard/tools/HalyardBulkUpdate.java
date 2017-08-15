@@ -86,6 +86,11 @@ public class HalyardBulkUpdate implements Tool {
     public static final String DECIMATE_FUNCTION_NAME = "decimateBy";
 
     /**
+     * Property defining optional ElasticSearch index URL
+     */
+    public static final String ELASTIC_INDEX_URL = "halyard.elastic.index.url";
+
+    /**
      * Full URI of a custom SPARQL function to decimate parallel evaluation based on Mapper index
      */
     public static final String DECIMATE_FUNCTION_URI = HALYARD.NAMESPACE + DECIMATE_FUNCTION_NAME;
@@ -103,6 +108,7 @@ public class HalyardBulkUpdate implements Tool {
         private boolean overrideRdfContext;
         private String tableName;
         private boolean checkBeforeWrite;
+        private String elasticIndexURL;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -127,6 +133,7 @@ public class HalyardBulkUpdate implements Tool {
             defaultRdfContext = defCtx == null ? null : SimpleValueFactory.getInstance().createIRI(defCtx);
             tableName = conf.get(TABLE_NAME_PROPERTY);
             checkBeforeWrite = conf.getBoolean(CHECK_BEFORE_WRITE_PROPERTY, false);
+            elasticIndexURL = conf.get(ELASTIC_INDEX_URL);
         }
 
         @Override
@@ -136,7 +143,7 @@ public class HalyardBulkUpdate implements Tool {
             final String fistLine = i > 0 ? query.substring(0, i) : query;
             context.setStatus("Execution of: " + fistLine);
             try {
-                final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, new HBaseSail.Ticker() {
+                final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL, new HBaseSail.Ticker() {
                     @Override
                     public void tick() {
                         context.progress();

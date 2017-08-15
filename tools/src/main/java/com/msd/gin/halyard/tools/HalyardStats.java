@@ -169,7 +169,7 @@ public class HalyardStats implements Tool {
                     if (Arrays.equals(statsContextHash, lastCtxFragment)) {
                         if (sail == null) {
                             Configuration conf = output.getConfiguration();
-                            sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null);
+                            sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
                             sail.initialize();
                         }
                         for (Statement st : HalyardTableUtils.parseStatements(value)) {
@@ -327,7 +327,7 @@ public class HalyardStats implements Tool {
             statsGraphContext = SVF.createIRI(conf.get(GRAPH_CONTEXT, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String targetUrl = conf.get(TARGET);
             if (targetUrl == null) {
-                sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null);
+                sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
                 sail.initialize();
                 sail.setNamespace(SD.PREFIX, SD.NAMESPACE);
                 sail.setNamespace(VOID.PREFIX, VOID.NAMESPACE);

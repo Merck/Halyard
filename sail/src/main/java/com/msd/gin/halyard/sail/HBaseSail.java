@@ -20,6 +20,11 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -28,8 +33,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.WeakHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.KeyValue;
@@ -88,6 +96,10 @@ import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.eclipse.rdf4j.sail.UpdateContext;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
 /**
  * HBaseSail is the RDF Storage And Inference Layer (SAIL) implementation on top of Apache HBase.
@@ -113,6 +125,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     private static final long STATUS_CACHING_TIMEOUT = 60000l;
     private static final Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
     private static final long DEFAULT_THRESHOLD = 1000l;
+    private static final int ELASTIC_RESULT_SIZE = 10000;
 
     private final Configuration config; //the configuration of the HBase database
     final String tableName;
@@ -123,6 +136,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     final int evaluationTimeout;
     private boolean readOnly = false;
     private long readOnlyTimestamp = -1;
+    final String elasticIndexURL;
     private final Ticker ticker;
 
     HTable table = null;
@@ -138,9 +152,10 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
      * @param splitBits int number of bits used for the calculation of HTable region pre-splits (applies for new tables only)
      * @param pushStrategy boolean option to use {@link com.msd.gin.halyard.strategy.HalyardEvaluationStrategy} instead of {@link org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy}
      * @param evaluationTimeout int timeout in seconds for each query evaluation, negative values mean no timeout
+     * @param elasticIndexURL String optional ElasticSearch index URL
      * @param ticker optional Ticker callback for keep-alive notifications
      */
-    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, Ticker ticker) {
+    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker) {
         this.config = config;
         this.tableName = tableName;
         this.create = create;
@@ -152,6 +167,11 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                 return new CardinalityCalculator() {
                     @Override
                     protected double getCardinality(StatementPattern sp) { //get the cardinality of the Statement form VOID statistics
+                        Var objectVar = sp.getObjectVar();
+                        //always return cardinality 1.0 for HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
+                        if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal)objectVar.getValue()).getDatatype())) {
+                            return 1.0;
+                        }
                         Var contextVar = sp.getContextVar();
                         IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI)contextVar.getValue();
                         long triples = getTriplesCount(graphNode, -1l);
@@ -191,6 +211,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
             }
         };
         this.evaluationTimeout = evaluationTimeout;
+        this.elasticIndexURL = elasticIndexURL;
         this.ticker = ticker;
     }
 
@@ -211,10 +232,10 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public void initialize() throws SailException { //initialize the SAIL
-        try { 
+        try {
         	    //get or create and get the HBase table
             table = HalyardTableUtils.getTable(config, tableName, create, splitBits);
-            
+
             //Iterate over statements relating to namespaces and add them to the namespace map.
             try (CloseableIteration<? extends Statement, SailException> nsIter = getStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null, true)) {
                 while (nsIter.hasNext()) {
@@ -238,7 +259,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
             String federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length());
             RepositoryFederatedService s = federatedServices.get(federatedTable);
             if (s == null) {
-                s = new RepositoryFederatedService(new SailRepository(new HBaseSail(config, federatedTable, false, 0, true, evaluationTimeout, ticker)));
+                s = new RepositoryFederatedService(new SailRepository(new HBaseSail(config, federatedTable, false, 0, true, evaluationTimeout, null, ticker)));
                 federatedServices.put(federatedTable, s);
                 s.initialize();
             }
@@ -320,14 +341,14 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
             // optimizers to modify the actual root node
             tupleExpr = new QueryRoot(tupleExpr);
         }
-        
+
         final long startTime = System.currentTimeMillis();
-        
+
         TripleSource source = new TripleSource() {
             @Override
             public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
                 try {
-                    return new ExceptionConvertingIteration<Statement, QueryEvaluationException>(new StatementScanner(startTime, subj, pred, obj, contexts)) {
+                    return new ExceptionConvertingIteration<Statement, QueryEvaluationException>(createScanner(startTime, subj, pred, obj, contexts)) {
                         @Override
                         protected QueryEvaluationException convert(Exception e) {
                             return new QueryEvaluationException(e);
@@ -376,7 +397,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public CloseableIteration<? extends Resource, SailException> getContextIDs() throws SailException {
-    	
+
         //generate an iterator over the identifiers of the contexts available in Halyard.
         final CloseableIteration<? extends Statement, SailException> scanner = getStatements(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, null, true, HALYARD.STATS_GRAPH_CONTEXT);
         return new CloseableIteration<Resource, SailException>() {
@@ -405,7 +426,15 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
 
     @Override
     public CloseableIteration<? extends Statement, SailException> getStatements(Resource subj, IRI pred, Value obj, boolean includeInferred, Resource... contexts) throws SailException {
-        return new StatementScanner(System.currentTimeMillis(), subj, pred, obj, contexts);
+        return createScanner(System.currentTimeMillis(), subj, pred, obj, contexts);
+    }
+
+    private StatementScanner createScanner(long startTime, Resource subj, IRI pred, Value obj, Resource...contexts) throws SailException {
+        if ((obj instanceof Literal) && (HALYARD.SEARCH_TYPE.equals(((Literal)obj).getDatatype()))) {
+            return new LiteralSearchStatementScanner(startTime, subj, pred, obj.stringValue(), contexts);
+        } else {
+            return new StatementScanner(startTime, subj, pred, obj, contexts);
+        }
     }
 
     @Override
@@ -500,15 +529,15 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
     @Override
     public void removeStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
     	    //should we be defensive about nulls for subj, pre and obj? removeStatements is where you would use nulls, not here.
-    	
+
         if (!isWritable()) throw new SailException(tableName + " is read only");
         try {
             for (Resource ctx : normalizeContexts(contexts)) {
                 for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx)) { //calculate the kv's corresponding to the quad (or triple)
-                    
+
                 	    //kv.getFamily and kv.getQualifier are deprecated CellUtil methods are recommended replacement.
                 	    //table.delete(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(kv.getFamily(), kv.getQualifier()));
-                	
+
                 	    byte[] fb= CellUtil.cloneFamily(kv);
                 	    byte[] qb = CellUtil.cloneQualifier(kv);
                 	    table.delete(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(fb, qb));
@@ -603,13 +632,85 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         namespaces.clear();
     }
 
+    Map <String, List<byte[]>> searchCache = Collections.synchronizedMap(new WeakHashMap<>());
+
     //Scans the Halyard table for statements that match the specified pattern
+    private class LiteralSearchStatementScanner extends StatementScanner {
+
+        Iterator<byte[]> objectHashes = null;
+        private final String literalSearchQuery;
+
+        public LiteralSearchStatementScanner(long startTime, Resource subj, IRI pred, String literalSearchQuery, Resource... contexts) throws SailException {
+            super(startTime, subj, pred, null, contexts);
+            if (elasticIndexURL == null || elasticIndexURL.length() == 0) {
+                throw new SailException("ElasticSearch Index URL is not properly configured.");
+            }
+            this.literalSearchQuery = literalSearchQuery;
+        }
+
+        @Override
+        protected Result nextResult() throws IOException {
+            while (true) {
+                if (objHash == null) {
+                    if (objectHashes == null) { //perform ES query and parse results
+                        List<byte[]> objectHashesList = searchCache.get(literalSearchQuery);
+                        if (objectHashesList == null) {
+                            objectHashesList = new ArrayList<>();
+                            HttpURLConnection http = (HttpURLConnection)(new URL(elasticIndexURL + "/_search").openConnection());
+                            try {
+                                http.setRequestMethod("POST");
+                                http.setDoOutput(true);
+                                http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                                http.connect();
+                                try (PrintStream out = new PrintStream(http.getOutputStream(), true, "UTF-8")) {
+                                    out.print("{\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"_source\":false,\"stored_fields\":\"_id\",\"size\":" + ELASTIC_RESULT_SIZE + "}");
+                                }
+                                int response = http.getResponseCode();
+                                String msg = http.getResponseMessage();
+                                if (response != 200) {
+                                    throw new IOException(msg);
+                                }
+                                try (InputStreamReader isr = new InputStreamReader(http.getInputStream(), "UTF-8")) {
+                                    JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
+                                    for (int i=0; i<hits.length(); i++) {
+                                        objectHashesList.add(Hex.decodeHex(hits.getJSONObject(i).getString("_id").toCharArray()));
+                                    }
+                                }
+                            } catch (JSONException | DecoderException ex) {
+                                throw new IOException(ex);
+                            } finally {
+                                http.disconnect();
+                            }
+                            searchCache.put(new String(literalSearchQuery), objectHashesList);
+                        }
+                        objectHashes = objectHashesList.iterator();
+                    }
+                    if (objectHashes.hasNext()) {
+                        objHash = objectHashes.next();
+                    } else {
+                        return null;
+                    }
+                    contexts = contextsList.iterator(); //reset iterator over contexts
+                }
+                Result res = super.nextResult();
+                if (res == null) {
+                    objHash = null;
+                } else {
+                    return res;
+                }
+            }
+        }
+    }
+
     private class StatementScanner implements CloseableIteration<Statement, SailException> {
 
         private final Resource subj;
         private final IRI pred;
         private final Value obj;
-        private final Iterator<Resource> contexts;
+        private final byte[] subjHash, predHash;
+        protected final List<Resource> contextsList;
+        protected Iterator<Resource> contexts;
+        protected byte[] objHash;
         private ResultScanner rs = null;
         private final long endTime;
         private Statement next = null;
@@ -619,18 +720,21 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
             this.subj = subj;
             this.pred = pred;
             this.obj = obj;
-            this.contexts = Arrays.asList(normalizeContexts(contexts)).iterator();
+            this.subjHash = HalyardTableUtils.hashKey(subj);
+            this.predHash = HalyardTableUtils.hashKey(pred);
+            this.objHash = HalyardTableUtils.hashKey(obj);
+            this.contextsList = Arrays.asList(normalizeContexts(contexts));
+            this.contexts = contextsList.iterator();
             this.endTime = startTime + (1000l * evaluationTimeout);
         }
 
-        private Result nextResult() throws IOException { //gets the next result to consider from the HBase Scan
+        protected Result nextResult() throws IOException { //gets the next result to consider from the HBase Scan
             while (true) {
                 if (rs == null) {
                     if (contexts.hasNext()) {
-                    	
+
                         //build a ResultScanner from an HBase Scan that finds potential matches
-                        rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, contexts.next())); 
-                        
+                        rs = table.getScanner(HalyardTableUtils.scan(subjHash, predHash, objHash, HalyardTableUtils.hashKey(contexts.next())));
                     } else {
                         return null;
                     }

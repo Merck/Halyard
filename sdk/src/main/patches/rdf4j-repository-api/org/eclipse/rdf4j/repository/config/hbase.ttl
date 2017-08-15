@@ -19,5 +19,6 @@
          halyard:splitBits "{%HBase Table presplit bits|0%}" ;
          halyard:pushStrategy "{%Use Halyard Push Evaluation Strategy|true|false%}" ;
          halyard:evaluationTimeout "{%Query Evaluation Timeout|180%}" ;
+         halyard:elasticIndexURL "{%Optional ElasticSearch Index URL|%}" ;
       ]
    ].

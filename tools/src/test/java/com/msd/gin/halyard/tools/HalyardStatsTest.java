@@ -58,7 +58,7 @@ public class HalyardStatsTest {
 
     @Test
     public void testStatsTarget() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "statsTable", true, -1, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "statsTable", true, -1, true, 0, null, null);
         sail.initialize();
         ValueFactory vf = SimpleValueFactory.getInstance();
         for (int i = 0; i < 1000; i++) {
@@ -109,7 +109,7 @@ public class HalyardStatsTest {
 
     @Test
     public void testStatsUpdate() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "statsTable2", true, -1, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "statsTable2", true, -1, true, 0, null, null);
         sail.initialize();
         ValueFactory vf = SimpleValueFactory.getInstance();
         for (int i = 0; i < 1000; i++) {
@@ -122,7 +122,7 @@ public class HalyardStatsTest {
         assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(),
                 new String[]{"-s", "statsTable2"}));
 
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "statsTable2", false, -1, true, 0, null);
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "statsTable2", false, -1, true, 0, null, null);
         sail.initialize();
 
         IRI graph0 = vf.createIRI("http://whatever/graph0");

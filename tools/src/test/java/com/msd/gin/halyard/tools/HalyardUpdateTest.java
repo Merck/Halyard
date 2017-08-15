@@ -57,7 +57,7 @@ public class HalyardUpdateTest {
             ROOT = ROOT + "/";
         }
         ValueFactory vf = SimpleValueFactory.getInstance();
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, true, 0, true, 0, null, null);
         sail.initialize();
         for (int i=0; i<5; i++) {
             for (int j=0; j<5; j++) {
@@ -107,7 +107,7 @@ public class HalyardUpdateTest {
     @Test
     public void testInsertAndDelete() throws Exception {
         HalyardUpdate.main(new String[] {"-s", TABLE, "-q", "insert {?o <http://whatever/reverse> ?s} where {?s <http://whatever/pred> ?o}"});
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
         sail.initialize();
         try {
             CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/reverse"), null, true);
@@ -123,7 +123,7 @@ public class HalyardUpdateTest {
         }
 
         HalyardUpdate.main(new String[] {"-s", TABLE, "-q", "delete {?s <http://whatever/reverse> ?o} where {?s <http://whatever/reverse> ?o}"});
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null);
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
         sail.initialize();
         try {
             CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/reverse"), null, true);

@@ -53,12 +53,12 @@ public class HBaseSailTest {
 
     @Test(expected = UnsupportedOperationException.class)
     public void testGetDataDir() throws Exception {
-        new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null).getDataDir();
+        new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null).getDataDir();
     }
 
     @Test
     public void testInitializeAndShutDown() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null);
         assertFalse(sail.isOpen());
         sail.initialize();
         assertTrue(sail.isOpen());
@@ -68,7 +68,7 @@ public class HBaseSailTest {
 
     @Test
     public void testIsWritable() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertableRW", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertableRW", true, 0, true, 0, null, null);
         sail.initialize();
         HTableDescriptor desc = sail.table.getTableDescriptor();
         assertTrue(sail.isWritable());
@@ -80,7 +80,7 @@ public class HBaseSailTest {
                 ha.modifyTable(desc.getTableName(), desc);
             }
         }
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), desc.getNameAsString(), true, 0, true, 0, null);
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), desc.getNameAsString(), true, 0, true, 0, null, null);
         sail.initialize();
         assertFalse(sail.isWritable());
         sail.shutDown();
@@ -88,7 +88,7 @@ public class HBaseSailTest {
 
     @Test(expected = SailException.class)
     public void testWriteToReadOnly() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertableRO", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertableRO", true, 0, true, 0, null, null);
         sail.initialize();
         try {
             HTableDescriptor desc = sail.table.getTableDescriptor();
@@ -108,32 +108,32 @@ public class HBaseSailTest {
 
     @Test
     public void testGetConnection() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null);
         assertSame(sail, sail.getConnection());
     }
 
     @Test
     public void testGetValueFactory() throws Exception {
-        assertSame(SimpleValueFactory.getInstance(), new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null).getValueFactory());
+        assertSame(SimpleValueFactory.getInstance(), new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null).getValueFactory());
     }
 
     @Test
     public void testGetSupportedIsolationLevels() throws Exception {
-        List<IsolationLevel> il = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null).getSupportedIsolationLevels();
+        List<IsolationLevel> il = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null).getSupportedIsolationLevels();
         assertEquals(1, il.size());
         assertTrue(il.contains(IsolationLevels.NONE));
     }
 
     @Test
     public void testGetDefaultIsolationLevel() throws Exception {
-        assertSame(IsolationLevels.NONE, new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null).getDefaultIsolationLevel());
+        assertSame(IsolationLevels.NONE, new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null).getDefaultIsolationLevel());
     }
 
     @Test
     public void testGetContextIDs() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
         Configuration cfg = HBaseServerTestInstance.getInstanceConfig();
-        HBaseSail sail = new HBaseSail(cfg, "whatevertablectx", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(cfg, "whatevertablectx", true, 0, true, 0, null, null);
         sail.initialize();
         sail.addStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, vf.createIRI("http://whatever/ctx"), HALYARD.STATS_GRAPH_CONTEXT);
         sail.commit();
@@ -147,7 +147,7 @@ public class HBaseSailTest {
     public void testSize() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
         Configuration cfg = HBaseServerTestInstance.getInstanceConfig();
-        HBaseSail sail = new HBaseSail(cfg, "whatevertablesize", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(cfg, "whatevertablesize", true, 0, true, 0, null, null);
         sail.initialize();
         sail.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, vf.createLiteral(567), HALYARD.STATS_GRAPH_CONTEXT);
         sail.commit();
@@ -156,43 +156,43 @@ public class HBaseSailTest {
 
     @Test(expected = UnknownSailTransactionStateException.class)
     public void testBegin() throws Exception {
-        new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null).begin(IsolationLevels.READ_COMMITTED);
+        new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null).begin(IsolationLevels.READ_COMMITTED);
     }
 
     @Test(expected = UnsupportedOperationException.class)
     public void testRollback() throws Exception {
-        new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null).rollback();
+        new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null).rollback();
     }
 
     @Test
     public void testIsActive() throws Exception {
-        assertTrue(new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null).isActive());
+        assertTrue(new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null).isActive());
     }
 
     @Test
     public void testNamespaces() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null);
         sail.initialize();
         assertFalse(sail.getNamespaces().hasNext());
         sail.setNamespace("prefix", "http://whatever/namespace/");
         sail.shutDown();
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", false, 0, true, 0, null);
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
         assertTrue(sail.getNamespaces().hasNext());
         sail.removeNamespace("prefix");
         sail.shutDown();
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", false, 0, true, 0, null);
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
         assertFalse(sail.getNamespaces().hasNext());
         sail.setNamespace("prefix", "http://whatever/namespace/");
         sail.setNamespace("prefix", "http://whatever/namespace2/");
         sail.shutDown();
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", false, 0, true, 0, null);
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
         assertEquals("http://whatever/namespace2/", sail.getNamespace("prefix"));
         sail.clearNamespaces();
         sail.shutDown();
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", false, 0, true, 0, null);
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
         assertFalse(sail.getNamespaces().hasNext());
         sail.shutDown();
@@ -206,7 +206,7 @@ public class HBaseSailTest {
         Value obj = vf.createLiteral("whatever");
         IRI context = vf.createIRI("http://whatever/context/");
         CloseableIteration<? extends Statement, SailException> iter;
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null);
         sail.initialize();
         sail.addStatement(subj, pred, obj, context);
         sail.commit();
@@ -230,7 +230,7 @@ public class HBaseSailTest {
         IRI pred = vf.createIRI("http://whatever/pred/");
         Value obj = vf.createLiteral("whatever");
         CloseableIteration<? extends Statement, SailException> iter;
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
         rep.initialize();
         sail.addStatement(subj, pred, obj);
@@ -249,7 +249,7 @@ public class HBaseSailTest {
         Value obj = vf.createLiteral("whatever");
         IRI context = vf.createIRI("http://whatever/context/");
         CloseableIteration<? extends Statement, SailException> iter;
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
         rep.initialize();
         sail.addStatement(subj, pred, obj, context);
@@ -267,14 +267,14 @@ public class HBaseSailTest {
         IRI pred = vf.createIRI("http://whatever/pred/");
         Value obj = vf.createLiteral("whatever");
         CloseableIteration<? extends Statement, SailException> iter;
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverservice", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverservice", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
         rep.initialize();
         sail.addStatement(subj, pred, obj);
         sail.commit();
         rep.shutDown();
 
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverparent", true, 0, true, 0, null);
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverparent", true, 0, true, 0, null, null);
         rep = new SailRepository(sail);
         rep.initialize();
         TupleQuery q = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "select * {SERVICE <" + HALYARD.NAMESPACE +"whateverservice> {?s ?p ?o}}");
@@ -285,7 +285,7 @@ public class HBaseSailTest {
 
     @Test(expected = UnsupportedOperationException.class)
     public void testStatementsIteratorRemove1() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null);
         try {
             sail.initialize();
             sail.getStatements(null, null, null, true).remove();
@@ -296,7 +296,7 @@ public class HBaseSailTest {
 
     @Test(expected = UnsupportedOperationException.class)
     public void testStatementsIteratorRemove2() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null);
         try {
             sail.initialize();
             ValueFactory vf = SimpleValueFactory.getInstance();
@@ -308,7 +308,7 @@ public class HBaseSailTest {
 
     @Test
     public void testEmptyMethodsThatShouldDoNothing() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null);
         sail.setDataDir(null);
         sail.prepare();
         sail.begin();
@@ -320,7 +320,7 @@ public class HBaseSailTest {
 
     @Test(expected = SailException.class)
     public void testTimeoutGetStatements() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 1, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 1, null, null);
         sail.initialize();
         try {
             sail.commit();
@@ -334,7 +334,7 @@ public class HBaseSailTest {
 
     @Test
     public void testCardinalityCalculator() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "cardinalitytable", true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "cardinalitytable", true, 0, true, 0, null, null);
         sail.initialize();
         SimpleValueFactory f = SimpleValueFactory.getInstance();
         TupleExpr q1 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s a ?o}", "http://whatever/").getTupleExpr();

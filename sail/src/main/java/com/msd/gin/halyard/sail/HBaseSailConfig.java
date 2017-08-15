@@ -55,6 +55,7 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
     private boolean create = true;
     private boolean push = true;
     private int evaluationTimeout = 180; //3 min
+    private String elasticIndexURL = "";
 
     /**
      * Sets HBase table name
@@ -137,6 +138,22 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
     }
 
     /**
+     * Sets ElasticSearch index URL
+     * @param elasticIndexURL String ElasticSearch index URL
+     */
+    public void setElasticIndexURL(String elasticIndexURL) {
+        this.elasticIndexURL = elasticIndexURL;
+    }
+
+    /**
+     * Gets ElasticSearch index URL
+     * @return String ElasticSearch index URL
+     */
+    public String getElasticIndexURL() {
+        return elasticIndexURL;
+    }
+
+    /**
      * Default constructor of HBaseSailConfig
      */
     public HBaseSailConfig() {
@@ -157,6 +174,7 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
         graph.add(implNode, HALYARD.CREATE_TABLE_PROPERTY, vf.createLiteral(create));
         graph.add(implNode, HALYARD.PUSH_STRATEGY_PROPERTY, vf.createLiteral(push));
         graph.add(implNode, HALYARD.EVALUATION_TIMEOUT_PROPERTY, vf.createLiteral(evaluationTimeout));
+        graph.add(implNode, HALYARD.ELASTIC_INDEX_URL_PROPERTY, vf.createLiteral(elasticIndexURL));
         return implNode;
     }
 
@@ -209,6 +227,10 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
             setEvaluationTimeout(timeoutValue.get().intValue());
         } catch (NumberFormatException e) {
             throw new SailConfigException(e);
+        }
+        Optional<Literal> elasticIndexValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.ELASTIC_INDEX_URL_PROPERTY);
+        if (elasticIndexValue.isPresent()) {
+            setElasticIndexURL(elasticIndexValue.get().stringValue());
         }
     }
 

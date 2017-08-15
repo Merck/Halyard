@@ -196,7 +196,7 @@ public class HalyardParallelExport implements Tool {
                         props[i] = new String(Base64.decodeBase64(props[i]), UTF8);
                     }
                 }
-                HalyardExport.export(cfg, log, cfg.get(SOURCE), cfg.get(QUERY), MessageFormat.format(cfg.get(TARGET), iis.index), cfg.get(JDBC_DRIVER), drCp, props, false);
+                HalyardExport.export(cfg, log, cfg.get(SOURCE), cfg.get(QUERY), MessageFormat.format(cfg.get(TARGET), iis.index), cfg.get(JDBC_DRIVER), drCp, props, false, cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL));
             } catch (Exception e) {
                 throw new IOException(e);
             }

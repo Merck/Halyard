@@ -48,7 +48,7 @@ public class HalyardExportJDBCTypesTest {
     @BeforeClass
     public static void setup() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, true, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, true, 0, true, 0, null, null);
         sail.initialize();
         for (int i=1; i<10; i++) {
             sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/date"), vf.createLiteral(new Date(i, i, i)));

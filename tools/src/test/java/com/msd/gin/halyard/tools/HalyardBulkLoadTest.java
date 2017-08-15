@@ -72,7 +72,7 @@ public class HalyardBulkLoadTest {
         htableDir.delete();
         assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkLoad(), new String[]{"-Dhalyard.table.splitbits=-1", "-Dhalyard.parser.skipinvalid=true", root.toURI().toURL().toString(), htableDir.toURI().toURL().toString(), "bulkLoadTable"}));
 
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
         rep.initialize();
         TupleQuery q = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "select (count(*) as ?c) where {?s ?p ?o}");

@@ -55,7 +55,7 @@ public final class HBaseSailFactory implements SailFactory {
         if (config instanceof HBaseSailConfig) {
             HBaseSailConfig hconfig = (HBaseSailConfig) config;
             //instantiate the sail
-            HBaseSail sail = new HBaseSail(HBaseConfiguration.create(), hconfig.getTablespace(), hconfig.isCreate(), hconfig.getSplitBits(), hconfig.isPush(), hconfig.getEvaluationTimeout(), null);
+            HBaseSail sail = new HBaseSail(HBaseConfiguration.create(), hconfig.getTablespace(), hconfig.isCreate(), hconfig.getSplitBits(), hconfig.isPush(), hconfig.getEvaluationTimeout(), hconfig.getElasticIndexURL(), null);
             return sail;
         } else {
             throw new SailConfigException("Invalid configuration: " + config);

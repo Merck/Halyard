@@ -45,6 +45,12 @@
                                     <type>war</type>
                                     <destFileName>rdf4j-workbench.war</destFileName>
                                 </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.json</groupId>
+                                    <artifactId>json</artifactId>
+                                    <version>20140107</version>
+                                    <type>jar</type>
+                                </artifactItem>
                             </artifactItems>
                             <outputDirectory>${project.build.directory}</outputDirectory>
                             <overWriteReleases>true</overWriteReleases>
@@ -66,6 +72,7 @@
                                     <zipfileset dir="../strategy/target" includes="halyard-strategy-${project.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="../sail/target" includes="halyard-sail-${project.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="../sdk/target" includes="rdf4j-repository-api-${rdf4j.version}.jar" prefix="WEB-INF/lib"/>
+                                    <zipfileset dir="${project.build.directory}" includes="json-20140107.jar" prefix="WEB-INF/lib"/>
                                 </zip>
                                 <zip destfile="${project.build.directory}/rdf4j-workbench.war" update="true">
                                     <fileset dir="src/main/patches/rdf4j-workbench"/>

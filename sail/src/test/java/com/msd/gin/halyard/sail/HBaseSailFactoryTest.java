@@ -44,6 +44,7 @@ public class HBaseSailFactoryTest {
         hbsc.setSplitBits(3);
         hbsc.setEvaluationTimeout(480);
         hbsc.setTablespace("testtable");
+        hbsc.setElasticIndexURL("http://whatever/index");
         Sail sail = new HBaseSailFactory().getSail(hbsc);
         assertTrue(sail instanceof HBaseSail);
         HBaseSail hbs = (HBaseSail)sail;
@@ -52,6 +53,7 @@ public class HBaseSailFactoryTest {
         assertEquals(3, hbs.splitBits);
         assertEquals("testtable", hbs.tableName);
         assertEquals(480, hbs.evaluationTimeout);
+        assertEquals("http://whatever/index", hbs.elasticIndexURL);
     }
 
 }
