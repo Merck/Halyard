@@ -152,6 +152,7 @@ public class HBaseSailTest {
         sail.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, vf.createLiteral(567), HALYARD.STATS_GRAPH_CONTEXT);
         sail.commit();
         assertEquals(567, sail.size());
+        assertEquals(567, sail.size(HALYARD.STATS_ROOT_NODE));
     }
 
     @Test(expected = UnknownSailTransactionStateException.class)

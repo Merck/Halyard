@@ -320,6 +320,8 @@ public class HalyardBulkLoad implements Tool {
                 Configuration conf = context.getConfiguration();
                 for (Path file : paths) try {
                     RDFParser parser;
+                    InputStream localIn;
+                    String localBaseUri;
                     synchronized (this) {
                         if (seek != null) {
                             finishedSize += seek.getPos();
@@ -339,8 +341,10 @@ public class HalyardBulkLoad implements Tool {
                         parser = Rio.createParser(Rio.getParserFormatForFileName(baseUri).get());
                         parser.setRDFHandler(this);
                         parser.setStopAtFirstError(!skipInvalid);
+                        localIn = this.in; //synchronised parameters must be copied to a local variable for use outide of sync block
+                        localBaseUri = this.baseUri;
                     }
-                    parser.parse(in, file.toString());
+                    parser.parse(localIn, localBaseUri);
                 } catch (Exception e) {
                     if (skipInvalid) {
                         LOG.log(Level.WARNING, "Exception while parsing RDF", e);

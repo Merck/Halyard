@@ -11,7 +11,7 @@
   </Match>
   <Match>
     <Class name="com.msd.gin.halyard.sail.HBaseSail$LiteralSearchStatementScanner"/>
-    <Method name="subsetTriplesPart"/>
+    <Method name="nextResult"/>
     <Bug pattern="DM_STRING_CTOR"/>
   </Match>
 </FindBugsFilter>
