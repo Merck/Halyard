@@ -149,10 +149,22 @@ public class HBaseSailTest {
         Configuration cfg = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(cfg, "whatevertablesize", true, 0, true, 0, null, null);
         sail.initialize();
+        assertEquals(0, sail.size());
+        assertEquals(0, sail.size(HALYARD.STATS_ROOT_NODE));
         sail.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, vf.createLiteral(567), HALYARD.STATS_GRAPH_CONTEXT);
         sail.commit();
         assertEquals(567, sail.size());
         assertEquals(567, sail.size(HALYARD.STATS_ROOT_NODE));
+        sail.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, vf.createLiteral(568), HALYARD.STATS_GRAPH_CONTEXT);
+        sail.commit();
+        try {
+            sail.size();
+            fail("Expected SailException");
+        } catch (SailException se) {}
+        try {
+            sail.size(HALYARD.STATS_ROOT_NODE);
+            fail("Expected SailException");
+        } catch (SailException se) {}
     }
 
     @Test(expected = UnknownSailTransactionStateException.class)
