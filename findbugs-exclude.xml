@@ -9,4 +9,9 @@
     <Method name="calculateSplits"/>
     <Bug pattern="VA_PRIMITIVE_ARRAY_PASSED_TO_OBJECT_VARARG"/>
   </Match>
+  <Match>
+    <Class name="com.msd.gin.halyard.sail.HBaseSail$LiteralSearchStatementScanner"/>
+    <Method name="subsetTriplesPart"/>
+    <Bug pattern="DM_STRING_CTOR"/>
+  </Match>
 </FindBugsFilter>

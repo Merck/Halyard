@@ -24,6 +24,7 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -204,7 +205,7 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
                         if (partitionVar == null || !partitionVar.hasValue()) {
                             return 1.0;
                         } else {
-                            return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(partitionVar.getValue()).getBytes()))), DEFAULT_THRESHOLD) /total;
+                            return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(partitionVar.getValue()).getBytes(StandardCharsets.UTF_8)))), DEFAULT_THRESHOLD) /total;
                         }
                     }
                 };

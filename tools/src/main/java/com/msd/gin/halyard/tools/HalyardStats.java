@@ -227,6 +227,8 @@ public class HalyardStats implements Tool {
                         subsetType = VOID_EXT.OBJECT;
                         subsetId = obj;
                         break;
+                    default:
+                        throw new IOException("Unknown region #" + region);
                 }
             }
             switch (region) {
@@ -240,6 +242,7 @@ public class HalyardStats implements Tool {
                             classes++;
                     }
                     break;
+                default:
             }
             subsetCounter += value.rawCells().length;
             lastRegion = region;

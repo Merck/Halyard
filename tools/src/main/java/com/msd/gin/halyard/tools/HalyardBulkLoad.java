@@ -304,7 +304,7 @@ public class HalyardBulkLoad implements Tool {
 
         public Statement getNext() throws IOException, InterruptedException {
             Statement s = queue.take();
-            if (ex != null) {
+            if (ex != null) synchronized (this) {
                 throw new IOException("Exception while parsing: " + baseUri, ex);
             }
             return s == END_STATEMENT ? null : s;
@@ -340,7 +340,7 @@ public class HalyardBulkLoad implements Tool {
                         parser.setRDFHandler(this);
                         parser.setStopAtFirstError(!skipInvalid);
                     }
-                    parser.parse(in, baseUri);
+                    parser.parse(in, file.toString());
                 } catch (Exception e) {
                     if (skipInvalid) {
                         LOG.log(Level.WARNING, "Exception while parsing RDF", e);
