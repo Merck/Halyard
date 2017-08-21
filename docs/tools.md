@@ -154,7 +154,7 @@ Supported target systems, query types, formats and compressions are listed in th
 | Local Filesystem  | file:    | CSV with optional compressions  | RDF4J RIO supported RDF formats with optional compressions |
 | Hadoop Filesystem | hdfs:    | CSV with optional compressions  | RDF4J RIO supported RDF formats with optional compressions |
 | Database          | jdbc:    | direct mapping to table columns | ~~not supported~~ |
-{: class=table}
+{: .table }
 
 Other Hadoop standard and optional filesystems (like s3:, s3n:, file:, ftp:, webhdfs:) may work according to the actual cluster configuration, however they have not been tested.
 
