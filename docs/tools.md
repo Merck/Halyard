@@ -150,7 +150,7 @@ The exported data are determined by a SPARQL query. The SPARQL query can be of T
 Supported target systems, query types, formats and compressions are listed in the following table:
 
 | Target            | Protocol | Tuple Query                     | Graph Query |
-| ----------------- | -------- | ------------------------------- | ----------- |
+|-------------------|----------|---------------------------------|-------------|
 | Local Filesystem  | file:    | CSV with optional compressions  | RDF4J RIO supported RDF formats with optional compressions |
 | Hadoop Filesystem | hdfs:    | CSV with optional compressions  | RDF4J RIO supported RDF formats with optional compressions |
 | Database          | jdbc:    | direct mapping to table columns | ~~not supported~~ |
