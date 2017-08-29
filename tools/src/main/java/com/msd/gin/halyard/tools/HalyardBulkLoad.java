@@ -84,6 +84,11 @@ public class HalyardBulkLoad implements Tool {
     public static final String SPLIT_BITS_PROPERTY = "halyard.table.splitbits";
 
     /**
+     * Property truncating existing HBase table just before the bulk load
+     */
+    public static final String TRUNCATE_PROPERTY = "halyard.table.truncate";
+
+    /**
      * Boolean property skipping RDF parsing errors
      */
     public static final String SKIP_INVALID_PROPERTY = "halyard.parser.skipinvalid";
@@ -168,6 +173,9 @@ public class HalyardBulkLoad implements Tool {
             TableMapReduceUtil.addDependencyJars(job);
             TableMapReduceUtil.initCredentials(job);
             if (job.waitForCompletion(true)) {
+                if (getConf().getBoolean(TRUNCATE_PROPERTY, false)) {
+                    HalyardTableUtils.truncateTable(hTable).close();
+                }
                 new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(args[1]), hTable);
                 LOG.info("Bulk Load Completed..");
                 return 0;
