@@ -318,8 +318,12 @@ public class HalyardBulkLoad implements Tool {
             return s == END_STATEMENT ? null : s;
         }
 
-        public synchronized float getProgress() throws IOException {
-            return (float)(finishedSize + seek.getPos()) / (float)size;
+        public synchronized float getProgress() {
+            try {
+                return (float)(finishedSize + seek.getPos()) / (float)size;
+            } catch (IOException e) {
+                return (float)finishedSize / (float)size;
+            }
         }
 
         @Override
