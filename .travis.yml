@@ -4,3 +4,14 @@ jdk:
 sudo: required
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+deploy:
+  provider: releases
+  api_key:
+    secure: TsMForgZW7sfP3HyreeT7NGBcdBjfO96TDoOhbNL69a8IdndSoVcRjHsSNg7dyMxvzzROil37DzozPov9WnGnLab09oUKsgJcoSZ1jPnhr0/sUsR3Y13Py215AbgHxfl3ywFCcTrHl30mJDzwCHnBWApLEDzDJT1mvLaLSnLaJiawz5SBbGYM0/0yBz4PAhjahyOdpWEF4FB3+tYtPERX8LBhejVohc7yzivh3AfX6mtIywBCbvBi/j3YOR7JX4xknn5De5LIH+McEZwB4ZLk63d+Jqy4r33AGC2CThIYdaQ+uF/IIZxrHg2PA4V5sH9JxiOsnr80tLlHIDWXXzKdABDKxvpo90eMm9yWVvVK4VVWUWyAakWZUKpbARuWGlS4uonR+gaC6RI6iuzcOzjQFyC/8IrCWcNmwhF08JYncyb2JZAdQLpL7fxBuU9bzMrJO4BQeW2vQkBSAZiT6Fx0gNHd8lNiYr7tDJ7cTPLdw2nU3OP74D8hN0U11hWSqXz5ib0oJC6JfmjZ+K3BPlgXoidv9eGDBfIIo/9QeCbisnbhyd/01dTyizlC6J5dvvyFa0aEi6z6wpPaEaRCn0RgW36tP2DpqD8NiRZ4bkFLL8iUO3/VUYqe/7vm27aV5G9TUkOkaGNy05ySAQgBvoYW9jpz9KAywuwob1nYV2A58A=
+  file:
+    - sdk/target/halyard-sdk-*.zip
+    - webapps/target/halyard-webapps-*.zip
+  skip_cleanup: true
+  on:
+    repo: Merck/Halyard
+    tags: true
