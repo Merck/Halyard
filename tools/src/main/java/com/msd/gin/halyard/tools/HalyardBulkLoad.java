@@ -335,8 +335,10 @@ public class HalyardBulkLoad implements Tool {
                     InputStream localIn;
                     String localBaseUri;
                     synchronized (this) {
-                        if (seek != null) {
+                        if (seek != null) try {
                             finishedSize += seek.getPos();
+                        } catch (IOException e) {
+                            //ignore
                         }
                         close();
                         this.baseUri = file.toString();
