@@ -9,3 +9,8 @@
 /sdk/target/
 /webapps/target/
 /docs/_site
+/strategy/passing.log
+/strategy/failing.log
+/nbactions.xml
+/common/nbactions.xml
+/sail/nbactions.xml
