@@ -16,7 +16,13 @@
  */
 package com.msd.gin.halyard.sail;
 
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.impl.TreeModel;
+import org.eclipse.rdf4j.repository.config.RepositoryConfigSchema;
+import org.eclipse.rdf4j.repository.sail.config.SailRepositorySchema;
+import org.eclipse.rdf4j.sail.config.SailConfigException;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -88,5 +94,50 @@ public class HBaseSailConfigTest {
         assertFalse(cfg.isCreate());
         assertFalse(cfg.isPush());
         assertEquals("http://whateverURL/index", cfg.getElasticIndexURL());
+    }
+
+    @Test
+    public void testDefaultTableSpaceFromRepositoryId() throws Exception {
+        TreeModel g = new TreeModel();
+        IRI node = SimpleValueFactory.getInstance().createIRI("http://node");
+        Literal id =  SimpleValueFactory.getInstance().createLiteral("testId");
+        g.add(node, SailRepositorySchema.SAILIMPL, node);
+        g.add(node, RepositoryConfigSchema.REPOSITORYIMPL, node);
+        g.add(node, RepositoryConfigSchema.REPOSITORYID, id);
+        HBaseSailConfig cfg = new HBaseSailConfig();
+        cfg.parse(g, null);
+        assertEquals(id.stringValue(), cfg.getTablespace());
+    }
+
+    @Test(expected = SailConfigException.class)
+    public void testSplitbitsFail() throws Exception {
+        TreeModel g = new TreeModel();
+        g.add(SimpleValueFactory.getInstance().createIRI("http://node"), HALYARD.SPLITBITS_PROPERTY, SimpleValueFactory.getInstance().createLiteral("not a number"));
+        HBaseSailConfig cfg = new HBaseSailConfig();
+        cfg.parse(g, null);
+    }
+
+    @Test(expected = SailConfigException.class)
+    public void testCreateTableFail() throws Exception {
+        TreeModel g = new TreeModel();
+        g.add(SimpleValueFactory.getInstance().createIRI("http://node"), HALYARD.CREATE_TABLE_PROPERTY, SimpleValueFactory.getInstance().createLiteral("not a boolean"));
+        HBaseSailConfig cfg = new HBaseSailConfig();
+        cfg.parse(g, null);
+    }
+
+    @Test(expected = SailConfigException.class)
+    public void testPushStrategyFail() throws Exception {
+        TreeModel g = new TreeModel();
+        g.add(SimpleValueFactory.getInstance().createIRI("http://node"), HALYARD.PUSH_STRATEGY_PROPERTY, SimpleValueFactory.getInstance().createLiteral("not a boolean"));
+        HBaseSailConfig cfg = new HBaseSailConfig();
+        cfg.parse(g, null);
+    }
+
+    @Test(expected = SailConfigException.class)
+    public void testTimeoutFail() throws Exception {
+        TreeModel g = new TreeModel();
+        g.add(SimpleValueFactory.getInstance().createIRI("http://node"), HALYARD.EVALUATION_TIMEOUT_PROPERTY, SimpleValueFactory.getInstance().createLiteral("not a number"));
+        HBaseSailConfig cfg = new HBaseSailConfig();
+        cfg.parse(g, null);
     }
 }

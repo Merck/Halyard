@@ -16,7 +16,11 @@
  */
 package com.msd.gin.halyard.sail;
 
+import org.eclipse.rdf4j.model.Model;
+import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.sail.Sail;
+import org.eclipse.rdf4j.sail.config.SailConfigException;
+import org.eclipse.rdf4j.sail.config.SailImplConfig;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -54,6 +58,62 @@ public class HBaseSailFactoryTest {
         assertEquals("testtable", hbs.tableName);
         assertEquals(480, hbs.evaluationTimeout);
         assertEquals("http://whatever/index", hbs.elasticIndexURL);
+    }
+
+    @Test(expected = SailConfigException.class)
+    public void testGetSailFail1() throws Exception {
+        new HBaseSailFactory().getSail(new SailImplConfig() {
+            @Override
+            public String getType() {
+                return "WrongType";
+            }
+
+            @Override
+            public long getIterationCacheSyncThreshold() {
+                return 0;
+            }
+
+            @Override
+            public void validate() throws SailConfigException {
+            }
+
+            @Override
+            public Resource export(Model graph) {
+                return null;
+            }
+
+            @Override
+            public void parse(Model graph, Resource implNode) throws SailConfigException {
+            }
+        });
+    }
+
+    @Test(expected = SailConfigException.class)
+    public void testGetSailFail2() throws Exception {
+        new HBaseSailFactory().getSail(new SailImplConfig() {
+            @Override
+            public String getType() {
+                return HBaseSailFactory.SAIL_TYPE;
+            }
+
+            @Override
+            public long getIterationCacheSyncThreshold() {
+                return 0;
+            }
+
+            @Override
+            public void validate() throws SailConfigException {
+            }
+
+            @Override
+            public Resource export(Model graph) {
+                return null;
+            }
+
+            @Override
+            public void parse(Model graph, Resource implNode) throws SailConfigException {
+            }
+        });
     }
 
 }
