@@ -56,7 +56,7 @@ public class HalyardBulkUpdateTest {
 
         File queries = File.createTempFile("test_update_queries", ".sparql");
         try (PrintStream qs = new PrintStream(queries)) {
-            qs.println("construct {?o <http://whatever/reverse> ?s} where {?s <http://whatever/pred> ?o}");
+            qs.println("delete {?s <http://whatever/pred> ?o} insert {?o <http://whatever/reverse> ?s} where {?s <http://whatever/pred> ?o}");
         }
         File htableDir = File.createTempFile("test_htable", "");
         htableDir.delete();
@@ -75,6 +75,7 @@ public class HalyardBulkUpdateTest {
                 }
             }
             Assert.assertEquals(25, count);
+            Assert.assertFalse(sail.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/pred"), null, true).hasNext());
         } finally {
             sail.shutDown();
         }

@@ -108,7 +108,7 @@ import org.json.JSONTokener;
  * only supported for queries across multiple graphs in one Halyard database.
  * @author Adam Sotona (MSD)
  */
-public final class HBaseSail implements Sail, SailConnection, FederatedServiceResolver {
+public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver {
 
     /**
      * Ticker is a simple service interface that is notified when some data are processed.
@@ -520,11 +520,15 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         if (!isWritable()) throw new SailException(tableName + " is read only");
         try {
             for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, context)) { //serialize the key value pairs relating to the statement in HBase
-                table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
+                put(kv);
             }
         } catch (IOException e) {
             throw new SailException(e);
         }
+    }
+
+    protected void put(KeyValue kv) throws IOException {
+        table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
     }
 
     @Override
@@ -535,18 +539,16 @@ public final class HBaseSail implements Sail, SailConnection, FederatedServiceRe
         try {
             for (Resource ctx : normalizeContexts(contexts)) {
                 for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx)) { //calculate the kv's corresponding to the quad (or triple)
-
-                	    //kv.getFamily and kv.getQualifier are deprecated CellUtil methods are recommended replacement.
-                	    //table.delete(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(kv.getFamily(), kv.getQualifier()));
-
-                	    byte[] fb= CellUtil.cloneFamily(kv);
-                	    byte[] qb = CellUtil.cloneQualifier(kv);
-                	    table.delete(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(fb, qb));
+                    delete(kv);
                 }
             }
         } catch (IOException e) {
             throw new SailException(e);
         }
+    }
+
+    protected void delete(KeyValue kv) throws IOException {
+        table.delete(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(CellUtil.cloneFamily(kv), CellUtil.cloneQualifier(kv)));
     }
 
     @Override

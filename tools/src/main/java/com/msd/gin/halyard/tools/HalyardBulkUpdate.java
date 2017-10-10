@@ -49,18 +49,15 @@ import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
-import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.eclipse.rdf4j.query.GraphQuery;
 import org.eclipse.rdf4j.query.MalformedQueryException;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
+import org.eclipse.rdf4j.query.Update;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
@@ -70,7 +67,6 @@ import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
-import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.sail.SailException;
 
@@ -96,7 +92,6 @@ public class HalyardBulkUpdate implements Tool {
      */
     public static final String DECIMATE_FUNCTION_URI = HALYARD.NAMESPACE + DECIMATE_FUNCTION_NAME;
     private static final String TABLE_NAME_PROPERTY = "halyard.table.name";
-    private static final String CHECK_BEFORE_WRITE_PROPERTY = "halyard.check.before.write";
     private static final Logger LOG = Logger.getLogger(HalyardBulkUpdate.class.getName());
     private Configuration conf;
 
@@ -105,10 +100,7 @@ public class HalyardBulkUpdate implements Tool {
      */
     public static class SPARQLMapper extends Mapper<LongWritable, Text, ImmutableBytesWritable, KeyValue> {
 
-        private IRI defaultRdfContext;
-        private boolean overrideRdfContext;
         private String tableName;
-        private boolean checkBeforeWrite;
         private String elasticIndexURL;
 
         @Override
@@ -129,11 +121,7 @@ public class HalyardBulkUpdate implements Tool {
                 }
             });
             Configuration conf = context.getConfiguration();
-            overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
-            String defCtx = conf.get(DEFAULT_CONTEXT_PROPERTY);
-            defaultRdfContext = defCtx == null ? null : SimpleValueFactory.getInstance().createIRI(defCtx);
             tableName = conf.get(TABLE_NAME_PROPERTY);
-            checkBeforeWrite = conf.getBoolean(CHECK_BEFORE_WRITE_PROPERTY, false);
             elasticIndexURL = conf.get(ELASTIC_INDEX_URL);
         }
 
@@ -143,57 +131,65 @@ public class HalyardBulkUpdate implements Tool {
             int i = query.indexOf('\n');
             final String fistLine = i > 0 ? query.substring(0, i) : query;
             context.setStatus("Execution of: " + fistLine);
+            final AtomicLong added = new AtomicLong();
+            final AtomicLong removed = new AtomicLong();
             try {
                 final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL, new HBaseSail.Ticker() {
                     @Override
                     public void tick() {
                         context.progress();
                     }
-                });
+                }) {
+                    @Override
+                    protected void put(KeyValue kv) throws IOException {
+                        try {
+                            context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
+                        } catch (InterruptedException ex) {
+                            throw new IOException(ex);
+                        }
+                        if (added.incrementAndGet() % 1000l == 0) {
+                            context.setStatus(fistLine + " - " + added.get() + " added " + removed.get() + " removed");
+                            LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
+                        }
+                    }
+
+                    @Override
+                    protected void delete(KeyValue kv) throws IOException {
+                        kv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), (int) kv.getRowLength(),
+                                kv.getFamilyArray(), kv.getFamilyOffset(), (int) kv.getFamilyLength(),
+                                kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength(),
+                                kv.getTimestamp(), KeyValue.Type.DeleteColumn, kv.getValueArray(), kv.getValueOffset(),
+                                kv.getValueLength(), kv.getTagsArray(), kv.getTagsOffset(), kv.getTagsLength());
+                        try {
+                            context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
+                        } catch (InterruptedException ex) {
+                            throw new IOException(ex);
+                        }
+                        if (added.incrementAndGet() % 1000l == 0) {
+                            context.setStatus(fistLine + " - " + added.get() + " added " + removed.get() + " removed");
+                            LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
+                        }
+                    }
+
+                    @Override
+                    public void clear(Resource... contexts) throws SailException {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
+                        throw new UnsupportedOperationException();
+                    }
+                };
                 SailRepository rep = new SailRepository(sail);
                 try {
                     rep.initialize();
-                    GraphQuery gq = rep.getConnection().prepareGraphQuery(QueryLanguage.SPARQL, query);
+                    Update upd = rep.getConnection().prepareUpdate(QueryLanguage.SPARQL, query);
                     LOG.log(Level.INFO, "Execution of: {0}", query);
                     context.setStatus(fistLine);
-                    final AtomicLong counter = new AtomicLong();
-                    final AtomicLong newCounter = new AtomicLong();
-                    gq.evaluate(new AbstractRDFHandler() {
-                        @Override
-                        public void handleStatement(Statement statement) throws RDFHandlerException {
-                            context.progress();
-                            Resource rdfContext;
-                            if (overrideRdfContext || (rdfContext = statement.getContext()) == null) {
-                                rdfContext = defaultRdfContext;
-                            }
-                            try {
-                                if (checkBeforeWrite) {
-                                    try (CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(statement.getSubject(), statement.getPredicate(), statement.getObject(), true, rdfContext)) {
-                                        if (!iter.hasNext()) {
-                                            newCounter.incrementAndGet();
-                                            write(statement, rdfContext);
-                                        }
-                                    }
-                                } else {
-                                    newCounter.incrementAndGet();
-                                    write(statement, rdfContext);
-                                }
-                                if (counter.incrementAndGet() % 1000l == 0) {
-                                    context.setStatus(fistLine + " - " + newCounter.get() + "/" + counter.get());
-                                    LOG.log(Level.INFO, "{0} new out of {1} statements", new Object[] {newCounter.get(), counter.get()});
-                                }
-                            } catch (IOException | InterruptedException | SailException ex) {
-                                throw new RDFHandlerException(ex);
-                            }
-                        }
-                        private void write(Statement statement, Resource rdfContext) throws IOException, InterruptedException {
-                            for (KeyValue keyValue: HalyardTableUtils.toKeyValues(statement.getSubject(), statement.getPredicate(), statement.getObject(), rdfContext)) {
-                                context.write(new ImmutableBytesWritable(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength()), keyValue);
-                            }
-                        }
-                    });
-                    context.setStatus(fistLine + " - " + newCounter.get() + "/" + counter.get());
-                    LOG.log(Level.INFO, "Query finished with {0} new out of {1} statements", new Object[] {newCounter.get(), counter.get()});
+                    upd.execute();
+                    context.setStatus(fistLine + " - " + added.get() + " added " + removed.get() + " removed");
+                    LOG.log(Level.INFO, "Query finished with {0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
                 } finally {
                     rep.shutDown();
                 }
@@ -208,7 +204,7 @@ public class HalyardBulkUpdate implements Tool {
     @Override
     public int run(String[] args) throws Exception {
         if (args.length != 3) {
-            System.err.println("Usage: bulkupdate [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + DEFAULT_CONTEXT_PROPERTY + "=http://new_context] [-D" + OVERRIDE_CONTEXT_PROPERTY + "=true] <input_file_with_SPARQL_queries> <output_path> <table_name>");
+            System.err.println("Usage: bulkupdate [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] <input_file_with_SPARQL_queries> <output_path> <table_name>");
             return -1;
         }
         TableMapReduceUtil.addDependencyJars(getConf(),
