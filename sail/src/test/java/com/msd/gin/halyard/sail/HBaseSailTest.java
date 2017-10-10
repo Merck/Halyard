@@ -219,9 +219,10 @@ public class HBaseSailTest {
         Value obj = vf.createLiteral("whatever");
         IRI context = vf.createIRI("http://whatever/context/");
         CloseableIteration<? extends Statement, SailException> iter;
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null);
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertableClear", true, 0, true, 0, null, null);
         sail.initialize();
         sail.addStatement(subj, pred, obj, context);
+        sail.addStatement(subj, pred, obj);
         sail.commit();
         iter = sail.getStatements(subj, pred, obj, true);
         assertTrue(iter.hasNext());
@@ -229,6 +230,9 @@ public class HBaseSailTest {
         sail.clear(context);
         iter = sail.getStatements(subj, pred, obj, true);
         assertTrue(iter.hasNext());
+        iter.close();
+        iter = sail.getStatements(subj, pred, obj, true, context);
+        assertFalse(iter.hasNext());
         iter.close();
         sail.clear();
         iter = sail.getStatements(subj, pred, obj, true);
