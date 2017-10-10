@@ -18,8 +18,6 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HALYARD;
-import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_CONTEXT_PROPERTY;
-import static com.msd.gin.halyard.tools.HalyardBulkLoad.OVERRIDE_CONTEXT_PROPERTY;
 import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.IOException;
 import java.util.Arrays;
@@ -39,8 +37,6 @@ import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -213,16 +209,6 @@ public class HalyardBulkUpdate implements Tool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        if (SnappyCodec.isNativeCodeLoaded()) {
-            getConf().setBoolean(MRJobConfig.MAP_OUTPUT_COMPRESS, true);
-            getConf().setClass(MRJobConfig.MAP_OUTPUT_COMPRESS_CODEC, SnappyCodec.class, CompressionCodec.class);
-        }
-        getConf().setDouble(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 1.0);
-        getConf().setLong(MRJobConfig.TASK_TIMEOUT, 3600000l);
-        getConf().setInt(MRJobConfig.IO_SORT_FACTOR, 100);
-        getConf().setInt(MRJobConfig.IO_SORT_MB, 1000);
-        getConf().setInt(FileInputFormat.SPLIT_MAXSIZE, 1000000000);
-        getConf().setInt(LoadIncrementalHFiles.MAX_FILES_PER_REGION_PER_FAMILY, 2048);
         getConf().setStrings(TABLE_NAME_PROPERTY, args[2]);
         Job job = Job.getInstance(getConf(), "HalyardBulkUpdate -> " + args[1] + " -> " + args[2]);
         NLineInputFormat.setNumLinesPerSplit(job, 1);

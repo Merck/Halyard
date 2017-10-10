@@ -45,7 +45,6 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
-import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -147,16 +146,6 @@ public class HalyardBulkLoad implements Tool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        if (SnappyCodec.isNativeCodeLoaded()) {
-            getConf().setBoolean(MRJobConfig.MAP_OUTPUT_COMPRESS, true);
-            getConf().setClass(MRJobConfig.MAP_OUTPUT_COMPRESS_CODEC, SnappyCodec.class, CompressionCodec.class);
-        }
-        getConf().setDouble(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 1.0);
-        getConf().setLong(MRJobConfig.TASK_TIMEOUT, 3600000l);
-        getConf().setInt(MRJobConfig.IO_SORT_FACTOR, 100);
-        getConf().setInt(MRJobConfig.IO_SORT_MB, 1000);
-        getConf().setInt(FileInputFormat.SPLIT_MAXSIZE, 100000000);
-        getConf().setInt(LoadIncrementalHFiles.MAX_FILES_PER_REGION_PER_FAMILY, 2048);
         Job job = Job.getInstance(getConf(), "HalyardBulkLoad -> " + args[1] + " -> " + args[2]);
         job.setJarByClass(HalyardBulkLoad.class);
         job.setMapperClass(RDFMapper.class);

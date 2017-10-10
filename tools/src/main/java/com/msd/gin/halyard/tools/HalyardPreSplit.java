@@ -34,8 +34,6 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -56,7 +54,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 /**
- * Apache Hadoop MapReduce Tool for calculating pre-splits of an HBase table before a large dataset bulk-load. 
+ * Apache Hadoop MapReduce Tool for calculating pre-splits of an HBase table before a large dataset bulk-load.
  * Splits are based on the keys of a sample of the data to be loaded.
  * @author Adam Sotona (MSD)
  */
@@ -157,12 +155,6 @@ public class HalyardPreSplit implements Tool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        if (SnappyCodec.isNativeCodeLoaded()) {
-            getConf().setBoolean(MRJobConfig.MAP_OUTPUT_COMPRESS, true);
-            getConf().setClass(MRJobConfig.MAP_OUTPUT_COMPRESS_CODEC, SnappyCodec.class, CompressionCodec.class);
-        }
-        getConf().setLong(MRJobConfig.TASK_TIMEOUT, 3600000l);
-        getConf().setInt(FileInputFormat.SPLIT_MAXSIZE, 100000000);
         Job job = Job.getInstance(getConf(), "HalyardPreSplit -> " + args[1]);
          job.getConfiguration().set(TABLE_PROPERTY, args[1]);
         job.setJarByClass(HalyardPreSplit.class);

@@ -31,8 +31,6 @@ import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
 import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.io.WritableComparable;
-import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -132,16 +130,6 @@ public class HalyardHiveLoad implements Tool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        if (SnappyCodec.isNativeCodeLoaded()) {
-            getConf().setBoolean(MRJobConfig.MAP_OUTPUT_COMPRESS, true);
-            getConf().setClass(MRJobConfig.MAP_OUTPUT_COMPRESS_CODEC, SnappyCodec.class, CompressionCodec.class);
-        }
-        getConf().setDouble(MRJobConfig.COMPLETED_MAPS_FOR_REDUCE_SLOWSTART, 1.0);
-        getConf().setLong(MRJobConfig.TASK_TIMEOUT, 3600000l);
-        getConf().setInt(MRJobConfig.IO_SORT_FACTOR, 100);
-        getConf().setInt(MRJobConfig.IO_SORT_MB, 1000);
-        getConf().setInt(FileInputFormat.SPLIT_MAXSIZE, 1000000000);
-        getConf().setInt(LoadIncrementalHFiles.MAX_FILES_PER_REGION_PER_FAMILY, 2048);
         Job job = Job.getInstance(getConf(), "HalyardHiveLoad -> " + args[1] + " -> " + args[2]);
         int i = args[0].indexOf('.');
         HCatInputFormat.setInput(job, i > 0 ? args[0].substring(0, i) : null, args[0].substring(i + 1));
