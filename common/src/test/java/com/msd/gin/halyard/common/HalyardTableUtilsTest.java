@@ -64,7 +64,7 @@ public class HalyardTableUtilsTest {
         Resource subj = vf.createIRI("http://testBigLiteral/subject/");
         IRI pred = vf.createIRI("http://testBigLiteral/pred/");
         Value obj = vf.createLiteral(RandomStringUtils.random(100000));
-        for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, null)) {
+        for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, null, false, System.currentTimeMillis())) {
                 table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
         table.flushCommits();
@@ -85,8 +85,9 @@ public class HalyardTableUtilsTest {
         IRI pred2 = vf.createIRI("http://testConflictingHash/pred2/");
         Value obj1 = vf.createLiteral("literal1");
         Value obj2 = vf.createLiteral("literal2");
-        KeyValue kv1[] = HalyardTableUtils.toKeyValues(subj, pred1, obj1, null);
-        KeyValue kv2[] = HalyardTableUtils.toKeyValues(subj, pred2, obj2, null);
+        long timestamp = System.currentTimeMillis();
+        KeyValue kv1[] = HalyardTableUtils.toKeyValues(subj, pred1, obj1, null, false, timestamp);
+        KeyValue kv2[] = HalyardTableUtils.toKeyValues(subj, pred2, obj2, null, false, timestamp);
         for (int i=0; i<3; i++) {
             table.put(new Put(kv1[i].getRowArray(), kv1[i].getRowOffset(), kv1[i].getRowLength(), kv1[i].getTimestamp()).add(kv1[i]));
             KeyValue conflicting = new KeyValue(kv1[i].getRowArray(), kv1[i].getRowOffset(), kv1[i].getRowLength(),
@@ -111,7 +112,7 @@ public class HalyardTableUtilsTest {
         Resource subj = vf.createIRI("http://whatever/subj/");
         IRI pred = vf.createIRI("http://whatever/pred/");
         Value expl = vf.createLiteral("explicit");
-        for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, expl, null)) {
+        for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, expl, null, false, System.currentTimeMillis())) {
                 table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
         table.flushCommits();

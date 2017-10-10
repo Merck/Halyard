@@ -55,7 +55,7 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 /**
  * Core Halyard utility class performing RDF to HBase mappings and base HBase table and key management. The methods of this class define how
  * Halyard stores and finds data in HBase. This class also provides several constants that define the key encoding.
- * 
+ *
  * @author Adam Sotona (MSD)
  */
 public final class HalyardTableUtils {
@@ -67,9 +67,9 @@ public final class HalyardTableUtils {
 
     /*
      * Triples/ quads are stored in multiple regions as different permutations.
-     * These values define the prefixes of the regions. 
+     * These values define the prefixes of the regions.
      */
-    
+
     /**
      * HBase key prefix for SPO regions
      */
@@ -156,8 +156,8 @@ public final class HalyardTableUtils {
         cfg.setLong(HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD, 3600000l);
         if (create) {
             try (Connection con = ConnectionFactory.createConnection(config)) {
-                try (Admin admin = con.getAdmin()) { 
-                	    //check if the table exists and if it doesn't, make it 
+                try (Admin admin = con.getAdmin()) {
+                	    //check if the table exists and if it doesn't, make it
                     if (!admin.tableExists(TableName.valueOf(tableName))) {
                         HTableDescriptor td = new HTableDescriptor(TableName.valueOf(tableName));
                         td.addFamily(createColumnFamily());
@@ -166,7 +166,7 @@ public final class HalyardTableUtils {
                 }
             }
         }
-        
+
         //this is deprecated, the recommendation now is to use connection.getTable()
         HTable table = new HTable(cfg, tableName);
         table.setAutoFlushTo(false);
@@ -226,7 +226,7 @@ public final class HalyardTableUtils {
     private static void addSplits(TreeSet<byte[]> splitKeys, byte[] prefix, int splitBits) {
         if (splitBits == 0) return;
         if (splitBits < 0 || splitBits > 16) throw new IllegalArgumentException("Illegal nunmber of split bits");
-        
+
         final int splitStep = 1 << (16 - splitBits); //1 splitBit gives a split step of 32768, 8 splitBits gives a split step of 256
         for (int i = splitStep; i <= 0xFFFF; i += splitStep) { // 0xFFFF is 65535 so a split step of 32768 will give 2 iterations, larger split bits give more iterations
             byte bb[] = Arrays.copyOf(prefix, prefix.length + 2);
@@ -242,9 +242,11 @@ public final class HalyardTableUtils {
      * @param pred predicate IRI
      * @param obj object Value
      * @param context optional context Resource
+     * @param delete boolean switch whether to get KeyValues for deletion instead of for insertion
+     * @param timestamp long timestamp value for time-ordering purposes
      * @return array of KeyValues
      */
-    public static KeyValue[] toKeyValues(Resource subj, IRI pred, Value obj, Resource context) {
+    public static KeyValue[] toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, long timestamp) {
         byte[] sb = NTriplesUtil.toNTriplesString(subj).getBytes(UTF8); //subject bytes
         byte[] pb = NTriplesUtil.toNTriplesString(pred).getBytes(UTF8); //predicate bytes
         byte[] ob = NTriplesUtil.toNTriplesString(obj).getBytes(UTF8);  //object bytes
@@ -252,21 +254,30 @@ public final class HalyardTableUtils {
         byte[] sKey = hashKey(sb);  //subject key
         byte[] pKey = hashKey(pb);  //predicate key
         byte[] oKey = hashKey(ob);  //object key
-        
+
         //bytes to be used for the HBase column qualifier
         byte[] cq = ByteBuffer.allocate(sb.length + pb.length + ob.length + cb.length + 12).putInt(sb.length).putInt(pb.length).putInt(ob.length).put(sb).put(pb).put(ob).put(cb).array();
-        
+
         KeyValue kv[] =  new KeyValue[context == null ? PREFIXES : 2 * PREFIXES];
-        
+
+        KeyValue.Type type = delete ? KeyValue.Type.DeleteColumn : KeyValue.Type.Put;
+
+        //timestamp is shifted one bit left and the last bit is used to prioritize between inserts and deletes of the same time to avoid HBase ambiguity
+        //inserts are considered always later after deletes on a timeline
+        timestamp = timestamp << 1;
+        if (!delete) {
+            timestamp |= 1;
+        }
+
         //generate HBase key value pairs from: row, family, qualifier, value. Permutations of SPO (and if needed CSPO) are all stored. Values are actually empty.
-        kv[0] = new KeyValue(concat(SPO_PREFIX, false, sKey, pKey, oKey), CF_NAME, cq, EMPTY);
-        kv[1] = new KeyValue(concat(POS_PREFIX, false, pKey, oKey, sKey), CF_NAME, cq, EMPTY);
-        kv[2] = new KeyValue(concat(OSP_PREFIX, false, oKey, sKey, pKey), CF_NAME, cq, EMPTY);
+        kv[0] = new KeyValue(concat(SPO_PREFIX, false, sKey, pKey, oKey), CF_NAME, cq, timestamp, type, EMPTY);
+        kv[1] = new KeyValue(concat(POS_PREFIX, false, pKey, oKey, sKey), CF_NAME, cq, timestamp, type, EMPTY);
+        kv[2] = new KeyValue(concat(OSP_PREFIX, false, oKey, sKey, pKey), CF_NAME, cq, timestamp, type, EMPTY);
         if (context != null) {
             byte[] cKey = hashKey(cb);
-            kv[3] = new KeyValue(concat(CSPO_PREFIX, false, cKey, sKey, pKey, oKey), CF_NAME, cq, EMPTY);
-            kv[4] = new KeyValue(concat(CPOS_PREFIX, false, cKey, pKey, oKey, sKey), CF_NAME, cq, EMPTY);
-            kv[5] = new KeyValue(concat(COSP_PREFIX, false, cKey, oKey, sKey, pKey), CF_NAME, cq, EMPTY);
+            kv[3] = new KeyValue(concat(CSPO_PREFIX, false, cKey, sKey, pKey, oKey), CF_NAME, cq, timestamp, type, EMPTY);
+            kv[4] = new KeyValue(concat(CPOS_PREFIX, false, cKey, pKey, oKey, sKey), CF_NAME, cq, timestamp, type, EMPTY);
+            kv[5] = new KeyValue(concat(COSP_PREFIX, false, cKey, oKey, sKey, pKey), CF_NAME, cq, timestamp, type, EMPTY);
         }
         return kv;
     }

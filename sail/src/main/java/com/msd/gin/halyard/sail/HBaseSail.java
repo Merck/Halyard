@@ -40,7 +40,6 @@ import java.util.logging.Logger;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.HTable;
@@ -518,8 +517,9 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
     private void addStatementInternal(Resource subj, IRI pred, Value obj, Resource context) throws SailException {
         if (!isWritable()) throw new SailException(tableName + " is read only");
+        long timestamp = System.currentTimeMillis();
         try {
-            for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, context)) { //serialize the key value pairs relating to the statement in HBase
+            for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, context, false, timestamp)) { //serialize the key value pairs relating to the statement in HBase
                 put(kv);
             }
         } catch (IOException e) {
@@ -535,10 +535,11 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     public void removeStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
     	    //should we be defensive about nulls for subj, pre and obj? removeStatements is where you would use nulls, not here.
 
+        long timestamp = System.currentTimeMillis();
         if (!isWritable()) throw new SailException(tableName + " is read only");
         try {
             for (Resource ctx : normalizeContexts(contexts)) {
-                for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx)) { //calculate the kv's corresponding to the quad (or triple)
+                for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, true, timestamp)) { //calculate the kv's corresponding to the quad (or triple)
                     delete(kv);
                 }
             }
@@ -548,7 +549,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     }
 
     protected void delete(KeyValue kv) throws IOException {
-        table.delete(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addColumn(CellUtil.cloneFamily(kv), CellUtil.cloneQualifier(kv)));
+        table.delete(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addDeleteMarker(kv));
     }
 
     @Override

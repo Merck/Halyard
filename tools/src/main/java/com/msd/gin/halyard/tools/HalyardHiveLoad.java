@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import static com.msd.gin.halyard.tools.HalyardBulkLoad.TIMESTAMP_PROPERTY;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.logging.Logger;
@@ -79,6 +80,7 @@ public class HalyardHiveLoad implements Tool {
         private int dataColumnIndex;
         private RDFFormat rdfFormat;
         private String baseUri;
+        private long timestamp;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -89,6 +91,7 @@ public class HalyardHiveLoad implements Tool {
             dataColumnIndex = conf.getInt(HIVE_DATA_COLUMN_INDEX_PROPERTY, 0);
             rdfFormat = Rio.getParserFormatForMIMEType(conf.get(RDF_MIME_TYPE_PROPERTY)).get();
             baseUri = conf.get(BASE_URI_PROPERTY);
+            timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
         @Override
@@ -102,7 +105,7 @@ public class HalyardHiveLoad implements Tool {
                     if (overrideRdfContext || (rdfContext = st.getContext()) == null) {
                         rdfContext = defaultRdfContext;
                     }
-                    for (KeyValue keyValue: HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), rdfContext)) try {
+                    for (KeyValue keyValue: HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), rdfContext, false, timestamp)) try {
                         context.write(new ImmutableBytesWritable(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength()), keyValue);
                     } catch (IOException | InterruptedException e) {
                         throw new RDFHandlerException(e);
@@ -130,6 +133,7 @@ public class HalyardHiveLoad implements Tool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
+        getConf().setLong(TIMESTAMP_PROPERTY, getConf().getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis()));
         Job job = Job.getInstance(getConf(), "HalyardHiveLoad -> " + args[1] + " -> " + args[2]);
         int i = args[0].indexOf('.');
         HCatInputFormat.setInput(job, i > 0 ? args[0].substring(0, i) : null, args[0].substring(i + 1));

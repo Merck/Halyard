@@ -21,6 +21,7 @@ import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_CONTEXT_PROPERTY
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.OVERRIDE_CONTEXT_PROPERTY;
 import com.msd.gin.halyard.tools.HalyardBulkLoad.RioFileInputFormat;
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.SKIP_INVALID_PROPERTY;
+import static com.msd.gin.halyard.tools.HalyardBulkLoad.TIMESTAMP_PROPERTY;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -81,6 +82,7 @@ public class HalyardPreSplit implements Tool {
         private final Random random = new Random(0);
         private long counter = 0, next = 0;
         private int decimationFactor;
+        private long timestamp;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -92,6 +94,7 @@ public class HalyardPreSplit implements Tool {
             for (byte b = 1; b < 6; b++) {
                 context.write(new ImmutableBytesWritable(new byte[] {b}), new LongWritable(1));
             }
+            timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
         @Override
@@ -102,7 +105,7 @@ public class HalyardPreSplit implements Tool {
                 if (overrideRdfContext || (rdfContext = value.getContext()) == null) {
                     rdfContext = defaultRdfContext;
                 }
-                for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), rdfContext)) {
+                for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), rdfContext, false, timestamp)) {
                     context.write(new ImmutableBytesWritable(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength()), new LongWritable(keyValue.getLength()));
                 }
             }
@@ -155,6 +158,7 @@ public class HalyardPreSplit implements Tool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
+        getConf().setLong(TIMESTAMP_PROPERTY, getConf().getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis()));
         Job job = Job.getInstance(getConf(), "HalyardPreSplit -> " + args[1]);
          job.getConfiguration().set(TABLE_PROPERTY, args[1]);
         job.setJarByClass(HalyardPreSplit.class);

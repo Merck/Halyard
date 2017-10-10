@@ -72,15 +72,16 @@ public class HBaseSailHashConflictTest {
     @BeforeClass
     public static void setup() throws Exception {
         try (HTable table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", true, 0)) {
-            KeyValue triple[] = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null);
+            long timestamp = System.currentTimeMillis();
+            KeyValue triple[] = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp);
             KeyValue conflicts[][] = new KeyValue[][] {
-                HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null),
-                HalyardTableUtils.toKeyValues(SUBJ, CONF,  OBJ, null),
-                HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null),
-                HalyardTableUtils.toKeyValues(CONF, PRED,  OBJ, null),
-                HalyardTableUtils.toKeyValues(CONF, PRED, CONF, null),
-                HalyardTableUtils.toKeyValues(CONF, CONF,  OBJ, null),
-                HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null),
+                HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null, false, timestamp),
+                HalyardTableUtils.toKeyValues(SUBJ, CONF,  OBJ, null, false, timestamp),
+                HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null, false, timestamp),
+                HalyardTableUtils.toKeyValues(CONF, PRED,  OBJ, null, false, timestamp),
+                HalyardTableUtils.toKeyValues(CONF, PRED, CONF, null, false, timestamp),
+                HalyardTableUtils.toKeyValues(CONF, CONF,  OBJ, null, false, timestamp),
+                HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null, false, timestamp),
             };
             for (int i=0; i<triple.length; i++) {
                 KeyValue kv = triple[i];

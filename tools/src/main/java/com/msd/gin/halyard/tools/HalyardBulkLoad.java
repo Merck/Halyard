@@ -101,6 +101,11 @@ public class HalyardBulkLoad implements Tool {
      * Property defining default context for triples (or even for quads when context override is set)
      */
     public static final String DEFAULT_CONTEXT_PROPERTY = "halyard.parser.context.default";
+
+    /**
+     * Property defining exact timestamp of all loaded triples (System.currentTimeMillis() is the default value)
+     */
+    public static final String TIMESTAMP_PROPERTY = "halyard.bulkload.timestamp";
     private static final Logger LOG = Logger.getLogger(HalyardBulkLoad.class.getName());
 
     private Configuration conf;
@@ -112,6 +117,7 @@ public class HalyardBulkLoad implements Tool {
 
         private IRI defaultRdfContext;
         private boolean overrideRdfContext;
+        private long timestamp;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -119,6 +125,7 @@ public class HalyardBulkLoad implements Tool {
             overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
             String defCtx = conf.get(DEFAULT_CONTEXT_PROPERTY);
             defaultRdfContext = defCtx == null ? null : SimpleValueFactory.getInstance().createIRI(defCtx);
+            timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
         @Override
@@ -127,7 +134,7 @@ public class HalyardBulkLoad implements Tool {
             if (overrideRdfContext || (rdfContext = value.getContext()) == null) {
                 rdfContext = defaultRdfContext;
             }
-            for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), rdfContext)) {
+            for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), rdfContext, false, timestamp)) {
                 context.write(new ImmutableBytesWritable(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength()), keyValue);
             }
         }
@@ -146,6 +153,7 @@ public class HalyardBulkLoad implements Tool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
+        getConf().setLong(TIMESTAMP_PROPERTY, getConf().getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis()));
         Job job = Job.getInstance(getConf(), "HalyardBulkLoad -> " + args[1] + " -> " + args[2]);
         job.setJarByClass(HalyardBulkLoad.class);
         job.setMapperClass(RDFMapper.class);
