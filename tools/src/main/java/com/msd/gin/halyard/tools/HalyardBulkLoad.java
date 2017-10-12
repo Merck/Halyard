@@ -105,7 +105,8 @@ public class HalyardBulkLoad implements Tool {
     /**
      * Property defining exact timestamp of all loaded triples (System.currentTimeMillis() is the default value)
      */
-    public static final String TIMESTAMP_PROPERTY = "halyard.bulkload.timestamp";
+    public static final String DEFAULT_TIMESTAMP_PROPERTY = "halyard.bulk.timestamp";
+
     private static final Logger LOG = Logger.getLogger(HalyardBulkLoad.class.getName());
 
     private Configuration conf;
@@ -125,7 +126,7 @@ public class HalyardBulkLoad implements Tool {
             overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
             String defCtx = conf.get(DEFAULT_CONTEXT_PROPERTY);
             defaultRdfContext = defCtx == null ? null : SimpleValueFactory.getInstance().createIRI(defCtx);
-            timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
+            timestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
         @Override
@@ -153,7 +154,7 @@ public class HalyardBulkLoad implements Tool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        getConf().setLong(TIMESTAMP_PROPERTY, getConf().getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis()));
+        getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
         Job job = Job.getInstance(getConf(), "HalyardBulkLoad -> " + args[1] + " -> " + args[2]);
         job.setJarByClass(HalyardBulkLoad.class);
         job.setMapperClass(RDFMapper.class);

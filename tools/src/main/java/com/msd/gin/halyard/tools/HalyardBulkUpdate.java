@@ -19,6 +19,8 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
+import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY;
+import com.msd.gin.halyard.tools.TimeAwareHBaseSail.TimestampCallbackBinding;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
@@ -57,6 +59,7 @@ import org.eclipse.rdf4j.query.Update;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
+import org.eclipse.rdf4j.query.impl.MapBindingSet;
 import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.rio.RDFFormat;
@@ -83,6 +86,9 @@ public class HalyardBulkUpdate implements Tool {
      */
     public static final String ELASTIC_INDEX_URL = "halyard.elastic.index.url";
 
+    static final String TIMESTAMP_BINDING_NAME = "HALYARD_TIMESTAMP_SPECIAL_VARIABLE";
+    static final String TIMESTAMP_CALLBACK_BINDING_NAME = "HALYARD_TIMESTAMP_SPECIAL_CALLBACK_BINDING";
+
     /**
      * Full URI of a custom SPARQL function to decimate parallel evaluation based on Mapper index
      */
@@ -98,6 +104,7 @@ public class HalyardBulkUpdate implements Tool {
 
         private String tableName;
         private String elasticIndexURL;
+        private long defaultTimestamp;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -119,6 +126,7 @@ public class HalyardBulkUpdate implements Tool {
             Configuration conf = context.getConfiguration();
             tableName = conf.get(TABLE_NAME_PROPERTY);
             elasticIndexURL = conf.get(ELASTIC_INDEX_URL);
+            defaultTimestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
         @Override
@@ -130,7 +138,7 @@ public class HalyardBulkUpdate implements Tool {
             final AtomicLong added = new AtomicLong();
             final AtomicLong removed = new AtomicLong();
             try {
-                final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL, new HBaseSail.Ticker() {
+                final HBaseSail sail = new TimeAwareHBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL, new HBaseSail.Ticker() {
                     @Override
                     public void tick() {
                         context.progress();
@@ -168,6 +176,11 @@ public class HalyardBulkUpdate implements Tool {
                     }
 
                     @Override
+                    protected long getDefaultTimeStamp() {
+                        return defaultTimestamp;
+                    }
+
+                    @Override
                     public void clear(Resource... contexts) throws SailException {
                         throw new UnsupportedOperationException();
                     }
@@ -181,6 +194,7 @@ public class HalyardBulkUpdate implements Tool {
                 try {
                     rep.initialize();
                     Update upd = rep.getConnection().prepareUpdate(QueryLanguage.SPARQL, query);
+                    ((MapBindingSet)upd.getBindings()).addBinding(new TimestampCallbackBinding());
                     LOG.log(Level.INFO, "Execution of: {0}", query);
                     context.setStatus(fistLine);
                     upd.execute();
@@ -210,6 +224,7 @@ public class HalyardBulkUpdate implements Tool {
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
         getConf().setStrings(TABLE_NAME_PROPERTY, args[2]);
+        getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
         Job job = Job.getInstance(getConf(), "HalyardBulkUpdate -> " + args[1] + " -> " + args[2]);
         NLineInputFormat.setNumLinesPerSplit(job, 1);
         job.setJarByClass(HalyardBulkUpdate.class);

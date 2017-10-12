@@ -17,7 +17,6 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import static com.msd.gin.halyard.tools.HalyardBulkLoad.TIMESTAMP_PROPERTY;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.logging.Logger;
@@ -52,6 +51,7 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY;
 
 /**
  * MapReduce tool for bulk loading of RDF data (in any standard RDF form) from given Hive table and column
@@ -91,7 +91,7 @@ public class HalyardHiveLoad implements Tool {
             dataColumnIndex = conf.getInt(HIVE_DATA_COLUMN_INDEX_PROPERTY, 0);
             rdfFormat = Rio.getParserFormatForMIMEType(conf.get(RDF_MIME_TYPE_PROPERTY)).get();
             baseUri = conf.get(BASE_URI_PROPERTY);
-            timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
+            timestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
         @Override
@@ -133,7 +133,7 @@ public class HalyardHiveLoad implements Tool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        getConf().setLong(TIMESTAMP_PROPERTY, getConf().getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis()));
+        getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
         Job job = Job.getInstance(getConf(), "HalyardHiveLoad -> " + args[1] + " -> " + args[2]);
         int i = args[0].indexOf('.');
         HCatInputFormat.setInput(job, i > 0 ? args[0].substring(0, i) : null, args[0].substring(i + 1));

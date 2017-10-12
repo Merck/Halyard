@@ -324,7 +324,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     }
 
     //generates a Resource[] from 0 or more Resources
-    private static Resource[] normalizeContexts(Resource... contexts) {
+    protected static Resource[] normalizeContexts(Resource... contexts) {
         if (contexts == null || contexts.length == 0) {
             return new Resource[] {null};
         } else {
@@ -508,16 +508,20 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         addStatement(subj, pred, obj, contexts);
     }
 
+    protected long getDefaultTimeStamp() {
+        return System.currentTimeMillis();
+    }
+
     @Override
     public void addStatement(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
+        long timestamp = getDefaultTimeStamp();
         for (Resource ctx : normalizeContexts(contexts)) {
-            addStatementInternal(subj, pred, obj, ctx);
+            addStatementInternal(subj, pred, obj, ctx, timestamp);
         }
     }
 
-    private void addStatementInternal(Resource subj, IRI pred, Value obj, Resource context) throws SailException {
+    protected void addStatementInternal(Resource subj, IRI pred, Value obj, Resource context, long timestamp) throws SailException {
         if (!isWritable()) throw new SailException(tableName + " is read only");
-        long timestamp = System.currentTimeMillis();
         try {
             for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, context, false, timestamp)) { //serialize the key value pairs relating to the statement in HBase
                 put(kv);
@@ -535,8 +539,8 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     public void removeStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
     	    //should we be defensive about nulls for subj, pre and obj? removeStatements is where you would use nulls, not here.
 
-        long timestamp = System.currentTimeMillis();
         if (!isWritable()) throw new SailException(tableName + " is read only");
+        long timestamp = getDefaultTimeStamp();
         try {
             for (Resource ctx : normalizeContexts(contexts)) {
                 for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, true, timestamp)) { //calculate the kv's corresponding to the quad (or triple)
@@ -609,7 +613,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
             if (oldNS != null) {
                 removeStatement(null, vf.createIRI(oldNS.getName()), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix));
             }
-            addStatementInternal(vf.createIRI(name), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), null);
+            addStatementInternal(vf.createIRI(name), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), null, getDefaultTimeStamp());
         } catch (SailException e) {
             LOG.log(Level.WARNING, "Namespace prefix could not be presisted due to an exception", e);
         }
