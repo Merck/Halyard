@@ -167,7 +167,7 @@ public class HalyardParallelExport implements Tool {
                             throw new ValueExprEvaluationException("paralelSplitBy function does not allow null values");
                         }
                     }
-                    return valueFactory.createLiteral(Arrays.hashCode(args) % iis.size == iis.index);
+                    return valueFactory.createLiteral(Math.floorMod(Arrays.hashCode(args), iis.size) == iis.index);
                 }
             });
             try {

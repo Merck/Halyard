@@ -120,7 +120,8 @@ public class HalyardBulkUpdate implements Tool {
                     if (!(args[0] instanceof Literal) || !(args[1] instanceof Literal)) throw new ValueExprEvaluationException("First two two arguments of " + DECIMATE_FUNCTION_URI + " function must be literals");
                     int index = ((Literal)args[0]).intValue();
                     int size = ((Literal)args[1]).intValue();
-                    return valueFactory.createLiteral(Arrays.hashCode(args) % size == index);
+                    int hash = Arrays.hashCode(Arrays.copyOfRange(args, 2, args.length));
+                    return valueFactory.createLiteral(Math.floorMod(hash, size) == index);
                 }
             });
             Configuration conf = context.getConfiguration();
