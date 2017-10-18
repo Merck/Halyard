@@ -16,7 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.InputStream;
 import java.util.Properties;
 import java.util.logging.Logger;
@@ -29,6 +28,7 @@ import org.apache.commons.cli.PosixParser;
 import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.Update;
+import org.eclipse.rdf4j.query.impl.MapBindingSet;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 
 /**
@@ -87,10 +87,11 @@ public final class HalyardUpdate {
                 if (s != null && s.length > 1)  throw new ParseException("Multiple values for option: " + c);
             }
 
-            SailRepository rep = new SailRepository(new HBaseSail(conf, cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('e'), null));
+            SailRepository rep = new SailRepository(new TimeAwareHBaseSail(conf, cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('e'), null));
             rep.initialize();
             try {
                 Update u = rep.getConnection().prepareUpdate(QueryLanguage.SPARQL, cmd.getOptionValue('q'));
+                ((MapBindingSet)u.getBindings()).addBinding(new TimeAwareHBaseSail.TimestampCallbackBinding());
                 LOG.info("Update execution started");
                 u.execute();
                 LOG.info("Update finished");
