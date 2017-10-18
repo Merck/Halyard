@@ -140,6 +140,22 @@ Halyard Update is a command line application designed to run SPARQL Update queri
 3. Execute `./update -s <HBase_table_name> -q '<sparql_query>'` to launch the update.
 
 
+### Halyard Bulk Update
+
+Halyard Bulk Update is a MapReduce application executing multiple SPARQL Update queries in parallel in Mapper phase. Shuffle and Reduce phase is responsible for efficient update of the dataset in a bulk mode (similar to Halyard Bulk Load). Halyard Bulk Update supports large scale DELETE/INSERT operations, where the deletes and inserts do not have direct impact on the dataset, however they are processed as an atomic bulk operation at the end.
+
+![Halyard Bulk Update](img/bulkupdate.png)
+
+**Update Usage:**
+
+1. Open terminal on a Hadoop cluster node with configured HBase.
+2. On a secured cluster don't forget to `kinit` with your credentials.
+3. Write SPARQL Update queries into a file - single line for each query
+4. Move file with the SPARQL queries to the shared filesyste (HDFS)
+5. Execute `./bulkupdate <shared_path_of_file_with_SPARQL_Update_queries> <temporary_path_for_HTable files> <HBase_table_name>` to launch the Bulk Update application. Following features are supported:
+	* Temporary path for HTable files is used to store temporary HBase table files and the files are moved to their final HBase locations during the last stage of the Bulk Load process.
+	* Optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify YARN queue to be used by the application.
+
 
 ### Halyard Export
 
@@ -341,6 +357,17 @@ halyard:statsContext {
 	* Option `-Dhalyard.stats.graph.context=<graph context url>` can override default statistics target graph context `http://merck.github.io/Halyard/ns#statsContext`.
 	* Option `-Dhalyard.stats.subset.threshold=<long value>` can override default threshold value `1000` for generation of subsets in statistics. Statistics will include virtual partitions for all subjects, properties and objects with cardinality higher than given threshold. Lower value may mess the statistics with many virtual partitions.
 
+### Halyard ElasticSearch Index
+
+Halyard ElasticSearch Index is a MapReduce application performing indexation of all literals of the given dataset into a supplementary ElasticSearch server/cluster. Halyard repository configured with such supplementary ElasticSearch index then provides some more advanced text search features over the indexed literals.
+
+![Halyard ElasticSearch Index](img/esindex.png)
+
+**Halyard ElasticSearch Index Usage:**
+
+1. Open terminal on a Hadoop cluster node with configured HBase.
+2. On a secured cluster don't forget to `kinit` with your credentials.
+3. Execute `./esindex -s <HBase_table_name> -t <target_ElasticSearch_index_url>` to execute the MapReduce application.
 
 ### RDF4J Web Applications
 

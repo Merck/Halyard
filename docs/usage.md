@@ -25,6 +25,7 @@ Multiple repositories configured in various RDF4J Servers or in multiple RDF4J C
 * **HBase Table presplit bits** - keep the default 0 unless you expect a very big dataset
 * **Use Halyard Push Evaluation Strategy** - may be set to false to fallback to the default RDF4J Evaluation Strategy implementation
 * **Query Evaluation Timeout** - may be adjusted or set to 0, however it creates a risk of resources exhaustion
+* **Optional ElasticSearch Index URL** - supplementary ElasticSearch index URL with indexed literals for advanced text search capabilities
 
 ### With RDF4J Console
 
@@ -38,6 +39,7 @@ Create HBase Table if missing (true|false) [true]:
 HBase Table presplit bits [0]:
 Use Halyard Push Evaluation Strategy (true|false) [true]:
 Query Evaluation Timeout [180]:
+Optional ElasticSearch Index URL:
 Repository created
 ```
 
@@ -142,6 +144,19 @@ The above query can be used any of the above described ways or tools (Console, W
 
 ```
 ./update -s testRepo -q 'insert {?s ?p ?o} where {?s ?p ?o}'
+```
+
+### With Halyard Bulk Update
+
+```
+> ./bulkupdate /my_hdfs_path/my_update_queries.sparql /my_hdfs_temp_path testRepo
+impl.YarnClientImpl: Submitted application application_1458476924873_30975
+mapreduce.Job: The url to track the job: http://my_app_master/proxy/application_1458476924873_30975/
+mapreduce.Job:  map 0% reduce 0%
+mapreduce.Job:  map 100% reduce 0%
+mapreduce.Job:  map 100% reduce 100%
+mapreduce.Job: Job job_1458476924873_30975 completed successfully
+INFO: Bulk Update Load Completed..
 ```
 
 ### With RDF4J Console
