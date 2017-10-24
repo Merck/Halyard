@@ -10,7 +10,7 @@ RDF4J repositories represent just configured connectors to the particular RDF st
 
 Halyard Datasets with all the RDF data are persisted within the HBase tables. Corresponding Halyard Dataset can be optionally created together with repository creation.
 
-Multiple repositories configured in various RDF4J Servers or in multiple RDF4J Consoles can share one common Halyard Dataset and so pint to the same HBase table.
+Multiple repositories configured in various RDF4J Servers or in multiple RDF4J Consoles can share one common Halyard Dataset and so point to the same HBase table.
 
 **Deletion of the repository** from one particular RDF4J Server or RDF4J Console does not delete Halyard Dataset and so it does not affect the data and other users. However **clearing** the repository or **deletion of the statements** has global effect for all users.
 
@@ -20,7 +20,7 @@ Multiple repositories configured in various RDF4J Servers or in multiple RDF4J C
 
 * **Repository ID** - is mandatory and may correspond to the HBase table name
 * **Repository title** - is optional
-* **HBase Table Name** - may be left empty when the table name corresponds to the Rpository ID
+* **HBase Table Name** - may be left empty when the table name corresponds to the Repository ID
 * **Create HBase Table if missing** - table presplit bits are ignored in case the table is not created
 * **HBase Table presplit bits** - keep the default 0 unless you expect a very big dataset
 * **Use Halyard Push Evaluation Strategy** - may be set to false to fallback to the default RDF4J Evaluation Strategy implementation
@@ -323,7 +323,7 @@ hbase(main):001:0> clone_snapshot 'testRepo_my_snapshot', 'testRepo2'
 2016-04-28 09:01:29,164 INFO  [main] snapshot.ExportSnapshot: Verify snapshot integrity
 2016-04-28 09:01:29,193 INFO  [main] snapshot.ExportSnapshot: Export Completed: testRepo_my_snapshot
 ```
-Note: skipping a lot of debugging information from the Map Reduce excution
+Note: skipping a lot of debugging information from the Map Reduce execution
 
 ### Bulk Merge of Multiple Datasets
 
