@@ -172,7 +172,7 @@ public class HBaseSailTest {
         new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null).begin(IsolationLevels.READ_COMMITTED);
     }
 
-    @Test(expected = UnsupportedOperationException.class)
+    @Test
     public void testRollback() throws Exception {
         new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null).rollback();
     }

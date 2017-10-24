@@ -495,7 +495,6 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
     @Override
     public void rollback() throws SailException {
-        throw new UnsupportedOperationException();
     }
 
     @Override
