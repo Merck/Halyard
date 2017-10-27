@@ -2,30 +2,31 @@
 title: Usage
 layout: doc
 ---
+
 # Usage
 
 ## Before you begin
 
-RDF4J repositories represent just configured connectors to the particular RDF storage. The repositories are always created and persisted within the actual context. RDF4J Console repository configuration is persisted under the actual user home directory. Repositories created through RDF4J Workbench exist within the actually connected RDF4J Server context only.
+RDF4J repositories represent just configured connectors to a particular RDF storage. The repositories are always created and persisted within the actual context. RDF4J Console repository configuration is persisted under the actual user home directory. Repositories created via the RDF4J Workbench exist within the actually connected RDF4J Server context only.
 
-Halyard Datasets with all the RDF data are persisted within the HBase tables. Corresponding Halyard Dataset can be optionally created together with repository creation.
+Halyard datasets with all the RDF data are persisted as HBase tables. The corresponding Halyard dataset can be optionally created when the repository is created.
 
-Multiple repositories configured in various RDF4J Servers or in multiple RDF4J Consoles can share one common Halyard Dataset and so pint to the same HBase table.
+Multiple repositories configured in various RDF4J Servers or in multiple RDF4J Consoles can share one common Halyard dataset and so point to the same HBase table.
 
-**Deletion of the repository** from one particular RDF4J Server or RDF4J Console does not delete Halyard Dataset and so it does not affect the data and other users. However **clearing** the repository or **deletion of the statements** has global effect for all users.
+**Deleting a repository** from a particular RDF4J Server or RDF4J Console does not delete the associated Halyard dataset and so it does not affect the data and other users. However **clearing** the repository or **deleting its statements** has global effect for all users.
 
-## Create Repository
+## Create repository
 
-### HBase Repository Settings
+### HBase repository settings
 
-* **Repository ID** - is mandatory and may correspond to the HBase table name
-* **Repository title** - is optional
-* **HBase Table Name** - may be left empty when the table name corresponds to the Rpository ID
-* **Create HBase Table if missing** - table presplit bits are ignored in case the table is not created
-* **HBase Table presplit bits** - keep the default 0 unless you expect a very big dataset
-* **Use Halyard Push Evaluation Strategy** - may be set to false to fallback to the default RDF4J Evaluation Strategy implementation
-* **Query Evaluation Timeout** - may be adjusted or set to 0, however it creates a risk of resources exhaustion
-* **Optional ElasticSearch Index URL** - supplementary ElasticSearch index URL with indexed literals for advanced text search capabilities
+* **Repository ID** is mandatory and may correspond to the HBase table name.
+* **Repository title** is optional.
+* **HBase table name** can be left empty when the table name corresponds to the Repository ID.
+* **Create HBase table if missing**: table presplit bits are ignored in case the table is not created.
+* **HBase table presplit bits**: keep the default value 0, unless you expect a very large dataset.
+* **Use Halyard Push Evaluation Strategy**: may be set to false to fallback to the default RDF4J evaluation strategy implementation.
+* **Query Evaluation Timeout** may be adjusted or set to 0, however, it creates a risk of resource exhaustion if long timeouts are allowed.
+* **Optional ElasticSearch Index URL**: URL of the supplementary ElasticSearch index with indexed literals for advanced text search capabilities.
 
 ### With RDF4J Console
 
@@ -47,7 +48,7 @@ Repository created
 
 ![RDF4J Workbench - New Repository](img/new_repo.png)
 
-## Connect to Existing Repository
+## Connect to the existing repository
 
 ### From RDF4J Console
 
@@ -60,10 +61,9 @@ Opened repository 'testRepo'
 
 Just select the repository from the list of repositories.
 
-Newly created repository is automatically connected in RDF4J Workbench.
+A newly created repository is connected automatically in the RDF4J Workbench.
 
-
-## Load RDF Data
+## Load RDF data
 
 ### With Halyard Bulk Load
 
@@ -77,7 +77,8 @@ mapreduce.Job:  map 100% reduce 100%
 mapreduce.Job: Job job_1458475483810_40875 completed successfully
 INFO: Bulk Load Completed..
 ```
-Note: Before Bulk Load of a very large datasets into a new HBase table it is wise to use Halyard PreSplit. Halyard PreSplit calculates HBase table region splits and creates HBase table for optimal following Bulk Load process. 
+
+Note: Before Bulk Load of very large datasets into a new HBase table it is recommended to use the Halyard PreSplit. Halyard PreSplit calculates the HBase table region splits and creates the HBase table optimized for the following Bulk Load process. 
 
 ### With Halyard Hive Load
 
@@ -91,7 +92,8 @@ mapreduce.Job:  map 100% reduce 100%
 mapreduce.Job: Job job_1514793734614_41673 completed successfully
 INFO: Hive Load Completed..
 ```
-Note: skipping a lot of debugging information from the Map Reduce execution
+
+Note: the above listing skips much debugging information from the MapReduce execution.
 
 ### With RDF4J Console
 
@@ -105,7 +107,7 @@ Data has been added to the repository (2622 ms)
 
 ![RDF4J Workbench - Add RDF](img/add_rdf.png)
 
-### With RDF4J Server SPARQL Endpoint REST APIs
+### With RDF4J Server SPARQL endpoint REST APIs
 
 ```
 PUT /rdf4j-server/repositories/testRepo/statements HTTP/1.1
@@ -114,16 +116,16 @@ Content-Type: application/rdf+xml;charset=UTF-8
 [RDF/XML ENCODED RDF DATA]
 ```
 
-## SPARQL Federated Queries Across Datasets
+## SPARQL federated queries across datasets
 
-Each Halyard dataset represents isolated graph space (a standalone triplestore). To SPARQL query across multiple datasets it is possible to:
+Each Halyard dataset represents a separate [RDF dataset](https://www.w3.org/TR/rdf11-concepts/#section-dataset). In order to issue SPARQL queries across multiple datasets it is possible to:
 
 1. Merge all the required datasets into one, as described later in this document.
-2. Or use SPARQL SERVICE to construct federated queries across multiple datasets.
+2. Use the SPARQL SERVICE clause to federate queries across multiple datasets.
 
-Halyard resolves another directly accessible HBase tables (datasets) as federation services. Halyard service URL for each dataset is constructed from Halyard prefix `http://merck.github.io/Halyard/ns#` and table name.
+Halyard resolves directly accessible HBase tables (datasets) as federation services. Halyard service URL for each dataset is constructed from the Halyard prefix `http://merck.github.io/Halyard/ns#` and the table name.
 
-For example we have datasets `dataset1` and `dataset2`. While querying dataset `dataset1` we can use following SPARQL query to access also data from dataset `dataset2`:
+For example, we have datasets `dataset1` and `dataset2`. While querying `dataset1`, we can use the following SPARQL query to also access data from `dataset2`:
 
 ```
 PREFIX halyard: <http://merck.github.io/Halyard/ns#>
@@ -131,19 +133,19 @@ PREFIX halyard: <http://merck.github.io/Halyard/ns#>
 SELECT *
   WHERE {
     SERVICE halyard:dataset2 {
-      ?s ?p ?o.
+      ?s ?p ?o .
     }
   }
 ```
 
-The above query can be used any of the above described ways or tools (Console, Workbench, REST API, Halyard Update, Export or Parallel Export). No other federated service types are recognised.
+This query can be used by any of the above-described ways or tools (Console, Workbench, REST API, Halyard Update, Export, or Parallel Export). No other federated service types, such as external SPARQL endpoints, are recognised.
 
 ## SPARQL Update
 
 ### With Halyard Update
 
 ```
-./update -s testRepo -q 'insert {?s ?p ?o} where {?s ?p ?o}'
+./update -s testRepo -q 'INSERT { ?s ?p ?o . } WHERE { ?s ?p ?o . }'
 ```
 
 ### With Halyard Bulk Update
@@ -174,7 +176,7 @@ Update executed in 800 ms
 
 ![RDF4J Workbench - SPARQL Update](img/update.png)
 
-### With RDF4J Server SPARQL Endpoint REST APIs
+### With RDF4J Server SPARQL endpoint REST APIs
 
 ```
 POST /rdf4j-server/repositories/testRepo/statements HTTP/1.1
@@ -183,7 +185,7 @@ Content-Type: application/x-www-form-urlencoded
 update=INSERT%20{?s%20?p%20?o}%20WHERE%20{?s%20?p%20?o}
 ```
 
-## SPARQL Query and Export Data
+## SPARQL query and export data
 
 ### With Halyard Export
 
@@ -192,7 +194,8 @@ update=INSERT%20{?s%20?p%20?o}%20WHERE%20{?s%20?p%20?o}
 INFO: Query execution started
 INFO: Export finished
 ```
-Note: additional debugging information may appear in the output of the export execution
+
+Note: additional debugging information may appear in the output of the Halyard Export execution.
 
 ### With Halyard Parallel Export
 
@@ -211,7 +214,7 @@ INFO: Parallel Export Completed..
 ```
 testRepo> sparql
 enter multi-line SPARQL query (terminate with line containing single '.')
-select * where {?s ?p ?o} limit 10
+SELECT * WHERE { ?s ?p ?o . } LIMIT 10
 .
 Evaluating SPARQL query...
 +------------------------+------------------------+------------------------+
@@ -238,33 +241,33 @@ Evaluating SPARQL query...
 ![RDF4J Workbench - Query Result](img/result.png)
 
 
-### With RDF4J Server SPARQL Endpoint REST APIs
+### With RDF4J Server SPARQL endpoint REST APIs
 
 ```
 GET /rdf4j-server/repositories/testRepo?query=select+*+where+%7B%3Fs+%3Fp+%3Fo%7D HTTP/1.1
 Accept: application/sparql-results+xml, */*;q=0.5
 ```
 
-## Delete Statements
+## Delete statements
 
 ### With RDF4J Update
 
 ```
-./update -s testRepo -q 'delete {?s ?p ?o} where {?s ?p ?o}'
+./update -s testRepo -q 'DELETE { ?s ?p ?o . } WHERE { ?s ?p ?o . }'
 ```
 
 ### With RDF4J Workbench
 
-![RDF4J Workbench - Remove Statements](img/remove.png)
+![RDF4J Workbench - Remove Statements](img/remove.png){:width="100%"}
 
-### With RDF4J Server SPARQL Endpoint REST APIs
+### With RDF4J Server SPARQL endpoint REST APIs
 
 ```
 DELETE /rdf4j-server/repositories/testRepo/statements?subj=&pred=&obj= HTTP/1.1
 
 ```
 
-## Clear Repository
+## Clear repository
 
 ### With RDF4J Console
 
@@ -277,17 +280,16 @@ Clearing repository...
 
 ![RDF4J Workbench - Clear All Statements](img/clear.png)
 
-
-### With RDF4J Server SPARQL Endpoint REST APIs
+### With RDF4J Server SPARQL endpoint REST APIs
 
 ```
 DELETE /rdf4j-server/repositories/testRepo/statements HTTP/1.1
-
 ```
 
-## HBase Shell Dataset Operations
+## HBase shell dataset operations
 
-### Snapshot Halyard Dataset
+### Snapshot Halyard dataset
+
 ```
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
@@ -298,7 +300,8 @@ hbase(main):001:0> snapshot 'testRepo', 'testRepo_my_snapshot'
 0 row(s) in 36.3380 seconds
 ```
 
-### Clone Halyard Dataset from Snapshot
+### Clone Halyard dataset from snapshot
+
 ```
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
@@ -309,7 +312,8 @@ hbase(main):001:0> clone_snapshot 'testRepo_my_snapshot', 'testRepo2'
 0 row(s) in 31.1590 seconds
 ```
 
-### Export Halyard Dataset Snapshot
+### Export Halyard dataset snapshot
+
 ```
 > hbase org.apache.hadoop.hbase.snapshot.ExportSnapshot -snapshot testRepo_my_snapshot -copy-to /my_hdfs_export_path
 2016-04-28 09:01:07,019 INFO  [main] snapshot.ExportSnapshot: Loading Snapshot hfile list
@@ -323,25 +327,25 @@ hbase(main):001:0> clone_snapshot 'testRepo_my_snapshot', 'testRepo2'
 2016-04-28 09:01:29,164 INFO  [main] snapshot.ExportSnapshot: Verify snapshot integrity
 2016-04-28 09:01:29,193 INFO  [main] snapshot.ExportSnapshot: Export Completed: testRepo_my_snapshot
 ```
-Note: skipping a lot of debugging information from the Map Reduce excution
 
-### Bulk Merge of Multiple Datasets
+Note: the above listing skips much debugging information from the MapReduce execution.
 
-1. Snapshot and Export all Halyard Datasets you want to merge <br>
-  (see the above described processes)
+### Bulk merge of multiple datasets
+
+1. Snapshot and export all Halyard datasets you want to merge. <br>
+  (see the above-described processes) 
 2. Merge the exported files <br>
-  Exported HBase files are organised under the target folder in the following structure:
-  `/archive/data/<table_namespace>/<table_name>/<region_id>/<column_family>/<region_files>`
-  We need to merge the region files under each column family from all exports into a single structure. <br>
-  As Halyard Dataset currently contains the only `e` column family, it can be achieved for example by following commands: <br>
+  Exported HBase files are organised under the target folder in the following structure: `/archive/data/<table_namespace>/<table_name>/<region_id>/<column_family>/<region_files>`. We need to merge the region files under each column family from all exports into a single structure. <br>
+  As Halyard dataset currently contains only the `e` column family, it can be achieved, for example, by following commands: <br>
   `> hdfs dfs -mkdir -p /my_hdfs_merged_path/e` <br>
   `> hdfs dfs -mv /my_hdfs_export_path/archive/data/*/*/*/e/* /my_hdfs_merged_path/e`
-3. Create a new Halyard Dataset <br>
-  (see the above described process)
+3. Create a new Halyard dataset. <br>
+  (see the above-described process)
 4. Load the merged files <br>
-  `> hbase org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles /my_hdfs_merged_path new_dataset_table_name`
+  `> hbase org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles /my_hdfs_merged_path new_dataset_table_name`
 
-### Boost Query Performance by Making the Dataset Read-only
+### Boost query performance by making datasets read-only
+
 ```
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
@@ -356,7 +360,8 @@ Done.
 0 row(s) in 2.2210 seconds
 ```
 
-### Disable/Enable Unused Dataset to Save HBase Resources
+### Disable/enable unused dataset to save HBase resources
+
 ```
 > hbase shell
 HBase Shell; enter 'help<RETURN>' for list of supported commands.
@@ -377,7 +382,7 @@ hbase(main):001:0> enable 'testRepo'
 0 row(s) in 1.2130 seconds
 ```
 
-### Delete Dataset
+### Delete dataset
 
 ```
 > hbase shell
