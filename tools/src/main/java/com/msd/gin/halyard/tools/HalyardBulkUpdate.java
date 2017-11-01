@@ -21,6 +21,7 @@ import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY;
 import com.msd.gin.halyard.tools.TimeAwareHBaseSail.TimestampCallbackBinding;
+import com.yammer.metrics.core.Gauge;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
 import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -47,6 +49,7 @@ import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
@@ -66,6 +69,7 @@ import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
+import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.sail.SailException;
 
@@ -219,10 +223,17 @@ public class HalyardBulkUpdate implements Tool {
             return -1;
         }
         TableMapReduceUtil.addDependencyJars(getConf(),
-                NTriplesUtil.class,
-                Rio.class,
-                RDFFormat.class,
-                RDFParser.class);
+               HalyardExport.class,
+               NTriplesUtil.class,
+               Rio.class,
+               AbstractRDFHandler.class,
+               RDFFormat.class,
+               RDFParser.class,
+               HTable.class,
+               HBaseConfiguration.class,
+               AuthenticationProtos.class,
+               Trace.class,
+               Gauge.class);
         HBaseConfiguration.addHbaseResources(getConf());
         getConf().setStrings(TABLE_NAME_PROPERTY, args[2]);
         getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));

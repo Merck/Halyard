@@ -18,6 +18,7 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.tools.HalyardExport.ExportException;
+import com.yammer.metrics.core.Gauge;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -207,7 +208,8 @@ public class HalyardElasticIndexer implements Tool {
                    HTable.class,
                    HBaseConfiguration.class,
                    AuthenticationProtos.class,
-                   Trace.class);
+                   Trace.class,
+                   Gauge.class);
             HBaseConfiguration.addHbaseResources(getConf());
             Job job = Job.getInstance(getConf(), "HalyardElasticIndexer " + source + " -> " + target);
             job.getConfiguration().set(SOURCE, source);

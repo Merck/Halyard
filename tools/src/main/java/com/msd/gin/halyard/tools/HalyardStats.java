@@ -21,6 +21,7 @@ import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.VOID_EXT;
 import com.msd.gin.halyard.tools.HalyardExport.ExportException;
+import com.yammer.metrics.core.Gauge;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -480,7 +481,8 @@ public class HalyardStats implements Tool {
                    HTable.class,
                    HBaseConfiguration.class,
                    AuthenticationProtos.class,
-                   Trace.class);
+                   Trace.class,
+                   Gauge.class);
             HBaseConfiguration.addHbaseResources(getConf());
             Job job = Job.getInstance(getConf(), "HalyardStats " + source + (target == null ? " update" : " -> " + target));
             job.getConfiguration().set(SOURCE, source);

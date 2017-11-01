@@ -18,6 +18,7 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.tools.HalyardExport.ExportException;
+import com.yammer.metrics.core.Gauge;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
@@ -327,7 +328,8 @@ public class HalyardParallelExport implements Tool {
                    HTable.class,
                    HBaseConfiguration.class,
                    AuthenticationProtos.class,
-                   Trace.class);
+                   Trace.class,
+                   Gauge.class);
             HBaseConfiguration.addHbaseResources(getConf());
             Job job = Job.getInstance(getConf(), "HalyardParallelExport " + source + " -> " + target);
             String cp = cmd.getOptionValue('l');
