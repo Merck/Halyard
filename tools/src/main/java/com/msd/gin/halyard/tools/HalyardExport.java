@@ -425,6 +425,41 @@ public final class HalyardExport {
         }
     }
 
+    private static class NullResultWriter extends QueryResultWriter {
+
+        public NullResultWriter(StatusLog log) {
+            super(log);
+        }
+
+        @Override
+        public void writeTupleQueryResult(TupleQueryResult queryResult) throws ExportException {
+            try {
+                while (queryResult.hasNext()) {
+                    queryResult.next();
+                    tick();
+                }
+            } catch (QueryEvaluationException e) {
+                throw new ExportException(e);
+            }
+        }
+
+        @Override
+        public void writeGraphQueryResult(GraphQueryResult queryResult) throws ExportException {
+            try {
+                while (queryResult.hasNext()) {
+                    queryResult.next();
+                    tick();
+                }
+            } catch (QueryEvaluationException e) {
+                throw new ExportException(e);
+            }
+        }
+
+        @Override
+        protected void closeWriter() throws ExportException {
+        }
+    }
+
     static Configuration conf = null; // this is a hook to pass custom configuration in tests
 
     private final String htableName;
@@ -493,7 +528,9 @@ public final class HalyardExport {
     public static void export(Configuration conf, StatusLog log, String source, String query, String targetUrl, String driverClass, URL[] driverClasspath, String[] jdbcProperties, boolean trimTable, String elasticIndexURL) throws ExportException {
         try {
             QueryResultWriter writer = null;
-            if (targetUrl.startsWith("jdbc:")) {
+            if (targetUrl.startsWith("null:")) {
+                writer = new NullResultWriter(log);
+            } else if (targetUrl.startsWith("jdbc:")) {
                 int i = targetUrl.lastIndexOf('/');
                 if (i < 0) throw new ExportException("Taret URL does not end with /<table_name>");
                 if (driverClass == null) throw new ExportException("Missing mandatory JDBC driver class name argument -c <driver_class>");

@@ -153,6 +153,16 @@ public class HalyardExportTest {
         assertEquals(1000, getTriplesCount(ROOT + name.getMethodName() +".ttl.bz2", CompressorStreamFactory.BZIP2, RDFFormat.TURTLE));
     }
 
+    @Test
+    public void testExport_Graph_to_NULL() throws Exception {
+        HalyardExport.main(new String[] {"-s", TABLE, "-q", GRAPH_QUERY, "-t", "null:/"});
+    }
+
+    @Test
+    public void testExport_Tuples_to_NULL() throws Exception {
+        HalyardExport.main(new String[] {"-s", TABLE, "-q", TUPLE_QUERY, "-t", "null:/"});
+    }
+
     public static int getLinesCount(String uri, String compression) throws Exception {
         InputStream in = FileSystem.get(URI.create(uri), HBaseServerTestInstance.getInstanceConfig()).open(new Path(uri));
         try {
