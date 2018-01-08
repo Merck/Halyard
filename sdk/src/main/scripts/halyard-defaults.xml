@@ -57,4 +57,36 @@
     <name>mapreduce.reduce.speculative</name>
     <value>false</value>
   </property>
+  <property>
+    <name>mapreduce.reduce.shuffle.parallelcopies</name>
+    <value>4</value>
+  </property>
+  <property>
+    <name>mapreduce.reduce.shuffle.memory.limit.percent</name>
+    <value>0.2</value>
+  </property>
+  <property>
+    <name>mapreduce.reduce.shuffle.input.buffer.percent</name>
+    <value>0.20</value>
+  </property>
+  <property>
+    <name>mapreduce.map.memory.mb</name>
+    <value>2856</value>
+  </property>
+  <property>
+    <name>mapreduce.map.java.opts</name>
+    <value>-Xmx2342m</value>
+  </property>
+  <property>
+    <name>mapreduce.reduce.memory.mb</name>
+    <value>5712</value>
+  </property>
+  <property>
+    <name>mapreduce.reduce.java.opts</name>
+    <value>-Xmx4684m</value>
+  </property>
+  <property>
+    <name>fs.permissions.umask-mode</name>
+    <value>000</value>
+  </property>
 </configuration>
