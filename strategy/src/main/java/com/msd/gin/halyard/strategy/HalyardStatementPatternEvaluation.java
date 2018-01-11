@@ -198,7 +198,7 @@ final class HalyardStatementPatternEvaluation {
                 protected void meetNode(QueryModelNode n) throws RuntimeException {
                     int pp = counter.getAndIncrement();
                     PRIORITY_MAP_CACHE.put(new IdentityWrapper<>(n), pp);
-                    if (n == node) ret.set(pp);
+                    if (n == node || n == node.getParentNode()) ret.set(pp);
                     super.meetNode(n);
                 }
 
