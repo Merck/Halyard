@@ -606,13 +606,11 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
     @Override
     public void setNamespace(String prefix, String name) throws SailException {
-        Namespace oldNS = namespaces.put(prefix, new SimpleNamespace(prefix, name));
+        namespaces.put(prefix, new SimpleNamespace(prefix, name));
         ValueFactory vf = SimpleValueFactory.getInstance();
         try {
-            if (oldNS != null) {
-                removeStatement(null, vf.createIRI(oldNS.getName()), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix));
-            }
-            addStatementInternal(vf.createIRI(name), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), null, getDefaultTimeStamp());
+            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix));
+            addStatementInternal(vf.createIRI(name), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), HALYARD.SYSTEM_GRAPH_CONTEXT, getDefaultTimeStamp());
         } catch (SailException e) {
             LOG.log(Level.WARNING, "Namespace prefix could not be presisted due to an exception", e);
         }
@@ -621,9 +619,9 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     @Override
     public void removeNamespace(String prefix) throws SailException {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        Namespace ns = namespaces.remove(prefix);
-        if (ns != null) try {
-            removeStatement(null, vf.createIRI(ns.getName()), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix));
+        namespaces.remove(prefix);
+        try {
+            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix));
         } catch (SailException e) {
             LOG.log(Level.WARNING, "Namespace prefix could not be removed due to an exception", e);
         }
