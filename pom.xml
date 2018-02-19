@@ -29,6 +29,7 @@
     <modules>
         <module>common</module>
         <module>strategy</module>
+        <module>rio</module>
         <module>sail</module>
         <module>tools</module>
         <module>sdk</module>
