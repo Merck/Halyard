@@ -16,15 +16,12 @@
  */
 package com.msd.gin.halyard.rio;
 
-import static com.msd.gin.halyard.rio.JSONParserTest.assertEquals;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.impl.LinkedHashModel;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
-import org.eclipse.rdf4j.rio.WriterConfig;
-import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
 import org.eclipse.rdf4j.rio.helpers.ContextStatementCollector;
 import org.junit.Assert;
 import static org.junit.Assert.assertNotNull;
@@ -50,7 +47,7 @@ public class NDJSONLDParserTest {
 
         Model expectedModel = Rio.parse(NDJSONLDParserTest.class.getResourceAsStream("efo_test.ttl"), "http://test/", RDFFormat.TURTLE);
 
-        assertEquals(expectedModel, transformedModel);
+        JSONParserParseTest.assertEquals(expectedModel, transformedModel);
     }
 
     @Test

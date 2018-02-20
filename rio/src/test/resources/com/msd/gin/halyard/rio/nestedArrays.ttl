@@ -1,0 +1,44 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix : <http://testParse/nestedArrays/> .
+
+<http://testParse/nestedArrays/> a owl:Ontology .
+
+:m4sUtoNKHXvHoyAbBEDOWeDENVFnt5CtRsNvsWebfVRUZKlhqOYv_oA-puVj4ZUD8qc5KbAmHx_zfUZGeQNRYA a ::Node ;
+	:a "b" , "c" , "d" ;
+	:e :m4sUtoNKHXvHoyAbBEDOWeDENVFnt5CtRsNvsWebfVRUZKlhqOYv_oA-puVj4ZUD8qc5KbAmHx_zfUZGeQNRYA.e:0 , :m4sUtoNKHXvHoyAbBEDOWeDENVFnt5CtRsNvsWebfVRUZKlhqOYv_oA-puVj4ZUD8qc5KbAmHx_zfUZGeQNRYA.e:1 .
+
+::Node a rdfs:Class .
+
+:a a owl:DatatypeProperty ;
+	rdfs:label "a" ;
+	rdfs:domain ::Node .
+
+:e a owl:ObjectProperty ;
+	rdfs:label "e" ;
+	rdfs:domain ::Node ;
+	rdfs:range :e:Node .
+
+:m4sUtoNKHXvHoyAbBEDOWeDENVFnt5CtRsNvsWebfVRUZKlhqOYv_oA-puVj4ZUD8qc5KbAmHx_zfUZGeQNRYA.e:0 a :e:Node ;
+	:e:index 0 ;
+	:e.f "g" .
+
+:e:Node a rdfs:Class .
+
+:e:index a owl:DatatypeProperty ;
+	rdfs:label "index" ;
+	rdfs:domain :e:Node .
+
+:e.f a owl:DatatypeProperty ;
+	rdfs:label "f" ;
+	rdfs:domain :e:Node .
+
+:m4sUtoNKHXvHoyAbBEDOWeDENVFnt5CtRsNvsWebfVRUZKlhqOYv_oA-puVj4ZUD8qc5KbAmHx_zfUZGeQNRYA.e:1 a :e:Node ;
+	:e:index 1 ;
+	:e.h "i" .
+
+:e.h a owl:DatatypeProperty ;
+	rdfs:label "h" ;
+	rdfs:domain :e:Node .
+

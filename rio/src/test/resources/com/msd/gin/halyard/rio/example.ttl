@@ -1,9 +1,9 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix : <http://test/> .
+@prefix : <http://testParse/example/> .
 
-: a owl:Ontology .
+<http://testParse/example/> a owl:Ontology .
 
 :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg a ::Node ;
 	:id "0001" ;
@@ -215,4 +215,3 @@
 	:topping:index 3 ;
 	:topping.id "5004" ;
 	:topping.type "Maple" .
-
