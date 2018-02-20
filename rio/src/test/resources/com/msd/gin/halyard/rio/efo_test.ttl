@@ -1,0 +1,37 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://www.ebi.ac.uk/efo/EFO_0007123> rdfs:label "So-Eum"@en ;
+	rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0007119> .
+
+<http://www.ebi.ac.uk/efo/EFO_0006347> <http://www.ebi.ac.uk/efo/alternative_term> "PAE" ;
+	rdfs:label "pulmonary artery enlargement"@en ;
+	rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0003765> .
+
+<http://www.ebi.ac.uk/efo/EFO_0004827> rdfs:label "economic and social preference" ;
+	rdfs:subClassOf <http://www.ifomis.org/bfo/1.1/snap#Quality> .
+
+<http://www.ebi.ac.uk/efo/EFO_0001270> <http://www.ebi.ac.uk/efo/alternative_term> "alpha" , "alpha mating type (yeast)" , "mating_type_alpha" ;
+	rdfs:label "mating type alpha" ;
+	rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0001268> .
+
+<http://www.ebi.ac.uk/efo/EFO_0007120> rdfs:label "Tae-Yang"@en ;
+	rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0007119> .
+
+<http://www.ebi.ac.uk/efo/EFO_0002614> <http://www.ebi.ac.uk/efo/alternative_term> "Drug resistance to insulin (disorder)" ;
+	rdfs:label "insulin resistance" ;
+	rdfs:subClassOf <http://purl.obolibrary.org/obo/HP_0001939> .
+
+<http://www.ebi.ac.uk/efo/EFO_0003847> <http://www.ebi.ac.uk/efo/alternative_term> "Idiocy" , "MENTAL DEFIC" , "Deficiency, Mental" , "Disabilities, Intellectual" , "Disability, Intellectual" , "Mental Retardations, Psychosocial" , "Retardations, Psychosocial Mental" , "Retardation, Mental" , "Mental Retardation, Psychosocial" , "Intellectual Disabilities" , "Psychosocial Mental Retardation" , "Intellectual Disability" , "Retardation, Psychosocial Mental" , "Mental Deficiency" , "Deficiencies, Mental" , "DEFIC MENTAL" , "Psychosocial Mental Retardations" , "Mental Deficiencies" ;
+	rdfs:label "mental retardation" ;
+	rdfs:subClassOf <http://purl.obolibrary.org/obo/HP_0000707> .
+
+<http://www.ebi.ac.uk/efo/EFO_0006852> rdfs:label "metastatic"@en ;
+	rdfs:subClassOf <http://purl.obolibrary.org/obo/HP_0012823> .
+
+<http://www.ebi.ac.uk/efo/EFO_0007654> rdfs:label "clinical and behavioural ideal cardiovascular health" ;
+	rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0007652> .
+
+<http://www.ebi.ac.uk/efo/EFO_0007063> rdfs:label "organism status" ;
+	rdfs:subClassOf <http://www.ifomis.org/bfo/1.1/snap#Quality> .
+
+

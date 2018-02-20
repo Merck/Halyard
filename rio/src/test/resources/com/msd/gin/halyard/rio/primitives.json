@@ -1,0 +1,10 @@
+{
+    "string": "text",
+    "boolean": true,
+    "integer": 42,
+    "double": 3.14,
+    "boolArray": [true, false, true, false],
+    "intArray": [1, 2, 3, 4, 5],
+    "doubleArray": [1.1, 2.2, 3.3],
+    "mixedArray": ["string", true, 47, 3.15, {}]
+}

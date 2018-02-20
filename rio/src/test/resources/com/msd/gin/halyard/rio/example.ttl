@@ -1,0 +1,217 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix : <http://testParse/example/> .
+
+<http://testParse/example/> a owl:Ontology .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg a ::Node ;
+	:id "0001" ;
+	:type "donut" ;
+	:name "Cake" ;
+	:ppu "0.55" ;
+	:batters :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.batters ;
+	:topping :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:0 , :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:1 , :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:2 , :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:3 , :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:4 , :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:5 , :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:6 .
+
+::Node a rdfs:Class .
+
+:id a owl:DatatypeProperty ;
+	rdfs:label "id" ;
+	rdfs:domain ::Node .
+
+:type a owl:DatatypeProperty ;
+	rdfs:label "type" ;
+	rdfs:domain ::Node .
+
+:name a owl:DatatypeProperty ;
+	rdfs:label "name" ;
+	rdfs:domain ::Node .
+
+:ppu a owl:DatatypeProperty ;
+	rdfs:label "ppu" ;
+	rdfs:domain ::Node .
+
+:batters a owl:ObjectProperty ;
+	rdfs:label "batters" ;
+	rdfs:domain ::Node ;
+	rdfs:range :batters:Node .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.batters a :batters:Node ;
+	:batters.batter :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.batters.batter:0 , :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.batters.batter:1 , :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.batters.batter:2 , :nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.batters.batter:3 .
+
+:batters:Node a rdfs:Class .
+
+:batters.batter a owl:ObjectProperty ;
+	rdfs:label "batter" ;
+	rdfs:domain :batters:Node ;
+	rdfs:range :batters.batter:Node .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.batters.batter:0 a :batters.batter:Node ;
+	:batters.batter:index 0 ;
+	:batters.batter.id "1001" ;
+	:batters.batter.type "Regular" .
+
+:batters.batter:Node a rdfs:Class .
+
+:batters.batter:index a owl:DatatypeProperty ;
+	rdfs:label "index" ;
+	rdfs:domain :batters.batter:Node .
+
+:batters.batter.id a owl:DatatypeProperty ;
+	rdfs:label "id" ;
+	rdfs:domain :batters.batter:Node .
+
+:batters.batter.type a owl:DatatypeProperty ;
+	rdfs:label "type" ;
+	rdfs:domain :batters.batter:Node .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.batters.batter:1 a :batters.batter:Node ;
+	:batters.batter:index 1 ;
+	:batters.batter.id "1002" ;
+	:batters.batter.type "Chocolate" .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.batters.batter:2 a :batters.batter:Node ;
+	:batters.batter:index 2 ;
+	:batters.batter.id "1003" ;
+	:batters.batter.type "Blueberry" .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.batters.batter:3 a :batters.batter:Node ;
+	:batters.batter:index 3 ;
+	:batters.batter.id "1004" ;
+	:batters.batter.type "Devil's Food" .
+
+:topping a owl:ObjectProperty ;
+	rdfs:label "topping" ;
+	rdfs:domain ::Node ;
+	rdfs:range :topping:Node .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:0 a :topping:Node ;
+	:topping:index 0 ;
+	:topping.id "5001" ;
+	:topping.type "None" .
+
+:topping:Node a rdfs:Class .
+
+:topping:index a owl:DatatypeProperty ;
+	rdfs:label "index" ;
+	rdfs:domain :topping:Node .
+
+:topping.id a owl:DatatypeProperty ;
+	rdfs:label "id" ;
+	rdfs:domain :topping:Node .
+
+:topping.type a owl:DatatypeProperty ;
+	rdfs:label "type" ;
+	rdfs:domain :topping:Node .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:1 a :topping:Node ;
+	:topping:index 1 ;
+	:topping.id "5002" ;
+	:topping.type "Glazed" .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:2 a :topping:Node ;
+	:topping:index 2 ;
+	:topping.id "5005" ;
+	:topping.type "Sugar" .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:3 a :topping:Node ;
+	:topping:index 3 ;
+	:topping.id "5007" ;
+	:topping.type "Powdered Sugar" .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:4 a :topping:Node ;
+	:topping:index 4 ;
+	:topping.id "5006" ;
+	:topping.type "Chocolate with Sprinkles" .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:5 a :topping:Node ;
+	:topping:index 5 ;
+	:topping.id "5003" ;
+	:topping.type "Chocolate" .
+
+:nahC-pyKoAEaHtMXcZNUcmogNPG_uiPrCYH9RIKDv3Q5yVb9ofcfdwOVB9dit-VcBFFyv58UKamqgaPpl-2Hrg.topping:6 a :topping:Node ;
+	:topping:index 6 ;
+	:topping.id "5004" ;
+	:topping.type "Maple" .
+
+:XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ a ::Node ;
+	:id "0002" ;
+	:type "donut" ;
+	:name "Raised" ;
+	:ppu "0.55" ;
+	:batters :XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.batters ;
+	:topping :XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.topping:0 , :XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.topping:1 , :XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.topping:2 , :XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.topping:3 , :XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.topping:4 .
+
+:XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.batters a :batters:Node ;
+	:batters.batter :XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.batters.batter:0 .
+
+:XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.batters.batter:0 a :batters.batter:Node ;
+	:batters.batter:index 0 ;
+	:batters.batter.id "1001" ;
+	:batters.batter.type "Regular" .
+
+:XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.topping:0 a :topping:Node ;
+	:topping:index 0 ;
+	:topping.id "5001" ;
+	:topping.type "None" .
+
+:XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.topping:1 a :topping:Node ;
+	:topping:index 1 ;
+	:topping.id "5002" ;
+	:topping.type "Glazed" .
+
+:XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.topping:2 a :topping:Node ;
+	:topping:index 2 ;
+	:topping.id "5005" ;
+	:topping.type "Sugar" .
+
+:XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.topping:3 a :topping:Node ;
+	:topping:index 3 ;
+	:topping.id "5003" ;
+	:topping.type "Chocolate" .
+
+:XnXcX7d-LEkzveHeHgc_nP2vXPgLKKT7OTK63VQwW0dyrmQ29PJeW48q0PtLq8y7lQoZU9ZemVom_Ohp1wyKpQ.topping:4 a :topping:Node ;
+	:topping:index 4 ;
+	:topping.id "5004" ;
+	:topping.type "Maple" .
+
+:I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw a ::Node ;
+	:id "0003" ;
+	:type "donut" ;
+	:name "Old Fashioned" ;
+	:ppu "0.55" ;
+	:batters :I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.batters ;
+	:topping :I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.topping:0 , :I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.topping:1 , :I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.topping:2 , :I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.topping:3 .
+
+:I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.batters a :batters:Node ;
+	:batters.batter :I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.batters.batter:0 , :I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.batters.batter:1 .
+
+:I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.batters.batter:0 a :batters.batter:Node ;
+	:batters.batter:index 0 ;
+	:batters.batter.id "1001" ;
+	:batters.batter.type "Regular" .
+
+:I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.batters.batter:1 a :batters.batter:Node ;
+	:batters.batter:index 1 ;
+	:batters.batter.id "1002" ;
+	:batters.batter.type "Chocolate" .
+
+:I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.topping:0 a :topping:Node ;
+	:topping:index 0 ;
+	:topping.id "5001" ;
+	:topping.type "None" .
+
+:I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.topping:1 a :topping:Node ;
+	:topping:index 1 ;
+	:topping.id "5002" ;
+	:topping.type "Glazed" .
+
+:I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.topping:2 a :topping:Node ;
+	:topping:index 2 ;
+	:topping.id "5003" ;
+	:topping.type "Chocolate" .
+
+:I-F-lgS74ij6Mu6Y3e2l5ErVtWVhSwuPgpRkeKrDHZAj_3611le4h8EqJMzOhvOikue9jj9NNdGMkPlTzzz3Pw.topping:3 a :topping:Node ;
+	:topping:index 3 ;
+	:topping.id "5004" ;
+	:topping.type "Maple" .

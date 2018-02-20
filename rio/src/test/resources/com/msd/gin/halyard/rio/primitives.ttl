@@ -1,0 +1,59 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix : <http://testParse/primitives/> .
+
+<http://testParse/primitives/> a owl:Ontology .
+
+:aZcwCir_UAqtD78F_Y_-m_9mrm65EvIUkCh9uT3-in9ek3p8Oa2GJi4nl-3RjoieUoNEI_crpvDuNuGZ02w2BA a ::Node ;
+	:string "text" ;
+	:integer "42" ;
+	:double "3.14" ;
+	:intArray "1" , "2" , "3" , "4" , "5" ;
+	:doubleArray "1.1" , "2.2" , "3.3" ;
+	:mixedArray "string" , "47" , "3.15" , :aZcwCir_UAqtD78F_Y_-m_9mrm65EvIUkCh9uT3-in9ek3p8Oa2GJi4nl-3RjoieUoNEI_crpvDuNuGZ02w2BA.mixedArray:4 .
+
+::Node a rdfs:Class .
+
+:string a owl:DatatypeProperty ;
+	rdfs:label "string" ;
+	rdfs:domain ::Node .
+
+:boolean a owl:DatatypeProperty ;
+	rdfs:label "boolean" ;
+	rdfs:domain ::Node .
+
+:integer a owl:DatatypeProperty ;
+	rdfs:label "integer" ;
+	rdfs:domain ::Node .
+
+:double a owl:DatatypeProperty ;
+	rdfs:label "double" ;
+	rdfs:domain ::Node .
+
+:boolArray a owl:DatatypeProperty ;
+	rdfs:label "boolArray" ;
+	rdfs:domain ::Node .
+
+:intArray a owl:DatatypeProperty ;
+	rdfs:label "intArray" ;
+	rdfs:domain ::Node .
+
+:doubleArray a owl:DatatypeProperty ;
+	rdfs:label "doubleArray" ;
+	rdfs:domain ::Node .
+
+:mixedArray a owl:DatatypeProperty , owl:ObjectProperty ;
+	rdfs:label "mixedArray" ;
+	rdfs:domain ::Node ;
+	rdfs:range :mixedArray:Node .
+
+:aZcwCir_UAqtD78F_Y_-m_9mrm65EvIUkCh9uT3-in9ek3p8Oa2GJi4nl-3RjoieUoNEI_crpvDuNuGZ02w2BA.mixedArray:4 a :mixedArray:Node ;
+	:mixedArray:index 4 .
+
+:mixedArray:Node a rdfs:Class .
+
+:mixedArray:index a owl:DatatypeProperty ;
+	rdfs:label "index" ;
+	rdfs:domain :mixedArray:Node .
+

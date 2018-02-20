@@ -1,0 +1,23 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix : <http://testParse/rootArray/> .
+
+<http://testParse/rootArray/> a owl:Ontology .
+
+<http://testParse/rootArray/-PI0Tg_gT0BNQYWiRyAsn75wfPmIUtC8CSUbzQwNuO6P4ytrkiXqtP9XkTzkmZO0DqyltHY1yCsjnKmBu-OFSg> a ::Node ;
+	:a "b" .
+
+::Node a rdfs:Class .
+
+:a a owl:DatatypeProperty ;
+	rdfs:label "a" ;
+	rdfs:domain ::Node .
+
+:nYQMyuwHhEx7iPAlnw1vWUU4Ww7NDfKdZ9jBX6pkZ3htlU09GEWIe4p1Tpgn3jHPTqxoYWu2QyRJMdzuCEPniw a ::Node ;
+	:c "d" .
+
+:c a owl:DatatypeProperty ;
+	rdfs:label "c" ;
+	rdfs:domain ::Node .
+
