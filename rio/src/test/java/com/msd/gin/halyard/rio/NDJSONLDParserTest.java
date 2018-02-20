@@ -23,7 +23,10 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
+import org.eclipse.rdf4j.rio.WriterConfig;
+import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
 import org.eclipse.rdf4j.rio.helpers.ContextStatementCollector;
+import org.junit.Assert;
 import static org.junit.Assert.assertNotNull;
 import org.junit.Test;
 
@@ -34,20 +37,24 @@ import org.junit.Test;
 public class NDJSONLDParserTest {
 
     @Test
-    public void testJSONParserFactory() {
+    public void testNDJSONLDParserFactory() {
         assertNotNull(Rio.createParser(NDJSONLDParser.NDJSONLD));
     }
 
     @Test
-    public void testJSONParser() throws Exception {
+    public void testNDJSONLDParser() throws Exception {
         Model transformedModel = new LinkedHashModel();
-        RDFParser parser = new JSONParser();
-        parser.getParserConfig().set(JSONParser.GENERATE_ONTOLOGY, true);
+        RDFParser parser = new NDJSONLDParser();
         parser.setRDFHandler(new ContextStatementCollector(transformedModel, SimpleValueFactory.getInstance()));
         parser.parse(NDJSONLDParserTest.class.getResourceAsStream("efo_test.ndjsonld"), "http://test/");
 
-        Model expectedModel = Rio.parse(JSONParser.class.getResourceAsStream("efo_test.ttl"), "http://test/", RDFFormat.TURTLE);
+        Model expectedModel = Rio.parse(NDJSONLDParserTest.class.getResourceAsStream("efo_test.ttl"), "http://test/", RDFFormat.TURTLE);
 
         assertEquals(expectedModel, transformedModel);
+    }
+
+    @Test
+    public void testGetRDFFormat() {
+        Assert.assertEquals(NDJSONLDParser.NDJSONLD, new NDJSONLDParser().getRDFFormat());
     }
 }

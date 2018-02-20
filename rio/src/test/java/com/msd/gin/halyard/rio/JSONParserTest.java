@@ -16,15 +16,21 @@
  */
 package com.msd.gin.halyard.rio;
 
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.TreeMap;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.impl.LinkedHashModel;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
+import org.eclipse.rdf4j.rio.RioSetting;
 import org.eclipse.rdf4j.rio.helpers.ContextStatementCollector;
 import org.junit.Assert;
 import static org.junit.Assert.assertNotNull;
@@ -72,7 +78,8 @@ public class JSONParserTest {
     public void testJSONParser() throws Exception {
         Model transformedModel = new LinkedHashModel();
         RDFParser parser = new JSONParser();
-        parser.getParserConfig().set(JSONParser.GENERATE_ONTOLOGY, true);
+        parser.setValueFactory(SimpleValueFactory.getInstance());
+        parser.set(JSONParser.GENERATE_ONTOLOGY, true);
         parser.setRDFHandler(new ContextStatementCollector(transformedModel, SimpleValueFactory.getInstance()));
         parser.parse(JSONParserTest.class.getResourceAsStream("testJson.json"), "http://test/");
 
@@ -80,4 +87,66 @@ public class JSONParserTest {
 
         assertEquals(expectedModel, transformedModel);
     }
+
+    @Test
+    public void testGetRDFFormat() {
+        Assert.assertEquals(JSONParser.JSON, new JSONParser().getRDFFormat());
+    }
+
+    @Test
+    public void testGetSupportedSettings() {
+        Collection<RioSetting<?>> set = new JSONParser().getSupportedSettings();
+        Assert.assertTrue(set.contains(JSONParser.GENERATE_DATA));
+        Assert.assertTrue(set.contains(JSONParser.GENERATE_ONTOLOGY));
+    }
+
+    @Test
+    public void testMethodsThatDoNothing() {
+        RDFParser p = new JSONParser();
+        p.setVerifyData(true);
+        p.setPreserveBNodeIDs(true);
+        p.setStopAtFirstError(true);
+        p.setDatatypeHandling(RDFParser.DatatypeHandling.NORMALIZE);
+        p.setParseErrorListener(null);
+        p.setParseLocationListener(null);
+
+    }
+
+    @Test
+    public void testParserSettings() {
+        RDFParser p = new JSONParser();
+        ParserConfig pc = new ParserConfig();
+        Assert.assertSame(pc, p.setParserConfig(pc).getParserConfig());
+    }
+
+    @Test
+    public void testParserEmpty() throws IOException {
+        Model transformedModel = new LinkedHashModel();
+        RDFParser parser = new JSONParser();
+        parser.setRDFHandler(new ContextStatementCollector(transformedModel, SimpleValueFactory.getInstance()));
+        parser.parse(new StringReader("[]"), "http://test/");
+        System.out.println(transformedModel);
+        Assert.assertTrue(transformedModel.isEmpty());
+    }
+
+    @Test
+    public void testParserEmptyObj() throws IOException {
+        Model transformedModel = new LinkedHashModel();
+        RDFParser parser = new JSONParser();
+        parser.setRDFHandler(new ContextStatementCollector(transformedModel, SimpleValueFactory.getInstance()));
+        parser.parse(new StringReader("{}"), "http://test/");
+        Assert.assertEquals(1, transformedModel.size());
+        Assert.assertTrue(transformedModel.contains(null, RDF.TYPE, SimpleValueFactory.getInstance().createIRI("http://test/:Node"), null));
+    }
+
+    @Test (expected = IllegalArgumentException.class)
+    public void testParseWrongJSON() throws IOException {
+        new JSONParser().parse(new StringReader("true"), "http://test/");
+    }
+
+    @Test (expected = IllegalArgumentException.class)
+    public void testParseInvalidURI() throws IOException  {
+        new JSONParser().parse(new StringReader("[]"), "invalid_uri");
+    }
+
 }

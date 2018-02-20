@@ -1,111 +1,37 @@
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix : <http://test/> .
 
-<http://test/> a owl:Ontology .
+<http://www.ebi.ac.uk/efo/EFO_0007123> rdfs:label "So-Eum"@en ;
+	rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0007119> .
 
-:U00cNxblkH0DemDWLWO35SWZTy9x6tm2UfVmLazXcJtVIQUS1qPtYWZdnmRBannAU0P-TY-jrQsudn-ZIunq6w a ::Node ;
-	<http://test/@id> "http://www.ebi.ac.uk/efo/EFO_0007123" ;
-	:label :U00cNxblkH0DemDWLWO35SWZTy9x6tm2UfVmLazXcJtVIQUS1qPtYWZdnmRBannAU0P-TY-jrQsudn-ZIunq6w.label ;
-	:parents "http://www.ebi.ac.uk/efo/EFO_0007119" ;
-	<http://test/@context> <http://test/U00cNxblkH0DemDWLWO35SWZTy9x6tm2UfVmLazXcJtVIQUS1qPtYWZdnmRBannAU0P-TY-jrQsudn-ZIunq6w.@context> .
+<http://www.ebi.ac.uk/efo/EFO_0006347> <http://www.ebi.ac.uk/efo/alternative_term> "PAE" ;
+	rdfs:label "pulmonary artery enlargement"@en ;
+	rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0003765> .
 
-::Node a rdfs:Class .
+<http://www.ebi.ac.uk/efo/EFO_0004827> rdfs:label "economic and social preference" ;
+	rdfs:subClassOf <http://www.ifomis.org/bfo/1.1/snap#Quality> .
 
-<http://test/@id> a owl:DatatypeProperty ;
-	rdfs:label "@id" ;
-	rdfs:domain ::Node .
+<http://www.ebi.ac.uk/efo/EFO_0001270> <http://www.ebi.ac.uk/efo/alternative_term> "alpha" , "alpha mating type (yeast)" , "mating_type_alpha" ;
+	rdfs:label "mating type alpha" ;
+	rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0001268> .
 
-:label a owl:ObjectProperty ;
-	rdfs:label "label" ;
-	rdfs:domain ::Node ;
-	rdfs:range :label:Node .
+<http://www.ebi.ac.uk/efo/EFO_0007120> rdfs:label "Tae-Yang"@en ;
+	rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0007119> .
 
-:U00cNxblkH0DemDWLWO35SWZTy9x6tm2UfVmLazXcJtVIQUS1qPtYWZdnmRBannAU0P-TY-jrQsudn-ZIunq6w.label a :label:Node ;
-	<http://test/label.@language> "en" ;
-	<http://test/label.@value> "So-Eum" .
+<http://www.ebi.ac.uk/efo/EFO_0002614> <http://www.ebi.ac.uk/efo/alternative_term> "Drug resistance to insulin (disorder)" ;
+	rdfs:label "insulin resistance" ;
+	rdfs:subClassOf <http://purl.obolibrary.org/obo/HP_0001939> .
 
-:label:Node a rdfs:Class .
+<http://www.ebi.ac.uk/efo/EFO_0003847> <http://www.ebi.ac.uk/efo/alternative_term> "Idiocy" , "MENTAL DEFIC" , "Deficiency, Mental" , "Disabilities, Intellectual" , "Disability, Intellectual" , "Mental Retardations, Psychosocial" , "Retardations, Psychosocial Mental" , "Retardation, Mental" , "Mental Retardation, Psychosocial" , "Intellectual Disabilities" , "Psychosocial Mental Retardation" , "Intellectual Disability" , "Retardation, Psychosocial Mental" , "Mental Deficiency" , "Deficiencies, Mental" , "DEFIC MENTAL" , "Psychosocial Mental Retardations" , "Mental Deficiencies" ;
+	rdfs:label "mental retardation" ;
+	rdfs:subClassOf <http://purl.obolibrary.org/obo/HP_0000707> .
 
-<http://test/label.@language> a owl:DatatypeProperty ;
-	rdfs:label "@language" ;
-	rdfs:domain :label:Node .
+<http://www.ebi.ac.uk/efo/EFO_0006852> rdfs:label "metastatic"@en ;
+	rdfs:subClassOf <http://purl.obolibrary.org/obo/HP_0012823> .
 
-<http://test/label.@value> a owl:DatatypeProperty ;
-	rdfs:label "@value" ;
-	rdfs:domain :label:Node .
+<http://www.ebi.ac.uk/efo/EFO_0007654> rdfs:label "clinical and behavioural ideal cardiovascular health" ;
+	rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0007652> .
 
-:parents a owl:DatatypeProperty ;
-	rdfs:label "parents" ;
-	rdfs:domain ::Node .
+<http://www.ebi.ac.uk/efo/EFO_0007063> rdfs:label "organism status" ;
+	rdfs:subClassOf <http://www.ifomis.org/bfo/1.1/snap#Quality> .
 
-<http://test/@context> a owl:ObjectProperty ;
-	rdfs:label "@context" ;
-	rdfs:domain ::Node ;
-	rdfs:range <http://test/@context:Node> .
-
-<http://test/U00cNxblkH0DemDWLWO35SWZTy9x6tm2UfVmLazXcJtVIQUS1qPtYWZdnmRBannAU0P-TY-jrQsudn-ZIunq6w.@context> a <http://test/@context:Node> ;
-	<http://test/@context.@vocab> "http://www.ebi.ac.uk/efo/" ;
-	<http://test/@context.rdfs> "http://www.w3.org/2000/01/rdf-schema#" ;
-	<http://test/@context.label> "rdfs:label" ;
-	<http://test/@context.parents> <http://test/U00cNxblkH0DemDWLWO35SWZTy9x6tm2UfVmLazXcJtVIQUS1qPtYWZdnmRBannAU0P-TY-jrQsudn-ZIunq6w.@context.parents> ;
-	<http://test/@context.alternative_terms> <http://test/U00cNxblkH0DemDWLWO35SWZTy9x6tm2UfVmLazXcJtVIQUS1qPtYWZdnmRBannAU0P-TY-jrQsudn-ZIunq6w.@context.alternative_terms> .
-
-<http://test/@context:Node> a rdfs:Class .
-
-<http://test/@context.@vocab> a owl:DatatypeProperty ;
-	rdfs:label "@vocab" ;
-	rdfs:domain <http://test/@context:Node> .
-
-<http://test/@context.rdfs> a owl:DatatypeProperty ;
-	rdfs:label "rdfs" ;
-	rdfs:domain <http://test/@context:Node> .
-
-<http://test/@context.label> a owl:DatatypeProperty ;
-	rdfs:label "label" ;
-	rdfs:domain <http://test/@context:Node> .
-
-<http://test/@context.parents> a owl:ObjectProperty ;
-	rdfs:label "parents" ;
-	rdfs:domain <http://test/@context:Node> ;
-	rdfs:range <http://test/@context.parents:Node> .
-
-<http://test/U00cNxblkH0DemDWLWO35SWZTy9x6tm2UfVmLazXcJtVIQUS1qPtYWZdnmRBannAU0P-TY-jrQsudn-ZIunq6w.@context.parents> a <http://test/@context.parents:Node> ;
-	<http://test/@context.parents.@id> "rdfs:subClassOf" ;
-	<http://test/@context.parents.@type> "@id" ;
-	<http://test/@context.parents.@container> "@set" .
-
-<http://test/@context.parents:Node> a rdfs:Class .
-
-<http://test/@context.parents.@id> a owl:DatatypeProperty ;
-	rdfs:label "@id" ;
-	rdfs:domain <http://test/@context.parents:Node> .
-
-<http://test/@context.parents.@type> a owl:DatatypeProperty ;
-	rdfs:label "@type" ;
-	rdfs:domain <http://test/@context.parents:Node> .
-
-<http://test/@context.parents.@container> a owl:DatatypeProperty ;
-	rdfs:label "@container" ;
-	rdfs:domain <http://test/@context.parents:Node> .
-
-<http://test/@context.alternative_terms> a owl:ObjectProperty ;
-	rdfs:label "alternative_terms" ;
-	rdfs:domain <http://test/@context:Node> ;
-	rdfs:range <http://test/@context.alternative_terms:Node> .
-
-<http://test/U00cNxblkH0DemDWLWO35SWZTy9x6tm2UfVmLazXcJtVIQUS1qPtYWZdnmRBannAU0P-TY-jrQsudn-ZIunq6w.@context.alternative_terms> a <http://test/@context.alternative_terms:Node> ;
-	<http://test/@context.alternative_terms.@id> "alternative_term" ;
-	<http://test/@context.alternative_terms.@container> "@set" .
-
-<http://test/@context.alternative_terms:Node> a rdfs:Class .
-
-<http://test/@context.alternative_terms.@id> a owl:DatatypeProperty ;
-	rdfs:label "@id" ;
-	rdfs:domain <http://test/@context.alternative_terms:Node> .
-
-<http://test/@context.alternative_terms.@container> a owl:DatatypeProperty ;
-	rdfs:label "@container" ;
-	rdfs:domain <http://test/@context.alternative_terms:Node> .
 
