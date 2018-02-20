@@ -149,4 +149,12 @@ public class JSONParserTest {
         new JSONParser().parse(new StringReader("[]"), "invalid_uri");
     }
 
+    @Test (expected = IllegalArgumentException.class)
+    public void testParserMultiObj() throws IOException {
+        Model transformedModel = new LinkedHashModel();
+        RDFParser parser = new JSONParser();
+        parser.setRDFHandler(new ContextStatementCollector(transformedModel, SimpleValueFactory.getInstance()));
+        parser.parse(new StringReader("{}{}"), "http://test/");
+    }
+
 }

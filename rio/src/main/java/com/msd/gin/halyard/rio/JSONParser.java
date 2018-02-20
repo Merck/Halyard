@@ -210,14 +210,19 @@ public final class JSONParser implements RDFParser {
             }
             handleNamespace("", this.baseURI.stringValue());
             TreeNode root = parser.readValueAsTree();
-            if (root.isArray()) {
-                for (int i=0; i<root.size(); i++) {
-                    transform(root.get(i));
+            if (root != null) {
+                if (root.isArray()) {
+                    for (int i=0; i<root.size(); i++) {
+                        transform(root.get(i));
+                    }
+                } else if (root.isObject()) {
+                    transform(root);
+                } else {
+                    throw new IllegalArgumentException("Illegal node type");
                 }
-            } else if (root.isObject()) {
-                transform(root);
-            } else {
-                throw new IllegalArgumentException("Illegal node type");
+                if (parser.nextToken() != null) {
+                    throw new IllegalArgumentException("Invalid JSON format");
+                }
             }
             if (rdfHandler != null) {
                 rdfHandler.endRDF();
