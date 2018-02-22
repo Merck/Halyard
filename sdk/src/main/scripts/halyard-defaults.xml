@@ -43,7 +43,7 @@
   </property>
   <property>
     <name>mapreduce.input.fileinputformat.split.maxsize</name>
-    <value>1000000000</value>
+    <value>100000000</value>
   </property>
   <property>
     <name>hbase.mapreduce.bulkload.max.hfiles.perRegion.perFamily</name>
