@@ -52,7 +52,7 @@ final class HalyardStatementPatternEvaluation {
     private static final int THREADS = 50;
 
     /**
-     * A holder for the BindingSetPipe and the iterator over a tree of query sub-parts 
+     * A holder for the BindingSetPipe and the iterator over a tree of query sub-parts
      */
     private static class PipeAndIteration {
 
@@ -74,7 +74,7 @@ final class HalyardStatementPatternEvaluation {
     }
 
     /**
-     * Implementation of a priority queue as an array of typed {@code LinkedList}s, 
+     * Implementation of a priority queue as an array of typed {@code LinkedList}s,
      * used in this class to create priority queue of {@code PipeAndIteration} objects
      */
     private static class PriorityQueue<E> {
@@ -117,7 +117,7 @@ final class HalyardStatementPatternEvaluation {
         /**
          * Find the first non-null value in the array of Linked Lists searching in descending order of {@code level} or block until something is available.
          * Essentially, wait until {@code this.poll()} is non-null;
-         * @return The first {@code E} in the highest priority group 
+         * @return The first {@code E} in the highest priority group
          * @throws InterruptedException
          */
         public synchronized E take() throws InterruptedException {
@@ -130,8 +130,8 @@ final class HalyardStatementPatternEvaluation {
     }
 
     /**
-     * Wraps an object so that a call to {@code hashCode()} will return the {@code System.identityHashCode()} and not invoke any overridden 
-     * implementation of that method. Also overrides any custom implementation of {@code equals()}. The end result is that objects are compared for canonical 
+     * Wraps an object so that a call to {@code hashCode()} will return the {@code System.identityHashCode()} and not invoke any overridden
+     * implementation of that method. Also overrides any custom implementation of {@code equals()}. The end result is that objects are compared for canonical
      * identity (they are references of the same object) and not logical identity (the objects are logically equivalent) and that calls to {@code hashCode()}
      * and {@code equals()} return consistent results as required by JDK contract.
      *
@@ -170,7 +170,7 @@ final class HalyardStatementPatternEvaluation {
     /**
      * Queues a binding set and {@code QueryModelNode} for evaluation using the current priority.
      * @param pipe the pipe that evaluation results are returned on
-     * @param iter 
+     * @param iter
      * @param node an implementation of any {@QueryModelNode} sub-type, typically a {@code ValueExpression}, {@Code UpdateExpression} or {@TupleExpression}
      */
     static void enqueue(HalyardTupleExprEvaluation.BindingSetPipe pipe,  CloseableIteration<BindingSet, QueryEvaluationException> iter, QueryModelNode node) {
@@ -192,7 +192,7 @@ final class HalyardStatementPatternEvaluation {
             final AtomicInteger ret = new AtomicInteger();
             QueryModelNode root = node;
             while (root.getParentNode() != null) root = root.getParentNode(); //traverse to the root of the query model
-            
+
             new AbstractQueryModelVisitor<RuntimeException>() {
                 @Override
                 protected void meetNode(QueryModelNode n) throws RuntimeException {
@@ -221,7 +221,7 @@ final class HalyardStatementPatternEvaluation {
         for (int i = 0; i < THREADS; i++) {
             final int threadNum = i;
             Thread t = new Thread(tg, new Runnable() {
-                
+
             		/**
             		 * Defines the behavior of every evaluation thread
             		 */
@@ -273,7 +273,7 @@ final class HalyardStatementPatternEvaluation {
     }
 
     /**
-     * Evaluate the statement pattern using the supplied bindings	
+     * Evaluate the statement pattern using the supplied bindings
      * @param parent to push or enqueue evaluation results
      * @param sp the {@code StatementPattern} to evaluate
      * @param bindings the set of names to which values are bound. For example, select ?s, ?p, ?o has the names s, p and o and the values bound to them are the
@@ -291,8 +291,12 @@ final class HalyardStatementPatternEvaluation {
         final Value contextValue = getVarValue(conVar, bindings);
 
         CloseableIteration<? extends Statement, QueryEvaluationException> stIter = null;
-
         try {
+            if (isUnbound(subjVar, bindings) || isUnbound(predVar, bindings) || isUnbound(objVar, bindings) || isUnbound(conVar, bindings)) {
+                // the variable must remain unbound for this solution see https://www.w3.org/TR/sparql11-query/#assignment
+                parent.push(null);
+                return;
+            }
             try {
                 Resource[] contexts;
 
@@ -438,9 +442,17 @@ final class HalyardStatementPatternEvaluation {
             }
         }, sp);
     }
+    
+    protected boolean isUnbound(Var var, BindingSet bindings) {
+        if (var == null) {
+            return false;
+        } else {
+            return bindings.hasBinding(var.getName()) && bindings.getValue(var.getName()) == null;
+        }
+    }
 
     /**
-     * Gets a value from a {@code Var} if it has a {@code Value}. If it does not then the method will attempt to get it 
+     * Gets a value from a {@code Var} if it has a {@code Value}. If it does not then the method will attempt to get it
      * from the bindings using the name of the Var
      * @param var
      * @param bindings

@@ -93,7 +93,7 @@ import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
 
 /**
- * Evaluates {@link TupleExpression}s and it's sub-interfaces and implementations. 
+ * Evaluates {@link TupleExpression}s and it's sub-interfaces and implementations.
  * @author Adam Sotona (MSD)
  */
 final class HalyardTupleExprEvaluation {
@@ -554,7 +554,10 @@ final class HalyardTupleExprEvaluation {
                             }
                         } catch (ValueExprEvaluationException e) {
                             // silently ignore type errors in extension arguments. They should not cause the
-                            // query to fail but just result in no additional binding.
+                            // query to fail but result in no bindings for this solution
+                            // see https://www.w3.org/TR/sparql11-query/#assignment
+                            // use null as place holder for unbound variables that must remain so
+                            targetBindings.setBinding(extElem.getName(), null);
                         } catch (QueryEvaluationException e) {
                             parent.handleException(e);
                         }
@@ -602,7 +605,7 @@ final class HalyardTupleExprEvaluation {
         String serviceUri;
         if (serviceRef.hasValue()) {
             serviceUri = serviceRef.getValue().stringValue();
-        } else if (bindings != null && bindings.hasBinding(serviceRef.getName())) {
+        } else if (bindings != null && bindings.getValue(serviceRef.getName()) != null) {
             serviceUri = bindings.getBinding(serviceRef.getName()).getValue().stringValue();
         } else {
             throw new QueryEvaluationException("SERVICE variables must be bound at evaluation time.");
@@ -1139,7 +1142,7 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Determines if the parent of the node is an instance of {@link Distinct} or {@link Reduced}. 
+     * Determines if the parent of the node is an instance of {@link Distinct} or {@link Reduced}.
      * @param node the {@link QueryModelNode} to test
      * @return {@code true} if the parent is and instance of {@link Distinct} or {@link Reduced} and {@code false} otherwise. If the parent is
      * an instance of {@link Slice} then the parent is considered to be the first non-{@code Slice} node up the tree.
