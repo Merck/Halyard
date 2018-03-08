@@ -59,6 +59,7 @@ import org.eclipse.rdf4j.query.algebra.MultiProjection;
 import org.eclipse.rdf4j.query.algebra.Order;
 import org.eclipse.rdf4j.query.algebra.OrderElem;
 import org.eclipse.rdf4j.query.algebra.Projection;
+import org.eclipse.rdf4j.query.algebra.ProjectionElem;
 import org.eclipse.rdf4j.query.algebra.ProjectionElemList;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
@@ -253,12 +254,34 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateProjection(BindingSetPipe parent, final Projection projection, final BindingSet bindings) {
+        boolean outer = true;
+        QueryModelNode ancestor = projection;
+        while (ancestor.getParentNode() != null) {
+                ancestor = ancestor.getParentNode();
+                if (ancestor instanceof Projection || ancestor instanceof MultiProjection) {
+                        outer = false;
+                }
+        }
+        final boolean includeAll = !outer;
+        BindingSet pushDownBindings;
+        if (projection.isSubquery()) {
+            pushDownBindings = new QueryBindingSet();
+            for (ProjectionElem pe : projection.getProjectionElemList().getElements()) {
+                    Value targetValue = bindings.getValue(pe.getSourceName());
+                    if (targetValue != null) {
+                            ((QueryBindingSet)pushDownBindings).setBinding(pe.getTargetName(), targetValue);
+                    }
+            }
+        } else {
+            pushDownBindings = bindings;
+        }
+
         evaluateTupleExpr(new BindingSetPipe(parent) {
             @Override
             public boolean push(BindingSet bs) throws InterruptedException {
-                return parent.push(bs == null ? null : ProjectionIterator.project(projection.getProjectionElemList(), bs, bindings, true));
+                return parent.push(bs == null ? null : ProjectionIterator.project(projection.getProjectionElemList(), bs, bindings, includeAll));
             }
-        }, projection.getArg(), bindings);
+        }, projection.getArg(), pushDownBindings);
     }
 
     /**

@@ -19,7 +19,6 @@ package com.msd.gin.halyard.strategy;
 import org.eclipse.rdf4j.query.parser.sparql.ComplexSPARQLQueryTest;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-import org.junit.Ignore;
 
 /**
  *
@@ -33,11 +32,5 @@ public class HalyardComplexSPARQLQueryTest extends ComplexSPARQLQueryTest {
 	{
 		return new SailRepository(new MemoryStoreWithHalyardStrategy());
 	}
-
-	@Ignore
-        @Override
-	public void testSES2154SubselectOptional() throws Exception {
-            //HLYD-188 Failing HalyardComplexSPARQLQueryTest.testSES2154SubselectOptional
-        }
 
 }
