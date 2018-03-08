@@ -16,7 +16,15 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import org.eclipse.rdf4j.common.iteration.CloseableIteration;
+import org.eclipse.rdf4j.common.iteration.FilterIteration;
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.Dataset;
+import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.sail.NotifyingSailConnection;
@@ -35,10 +43,39 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
         return new MemoryStoreConnection(this) {
 
             @Override
-            protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, TripleSource tripleSource) {
-                return new HalyardEvaluationStrategy(tripleSource, dataset, null, -1);
+            protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, final TripleSource tripleSource) {
+                return new HalyardEvaluationStrategy(new TripleSource() {
+                    @Override
+                    public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
+                        return new FilterIteration<Statement, QueryEvaluationException>(tripleSource.getStatements(subj, pred, obj, contexts)){
+                            boolean first = true;
+
+                            @Override
+                            public boolean hasNext() throws QueryEvaluationException {
+                                if (first) try {
+                                    first = false;
+                                    Thread.sleep(20);
+                                } catch (InterruptedException ex) {
+                                    //ignore
+                                }
+                                return super.hasNext(); //To change body of generated methods, choose Tools | Templates.
+                            }
+
+                            @Override
+                            protected boolean accept(Statement object) throws QueryEvaluationException {
+                                return true;
+                            }
+                        };
+                    }
+
+                    @Override
+                    public ValueFactory getValueFactory() {
+                        return tripleSource.getValueFactory();
+                    }
+                }, dataset, null, -1);
             }
 
         };
     }
+
 }
