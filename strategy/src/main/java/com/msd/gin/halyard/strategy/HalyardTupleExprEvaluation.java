@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -581,8 +582,11 @@ final class HalyardTupleExprEvaluation {
             private final AtomicLong ll = new AtomicLong(0);
             @Override
             public boolean push(BindingSet bs) throws InterruptedException {
-                if (bs == null) return parent.push(null);
                 long l = ll.incrementAndGet();
+                if (l > limit+1) {
+                    return false;
+                }
+                if (bs == null) return parent.push(null);
                 if (l <= offset) {
                     return true;
                 } else if (l <= limit) {
@@ -781,11 +785,14 @@ final class HalyardTupleExprEvaluation {
             }
         };
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
+            AtomicBoolean leftInProgress = new AtomicBoolean(true);
             @Override
             public boolean push(final BindingSet leftBindings) throws InterruptedException {
                 if (leftBindings == null) {
-                    if (joinsInProgress.decrementAndGet() == 0) {
-                        parent.push(null);
+                    if (leftInProgress.getAndSet(false)) {
+                        if (joinsInProgress.decrementAndGet() == 0) {
+                            parent.push(null);
+                        }
                     }
                 } else {
                     joinsInProgress.incrementAndGet();
