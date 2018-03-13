@@ -147,10 +147,14 @@ public class HBaseSailTest {
     public void testSize() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
         Configuration cfg = HBaseServerTestInstance.getInstanceConfig();
-        HBaseSail sail = new HBaseSail(cfg, "whatevertablesize", true, 0, true, 0, null, null);
+        HBaseSail sail = new HBaseSail(cfg, "whatevertablesize", true, 0, true, 180, null, null);
         sail.initialize();
         assertEquals(0, sail.size());
         assertEquals(0, sail.size(HALYARD.STATS_ROOT_NODE));
+        IRI iri = vf.createIRI("http://whatever/");
+        sail.addStatement(iri, iri, iri);
+        sail.commit();
+        assertEquals(1, sail.size());
         sail.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, vf.createLiteral(567), HALYARD.STATS_GRAPH_CONTEXT);
         sail.commit();
         assertEquals(567, sail.size());

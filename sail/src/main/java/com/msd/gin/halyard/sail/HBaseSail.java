@@ -462,6 +462,13 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                 }
             }
         }
+        // try to count it manually if there are no stats and there is a specific timeout
+        if (size == 0 && evaluationTimeout > 0) try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(null, null, null, true, contexts)) {
+            while (scanner.hasNext()) {
+                scanner.next();
+                size++;
+            }
+        }
         return size;
     }
 
