@@ -69,6 +69,7 @@ import org.eclipse.rdf4j.rio.RDFParserFactory;
 import org.eclipse.rdf4j.rio.RDFParserRegistry;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
+import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 /**
@@ -91,6 +92,11 @@ public class HalyardBulkLoad implements Tool {
      * Boolean property skipping RDF parsing errors
      */
     public static final String SKIP_INVALID_PROPERTY = "halyard.parser.skipinvalid";
+
+    /**
+     * Boolean property enabling RDF parser verification of data values
+     */
+    public static final String VERIFY_DATATYPE_VALUES_PROPERTY = "halyard.parser.verify.datatype.values";
 
     /**
      * Boolean property enforcing triples and quads context override with the default context
@@ -293,7 +299,7 @@ public class HalyardBulkLoad implements Tool {
         private final Path paths[];
         private final long size;
         private final SynchronousQueue<Statement> queue = new SynchronousQueue<>();
-        private final boolean skipInvalid;
+        private final boolean skipInvalid, verifyDataTypeValues;
         private Exception ex = null;
         private long finishedSize = 0;
 
@@ -306,6 +312,7 @@ public class HalyardBulkLoad implements Tool {
             this.paths = split.getPaths();
             this.size = split.getLength();
             this.skipInvalid = context.getConfiguration().getBoolean(SKIP_INVALID_PROPERTY, false);
+            this.verifyDataTypeValues = context.getConfiguration().getBoolean(VERIFY_DATATYPE_VALUES_PROPERTY, false);
         }
 
         public Statement getNext() throws IOException, InterruptedException {
@@ -353,6 +360,7 @@ public class HalyardBulkLoad implements Tool {
                         parser = Rio.createParser(Rio.getParserFormatForFileName(baseUri).get());
                         parser.setRDFHandler(this);
                         parser.setStopAtFirstError(!skipInvalid);
+                        parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
                         localIn = this.in; //synchronised parameters must be copied to a local variable for use outide of sync block
                         localBaseUri = this.baseUri;
                     }
