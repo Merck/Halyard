@@ -29,6 +29,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
@@ -39,13 +41,18 @@ import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
 import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
-import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.RecordReader;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -104,7 +111,7 @@ public class HalyardBulkUpdate implements Tool {
     /**
      * Mapper class performing SPARQL Graph query evaluation and producing Halyard KeyValue pairs for HBase BulkLoad Reducers
      */
-    public static class SPARQLMapper extends Mapper<LongWritable, Text, ImmutableBytesWritable, KeyValue> {
+    public static class SPARQLMapper extends Mapper<NullWritable, Text, ImmutableBytesWritable, KeyValue> {
 
         private String tableName;
         private String elasticIndexURL;
@@ -135,11 +142,10 @@ public class HalyardBulkUpdate implements Tool {
         }
 
         @Override
-        protected void map(LongWritable key, Text value, final Context context) throws IOException, InterruptedException {
+        protected void map(NullWritable key, Text value, final Context context) throws IOException, InterruptedException {
             String query = StringEscapeUtils.unescapeJava(value.toString());
-            int i = query.indexOf('\n');
-            final String fistLine = i > 0 ? query.substring(0, i) : query;
-            context.setStatus("Execution of: " + fistLine);
+            String name = ((FileSplit)context.getInputSplit()).getPath().getName();
+            context.setStatus("Execution of: " + name);
             final AtomicLong added = new AtomicLong();
             final AtomicLong removed = new AtomicLong();
             try {
@@ -157,7 +163,7 @@ public class HalyardBulkUpdate implements Tool {
                             throw new IOException(ex);
                         }
                         if (added.incrementAndGet() % 1000l == 0) {
-                            context.setStatus(fistLine + " - " + added.get() + " added " + removed.get() + " removed");
+                            context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
                             LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
                         }
                     }
@@ -175,7 +181,7 @@ public class HalyardBulkUpdate implements Tool {
                             throw new IOException(ex);
                         }
                         if (added.incrementAndGet() % 1000l == 0) {
-                            context.setStatus(fistLine + " - " + added.get() + " added " + removed.get() + " removed");
+                            context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
                             LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
                         }
                     }
@@ -201,9 +207,9 @@ public class HalyardBulkUpdate implements Tool {
                     Update upd = rep.getConnection().prepareUpdate(QueryLanguage.SPARQL, query);
                     ((MapBindingSet)upd.getBindings()).addBinding(new TimestampCallbackBinding());
                     LOG.log(Level.INFO, "Execution of: {0}", query);
-                    context.setStatus(fistLine);
+                    context.setStatus(name);
                     upd.execute();
-                    context.setStatus(fistLine + " - " + added.get() + " added " + removed.get() + " removed");
+                    context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
                     LOG.log(Level.INFO, "Query finished with {0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
                 } finally {
                     rep.shutDown();
@@ -219,7 +225,7 @@ public class HalyardBulkUpdate implements Tool {
     @Override
     public int run(String[] args) throws Exception {
         if (args.length != 3) {
-            System.err.println("Usage: bulkupdate [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] <input_file_with_SPARQL_queries> <output_path> <table_name>");
+            System.err.println("Usage: bulkupdate [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] <SPARQL_queries_input_path(s)> <output_path> <table_name>");
             return -1;
         }
         TableMapReduceUtil.addDependencyJars(getConf(),
@@ -238,16 +244,16 @@ public class HalyardBulkUpdate implements Tool {
         getConf().setStrings(TABLE_NAME_PROPERTY, args[2]);
         getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
         Job job = Job.getInstance(getConf(), "HalyardBulkUpdate -> " + args[1] + " -> " + args[2]);
-        NLineInputFormat.setNumLinesPerSplit(job, 1);
         job.setJarByClass(HalyardBulkUpdate.class);
         job.setMapperClass(SPARQLMapper.class);
         job.setMapOutputKeyClass(ImmutableBytesWritable.class);
         job.setMapOutputValueClass(KeyValue.class);
-        job.setInputFormatClass(NLineInputFormat.class);
+        job.setInputFormatClass(SPARQLInputFormat.class);
         job.setSpeculativeExecution(false);
         job.setReduceSpeculativeExecution(false);
         try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], false, 0)) {
             HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
+            FileInputFormat.setInputDirRecursive(job, true);
             FileInputFormat.setInputPaths(job, args[0]);
             FileOutputFormat.setOutputPath(job, new Path(args[1]));
             TableMapReduceUtil.addDependencyJars(job);
@@ -278,5 +284,75 @@ public class HalyardBulkUpdate implements Tool {
      */
     public static void main(String[] args) throws Exception {
         System.exit(ToolRunner.run(new Configuration(), new HalyardBulkUpdate(), args));
+    }
+
+    public static final class SPARQLInputFormat extends FileInputFormat<NullWritable, Text> {
+
+        @Override
+        protected boolean isSplitable(JobContext context, Path filename) {
+            return false;
+        }
+
+        @Override
+        public RecordReader<NullWritable, Text> createRecordReader(InputSplit split, TaskAttemptContext context) throws IOException, InterruptedException {
+            return new RecordReader<NullWritable, Text>() {
+
+                private FileSplit fileSplit;
+                private Configuration conf;
+                private boolean processed = false;
+
+                private final NullWritable key = NullWritable.get();
+                private final Text value = new Text();
+
+                @Override
+                public void initialize(InputSplit inputSplit, TaskAttemptContext taskAttemptContext) throws IOException, InterruptedException {
+                    this.fileSplit = (FileSplit) inputSplit;
+                    this.conf = taskAttemptContext.getConfiguration();
+                }
+
+                @Override
+                public boolean nextKeyValue() throws IOException {
+                    if (!processed) {
+                        byte[] contents = new byte[(int) fileSplit.getLength()];
+
+                        Path file = fileSplit.getPath();
+                        FileSystem fs = file.getFileSystem(conf);
+
+                        FSDataInputStream in = null;
+                        try {
+                            in = fs.open(file);
+                            IOUtils.readFully(in, contents, 0, contents.length);
+                            value.set(contents);
+                        } finally {
+                            IOUtils.closeStream(in);
+                        }
+                        processed = true;
+                        return true;
+                    }
+                    return false;
+                }
+
+                @Override
+                public NullWritable getCurrentKey() throws IOException, InterruptedException {
+                    return key;
+                }
+
+                @Override
+                public Text getCurrentValue() throws IOException, InterruptedException {
+                    return value;
+                }
+
+                @Override
+                public float getProgress() throws IOException, InterruptedException  {
+                    return processed ? 1.0f : 0.0f;
+                }
+
+                @Override
+                public void close() throws IOException {
+                    // do nothing
+                }
+            };
+        }
+
     }
 }

@@ -18,10 +18,8 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
-import static com.msd.gin.halyard.tools.HalyardBulkUpdate.DECIMATE_FUNCTION_URI;
 import java.io.File;
 import java.io.PrintStream;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Random;
@@ -30,20 +28,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Statement;
-import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.LinkedHashModel;
 import org.eclipse.rdf4j.model.impl.LinkedHashModelFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.eclipse.rdf4j.query.Update;
-import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
-import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
-import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
-import org.eclipse.rdf4j.query.impl.MapBindingSet;
-import org.eclipse.rdf4j.repository.sail.SailRepository;
-import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Assert;
 import static org.junit.Assert.*;
@@ -70,10 +59,13 @@ public class HalyardBulkUpdateTest {
         }
         sail.commit();
         sail.shutDown();
-
-        File queries = File.createTempFile("test_update_queries", ".sparql");
-        try (PrintStream qs = new PrintStream(queries)) {
-            for (int i=0; i<3; i++) {
+        File queries = File.createTempFile("test_update_queries", "");
+        queries.delete();
+        queries.mkdir();
+        for (int i=0; i<3; i++) {
+            File q = new File(queries, "test_update_query"+ i + ".sparql");
+            q.deleteOnExit();
+            try (PrintStream qs = new PrintStream(q)) {
                 qs.println("PREFIX halyard: <http://merck.github.io/Halyard/ns#> delete {?s <http://whatever/pred> ?o} insert {?o <http://whatever/reverse> ?s} where {?s <http://whatever/pred> ?o . FILTER (halyard:decimateBy(" + i + ", 3, ?s, ?o))}");
             }
         }
@@ -81,6 +73,11 @@ public class HalyardBulkUpdateTest {
         htableDir.delete();
 
         assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ queries.toURI().toURL().toString(), htableDir.toURI().toURL().toString(), TABLE}));
+
+        for (int i=0; i<3; i++) {
+            new File(queries, "test_update_query"+ i + ".sparql").delete();
+        }
+        queries.delete();
 
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
         sail.initialize();
@@ -171,9 +168,13 @@ public class HalyardBulkUpdateTest {
         sail.shutDown();
 
         //prepare the update queries
-        File queries = File.createTempFile("test_time_update_queries", ".sparql");
-        try (PrintStream qs = new PrintStream(queries)) {
-            for (i=0; i<3; i++) {
+        File queries = File.createTempFile("test_time_update_queries", "");
+        queries.delete();
+        queries.mkdir();
+        for (i=0; i<3; i++) {
+            File q = new File(queries, "test_time_update_query" + i + ".sparql");
+            q.deleteOnExit();
+            try (PrintStream qs = new PrintStream(q)) {
                 qs.println( "PREFIX : <http://whatever/> " +
                             "PREFIX halyard: <http://merck.github.io/Halyard/ns#> " +
                             "DELETE {" +
@@ -210,6 +211,11 @@ public class HalyardBulkUpdateTest {
 
         //execute BulkUpdate
         assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ queries.toURI().toURL().toString(), htableDir.toURI().toURL().toString(), "timebulkupdatetesttable"}));
+
+        for (i=0; i<3; i++) {
+            new File(queries, "test_update_query"+ i + ".sparql").delete();
+        }
+        queries.delete();
 
         //read transformed data into model
         LinkedHashModel resultModel = new LinkedHashModelFactory().createEmptyModel();
