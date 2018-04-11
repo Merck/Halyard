@@ -57,9 +57,11 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
+import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.MalformedQueryException;
@@ -192,13 +194,14 @@ public class HalyardBulkUpdate implements Tool {
                     }
 
                     @Override
-                    public void clear(Resource... contexts) throws SailException {
-                        throw new UnsupportedOperationException();
-                    }
-
-                    @Override
                     public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
-                        throw new UnsupportedOperationException();
+                        contexts = normalizeContexts(contexts);
+                        try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
+                            while (iter.hasNext()) {
+                                Statement st = iter.next();
+                                removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+                            }
+                        }
                     }
                 };
                 SailRepository rep = new SailRepository(sail);
