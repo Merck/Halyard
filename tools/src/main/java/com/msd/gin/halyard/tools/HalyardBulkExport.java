@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
@@ -104,11 +105,12 @@ public class HalyardBulkExport implements Tool {
 
         @Override
         protected void map(NullWritable key, Text value, final Context context) throws IOException, InterruptedException {
-            String query = StringEscapeUtils.unescapeJava(value.toString());
-            String name = ((FileSplit)context.getInputSplit()).getPath().getName();
+            final String query = StringEscapeUtils.unescapeJava(value.toString());
+            final String name = ((FileSplit)context.getInputSplit()).getPath().getName();
             int dot = name.indexOf('.');
-            String bName = dot > 0 ? name.substring(0, dot) : name;
+            final String bName = dot > 0 ? name.substring(0, dot) : name;
             context.setStatus("Execution of: " + name);
+            LOG.log(Level.INFO, "Execution of {0}:\n{1}", new Object[]{name, query});
             try {
                 HalyardExport.StatusLog log = new HalyardExport.StatusLog() {
                     @Override
@@ -117,7 +119,7 @@ public class HalyardBulkExport implements Tool {
                     }
                     @Override
                     public void logStatus(String status) {
-                        context.setStatus(status);
+                        context.setStatus(name + ": " + status);
                     }
                 };
                 Configuration cfg = context.getConfiguration();
