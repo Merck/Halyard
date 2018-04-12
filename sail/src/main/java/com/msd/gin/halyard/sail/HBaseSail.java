@@ -176,12 +176,16 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                         IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI)contextVar.getValue();
                         long triples = getTriplesCount(graphNode, -1l);
                         if (triples > 0) {
-                            return triples
+                            double card = triples
                                     * subsetTriplesPart(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar(), triples)
                                     * subsetTriplesPart(graphNode, VOID.PROPERTY, sp.getPredicateVar(), triples)
                                     * subsetTriplesPart(graphNode, VOID_EXT.OBJECT, sp.getObjectVar(), triples);
+                            LOG.log(Level.FINE, "cardinality of {0} = {1}", new Object[]{sp.toString(), card});
+                            return card;
                         } else {
-                            return super.getCardinality(sp);
+                            double card = super.getCardinality(sp);
+                            LOG.log(Level.FINE, "default cardinality of {0} = {1}", new Object[]{sp.toString(), card});
+                            return card;
                         }
                     }
 
@@ -191,11 +195,14 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                             if (ci.hasNext()) {
                                 Value v = ci.next().getObject();
                                 if (v instanceof Literal) try {
-                                    return ((Literal)v).longValue();
+                                    long l = ((Literal)v).longValue();
+                                    LOG.log(Level.FINER, "triple stats for {0} = {1}", new Object[]{subjectNode, l});
+                                    return l;
                                 } catch (NumberFormatException ignore) {}
-                                LOG.log(Level.WARNING, "Invalid statistics for:" + subjectNode);
+                                LOG.log(Level.WARNING, "Invalid statistics for:{0}", subjectNode);
                             }
                         }
+                        LOG.log(Level.FINER, "triple stats for {0} are not available, using default {1}", new Object[]{subjectNode, defaultValue});
                         return defaultValue;
                     }
 
@@ -335,6 +342,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     //evaluate queries/ subqueries
     @Override
     public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred) throws SailException {
+        LOG.log(Level.FINE, "Evaluated TupleExpr before optimizers:\n{0}", tupleExpr);
         tupleExpr = tupleExpr.clone();
         if (!(tupleExpr instanceof QueryRoot)) {
             // Add a dummy root node to the tuple expressions to allow the
@@ -380,7 +388,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         new IterativeEvaluationOptimizer().optimize(tupleExpr, dataset, bindings);
         new FilterOptimizer().optimize(tupleExpr, dataset, bindings);
         new OrderLimitOptimizer().optimize(tupleExpr, dataset, bindings);
-
+        LOG.log(Level.FINE, "Evaluated TupleExpr after optimization:\n{0}", tupleExpr);
         try {
         		//evaluate the expression against the TripleSource according to the EvaluationStrategy.
             CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = strategy.evaluate(tupleExpr, EmptyBindingSet.getInstance());
@@ -738,6 +746,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
             this.contextsList = Arrays.asList(normalizeContexts(contexts));
             this.contexts = contextsList.iterator();
             this.endTime = startTime + (1000l * evaluationTimeout);
+            LOG.log(Level.FINEST, "New StatementScanner {0} {1} {2} {3}", new Object[]{subj, pred, obj, contextsList});
         }
 
         protected Result nextResult() throws IOException { //gets the next result to consider from the HBase Scan
