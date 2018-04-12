@@ -176,10 +176,9 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                         IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI)contextVar.getValue();
                         long triples = getTriplesCount(graphNode, -1l);
                         if (triples > 0) {
-                            double card = triples
-                                    * subsetTriplesPart(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar(), triples)
-                                    * subsetTriplesPart(graphNode, VOID.PROPERTY, sp.getPredicateVar(), triples)
-                                    * subsetTriplesPart(graphNode, VOID_EXT.OBJECT, sp.getObjectVar(), triples);
+                            double card = Math.min(subsetTriplesPart(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar(), triples),
+                                          Math.min(subsetTriplesPart(graphNode, VOID.PROPERTY, sp.getPredicateVar(), triples),
+                                                   subsetTriplesPart(graphNode, VOID_EXT.OBJECT, sp.getObjectVar(), triples)));
                             LOG.log(Level.FINE, "cardinality of {0} = {1}", new Object[]{sp.toString(), card});
                             return card;
                         } else {
@@ -209,9 +208,9 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                     //calculate a multiplier for the triple count for this sub-part of the graph
                     private double subsetTriplesPart(IRI graph, IRI partitionType, Var partitionVar, double total) {
                         if (partitionVar == null || !partitionVar.hasValue()) {
-                            return 1.0;
+                            return total;
                         } else {
-                            return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(partitionVar.getValue()).getBytes(StandardCharsets.UTF_8)))), DEFAULT_THRESHOLD) /total;
+                            return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(partitionVar.getValue()).getBytes(StandardCharsets.UTF_8)))), DEFAULT_THRESHOLD);
                         }
                     }
                 };
