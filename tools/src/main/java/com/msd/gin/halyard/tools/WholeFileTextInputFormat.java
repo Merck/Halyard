@@ -17,8 +17,10 @@
 package com.msd.gin.halyard.tools;
 
 import java.io.IOException;
+import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
@@ -43,6 +45,11 @@ final class WholeFileTextInputFormat extends FileInputFormat<NullWritable, Text>
     }
 
     @Override
+    public List<FileStatus> listStatus(JobContext job) throws IOException {
+        return super.listStatus(job); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
     public RecordReader<NullWritable, Text> createRecordReader(InputSplit split, TaskAttemptContext context) throws IOException, InterruptedException {
         return new RecordReader<NullWritable, Text>() {
             private FileSplit fileSplit;
@@ -63,13 +70,9 @@ final class WholeFileTextInputFormat extends FileInputFormat<NullWritable, Text>
                     byte[] contents = new byte[(int) fileSplit.getLength()];
                     Path file = fileSplit.getPath();
                     FileSystem fs = file.getFileSystem(conf);
-                    FSDataInputStream in = null;
-                    try {
-                        in = fs.open(file);
+                    try (FSDataInputStream in = fs.open(file)){
                         IOUtils.readFully(in, contents, 0, contents.length);
                         value.set(contents);
-                    } finally {
-                        IOUtils.closeStream(in);
                     }
                     processed = true;
                     return true;

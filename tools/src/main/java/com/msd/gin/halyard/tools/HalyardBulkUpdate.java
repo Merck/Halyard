@@ -23,12 +23,14 @@ import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPER
 import com.msd.gin.halyard.tools.TimeAwareHBaseSail.TimestampCallbackBinding;
 import com.yammer.metrics.core.Gauge;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
@@ -39,6 +41,7 @@ import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
 import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -57,16 +60,22 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.MalformedQueryException;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.Update;
+import org.eclipse.rdf4j.query.algebra.UpdateExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
+import org.eclipse.rdf4j.query.parser.ParsedUpdate;
+import org.eclipse.rdf4j.query.parser.QueryParserUtil;
 import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
+import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
+import org.eclipse.rdf4j.repository.sail.SailUpdate;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParser;
@@ -100,6 +109,7 @@ public class HalyardBulkUpdate implements Tool {
      */
     public static final String DECIMATE_FUNCTION_URI = HALYARD.NAMESPACE + DECIMATE_FUNCTION_NAME;
     private static final String TABLE_NAME_PROPERTY = "halyard.table.name";
+    private static final String STAGE_PROPERTY = "halyard.update.stage";
     private static final Logger LOG = Logger.getLogger(HalyardBulkUpdate.class.getName());
     private Configuration conf;
 
@@ -111,6 +121,7 @@ public class HalyardBulkUpdate implements Tool {
         private String tableName;
         private String elasticIndexURL;
         private long defaultTimestamp;
+        private int stage;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -134,87 +145,101 @@ public class HalyardBulkUpdate implements Tool {
             tableName = conf.get(TABLE_NAME_PROPERTY);
             elasticIndexURL = conf.get(ELASTIC_INDEX_URL);
             defaultTimestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
+            stage = conf.getInt(STAGE_PROPERTY, 0);
         }
 
         @Override
         protected void map(NullWritable key, Text value, final Context context) throws IOException, InterruptedException {
-            String query = StringEscapeUtils.unescapeJava(value.toString());
+            String query = value.toString();
             String name = ((FileSplit)context.getInputSplit()).getPath().getName();
-            context.setStatus("Execution of: " + name);
-            final AtomicLong added = new AtomicLong();
-            final AtomicLong removed = new AtomicLong();
-            try {
-                final HBaseSail sail = new TimeAwareHBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL, new HBaseSail.Ticker() {
-                    @Override
-                    public void tick() {
-                        context.progress();
-                    }
-                }) {
-                    @Override
-                    protected void put(KeyValue kv) throws IOException {
-                        try {
-                            context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
-                        } catch (InterruptedException ex) {
-                            throw new IOException(ex);
+            ParsedUpdate parsedUpdate = QueryParserUtil.parseUpdate(QueryLanguage.SPARQL, query, null);
+            if (parsedUpdate.getUpdateExprs().size() <= stage) {
+                context.setStatus("Nothing to execute in: " + name + " for stage #" + stage);
+            } else {
+                UpdateExpr ue = parsedUpdate.getUpdateExprs().get(stage);
+                LOG.info(ue.toString());
+                ParsedUpdate singleUpdate = new ParsedUpdate(parsedUpdate.getSourceString(), parsedUpdate.getNamespaces());
+                singleUpdate.addUpdateExpr(ue);
+                Dataset d = parsedUpdate.getDatasetMapping().get(ue);
+                if (d != null) {
+                    singleUpdate.map(ue, d);
+                }
+                context.setStatus("Execution of: " + name + " stage #" + stage);
+                final AtomicLong added = new AtomicLong();
+                final AtomicLong removed = new AtomicLong();
+                try {
+                    final HBaseSail sail = new TimeAwareHBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL, new HBaseSail.Ticker() {
+                        @Override
+                        public void tick() {
+                            context.progress();
                         }
-                        if (added.incrementAndGet() % 1000l == 0) {
-                            context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-                            LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
-                        }
-                    }
-
-                    @Override
-                    protected void delete(KeyValue kv) throws IOException {
-                        kv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), (int) kv.getRowLength(),
-                                kv.getFamilyArray(), kv.getFamilyOffset(), (int) kv.getFamilyLength(),
-                                kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength(),
-                                kv.getTimestamp(), KeyValue.Type.DeleteColumn, kv.getValueArray(), kv.getValueOffset(),
-                                kv.getValueLength(), kv.getTagsArray(), kv.getTagsOffset(), kv.getTagsLength());
-                        try {
-                            context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
-                        } catch (InterruptedException ex) {
-                            throw new IOException(ex);
-                        }
-                        if (added.incrementAndGet() % 1000l == 0) {
-                            context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-                            LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
-                        }
-                    }
-
-                    @Override
-                    protected long getDefaultTimeStamp() {
-                        return defaultTimestamp;
-                    }
-
-                    @Override
-                    public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
-                        contexts = normalizeContexts(contexts);
-                        try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
-                            while (iter.hasNext()) {
-                                Statement st = iter.next();
-                                removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+                    }) {
+                        @Override
+                        protected void put(KeyValue kv) throws IOException {
+                            try {
+                                context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
+                            } catch (InterruptedException ex) {
+                                throw new IOException(ex);
+                            }
+                            if (added.incrementAndGet() % 1000l == 0) {
+                                context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
+                                LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
                             }
                         }
-                    }
-                };
-                SailRepository rep = new SailRepository(sail);
-                try {
-                    rep.initialize();
-                    Update upd = rep.getConnection().prepareUpdate(QueryLanguage.SPARQL, query);
-                    ((MapBindingSet)upd.getBindings()).addBinding(new TimestampCallbackBinding());
-                    LOG.log(Level.INFO, "Execution of: {0}", query);
-                    context.setStatus(name);
-                    upd.execute();
-                    context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-                    LOG.log(Level.INFO, "Query finished with {0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
-                } finally {
-                    rep.shutDown();
-                }
-            } catch (RepositoryException | MalformedQueryException | QueryEvaluationException | RDFHandlerException ex) {
-                LOG.log(Level.SEVERE, null, ex);
-                throw new IOException(ex);
-            }
 
+                        @Override
+                        protected void delete(KeyValue kv) throws IOException {
+                            kv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), (int) kv.getRowLength(),
+                                    kv.getFamilyArray(), kv.getFamilyOffset(), (int) kv.getFamilyLength(),
+                                    kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength(),
+                                    kv.getTimestamp(), KeyValue.Type.DeleteColumn, kv.getValueArray(), kv.getValueOffset(),
+                                    kv.getValueLength(), kv.getTagsArray(), kv.getTagsOffset(), kv.getTagsLength());
+                            try {
+                                context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
+                            } catch (InterruptedException ex) {
+                                throw new IOException(ex);
+                            }
+                            if (added.incrementAndGet() % 1000l == 0) {
+                                context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
+                                LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
+                            }
+                        }
+
+                        @Override
+                        protected long getDefaultTimeStamp() {
+                            return defaultTimestamp;
+                        }
+
+                        @Override
+                        public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
+                            contexts = normalizeContexts(contexts);
+                            try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
+                                while (iter.hasNext()) {
+                                    Statement st = iter.next();
+                                    removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+                                }
+                            }
+                        }
+                    };
+                    SailRepository rep = new SailRepository(sail);
+                    try {
+                        rep.initialize();
+                        SailRepositoryConnection con = rep.getConnection();
+                        Update upd = new SailUpdate(singleUpdate, con){};
+                        ((MapBindingSet)upd.getBindings()).addBinding(new TimestampCallbackBinding());
+                        LOG.log(Level.INFO, "Execution of: {0}", query);
+                        context.setStatus(name);
+                        upd.execute();
+                        context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
+                        LOG.log(Level.INFO, "Query finished with {0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
+                    } finally {
+                        rep.shutDown();
+                    }
+                } catch (RepositoryException | MalformedQueryException | QueryEvaluationException | RDFHandlerException ex) {
+                    LOG.log(Level.SEVERE, null, ex);
+                    throw new IOException(ex);
+                }
+            }
         }
     }
 
@@ -239,28 +264,52 @@ public class HalyardBulkUpdate implements Tool {
         HBaseConfiguration.addHbaseResources(getConf());
         getConf().setStrings(TABLE_NAME_PROPERTY, args[2]);
         getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
-        Job job = Job.getInstance(getConf(), "HalyardBulkUpdate -> " + args[1] + " -> " + args[2]);
-        job.setJarByClass(HalyardBulkUpdate.class);
-        job.setMapperClass(SPARQLUpdateMapper.class);
-        job.setMapOutputKeyClass(ImmutableBytesWritable.class);
-        job.setMapOutputValueClass(KeyValue.class);
-        job.setInputFormatClass(WholeFileTextInputFormat.class);
-        job.setSpeculativeExecution(false);
-        job.setReduceSpeculativeExecution(false);
-        try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], false, 0)) {
-            HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
-            FileInputFormat.setInputDirRecursive(job, true);
-            FileInputFormat.setInputPaths(job, args[0]);
-            FileOutputFormat.setOutputPath(job, new Path(args[1]));
-            TableMapReduceUtil.addDependencyJars(job);
-            TableMapReduceUtil.initCredentials(job);
-            if (job.waitForCompletion(true)) {
-                new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(args[1]), hTable);
-                LOG.info("Bulk Update Completed..");
-                return 0;
+        int stages = 1;
+        for (int stage = 0; stage < stages; stage++) {
+            Job job = Job.getInstance(getConf(), "HalyardBulkUpdate -> " + args[1] + " -> " + args[2] + " stage #" + stage);
+            job.getConfiguration().setInt(STAGE_PROPERTY, stage);
+            job.setJarByClass(HalyardBulkUpdate.class);
+            job.setMapperClass(SPARQLUpdateMapper.class);
+            job.setMapOutputKeyClass(ImmutableBytesWritable.class);
+            job.setMapOutputValueClass(KeyValue.class);
+            job.setInputFormatClass(WholeFileTextInputFormat.class);
+            job.setSpeculativeExecution(false);
+            job.setReduceSpeculativeExecution(false);
+            try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], false, 0)) {
+                HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
+                FileInputFormat.setInputDirRecursive(job, true);
+                FileInputFormat.setInputPaths(job, args[0]);
+                Path outPath = new Path(args[1], "stage"+stage);
+                FileOutputFormat.setOutputPath(job, outPath);
+                TableMapReduceUtil.addDependencyJars(job);
+                TableMapReduceUtil.initCredentials(job);
+                if (stage == 0) { //count real number of stages
+                    WholeFileTextInputFormat inf = new WholeFileTextInputFormat();
+                    for (FileStatus file : inf.listStatus(job)) {
+                        byte[] contents = new byte[(int) file.getLen()];
+                        try (FSDataInputStream in = file.getPath().getFileSystem(conf).open(file.getPath())) {
+                            IOUtils.readFully(in, contents, 0, contents.length);
+                            int updates = QueryParserUtil.parseUpdate(QueryLanguage.SPARQL, new String(contents, StandardCharsets.UTF_8), null).getUpdateExprs().size();
+                            if (updates > stages) {
+                                stages = updates;
+                            }
+                            LOG.log(Level.INFO, "{0} contains {1} stages of the update sequence.", new Object[]{file.getPath(), updates});
+                        } catch (MalformedQueryException mqe) {
+                            throw new IOException("Exception while parsing " + file.getPath(), mqe);
+                        }
+                    }
+                    LOG.log(Level.INFO, "Bulk Update will process {0} MapReduce stages.", stages);
+                }
+                if (job.waitForCompletion(true)) {
+                    new LoadIncrementalHFiles(getConf()).doBulkLoad(outPath, hTable);
+                    LOG.log(Level.INFO, "Stage #{0} of {1} completed..", new Object[]{stage, stages});
+                } else {
+                    return -1;
+                }
             }
         }
-        return -1;
+        LOG.info("Bulk Update Completed..");
+        return 0;
     }
 
     @Override

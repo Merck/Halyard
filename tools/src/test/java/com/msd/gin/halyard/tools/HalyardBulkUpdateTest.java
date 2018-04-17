@@ -36,6 +36,7 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Assert;
 import static org.junit.Assert.*;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -66,7 +67,13 @@ public class HalyardBulkUpdateTest {
             File q = new File(queries, "test_update_query"+ i + ".sparql");
             q.deleteOnExit();
             try (PrintStream qs = new PrintStream(q)) {
-                qs.println("PREFIX halyard: <http://merck.github.io/Halyard/ns#> delete {?s <http://whatever/pred> ?o} insert {?o <http://whatever/reverse> ?s} where {?s <http://whatever/pred> ?o . FILTER (halyard:decimateBy(" + i + ", 3, ?s, ?o))}");
+                qs.println("PREFIX halyard: <http://merck.github.io/Halyard/ns#>\n"
+                    + "delete {?s <http://whatever/pred> ?o}\n"
+                    + "insert {?o <http://whatever/reverse> ?s}\n"
+                    + "where {?s <http://whatever/pred> ?o . FILTER (halyard:decimateBy(" + i + ", 3, ?s, ?o))};"
+                    + "PREFIX halyard: <http://merck.github.io/Halyard/ns#>\n"
+                    + "insert {?s <http://whatever/another> ?o}\n"
+                    + "where {?s <http://whatever/reverse> ?o . FILTER (halyard:decimateBy(" + i + ", 3, ?s, ?o))}");
             }
         }
         File htableDir = File.createTempFile("test_htable", "");
@@ -83,14 +90,14 @@ public class HalyardBulkUpdateTest {
         sail.initialize();
         try {
             int count;
-            try (CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/reverse"), null, true)) {
+            try (CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(null, null, null, true)) {
                 count = 0;
                 while (iter.hasNext()) {
                     iter.next();
                     count++;
                 }
             }
-            Assert.assertEquals(25, count);
+            Assert.assertEquals(50, count);
             Assert.assertFalse(sail.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/pred"), null, true).hasNext());
         } finally {
             sail.shutDown();
