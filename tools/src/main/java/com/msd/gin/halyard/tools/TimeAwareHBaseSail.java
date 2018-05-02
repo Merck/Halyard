@@ -27,6 +27,7 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.datatypes.XMLDatatypeUtil;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -69,12 +70,19 @@ public class TimeAwareHBaseSail extends HBaseSail {
         super(config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker);
     }
 
+    private static long longValueOfTimeStamp(Literal ts) {
+        if (XMLDatatypeUtil.isCalendarDatatype(ts.getDatatype())) {
+            return ts.calendarValue().toGregorianCalendar().getTimeInMillis();
+        }
+        return ts.longValue();
+    }
+
     @Override
     public void addStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
         BindingSet bs;
         Binding b;
         Value v;
-        long timestamp = (op != null && (bs = op.getBindingSet()) != null && (b = bs.getBinding(TIMESTAMP_CALLBACK_BINDING_NAME)) != null) ? ((Literal) b.getValue()).longValue() : System.currentTimeMillis();
+        long timestamp = (op != null && (bs = op.getBindingSet()) != null && (b = bs.getBinding(TIMESTAMP_CALLBACK_BINDING_NAME)) != null) ? longValueOfTimeStamp((Literal) b.getValue()) : System.currentTimeMillis();
         for (Resource ctx : normalizeContexts(contexts)) {
             addStatementInternal(subj, pred, obj, ctx, timestamp);
         }
@@ -85,7 +93,7 @@ public class TimeAwareHBaseSail extends HBaseSail {
         BindingSet bs;
         Binding b;
         Value v;
-        long timestamp = (op != null && (bs = op.getBindingSet()) != null && (b = bs.getBinding(TIMESTAMP_CALLBACK_BINDING_NAME)) != null) ? ((Literal) b.getValue()).longValue() : System.currentTimeMillis();
+        long timestamp = (op != null && (bs = op.getBindingSet()) != null && (b = bs.getBinding(TIMESTAMP_CALLBACK_BINDING_NAME)) != null) ? longValueOfTimeStamp((Literal) b.getValue()) : System.currentTimeMillis();
         try {
             for (Resource ctx : normalizeContexts(contexts)) {
                 for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, true, timestamp)) { //calculate the kv's corresponding to the quad (or triple)

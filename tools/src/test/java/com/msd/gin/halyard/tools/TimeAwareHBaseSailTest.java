@@ -37,7 +37,7 @@ import static org.junit.Assert.assertTrue;
 public class TimeAwareHBaseSailTest {
 
     @Test
-    public void timestampTest() throws Exception {
+    public void timestampLongTest() throws Exception {
         CloseableIteration<? extends Statement, SailException> iter;
         HBaseSail sail = new TimeAwareHBaseSail(HBaseServerTestInstance.getInstanceConfig(), "timestamptable", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
@@ -48,6 +48,22 @@ public class TimeAwareHBaseSailTest {
         assertFalse(testUpdate(con, "delete {<http://whatever> <http://whatever> <http://whatever>} where {bind(4 as ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE)}"));
         assertFalse(testUpdate(con, "insert {<http://whatever> <http://whatever> <http://whatever>} where {bind(3 as ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE)}"));
         assertTrue(testUpdate(con, "insert {<http://whatever> <http://whatever> <http://whatever>} where {bind(4 as ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE)}"));
+        rep.shutDown();
+
+    }
+
+    @Test
+    public void timestampDateTimeTest() throws Exception {
+        CloseableIteration<? extends Statement, SailException> iter;
+        HBaseSail sail = new TimeAwareHBaseSail(HBaseServerTestInstance.getInstanceConfig(), "timestamptable", true, 0, true, 0, null, null);
+        SailRepository rep = new SailRepository(sail);
+        rep.initialize();
+        SailRepositoryConnection con = rep.getConnection();
+        assertTrue(testUpdate(con, "insert {<http://whatever> <http://whatever> <http://whatever>} where {bind(\"2002-05-30T09:30:10.2\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE)}"));
+        assertTrue(testUpdate(con, "delete {<http://whatever> <http://whatever> <http://whatever>} where {bind(\"2002-05-30T09:30:10.1\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE)}"));
+        assertFalse(testUpdate(con, "delete {<http://whatever> <http://whatever> <http://whatever>} where {bind(\"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE)}"));
+        assertFalse(testUpdate(con, "insert {<http://whatever> <http://whatever> <http://whatever>} where {bind(\"2002-05-30T09:30:10.3\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE)}"));
+        assertTrue(testUpdate(con, "insert {<http://whatever> <http://whatever> <http://whatever>} where {bind(\"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE)}"));
         rep.shutDown();
     }
 
