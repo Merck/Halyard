@@ -17,7 +17,35 @@ The SAILs are executed within the Console local context by default or the Consol
 
 The Console represents an all-in-one user solution for experiments with various SAILs (based in-memory or on a local filesystem) as well as for Halyard (HBase SAIL) cluster connection. For use with Halyard (HBase SAIL) it is mandatory to execute the Console on a Hadoop & HBase configured cluster node.
 
-![RDF4J Console](img/console.png)
+```
+$ ./console.sh
+Connected to default data directory
+RDF4J Console 2.2.2
+
+2.2.2
+Type 'help' for help.
+
+> help
+For more information on a specific command, try 'help <command>'.
+List of all commands:
+help        Displays this help message
+info        Shows info about the console
+connect     Connects to a (local or remote) set of repositories
+disconnect  Disconnects from the current set of repositories
+create      Creates a new repository
+federate    Federate existing repositories.
+drop        Drops a repository
+open        Opens a repository to work on, takes a repository ID as argument
+close       Closes the current repository
+show        Displays an overview of various resources
+load        Loads a data file into a repository, takes a file path or URL as argument
+verify      Verifies the syntax of an RDF data file, takes a file path or URL as argument
+clear       Removes data from a repository
+sparql      Evaluate a SPARQL query
+serql       Evaluate a SeRQL query
+set         Allows various console parameters to be set
+exit, quit  Exit the console
+```
 
 **Console usage:**
 
@@ -54,7 +82,15 @@ All the supported RDF formats can be also compressed with one of the compression
 * LZO (.lzo)
 * Snappy (.snappy)
 
-![Halyard Bulk Load](img/bulkload.png)
+```
+$ ./bulkload
+Usage: bulkload [-Dmapreduce.job.queuename=proofofconcepts] \
+                [-Dhalyard.parser.skipinvalid=true] \
+                [-Dhalyard.table.splitbits=8] \
+                [-Dhalyard.parser.context.default=http://new_context] \
+                [-Dhalyard.parser.context.override=true] \
+                <input path(s)> <output path> <table name>
+```
 
 **Bulk Load usage:**
 
@@ -74,11 +110,19 @@ All the supported RDF formats can be also compressed with one of the compression
 
 ### Halyard PreSplit
 
-Halyard PreSplit is a MapReduce application designed to estimate optimal HBase region splits for big datasets before the Bulk Load. Halyard PreSplit creates an empty HBase table based on calculations from the dataset sources sampling. For very large datasets it is wise to calculate the pre-splits before the HBase table is created to allow more efficient following Bulk Load process of the data. Optional definition or override of the graph context should be specified exactly the same as for the following Bulk Load process so the region presplits estimations are precise.   
+Halyard PreSplit is a MapReduce application designed to estimate optimal HBase region splits for big datasets before the Bulk Load. Halyard PreSplit creates an empty HBase table based on calculations from the dataset sources sampling. For very large datasets it is wise to calculate the pre-splits before the HBase table is created to allow more efficient following Bulk Load process of the data. Optional definition or override of the graph context should be specified exactly the same as for the following Bulk Load process so the region presplits estimations are precise.
 
 Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.
 
-![Halyard PreSplit](img/presplit.png)
+```
+$ ./presplit
+Usage: presplit [-Dmapreduce.job.queuename=proofofconcepts] \
+                [-Dhalyard.parser.skipinvalid=true] \
+                [-Dhalyard.table.splitbits=8] \
+                [-Dhalyard.parser.context.default=http://new_context] \
+                [-Dhalyard.parser.context.override=true] \
+                <input path(s)> <table name>
+```
 
 **PreSplit usage:**
 
@@ -112,7 +156,17 @@ Halyard Hive Load consumes RDF data files of various formats supported by RDF4J 
  * application/rdf+json
  * application/xhtml+xml (application/html, text/html)
 
-![Halyard Hive Load](img/hiveload.png)
+```
+$ ./hiveload 
+Usage: hiveload -Dhalyard.rdf.mime.type='application/ld+json' \
+                [-Dmapreduce.job.queuename=proofofconcepts] \
+                [-Dhalyard.hive.data.column.index=3] \
+                [-Dhalyard.base.uri='http://my_base_uri/'] \
+                [-Dhalyard.table.splitbits=8] \
+                [-Dhalyard.parser.context.default=http://new_context] \
+                [-Dhalyard.parser.context.override=true] \
+                <Hive table name> <output path> <HBase table name>
+```
 
 **Hive Load usage:**
 
@@ -132,7 +186,17 @@ Halyard Hive Load consumes RDF data files of various formats supported by RDF4J 
 
 Halyard Update is a command-line application designed to run SPARQL Update operations to transform data in an HBase Halyard dataset.
 
-![Halyard Update](img/hupdate.png)
+```
+$ ./update
+usage: update [-e <elastic_index_url>] [-h] [-q <sparql_query>] [-s <source_htable>] [-v]
+Updates Halyard RDF store based on provided SPARQL update query
+ -e <elastic_index_url>   Optional ElasticSearch index URL
+ -h                       Prints this help
+ -q <sparql_query>        SPARQL tuple or graph query executed to export the data
+ -s <source_htable>       Source HBase table with Halyard RDF store
+ -v                       Prints version
+Example: update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs ?o}'
+```
 
 **Update usage:**
 
@@ -144,13 +208,17 @@ Halyard Update is a command-line application designed to run SPARQL Update opera
 
 Halyard Bulk Update is a MapReduce application that executes multiple SPARQL Update operations in parallel in the Mapper phase. The Shuffle and Reduce phase are responsible for the efficient update of the dataset in a bulk mode (similar to the Halyard Bulk Load). Halyard Bulk Update supports large-scale DELETE/INSERT operations that are not executed separately, but instead they are processed as a single atomic bulk operation at the end of the execution.
 
-![Halyard Bulk Update](img/bulkupdate.png)
+```
+$ ./bulkupdate
+Usage: bulkupdate [-Dmapreduce.job.queuename=proofofconcepts] \
+                  <input_file_with_SPARQL_queries> <output_path> <table_name>
+```
 
 **Update usage:**
 
 1. Open terminal on a Hadoop cluster node with a configured HBase.
 2. Don't forget to `kinit` with your credentials if on a secured cluster.
-3. Write the SPARQL Update operations into a file, in which each operation is on a single line. 
+3. Write the SPARQL Update operations into a file, in which each operation is on a single line.
 4. Move the file with the SPARQL Update operations to the shared filesystem (HDFS).
 5. Execute `./bulkupdate <shared_path_of_file_with_SPARQL_Update_operations> <temporary_path_for_HTable_files> <HBase_table_name>` to launch the Bulk Update application. The following features are supported:
 	* The temporary path for the HTable files is used to store the temporary HBase table files. The files are moved to their final HBase locations during the last stage of the Bulk Load process.
@@ -192,7 +260,34 @@ The RDF4J RIO supported RDF formats are:
 * TriX (.xml, .trix)
 * Turtle (.ttl)
 
-![Halyard Export](img/export.png)
+```
+$ ./export
+Usage: export [-c <driver_class>] \
+              [-e <elastic_index_url>] \
+              [-h] \
+              [-l <driver_classpath>] \
+              [-p <property=value>] \
+              [-q <sparql_query>] \
+              [-r] \
+              [-s <source_htable>] \
+              [-t <target_url>] \
+              [-v]
+Exports graph or table data from Halyard RDF store based on SPARQL query
+ -c <driver_class>        JDBC driver class name
+ -e <elastic_index_url>   Optional ElasticSearch index URL
+ -h                       Prints this help
+ -l <driver_classpath>    JDBC driver classpath delimited by ':'
+ -p <property=value>      JDBC connection properties
+ -q <sparql_query>        SPARQL tuple or graph query executed to export the data
+ -r                       Trim target table before export (apply for JDBC only)
+ -s <source_htable>       Source HBase table with Halyard RDF store
+ -t <target_url>          file://<path>/<file_name>.<ext> or hdfs://<path>/<file_name>.<ext> or
+                          jdbc:<jdbc_connection>/<table_name>
+ -v                       Prints version
+Example: export -s my_dataset \
+                -q 'SELECT * WHERE { ?subjet ?predicate ?object . }' \
+                -t hdfs:/my_folder/my_data.csv.gz
+```
 
 **Export usage:**
 
@@ -211,7 +306,38 @@ The RDF4J RIO supported RDF formats are:
 
 Halyard Parallel Export is a MapReduce application that executes multiple Halyard Exports in multiple Map tasks across a Hadoop cluster. All the exports are instructed with the same SPARQL query, the same target, and the same options. The parallelisation is done using a custom SPARQL filter function `halyard:parallelSplitBy(?a_binding)`. The function takes one or more bindings as its arguments and these bindings are used as keys to randomly distribute the query evaluation across all mappers.
 
-![Halyard Parallel Export](img/pexport.png)
+```
+$ ./pexport
+Usage: pexport [-c <driver_class>] \
+               [-h] \
+               [-l <driver_classpath>] \
+               [-p <property=value>] \
+               [-q <sparql_query>] \
+               [-s <source_htable>] \
+               [-t <target_url>] \
+               [-v]
+Exports graph or table data from Halyard RDF store, using parallalel SPARQL query
+ -c <driver_class>       JDBC driver class name
+ -h                      Prints this help
+ -l <driver_classpath>   JDBC driver classpath delimited by ':'
+ -p <property=value>     JDBC connection properties
+ -q <sparql_query>       SPARQL tuple or graph query with use of
+                         'http://merck.github.io/Halyard/ns#parallelSplitBy' function
+ -s <source_htable>      Source HBase table with Halyard RDF store
+ -t <target_url>         file://<path>/<file_name>{0}.<ext> or hdfs://<path>/<file_name>{0}.<ext> or
+                         jdbc:<jdbc_connection>/<table_name>
+ -v                      Prints version
+
+Example: pexport [-Dmapreduce.job.maps=10] \
+                 [-Dmapreduce.job.queuename=proofofconcepts] \
+                 -s my_dataset
+                 -q 'PREFIX halyard: <http://merck.github.io/Halyard/ns#>
+                     SELECT * WHERE {
+                       ?s ?p ?o .
+                       FILTER halyard:parallelSplitBy(?s)
+                     }' \
+                -t hdfs:/my_folder/my_data{0}.csv.gz
+```
 
 **Parallel Export usage:**
 
@@ -230,7 +356,23 @@ Halyard Parallel Export is a MapReduce application that executes multiple Halyar
 
 Halyard Stats is a MapReduce application that calculates dataset statistics and stores them in the dataset in the `http://merck.github.io/Halyard/ns#statsContext` named graph. The generated statistics are described by the [VoID vocabulary](http://www.w3.org/TR/void/#statistics), its [extensions](http://ldf.fi/void-ext), and the [SPARQL 1.1 Service Description](http://www.w3.org/TR/sparql11-service-description).
 
-![Halyard Stats](img/stats.png)
+```
+$ ./stats
+Usage: stats [-h] \
+             [-s <source_htable>] \
+             [-t <target_url>] \
+             [-v]
+Updates or exports statistics about Halyard dataset.
+ -h                   Prints this help
+ -s <source_htable>   Source HBase table with Halyard RDF store
+ -t <target_url>      Optional target file to export the statistics (instead of update)
+                      hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]
+ -v                   Prints version
+Example: stats [-Dmapreduce.job.queuename=proofofconcepts] \
+               [-Dhalyard.stats.graph.context='http://whatever/mystats'] \
+               -s my_dataset \
+               [-t hdfs:/my_folder/my_stats.trig]
+```
 
 **Sample statistics (in the [TriG](http://www.w3.org/TR/trig/) format):**
 
@@ -352,7 +494,7 @@ halyard:statsContext {
 1. Open terminal on a Hadoop cluster node with a configured HBase.
 2. Don't forget to `kinit` with your credentials if on a secured cluster.
 3. Execute `./stats -s <HBase_table_name>` to launch the calculation of the statistics. The following features are supported:
-	* The target file format and optional compression (for hdfs: targets) is determined from the target file extension. The statistics are stored in the dataset when target file is not specified. 
+	* The target file format and optional compression (for hdfs: targets) is determined from the target file extension. The statistics are stored in the dataset when target file is not specified.
 	* The option `-Dhalyard.stats.graph.context=<graph context url>` can override the default statistics target graph context `http://merck.github.io/Halyard/ns#statsContext`.
 	* The option `-Dhalyard.stats.subset.threshold=<long value>` can override the default threshold value `1000` for the generation of subsets in statistics. The statistics will include virtual partitions for all subjects, properties, and objects with cardinality higher than the given threshold. Lower value may produce the statistics with many virtual partitions.
 
@@ -360,7 +502,20 @@ halyard:statsContext {
 
 Halyard ElasticSearch Index is a MapReduce application that indexes all literals in the given dataset into a supplementary ElasticSearch server/cluster. A Halyard repository configured with such supplementary ElasticSearch index can then provide more advanced text search features over the indexed literals.
 
-![Halyard ElasticSearch Index](img/esindex.png)
+```
+$ ./esindex
+Usage: stats [-h] \
+             [-s <source_htable>] \
+             [-t <target_url>] \
+             [-v]
+Indexes all literals from Halyard dataset into Elasticsearch.
+ -h                   Prints this help
+ -s <source_htable>   Source HBase table with Halyard RDF store
+ -t <target_url>      Elasticsearch target index url <server>:<port>/<index_name>
+ -v                   Prints version
+Example: esindex -s my_dataset \
+                 -t http://my_elastic.my.org:9200/my_index
+```
 
 **Halyard ElasticSearch Index usage:**
 
