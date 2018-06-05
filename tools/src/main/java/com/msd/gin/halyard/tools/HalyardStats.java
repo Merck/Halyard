@@ -93,7 +93,7 @@ public class HalyardStats implements Tool {
 
     private static final String SOURCE = "halyard.stats.source";
     private static final String TARGET = "halyard.stats.target";
-    static final String SUBSET_THRESHOLD = "halyard.stats.subset.threshold";
+    static final String THRESHOLD = "halyard.stats.threshold";
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
     private static final Logger LOG = Logger.getLogger(HalyardStats.class.getName());
@@ -120,14 +120,14 @@ public class HalyardStats implements Tool {
         long distinctIRIReferenceSubjects, distinctIRIReferenceObjects, distinctBlankNodeObjects, distinctBlankNodeSubjects, distinctLiterals;
         IRI subsetType;
         String subsetId;
-        long subsetThreshold, subsetCounter;
+        long threshold, setCounter, subsetCounter;
         HBaseSail sail;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             update = conf.get(TARGET) == null;
-            subsetThreshold = conf.getLong(SUBSET_THRESHOLD, 1000);
+            threshold = conf.getLong(THRESHOLD, 1000);
             statsContext = ssf.createIRI(conf.get(GRAPH_CONTEXT, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             statsContextHash = HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(statsContext).getBytes(UTF8));
         }
@@ -244,27 +244,30 @@ public class HalyardStats implements Tool {
                 default:
             }
             subsetCounter += value.rawCells().length;
+            setCounter += value.rawCells().length;
             lastRegion = region;
         }
 
         private void report(Context output, IRI property, String partitionId, long value) throws IOException, InterruptedException {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            try (DataOutputStream dos = new DataOutputStream(baos)) {
-                dos.writeUTF(graph.stringValue());
-                dos.writeUTF(property.stringValue());
-                if (partitionId == null) {
-                    dos.writeInt(0);
-                } else {
-                    byte b[] = partitionId.getBytes(UTF8);
-                    dos.writeInt(b.length);
-                    dos.write(b);
+            if (value > 0) {
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                try (DataOutputStream dos = new DataOutputStream(baos)) {
+                    dos.writeUTF(graph.stringValue());
+                    dos.writeUTF(property.stringValue());
+                    if (partitionId == null) {
+                        dos.writeInt(0);
+                    } else {
+                        byte b[] = partitionId.getBytes(UTF8);
+                        dos.writeInt(b.length);
+                        dos.write(b);
+                    }
                 }
+                output.write(new ImmutableBytesWritable(baos.toByteArray()), new LongWritable(value));
             }
-            output.write(new ImmutableBytesWritable(baos.toByteArray()), new LongWritable(value));
         }
 
         protected void cleanupSubset(Context output) throws IOException, InterruptedException {
-            if (subsetCounter >= subsetThreshold) {
+            if (subsetCounter >= threshold) {
                 report(output, subsetType, subsetId, subsetCounter);
             }
             subsetCounter = 0;
@@ -272,25 +275,28 @@ public class HalyardStats implements Tool {
 
         @Override
         protected void cleanup(Context output) throws IOException, InterruptedException {
-            report(output, VOID.TRIPLES, null, triples);
+            if (graph == HALYARD.STATS_ROOT_NODE || setCounter >= threshold) {
+                report(output, VOID.TRIPLES, null, triples);
+                report(output, VOID.DISTINCT_SUBJECTS, null, distinctSubjects);
+                report(output, VOID.PROPERTIES, null, properties);
+                report(output, VOID.DISTINCT_OBJECTS, null, distinctObjects);
+                report(output, VOID.CLASSES, null, classes);
+                report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_OBJECTS, null, distinctIRIReferenceObjects);
+                report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_SUBJECTS, null, distinctIRIReferenceSubjects);
+                report(output, VOID_EXT.DISTINCT_BLANK_NODE_OBJECTS, null, distinctBlankNodeObjects);
+                report(output, VOID_EXT.DISTINCT_BLANK_NODE_SUBJECTS, null, distinctBlankNodeSubjects);
+                report(output, VOID_EXT.DISTINCT_LITERALS, null, distinctLiterals);
+            }
+            setCounter = 0;
             triples = 0;
-            report(output, VOID.DISTINCT_SUBJECTS, null, distinctSubjects);
             distinctSubjects = 0;
-            report(output, VOID.PROPERTIES, null, properties);
             properties = 0;
-            report(output, VOID.DISTINCT_OBJECTS, null, distinctObjects);
             distinctObjects = 0;
-            report(output, VOID.CLASSES, null, classes);
             classes = 0;
-            report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_OBJECTS, null, distinctIRIReferenceObjects);
             distinctIRIReferenceObjects = 0;
-            report(output, VOID_EXT.DISTINCT_IRI_REFERENCE_SUBJECTS, null, distinctIRIReferenceSubjects);
             distinctIRIReferenceSubjects = 0;
-            report(output, VOID_EXT.DISTINCT_BLANK_NODE_OBJECTS, null, distinctBlankNodeObjects);
             distinctBlankNodeObjects = 0;
-            report(output, VOID_EXT.DISTINCT_BLANK_NODE_SUBJECTS, null, distinctBlankNodeSubjects);
             distinctBlankNodeSubjects = 0;
-            report(output, VOID_EXT.DISTINCT_LITERALS, null, distinctLiterals);
             distinctLiterals = 0;
             cleanupSubset(output);
             if (sail != null) {

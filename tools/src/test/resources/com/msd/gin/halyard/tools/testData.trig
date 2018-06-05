@@ -1,0 +1,1573 @@
+@prefix : <http://whatever/> .
+
+:graph1 {
+	_:id5f75 :pred2 "whatever value 275" ;
+		a :type275 .
+
+	:subj7 :pred0 "whatever value 507" ;
+		:pred10 "whatever value 907" ;
+		:pred1 "whatever value 807" ;
+		:pred8 "whatever value 307" ;
+		:pred12 "whatever value 207" ;
+		a :type107 , :type607 , :type907 , :type707 , :type507 , :type207 , :type807 , :type307 ;
+		:pred9 "whatever value 607" ;
+		:pred5 _:id5f7 ;
+		:pred3 "whatever value 107" .
+
+	_:id5f79 :pred4 "whatever value 979" ;
+		a :type979 .
+
+	_:id5f49 :pred12 "whatever value 649" ;
+		a :type649 .
+
+	:subj83 :pred2 _:id5f83 ;
+		:pred10 "whatever value 283" ;
+		:pred1 "whatever value 183" ;
+		:pred8 "whatever value 983" ;
+		:pred12 "whatever value 883" ;
+		a :type783 , :type283 , :type683 , :type483 , :type883 , :type183 , :type383 , :type983 ;
+		:pred6 "whatever value 383" ;
+		:pred7 "whatever value 683" ;
+		:pred3 "whatever value 783" .
+
+	:subj45 :pred0 "whatever value 845" ;
+		:pred2 "whatever value 145" ;
+		:pred8 "whatever value 645" ;
+		:pred4 "whatever value 745" ;
+		:pred12 "whatever value 545" ;
+		a :type145 , :type645 , :type345 , :type245 , :type545 , :type845 , :type745 , :type945 , :type445 ;
+		:pred9 _:id5f45 ;
+		:pred11 _:id5f45 ;
+		:pred7 "whatever value 345" ;
+		:pred3 "whatever value 445" .
+
+	:subj33 :pred0 "whatever value 533" ;
+		:pred10 "whatever value 933" ;
+		:pred1 _:id5f33 ;
+		:pred8 "whatever value 333" ;
+		:pred4 "whatever value 433" ;
+		:pred12 "whatever value 233" ;
+		a :type533 , :type333 , :type733 , :type133 , :type233 , :type933 , :type633 , :type433 , :type833 ;
+		:pred9 "whatever value 633" ;
+		:pred5 "whatever value 733" ;
+		:pred3 _:id5f33 .
+
+	_:id5f85 :pred8 _:id5f85 ;
+		a :type385 .
+
+	_:id5f83 a :type583 ;
+		:pred11 "whatever value 583" .
+
+	:subj19 :pred0 _:id5f19 ;
+		:pred2 _:id5f19 ;
+		:pred8 "whatever value 619" ;
+		:pred4 "whatever value 719" ;
+		:pred12 "whatever value 519" ;
+		a :type919 , :type519 , :type619 , :type119 , :type419 , :type219 , :type819 , :type719 ;
+		:pred9 "whatever value 919" ;
+		:pred11 "whatever value 219" ;
+		:pred3 "whatever value 419" .
+
+	_:id5f17 :pred10 "whatever value 517" ;
+		a :type517 .
+
+	_:id5f37 a :type737 ;
+		:pred9 "whatever value 737" .
+
+	_:id5f53 a :type253 ;
+		:pred6 "whatever value 253" .
+
+	_:id5f29 :pred0 "whatever value 429" ;
+		a :type429 .
+
+	_:id5f81 :pred1 "whatever value 781" ;
+		a :type781 .
+
+	_:id5f63 :pred12 "whatever value 363" ;
+		a :type363 .
+
+	:subj9 :pred2 "whatever value 509" ;
+		:pred10 "whatever value 309" ;
+		:pred12 "whatever value 909" ;
+		a :type109 , :type909 , :type509 , :type609 , :type809 , :type409 , :type709 , :type309 ;
+		:pred6 "whatever value 409" ;
+		:pred11 _:id5f9 ;
+		:pred7 "whatever value 709" ;
+		:pred5 "whatever value 109" ;
+		:pred3 "whatever value 809" .
+
+	_:id5f3 :pred10 "whatever value 803" ;
+		a :type803 .
+
+	_:id5f87 a :type187 ;
+		:pred5 "whatever value 187" .
+
+	:subj13 :pred2 "whatever value 613" ;
+		:pred10 _:id5f13 ;
+		:pred1 "whatever value 313" ;
+		a :type513 , :type313 , :type613 , :type113 , :type213 , :type813 , :type413 , :type713 ;
+		:pred6 "whatever value 513" ;
+		:pred9 "whatever value 113" ;
+		:pred11 "whatever value 713" ;
+		:pred7 "whatever value 813" ;
+		:pred5 "whatever value 213" .
+
+	_:id5f71 :pred8 "whatever value 671" ;
+		a :type671 .
+
+	_:id5f41 a :type341 ;
+		:pred3 "whatever value 341" .
+
+	_:id5f5 a :type605 ;
+		:pred7 "whatever value 605" .
+
+	:subj35 :pred2 "whatever value 535" ;
+		:pred10 "whatever value 335" ;
+		:pred1 "whatever value 235" ;
+		a :type735 , :type335 , :type535 , :type835 , :type435 , :type635 , :type135 , :type235 ;
+		:pred6 "whatever value 435" ;
+		:pred11 "whatever value 635" ;
+		:pred7 _:id5f35 ;
+		:pred5 "whatever value 135" ;
+		:pred3 "whatever value 835" .
+
+	:subj1 :pred2 [] ;
+		:pred10 "whatever value 101" ;
+		:pred8 "whatever value 801" ;
+		:pred4 "whatever value 901" ;
+		:pred12 "whatever value 701" ;
+		a :type301 , :type101 , :type801 , :type901 , :type201 , :type501 , :type401 , :type601 , :type701 ;
+		:pred6 "whatever value 201" ;
+		:pred11 "whatever value 401" ;
+		:pred7 "whatever value 501" ;
+		:pred3 "whatever value 601" .
+
+	:subj5 :pred2 "whatever value 405" ;
+		:pred10 "whatever value 205" ;
+		:pred1 _:id5f5 ;
+		:pred8 "whatever value 905" ;
+		:pred12 _:id5f5 ;
+		a :type905 , :type305 , :type705 , :type105 , :type805 , :type505 , :type405 , :type205 ;
+		:pred6 "whatever value 305" ;
+		:pred11 "whatever value 505" ;
+		:pred3 "whatever value 705" .
+
+	_:id5f91 a :type891 ;
+		:pred7 "whatever value 891" .
+
+	:subj21 :pred0 "whatever value 221" ;
+		:pred2 "whatever value 821" ;
+		:pred10 "whatever value 621" ;
+		:pred1 "whatever value 521" ;
+		a :type421 , :type821 , :type221 , :type921 , :type321 , :type721 , :type521 , :type621 ;
+		:pred6 _:id5f21 ;
+		:pred9 "whatever value 321" ;
+		:pred11 "whatever value 921" ;
+		:pred5 "whatever value 421" .
+
+	:subj17 :pred0 "whatever value 117" ;
+		:pred2 "whatever value 717" ;
+		:pred1 "whatever value 417" ;
+		a :type717 , :type117 , :type617 , :type817 , :type417 , :type917 , :type217 , :type317 ;
+		:pred6 "whatever value 617" ;
+		:pred9 _:id5f17 ;
+		:pred11 "whatever value 817" ;
+		:pred7 _:id5f17 ;
+		:pred5 "whatever value 317" .
+
+	_:id5f47 :pred2 _:id5f47 ;
+		a :type847 .
+
+	:subj47 :pred0 "whatever value 247" ;
+		:pred10 "whatever value 647" ;
+		:pred1 "whatever value 547" ;
+		:pred4 _:id5f47 ;
+		a :type747 , :type447 , :type947 , :type247 , :type547 , :type647 , :type347 , :type147 ;
+		:pred6 "whatever value 747" ;
+		:pred9 "whatever value 347" ;
+		:pred11 "whatever value 947" ;
+		:pred5 "whatever value 447" .
+
+	_:id5f13 a :type913 ;
+		:pred3 "whatever value 913" .
+
+	_:id5f73 a :type473 ;
+		:pred5 "whatever value 473" .
+
+	:subj39 :pred2 "whatever value 639" ;
+		:pred10 "whatever value 439" ;
+		:pred1 "whatever value 339" ;
+		a :type439 , :type139 , :type839 , :type639 , :type939 , :type239 , :type339 , :type739 ;
+		:pred9 "whatever value 139" ;
+		:pred11 "whatever value 739" ;
+		:pred7 "whatever value 839" ;
+		:pred5 "whatever value 239" ;
+		:pred3 "whatever value 939" .
+
+	:subj89 :pred0 "whatever value 689" ;
+		:pred1 "whatever value 989" ;
+		:pred8 "whatever value 489" ;
+		:pred4 "whatever value 589" ;
+		:pred12 "whatever value 389" ;
+		a :type689 , :type389 , :type189 , :type789 , :type889 , :type489 , :type289 , :type989 , :type589 ;
+		:pred9 "whatever value 789" ;
+		:pred7 _:id5f89 ;
+		:pred5 _:id5f89 ;
+		:pred3 "whatever value 289" .
+
+	:subj67 :pred0 "whatever value 767" ;
+		:pred8 [] ;
+		:pred4 "whatever value 667" ;
+		:pred12 "whatever value 467" ;
+		a :type867 , :type467 , :type767 , :type167 , :type667 , :type267 , :type567 , :type967 , :type367 ;
+		:pred9 "whatever value 867" ;
+		:pred11 "whatever value 167" ;
+		:pred7 "whatever value 267" ;
+		:pred5 "whatever value 967" ;
+		:pred3 "whatever value 367" .
+
+	:subj57 :pred2 "whatever value 457" ;
+		:pred10 "whatever value 257" ;
+		:pred1 "whatever value 157" ;
+		:pred12 "whatever value 857" ;
+		a :type357 , :type757 , :type257 , :type457 , :type657 , :type557 , :type857 , :type157 ;
+		:pred6 _:id5f57 ;
+		:pred11 "whatever value 557" ;
+		:pred7 "whatever value 657" ;
+		:pred3 "whatever value 757" .
+
+	:subj59 :pred0 "whatever value 559" ;
+		:pred10 _:id5f59 ;
+		:pred1 "whatever value 859" ;
+		:pred8 "whatever value 359" ;
+		:pred4 "whatever value 459" ;
+		:pred12 _:id5f59 ;
+		a :type659 , :type959 , :type559 , :type359 , :type159 , :type859 , :type259 , :type459 ;
+		:pred9 "whatever value 659" ;
+		:pred3 "whatever value 159" .
+
+	:subj11 :pred0 "whatever value 611" ;
+		:pred1 "whatever value 911" ;
+		:pred8 "whatever value 411" ;
+		:pred4 _:id5f11 ;
+		:pred12 "whatever value 311" ;
+		a :type111 , :type311 , :type211 , :type811 , :type911 , :type411 , :type611 , :type711 , :type511 ;
+		:pred9 "whatever value 711" ;
+		:pred7 "whatever value 111" ;
+		:pred5 "whatever value 811" ;
+		:pred3 "whatever value 211" .
+
+	_:id5f39 a :type539 ;
+		:pred6 _:id5f39 .
+
+	:subj71 :pred0 "whatever value 871" ;
+		:pred2 "whatever value 171" ;
+		:pred4 "whatever value 771" ;
+		:pred12 "whatever value 571" ;
+		a :type371 , :type971 , :type571 , :type771 , :type871 , :type471 , :type171 , :type271 ;
+		:pred9 "whatever value 971" ;
+		:pred11 "whatever value 271" ;
+		:pred7 _:id5f71 ;
+		:pred3 "whatever value 471" .
+
+	_:id5f31 :pred10 _:id5f31 ;
+		a :type231 .
+
+	:subj95 :pred0 "whatever value 195" ;
+		:pred2 "whatever value 795" ;
+		:pred10 _:id5f95 ;
+		a :type795 , :type895 , :type995 , :type295 , :type595 , :type195 , :type695 , :type395 ;
+		:pred6 "whatever value 695" ;
+		:pred9 "whatever value 295" ;
+		:pred11 "whatever value 895" ;
+		:pred7 "whatever value 995" ;
+		:pred5 "whatever value 395" .
+
+	:subj73 :pred0 _:id5f73 ;
+		:pred2 "whatever value 873" ;
+		:pred10 "whatever value 673" ;
+		:pred1 "whatever value 573" ;
+		:pred4 "whatever value 173" ;
+		a :type373 , :type873 , :type673 , :type173 , :type773 , :type273 , :type973 , :type573 ;
+		:pred6 "whatever value 773" ;
+		:pred9 "whatever value 373" ;
+		:pred11 _:id5f73 .
+
+	:subj77 :pred0 "whatever value 377" ;
+		:pred2 "whatever value 977" ;
+		:pred10 _:id5f77 ;
+		:pred1 "whatever value 677" ;
+		:pred8 "whatever value 177" ;
+		:pred4 "whatever value 277" ;
+		a :type477 , :type577 , :type777 , :type177 , :type877 , :type677 , :type377 , :type277 , :type977 ;
+		:pred6 "whatever value 877" ;
+		:pred9 "whatever value 477" ;
+		:pred5 "whatever value 577" .
+
+	:subj93 :pred0 "whatever value 793" ;
+		:pred8 "whatever value 593" ;
+		:pred12 "whatever value 493" ;
+		a :type393 , :type193 , :type793 , :type293 , :type593 , :type993 , :type493 , :type893 ;
+		:pred9 "whatever value 893" ;
+		:pred11 "whatever value 193" ;
+		:pred7 "whatever value 293" ;
+		:pred5 "whatever value 993" ;
+		:pred3 "whatever value 393" .
+
+	_:id5f59 a :type759 ;
+		:pred5 "whatever value 759" .
+
+	_:id5f25 a :type825 ;
+		:pred6 "whatever value 825" .
+
+	:subj91 :pred2 "whatever value 691" ;
+		:pred10 "whatever value 491" ;
+		:pred1 "whatever value 391" ;
+		a :type391 , :type591 , :type491 , :type291 , :type191 , :type691 , :type991 , :type791 ;
+		:pred6 "whatever value 591" ;
+		:pred9 "whatever value 191" ;
+		:pred11 _:id5f91 ;
+		:pred5 "whatever value 291" ;
+		:pred3 "whatever value 991" .
+
+	_:id5f69 a :type869 ;
+		:pred11 "whatever value 869" .
+
+	:subj55 :pred0 _:id5f55 ;
+		:pred10 "whatever value 855" ;
+		:pred1 "whatever value 755" ;
+		:pred8 "whatever value 255" ;
+		:pred4 "whatever value 355" ;
+		:pred12 "whatever value 155" ;
+		a :type655 , :type155 , :type955 , :type455 , :type255 , :type355 , :type555 , :type855 , :type755 ;
+		:pred6 "whatever value 955" ;
+		:pred9 "whatever value 555" ;
+		:pred5 "whatever value 655" .
+
+	:subj37 :pred0 _:id5f37 ;
+		:pred1 "whatever value 937" ;
+		:pred8 "whatever value 437" ;
+		:pred4 "whatever value 537" ;
+		:pred12 "whatever value 337" ;
+		a :type237 , :type937 , :type437 , :type837 , :type337 , :type537 , :type137 , :type637 ;
+		:pred7 "whatever value 137" ;
+		:pred5 "whatever value 837" ;
+		:pred3 "whatever value 237" .
+
+	_:id5f7 :pred4 "whatever value 407" ;
+		a :type407 .
+
+	_:id5f35 :pred12 "whatever value 935" ;
+		a :type935 .
+
+	_:id5f43 :pred0 "whatever value 143" ;
+		a :type143 .
+
+	_:id5f21 :pred4 "whatever value 121" ;
+		a :type121 .
+
+	:subj15 :pred8 "whatever value 515" ;
+		:pred4 "whatever value 615" ;
+		:pred12 "whatever value 415" ;
+		a :type215 , :type515 , :type415 , :type315 , :type115 , :type815 , :type615 , :type915 ;
+		:pred9 "whatever value 815" ;
+		:pred11 "whatever value 115" ;
+		:pred7 "whatever value 215" ;
+		:pred5 "whatever value 915" ;
+		:pred3 _:id5f15 .
+
+	:subj41 :pred0 "whatever value 741" ;
+		:pred8 "whatever value 541" ;
+		:pred4 "whatever value 641" ;
+		:pred12 _:id5f41 ;
+		a :type241 , :type541 , :type841 , :type141 , :type741 , :type441 , :type941 , :type641 ;
+		:pred9 "whatever value 841" ;
+		:pred11 "whatever value 141" ;
+		:pred7 "whatever value 241" ;
+		:pred5 "whatever value 941" .
+
+	_:id5f61 :pred2 "whatever value 561" ;
+		a :type561 .
+
+	:subj63 :pred0 "whatever value 663" ;
+		:pred1 "whatever value 963" ;
+		:pred8 "whatever value 463" ;
+		:pred4 "whatever value 563" ;
+		a :type163 , :type463 , :type563 , :type663 , :type763 , :type263 , :type963 , :type863 ;
+		:pred9 _:id5f63 ;
+		:pred7 "whatever value 163" ;
+		:pred5 "whatever value 863" ;
+		:pred3 "whatever value 263" .
+
+	:subj81 :pred0 "whatever value 481" ;
+		:pred10 "whatever value 881" ;
+		:pred8 "whatever value 281" ;
+		:pred4 "whatever value 381" ;
+		:pred12 "whatever value 181" ;
+		a :type381 , :type181 , :type881 , :type681 , :type981 , :type281 , :type481 , :type581 ;
+		:pred6 "whatever value 981" ;
+		:pred9 _:id5f81 ;
+		:pred5 "whatever value 681" .
+
+	_:id5f19 a :type319 ;
+		:pred7 "whatever value 319" .
+
+	:subj23 :pred0 "whatever value 923" ;
+		:pred2 "whatever value 223" ;
+		:pred8 "whatever value 723" ;
+		:pred4 "whatever value 823" ;
+		:pred12 [] ;
+		a :type523 , :type423 , :type623 , :type823 , :type223 , :type323 , :type923 , :type123 , :type723 ;
+		:pred6 "whatever value 123" ;
+		:pred11 "whatever value 323" ;
+		:pred7 "whatever value 423" ;
+		:pred3 "whatever value 523" .
+
+	:subj69 :pred0 "whatever value 169" ;
+		:pred2 "whatever value 769" ;
+		:pred10 "whatever value 569" ;
+		:pred1 _:id5f69 ;
+		a :type769 , :type469 , :type669 , :type569 , :type969 , :type169 , :type269 , :type369 ;
+		:pred6 "whatever value 669" ;
+		:pred9 "whatever value 269" ;
+		:pred7 "whatever value 969" ;
+		:pred5 "whatever value 369" .
+
+	:subj51 :pred0 "whatever value 351" ;
+		:pred2 "whatever value 951" ;
+		:pred10 "whatever value 751" ;
+		:pred1 _:id5f51 ;
+		:pred8 "whatever value 151" ;
+		:pred4 "whatever value 251" ;
+		a :type851 , :type251 , :type551 , :type751 , :type351 , :type651 , :type951 , :type151 ;
+		:pred6 "whatever value 851" ;
+		:pred5 "whatever value 551" .
+
+	_:id5f15 :pred0 "whatever value 715" ;
+		a :type715 .
+
+	_:id5f97 a :type297 ;
+		:pred11 "whatever value 297" .
+
+	:subj25 :pred0 "whatever value 325" ;
+		:pred2 "whatever value 925" ;
+		:pred10 "whatever value 725" ;
+		:pred1 "whatever value 625" ;
+		:pred8 "whatever value 125" ;
+		:pred4 "whatever value 225" ;
+		a :type525 , :type725 , :type325 , :type125 , :type625 , :type925 , :type425 , :type225 ;
+		:pred9 "whatever value 425" ;
+		:pred5 _:id5f25 .
+
+	:subj53 :pred2 "whatever value 353" ;
+		:pred10 "whatever value 153" ;
+		:pred8 "whatever value 853" ;
+		:pred4 "whatever value 953" ;
+		:pred12 "whatever value 753" ;
+		a :type953 , :type153 , :type453 , :type353 , :type753 , :type853 , :type653 , :type553 ;
+		:pred11 "whatever value 453" ;
+		:pred7 _:id5f53 ;
+		:pred3 "whatever value 653" .
+
+	:subj27 :pred2 "whatever value 327" ;
+		:pred10 "whatever value 127" ;
+		:pred8 "whatever value 827" ;
+		:pred4 "whatever value 927" ;
+		:pred12 "whatever value 727" ;
+		a :type527 , :type127 , :type727 , :type827 , :type427 , :type327 , :type227 , :type927 ;
+		:pred6 "whatever value 227" ;
+		:pred11 _:id5f27 ;
+		:pred7 "whatever value 527" .
+
+	_:id5f9 :pred1 "whatever value 209" ;
+		a :type209 .
+
+	:subj43 :pred2 "whatever value 743" ;
+		:pred10 "whatever value 543" ;
+		:pred1 "whatever value 443" ;
+		a :type943 , :type543 , :type743 , :type643 , :type243 , :type443 , :type343 , :type843 ;
+		:pred6 "whatever value 643" ;
+		:pred9 "whatever value 243" ;
+		:pred11 "whatever value 843" ;
+		:pred7 "whatever value 943" ;
+		:pred5 _:id5f43 .
+
+	_:id5f57 :pred8 "whatever value 957" ;
+		a :type957 .
+
+	:subj85 :pred0 "whatever value 585" ;
+		:pred10 "whatever value 985" ;
+		:pred1 "whatever value 885" ;
+		:pred4 "whatever value 485" ;
+		:pred12 "whatever value 285" ;
+		a :type685 , :type185 , :type885 , :type985 , :type485 , :type785 , :type285 , :type585 ;
+		:pred9 "whatever value 685" ;
+		:pred5 "whatever value 785" ;
+		:pred3 "whatever value 185" .
+
+	_:id5f95 :pred1 "whatever value 495" ;
+		a :type495 .
+
+	:subj3 :pred0 "whatever value 403" ;
+		:pred1 "whatever value 703" ;
+		:pred8 _:id5f3 ;
+		:pred4 "whatever value 303" ;
+		:pred12 "whatever value 103" ;
+		a :type703 , :type203 , :type303 , :type503 , :type903 , :type103 , :type603 , :type403 ;
+		:pred6 _:id5f3 ;
+		:pred9 "whatever value 503" ;
+		:pred5 "whatever value 603" .
+
+	:subj61 :pred10 "whatever value 361" ;
+		:pred1 "whatever value 261" ;
+		:pred12 "whatever value 961" ;
+		a :type461 , :type761 , :type961 , :type861 , :type361 , :type261 , :type661 , :type161 ;
+		:pred6 "whatever value 461" ;
+		:pred11 "whatever value 661" ;
+		:pred7 "whatever value 761" ;
+		:pred5 _:id5f61 ;
+		:pred3 _:id5f61 .
+
+	_:id5f27 a :type627 ;
+		:pred3 "whatever value 627" .
+
+	:subj97 :pred0 "whatever value 897" ;
+		:pred2 "whatever value 197" ;
+		:pred8 "whatever value 697" ;
+		:pred4 "whatever value 797" ;
+		:pred12 "whatever value 597" ;
+		a :type497 , :type797 , :type397 , :type697 , :type897 , :type997 , :type597 , :type197 ;
+		:pred9 "whatever value 997" ;
+		:pred7 "whatever value 397" ;
+		:pred3 _:id5f97 .
+
+	:subj79 :pred2 "whatever value 379" ;
+		:pred10 "whatever value 179" ;
+		:pred8 "whatever value 879" ;
+		:pred12 "whatever value 779" ;
+		a :type279 , :type179 , :type479 , :type779 , :type679 , :type579 , :type879 , :type379 ;
+		:pred6 "whatever value 279" ;
+		:pred11 "whatever value 479" ;
+		:pred7 "whatever value 579" ;
+		:pred3 _:id5f79 .
+
+	_:id5f51 a :type451 ;
+		:pred9 "whatever value 451" .
+
+	:subj87 :pred2 "whatever value 587" ;
+		:pred10 "whatever value 387" ;
+		:pred1 _:id5f87 ;
+		:pred12 _:id5f87 ;
+		a :type787 , :type987 , :type487 , :type287 , :type387 , :type587 , :type887 , :type687 ;
+		:pred6 "whatever value 487" ;
+		:pred11 "whatever value 687" ;
+		:pred7 "whatever value 787" ;
+		:pred3 "whatever value 887" .
+
+	_:id5f65 a :type165 ;
+		:pred9 "whatever value 165" .
+
+	:subj75 :pred0 "whatever value 975" ;
+		:pred8 "whatever value 775" ;
+		:pred4 _:id5f75 ;
+		:pred12 "whatever value 675" ;
+		a :type575 , :type775 , :type375 , :type475 , :type675 , :type975 , :type175 , :type875 ;
+		:pred6 _:id5f75 ;
+		:pred11 "whatever value 375" ;
+		:pred7 "whatever value 475" ;
+		:pred3 "whatever value 575" .
+
+	:subj65 :pred2 _:id5f65 ;
+		:pred10 "whatever value 465" ;
+		:pred1 "whatever value 365" ;
+		a :type765 , :type265 , :type465 , :type865 , :type365 , :type565 , :type665 , :type965 ;
+		:pred6 "whatever value 565" ;
+		:pred11 "whatever value 765" ;
+		:pred7 "whatever value 865" ;
+		:pred5 "whatever value 265" ;
+		:pred3 "whatever value 965" .
+
+	:subj29 :pred10 "whatever value 829" ;
+		:pred1 "whatever value 729" ;
+		:pred8 "whatever value 229" ;
+		:pred4 _:id5f29 ;
+		:pred12 "whatever value 129" ;
+		a :type729 , :type229 , :type529 , :type629 , :type929 , :type329 , :type829 , :type129 ;
+		:pred6 "whatever value 929" ;
+		:pred9 "whatever value 529" ;
+		:pred5 "whatever value 629" .
+
+	:subj49 :pred0 "whatever value 949" ;
+		:pred2 "whatever value 249" ;
+		:pred8 _:id5f49 ;
+		:pred4 "whatever value 849" ;
+		a :type949 , :type449 , :type149 , :type349 , :type549 , :type749 , :type249 , :type849 ;
+		:pred6 "whatever value 149" ;
+		:pred11 "whatever value 349" ;
+		:pred7 "whatever value 449" ;
+		:pred3 "whatever value 549" .
+
+	:subj99 :pred0 "whatever value 299" ;
+		:pred2 "whatever value 899" ;
+		:pred10 "whatever value 699" ;
+		:pred1 "whatever value 599" ;
+		:pred4 "whatever value 199" ;
+		a :type599 , :type999 , :type799 , :type699 , :type499 , :type899 , :type399 , :type299 , :type199 ;
+		:pred6 "whatever value 799" ;
+		:pred9 _:id5f99 ;
+		:pred11 "whatever value 999" ;
+		:pred5 "whatever value 499" .
+
+	:subj31 :pred2 "whatever value 431" ;
+		:pred1 "whatever value 131" ;
+		:pred8 _:id5f31 ;
+		:pred12 "whatever value 831" ;
+		a :type331 , :type531 , :type731 , :type131 , :type831 , :type431 , :type631 , :type931 ;
+		:pred6 "whatever value 331" ;
+		:pred11 "whatever value 531" ;
+		:pred7 "whatever value 631" ;
+		:pred3 "whatever value 731" .
+
+	_:id5f93 :pred4 _:id5f93 ;
+		a :type693 .
+}
+
+{
+	:subj7 a :type7 ;
+		:pred7 _:id5f7 .
+
+	:subj83 a :type83 ;
+		:pred5 "whatever value 83" .
+
+	:subj45 a :type45 ;
+		:pred6 "whatever value 45" .
+
+	:subj19 a :type19 ;
+		:pred6 "whatever value 19" .
+
+	:subj9 a :type9 ;
+		:pred9 "whatever value 9" .
+
+	:subj13 :pred0 "whatever value 13" ;
+		a :type13 .
+
+	:subj35 a :type35 ;
+		:pred9 _:id5f35 .
+
+	:subj1 :pred1 "whatever value 1" ;
+		a :type1 .
+
+	:subj5 a :type5 ;
+		:pred5 "whatever value 5" .
+
+	:subj21 :pred8 _:id5f21 ;
+		a :type21 .
+
+	:subj17 :pred4 "whatever value 17" ;
+		a :type17 .
+
+	:subj47 :pred8 "whatever value 47" ;
+		a :type47 .
+
+	:subj39 :pred0 "whatever value 39" ;
+		a :type39 .
+
+	:subj89 a :type89 ;
+		:pred11 "whatever value 89" .
+
+	:subj67 :pred2 "whatever value 67" ;
+		a :type67 .
+
+	:subj57 a :type57 ;
+		:pred5 "whatever value 57" .
+
+	:subj59 a :type59 ;
+		:pred7 "whatever value 59" .
+
+	:subj71 a :type71 ;
+		:pred6 "whatever value 71" .
+
+	:subj95 :pred4 "whatever value 95" ;
+		a :type95 .
+
+	:subj73 :pred8 "whatever value 73" ;
+		a :type73 .
+
+	:subj93 :pred2 "whatever value 93" ;
+		a :type93 .
+
+	:subj91 :pred0 _:id5f91 ;
+		a :type91 .
+
+	:subj37 a :type37 ;
+		:pred11 "whatever value 37" .
+
+	:subj15 :pred2 "whatever value 15" ;
+		a :type15 .
+
+	:subj41 :pred2 "whatever value 41" ;
+		a :type41 .
+
+	:subj63 a :type63 ;
+		:pred11 _:id5f63 .
+
+	:subj81 a :type81 ;
+		:pred3 "whatever value 81" .
+
+	:subj23 :pred10 "whatever value 23" ;
+		a :type23 .
+
+	:subj69 :pred4 "whatever value 69" ;
+		a :type69 .
+
+	:subj51 :pred12 "whatever value 51" ;
+		a :type51 .
+
+	:subj25 :pred12 "whatever value 25" ;
+		a :type25 .
+
+	:subj53 :pred1 "whatever value 53" ;
+		a :type53 .
+
+	:subj27 :pred1 "whatever value 27" ;
+		a :type27 .
+
+	:subj43 :pred4 "whatever value 43" ;
+		a :type43 .
+
+	:subj85 a :type85 ;
+		:pred7 "whatever value 85" .
+
+	:subj3 a :type3 ;
+		:pred3 "whatever value 3" .
+
+	:subj61 a :type61 ;
+		:pred9 "whatever value 61" .
+
+	:subj97 a :type97 ;
+		:pred6 "whatever value 97" .
+
+	:subj79 :pred1 "whatever value 79" ;
+		a :type79 .
+
+	:subj87 a :type87 ;
+		:pred9 "whatever value 87" .
+
+	:subj75 :pred10 "whatever value 75" ;
+		a :type75 .
+
+	:subj65 :pred0 "whatever value 65" ;
+		a :type65 .
+
+	:subj29 a :type29 ;
+		:pred3 "whatever value 29" .
+
+	:subj49 :pred10 _:id5f49 ;
+		a :type49 .
+
+	:subj31 a :type31 ;
+		:pred5 "whatever value 31" .
+
+	:subj80 :pred2 "whatever value 80" ;
+		a :type80 .
+
+	:subj54 :pred2 "whatever value 54" ;
+		a :type54 .
+
+	_:id5f0 :pred0 _:id5f0 ;
+		a :type0 .
+
+	_:id5f44 a :type44 ;
+		:pred5 "whatever value 44" .
+
+	:subj78 :pred0 "whatever value 78" ;
+		a :type78 .
+
+	:subj84 a :type84 ;
+		:pred6 _:id5f84 .
+
+	:subj98 a :type98 ;
+		:pred7 _:id5f98 .
+
+	_:id5f88 :pred10 "whatever value 88" ;
+		a :type88 .
+
+	:subj34 :pred8 "whatever value 34" ;
+		a :type34 .
+
+	:subj96 a :type96 ;
+		:pred5 "whatever value 96" .
+
+	:subj48 a :type48 ;
+		:pred9 "whatever value 48" .
+
+	_:id5f66 :pred1 "whatever value 66" ;
+		a :type66 .
+
+	:subj8 :pred8 "whatever value 8" ;
+		a :type8 .
+
+	:subj64 :pred12 "whatever value 64" ;
+		a :type64 .
+
+	:subj38 :pred12 "whatever value 38" ;
+		a :type38 .
+
+	:subj86 :pred8 "whatever value 86" ;
+		a :type86 .
+
+	:subj40 :pred1 "whatever value 40" ;
+		a :type40 .
+
+	:subj46 a :type46 ;
+		:pred7 "whatever value 46" .
+
+	:subj2 :pred2 "whatever value 2" ;
+		a :type2 .
+
+	:subj60 :pred8 "whatever value 60" ;
+		a :type60 .
+
+	:subj68 a :type68 ;
+		:pred3 "whatever value 68" .
+
+	:subj26 :pred0 "whatever value 26" ;
+		a :type26 .
+
+	:subj74 a :type74 ;
+		:pred9 "whatever value 74" .
+
+	:subj56 :pred4 _:id5f56 ;
+		a :type56 .
+
+	:subj36 :pred10 "whatever value 36" ;
+		a :type36 .
+
+	:subj18 a :type18 ;
+		:pred5 "whatever value 18" .
+
+	:subj62 :pred10 "whatever value 62" ;
+		a :type62 .
+
+	:subj4 :pred4 "whatever value 4" ;
+		a :type4 .
+
+	:subj76 a :type76 ;
+		:pred11 "whatever value 76" .
+
+	_:id5f77 :pred12 _:id5f77 ;
+		a :type77 .
+
+	:subj14 :pred1 _:id5f14 ;
+		a :type14 .
+
+	:subj52 :pred0 "whatever value 52" ;
+		a :type52 .
+
+	:subj82 :pred4 "whatever value 82" ;
+		a :type82 .
+
+	_:id5f55 a :type55 ;
+		:pred3 "whatever value 55" .
+
+	:subj94 a :type94 ;
+		:pred3 "whatever value 94" .
+
+	:subj30 :pred4 "whatever value 30" ;
+		a :type30 .
+
+	:subj50 a :type50 ;
+		:pred11 "whatever value 50" .
+
+	:subj90 :pred12 "whatever value 90" ;
+		a :type90 .
+
+	:subj10 :pred10 "whatever value 10" ;
+		a :type10 .
+
+	:subj32 a :type32 ;
+		:pred6 "whatever value 32" .
+
+	:subj24 a :type24 ;
+		:pred11 "whatever value 24" .
+
+	:subj58 a :type58 ;
+		:pred6 "whatever value 58" .
+
+	:subj16 a :type16 ;
+		:pred3 "whatever value 16" .
+
+	:subj92 :pred1 "whatever value 92" ;
+		a :type92 .
+
+	_:id5f11 a :type11 ;
+		:pred11 "whatever value 11" .
+
+	:subj70 a :type70 ;
+		:pred5 _:id5f70 .
+
+	_:id5f33 a :type33 ;
+		:pred7 "whatever value 33" .
+
+	_:id5f22 a :type22 ;
+		:pred9 "whatever value 22" .
+
+	_:id5f99 :pred8 "whatever value 99" ;
+		a :type99 .
+
+	:subj12 :pred12 "whatever value 12" ;
+		a :type12 .
+
+	:subj42 a :type42 ;
+		:pred3 _:id5f42 .
+
+	:subj72 a :type72 ;
+		:pred7 "whatever value 72" .
+
+	:subj28 :pred2 _:id5f28 ;
+		a :type28 .
+
+	:subj20 a :type20 ;
+		:pred7 "whatever value 20" .
+
+	:subj6 a :type6 ;
+		:pred6 "whatever value 6" .
+}
+
+:graph0 {
+	:subj80 :pred0 "whatever value 780" ;
+		:pred8 "whatever value 580" ;
+		:pred4 "whatever value 680" ;
+		:pred12 "whatever value 480" ;
+		a :type380 , :type280 , :type780 , :type480 , :type980 , :type580 , :type680 , :type180 ;
+		:pred11 "whatever value 180" ;
+		:pred7 _:id5f80 ;
+		:pred5 _:id5f80 ;
+		:pred3 "whatever value 380" .
+
+	:subj54 :pred0 "whatever value 754" ;
+		:pred8 "whatever value 554" ;
+		:pred4 "whatever value 654" ;
+		:pred12 "whatever value 454" ;
+		a :type654 , :type954 , :type854 , :type354 , :type254 , :type454 , :type754 , :type554 ;
+		:pred9 _:id5f54 ;
+		:pred7 "whatever value 254" ;
+		:pred5 "whatever value 954" ;
+		:pred3 "whatever value 354" .
+
+	:subj78 :pred2 "whatever value 678" ;
+		:pred10 "whatever value 478" ;
+		:pred1 [] ;
+		a :type978 , :type278 , :type378 , :type178 , :type878 , :type678 , :type578 , :type778 , :type478 ;
+		:pred6 "whatever value 578" ;
+		:pred9 "whatever value 178" ;
+		:pred11 "whatever value 778" ;
+		:pred7 "whatever value 878" ;
+		:pred5 "whatever value 278" ;
+		:pred3 "whatever value 978" .
+
+	:subj84 :pred0 "whatever value 884" ;
+		:pred2 "whatever value 184" ;
+		:pred8 "whatever value 684" ;
+		:pred4 _:id5f84 ;
+		:pred12 "whatever value 584" ;
+		a :type684 , :type784 , :type584 , :type984 , :type284 , :type384 , :type884 , :type184 ;
+		:pred9 "whatever value 984" ;
+		:pred11 "whatever value 284" ;
+		:pred7 "whatever value 384" .
+
+	:subj98 :pred0 "whatever value 598" ;
+		:pred10 "whatever value 998" ;
+		:pred1 "whatever value 898" ;
+		:pred8 "whatever value 398" ;
+		:pred4 "whatever value 498" ;
+		:pred12 "whatever value 298" ;
+		a :type398 , :type998 , :type898 , :type498 , :type798 , :type298 , :type698 , :type598 ;
+		:pred9 "whatever value 698" ;
+		:pred5 _:id5f98 .
+
+	:subj34 :pred0 "whatever value 234" ;
+		:pred2 "whatever value 834" ;
+		:pred10 "whatever value 634" ;
+		:pred1 "whatever value 534" ;
+		:pred4 "whatever value 134" ;
+		a :type734 , :type234 , :type134 , :type434 , :type634 , :type834 , :type934 , :type334 , :type534 ;
+		:pred6 "whatever value 734" ;
+		:pred9 "whatever value 334" ;
+		:pred11 "whatever value 934" ;
+		:pred5 [] .
+
+	:subj96 :pred2 "whatever value 496" ;
+		:pred10 "whatever value 296" ;
+		:pred1 _:id5f96 ;
+		:pred8 "whatever value 996" ;
+		:pred12 _:id5f96 ;
+		a :type496 , :type896 , :type196 , :type296 , :type696 , :type596 , :type796 , :type996 ;
+		:pred11 "whatever value 596" ;
+		:pred7 "whatever value 696" ;
+		:pred3 "whatever value 796" .
+
+	:subj48 :pred2 "whatever value 548" ;
+		:pred10 "whatever value 348" ;
+		:pred1 "whatever value 248" ;
+		:pred12 "whatever value 948" ;
+		a :type248 , :type648 , :type148 , :type448 , :type548 , :type848 , :type348 , :type948 ;
+		:pred6 _:id5f48 ;
+		:pred11 "whatever value 648" ;
+		:pred5 "whatever value 148" ;
+		:pred3 "whatever value 848" .
+
+	:subj8 :pred0 "whatever value 208" ;
+		:pred2 "whatever value 808" ;
+		:pred10 "whatever value 608" ;
+		:pred1 "whatever value 508" ;
+		:pred4 "whatever value 108" ;
+		a :type708 , :type608 , :type408 , :type808 , :type208 , :type508 , :type108 , :type908 ;
+		:pred6 "whatever value 708" ;
+		:pred11 "whatever value 908" ;
+		:pred5 "whatever value 408" .
+
+	:subj64 :pred0 _:id5f64 ;
+		:pred2 "whatever value 964" ;
+		:pred10 "whatever value 764" ;
+		:pred1 "whatever value 664" ;
+		:pred8 "whatever value 164" ;
+		a :type964 , :type364 , :type664 , :type764 , :type864 , :type164 , :type464 , :type564 ;
+		:pred6 "whatever value 864" ;
+		:pred9 "whatever value 464" ;
+		:pred5 "whatever value 564" .
+
+	:subj38 :pred0 "whatever value 338" ;
+		:pred2 _:id5f38 ;
+		:pred10 "whatever value 738" ;
+		:pred8 "whatever value 138" ;
+		:pred4 _:id5f38 ;
+		a :type938 , :type238 , :type138 , :type338 , :type438 , :type838 , :type738 , :type538 ;
+		:pred6 "whatever value 838" ;
+		:pred9 "whatever value 438" ;
+		:pred5 "whatever value 538" .
+
+	:subj86 :pred2 "whatever value 886" ;
+		:pred10 _:id5f86 ;
+		:pred1 "whatever value 586" ;
+		:pred4 "whatever value 186" ;
+		a :type386 , :type686 , :type486 , :type786 , :type586 , :type886 , :type986 , :type186 ;
+		:pred6 "whatever value 786" ;
+		:pred9 "whatever value 386" ;
+		:pred11 "whatever value 986" ;
+		:pred5 "whatever value 486" .
+
+	:subj40 :pred2 "whatever value 340" ;
+		:pred10 _:id5f40 ;
+		:pred8 _:id5f40 ;
+		:pred4 "whatever value 940" ;
+		:pred12 "whatever value 740" ;
+		a :type540 , :type840 , :type140 , :type740 , :type640 , :type240 , :type340 , :type940 ;
+		:pred6 "whatever value 240" ;
+		:pred7 "whatever value 540" ;
+		:pred3 "whatever value 640" .
+
+	:subj46 :pred0 _:id5f46 ;
+		:pred1 "whatever value 846" ;
+		:pred8 "whatever value 346" ;
+		:pred4 "whatever value 446" ;
+		:pred12 "whatever value 246" ;
+		a :type746 , :type646 , :type246 , :type846 , :type446 , :type146 , :type546 , :type346 ;
+		:pred9 "whatever value 646" ;
+		:pred5 "whatever value 746" ;
+		:pred3 "whatever value 146" .
+
+	:subj2 :pred0 "whatever value 702" ;
+		:pred8 "whatever value 502" ;
+		:pred4 _:id5f2 ;
+		:pred12 "whatever value 402" ;
+		a :type602 , :type402 , :type102 , :type202 , :type702 , :type302 , :type802 , :type502 ;
+		:pred9 "whatever value 802" ;
+		:pred11 "whatever value 102" ;
+		:pred7 "whatever value 202" ;
+		:pred3 "whatever value 302" .
+
+	:subj60 :pred0 "whatever value 260" ;
+		:pred2 "whatever value 860" ;
+		:pred1 _:id5f60 ;
+		:pred4 "whatever value 160" ;
+		a :type960 , :type260 , :type860 , :type460 , :type160 , :type560 , :type760 , :type360 ;
+		:pred6 "whatever value 760" ;
+		:pred9 "whatever value 360" ;
+		:pred11 "whatever value 960" ;
+		:pred5 "whatever value 460" .
+
+	:subj68 :pred0 "whatever value 468" ;
+		:pred10 _:id5f68 ;
+		:pred1 "whatever value 768" ;
+		:pred8 "whatever value 268" ;
+		:pred4 "whatever value 368" ;
+		:pred12 _:id5f68 ;
+		a :type568 , :type468 , :type168 , :type368 , :type668 , :type268 , :type768 , :type868 ;
+		:pred9 "whatever value 568" ;
+		:pred5 "whatever value 668" .
+
+	:subj26 :pred2 "whatever value 626" ;
+		:pred10 "whatever value 426" ;
+		:pred1 "whatever value 326" ;
+		a :type626 , :type326 , :type526 , :type926 , :type826 , :type226 , :type426 , :type126 ;
+		:pred6 "whatever value 526" ;
+		:pred9 _:id5f26 ;
+		:pred7 _:id5f26 ;
+		:pred5 "whatever value 226" ;
+		:pred3 "whatever value 926" .
+
+	:subj74 :pred2 _:id5f74 ;
+		:pred1 "whatever value 274" ;
+		:pred12 "whatever value 974" ;
+		a :type974 , :type874 , :type474 , :type174 , :type274 , :type774 , :type574 , :type674 ;
+		:pred6 "whatever value 474" ;
+		:pred11 "whatever value 674" ;
+		:pred7 "whatever value 774" ;
+		:pred5 "whatever value 174" ;
+		:pred3 "whatever value 874" .
+
+	:subj56 :pred0 "whatever value 156" ;
+		:pred2 _:id5f56 ;
+		:pred10 "whatever value 556" ;
+		:pred1 "whatever value 456" ;
+		a :type956 , :type256 , :type456 , :type656 , :type856 , :type356 , :type756 , :type556 , :type156 ;
+		:pred6 "whatever value 656" ;
+		:pred9 "whatever value 256" ;
+		:pred11 "whatever value 856" ;
+		:pred7 "whatever value 956" ;
+		:pred5 "whatever value 356" .
+
+	:subj36 :pred0 "whatever value 936" ;
+		:pred2 "whatever value 236" ;
+		:pred8 "whatever value 736" ;
+		:pred12 "whatever value 636" ;
+		a :type136 , :type436 , :type536 , :type236 , :type736 , :type636 , :type336 , :type936 ;
+		:pred6 "whatever value 136" ;
+		:pred11 _:id5f36 ;
+		:pred7 "whatever value 436" ;
+		:pred3 "whatever value 536" .
+
+	:subj18 :pred10 "whatever value 218" ;
+		:pred1 "whatever value 118" ;
+		:pred8 "whatever value 918" ;
+		:pred12 "whatever value 818" ;
+		a :type818 , :type318 , :type218 , :type518 , :type618 , :type118 , :type718 , :type918 ;
+		:pred6 "whatever value 318" ;
+		:pred11 _:id5f18 ;
+		:pred7 "whatever value 618" ;
+		:pred3 "whatever value 718" .
+
+	:subj62 :pred0 "whatever value 962" ;
+		:pred2 "whatever value 262" ;
+		:pred8 "whatever value 762" ;
+		:pred4 "whatever value 862" ;
+		:pred12 "whatever value 662" ;
+		a :type862 , :type762 , :type962 , :type362 , :type162 , :type262 , :type662 , :type562 ;
+		:pred6 "whatever value 162" ;
+		:pred11 "whatever value 362" ;
+		:pred3 "whatever value 562" .
+
+	:subj4 :pred0 "whatever value 104" ;
+		:pred10 _:id5f4 ;
+		:pred1 "whatever value 404" ;
+		a :type104 , :type404 , :type904 , :type604 , :type504 , :type304 , :type804 , :type204 ;
+		:pred6 "whatever value 604" ;
+		:pred9 "whatever value 204" ;
+		:pred11 "whatever value 804" ;
+		:pred7 "whatever value 904" ;
+		:pred5 "whatever value 304" .
+
+	:subj76 :pred0 "whatever value 676" ;
+		:pred1 "whatever value 976" ;
+		:pred8 _:id5f76 ;
+		:pred4 "whatever value 576" ;
+		:pred12 "whatever value 376" ;
+		a :type876 , :type476 , :type776 , :type676 , :type576 , :type976 , :type376 , :type276 ;
+		:pred9 "whatever value 776" ;
+		:pred5 "whatever value 876" ;
+		:pred3 "whatever value 276" .
+
+	:subj14 :pred2 "whatever value 314" ;
+		:pred10 "whatever value 114" ;
+		:pred4 "whatever value 914" ;
+		:pred12 _:id5f14 ;
+		a :type914 , :type714 , :type614 , :type114 , :type514 , :type214 , :type414 , :type314 ;
+		:pred6 "whatever value 214" ;
+		:pred11 "whatever value 414" ;
+		:pred7 "whatever value 514" ;
+		:pred3 "whatever value 614" .
+
+	:subj52 :pred2 "whatever value 652" ;
+		:pred10 "whatever value 452" ;
+		a :type552 , :type252 , :type452 , :type152 , :type952 , :type652 , :type852 , :type752 ;
+		:pred6 "whatever value 552" ;
+		:pred9 "whatever value 152" ;
+		:pred11 "whatever value 752" ;
+		:pred7 "whatever value 852" ;
+		:pred5 _:id5f52 ;
+		:pred3 _:id5f52 .
+
+	:subj82 :pred0 _:id5f82 ;
+		:pred2 "whatever value 782" ;
+		:pred10 "whatever value 582" ;
+		:pred1 "whatever value 482" ;
+		a :type282 , :type982 , :type482 , :type182 , :type382 , :type782 , :type582 , :type882 ;
+		:pred9 "whatever value 282" ;
+		:pred11 _:id5f82 ;
+		:pred7 "whatever value 982" ;
+		:pred5 "whatever value 382" .
+
+	:subj94 :pred0 "whatever value 494" ;
+		:pred10 "whatever value 894" ;
+		:pred1 "whatever value 794" ;
+		:pred8 _:id5f94 ;
+		:pred4 "whatever value 394" ;
+		:pred12 "whatever value 194" ;
+		a :type294 , :type394 , :type894 , :type194 , :type694 , :type994 , :type494 , :type794 ;
+		:pred6 _:id5f94 ;
+		:pred5 "whatever value 694" .
+
+	:subj30 :pred0 "whatever value 130" ;
+		:pred2 "whatever value 730" ;
+		:pred10 "whatever value 530" ;
+		:pred1 "whatever value 430" ;
+		a :type230 , :type530 , :type730 , :type130 , :type930 , :type430 , :type830 , :type630 ;
+		:pred6 _:id5f30 ;
+		:pred9 "whatever value 230" ;
+		:pred11 "whatever value 830" ;
+		:pred7 "whatever value 930" .
+
+	:subj50 :pred0 "whatever value 650" ;
+		:pred1 "whatever value 950" ;
+		:pred8 "whatever value 450" ;
+		:pred12 _:id5f50 ;
+		a :type950 , :type850 , :type650 , :type450 , :type150 , :type750 , :type350 , :type250 ;
+		:pred9 "whatever value 750" ;
+		:pred7 "whatever value 150" ;
+		:pred5 "whatever value 850" ;
+		:pred3 "whatever value 250" .
+
+	:subj90 :pred0 "whatever value 390" ;
+		:pred10 "whatever value 790" ;
+		:pred1 "whatever value 690" ;
+		:pred8 "whatever value 190" ;
+		:pred4 "whatever value 290" ;
+		a :type790 , :type690 , :type190 , :type490 , :type590 , :type290 , :type390 , :type890 ;
+		:pred6 "whatever value 890" ;
+		:pred9 _:id5f90 ;
+		:pred5 "whatever value 590" .
+
+	:subj10 :pred0 _:id5f10 ;
+		:pred2 _:id5f10 ;
+		:pred8 "whatever value 710" ;
+		:pred4 "whatever value 810" ;
+		:pred12 "whatever value 610" ;
+		a :type810 , :type610 , :type510 , :type710 , :type310 , :type410 , :type910 , :type210 ;
+		:pred11 "whatever value 310" ;
+		:pred7 "whatever value 410" ;
+		:pred3 "whatever value 510" .
+
+	:subj32 :pred0 "whatever value 832" ;
+		:pred8 "whatever value 632" ;
+		:pred4 "whatever value 732" ;
+		:pred12 _:id5f32 ;
+		a :type832 , :type532 , :type232 , :type632 , :type432 , :type932 , :type332 , :type732 ;
+		:pred9 "whatever value 932" ;
+		:pred11 "whatever value 232" ;
+		:pred7 "whatever value 332" ;
+		:pred3 "whatever value 432" .
+
+	:subj24 :pred0 "whatever value 624" ;
+		:pred8 "whatever value 424" ;
+		:pred4 "whatever value 524" ;
+		:pred12 "whatever value 324" ;
+		a :type824 , :type124 , :type224 , :type324 , :type524 , :type624 , :type424 , :type724 ;
+		:pred9 "whatever value 724" ;
+		:pred7 "whatever value 124" ;
+		:pred5 "whatever value 824" ;
+		:pred3 _:id5f24 .
+
+	:subj58 :pred2 "whatever value 158" ;
+		:pred8 _:id5f58 ;
+		:pred4 "whatever value 758" ;
+		:pred12 "whatever value 558" ;
+		a :type958 , :type558 , :type658 , :type158 , :type358 , :type258 , :type758 , :type458 ;
+		:pred9 "whatever value 958" ;
+		:pred11 "whatever value 258" ;
+		:pred7 "whatever value 358" ;
+		:pred3 "whatever value 458" .
+
+	:subj16 :pred0 "whatever value 416" ;
+		:pred10 "whatever value 816" ;
+		:pred1 "whatever value 716" ;
+		:pred8 "whatever value 216" ;
+		:pred4 "whatever value 316" ;
+		:pred12 "whatever value 116" ;
+		a :type816 , :type416 , :type316 , :type116 , :type516 , :type916 , :type716 , :type216 ;
+		:pred6 "whatever value 916" ;
+		:pred9 "whatever value 516" .
+
+	:subj92 :pred2 _:id5f92 ;
+		:pred10 "whatever value 192" ;
+		:pred8 "whatever value 892" ;
+		:pred4 "whatever value 992" ;
+		a :type492 , :type992 , :type292 , :type692 , :type592 , :type892 , :type192 , :type392 ;
+		:pred6 "whatever value 292" ;
+		:pred11 "whatever value 492" ;
+		:pred7 "whatever value 592" ;
+		:pred3 "whatever value 692" .
+
+	:subj70 :pred2 "whatever value 470" ;
+		:pred10 "whatever value 270" ;
+		:pred1 "whatever value 170" ;
+		:pred8 "whatever value 970" ;
+		:pred12 "whatever value 870" ;
+		a :type870 , :type970 , :type270 , :type170 , :type670 , :type570 , :type470 , :type370 ;
+		:pred6 "whatever value 370" ;
+		:pred11 "whatever value 570" ;
+		:pred7 "whatever value 670" .
+
+	:subj12 :pred0 "whatever value 312" ;
+		:pred2 "whatever value 912" ;
+		:pred10 "whatever value 712" ;
+		:pred1 "whatever value 612" ;
+		:pred8 _:id5f12 ;
+		:pred4 "whatever value 212" ;
+		a :type712 , :type512 , :type412 , :type112 , :type912 , :type312 , :type612 , :type212 , :type812 ;
+		:pred6 _:id5f12 ;
+		:pred9 "whatever value 412" ;
+		:pred5 "whatever value 512" .
+
+	:subj42 :pred0 "whatever value 442" ;
+		:pred10 "whatever value 842" ;
+		:pred1 _:id5f42 ;
+		:pred4 "whatever value 342" ;
+		:pred12 "whatever value 142" ;
+		a :type342 , :type742 , :type142 , :type942 , :type542 , :type842 , :type642 , :type442 ;
+		:pred6 "whatever value 942" ;
+		:pred9 "whatever value 542" ;
+		:pred5 "whatever value 642" .
+
+	:subj72 :pred10 "whatever value 972" ;
+		:pred1 "whatever value 872" ;
+		:pred8 "whatever value 372" ;
+		:pred4 "whatever value 472" ;
+		:pred12 "whatever value 272" ;
+		a :type972 , :type672 , :type472 , :type872 , :type172 , :type272 , :type372 , :type772 ;
+		:pred9 _:id5f72 ;
+		:pred5 "whatever value 772" ;
+		:pred3 "whatever value 172" .
+
+	:subj28 :pred0 _:id5f28 ;
+		:pred4 "whatever value 628" ;
+		:pred12 "whatever value 428" ;
+		a :type228 , :type628 , :type328 , :type928 , :type128 , :type728 , :type428 , :type828 ;
+		:pred9 "whatever value 828" ;
+		:pred11 "whatever value 128" ;
+		:pred7 "whatever value 228" ;
+		:pred5 "whatever value 928" ;
+		:pred3 "whatever value 328" .
+
+	:subj20 :pred0 "whatever value 520" ;
+		:pred10 "whatever value 920" ;
+		:pred1 "whatever value 820" ;
+		:pred8 "whatever value 320" ;
+		:pred4 _:id5f20 ;
+		a :type420 , :type920 , :type620 , :type520 , :type120 , :type720 , :type820 , :type320 ;
+		:pred9 "whatever value 620" ;
+		:pred5 "whatever value 720" ;
+		:pred3 "whatever value 120" .
+
+	:subj6 :pred0 "whatever value 806" ;
+		:pred2 "whatever value 106" ;
+		:pred8 "whatever value 606" ;
+		:pred4 "whatever value 706" ;
+		a :type406 , :type106 , :type706 , :type606 , :type906 , :type306 , :type806 , :type206 ;
+		:pred9 "whatever value 906" ;
+		:pred11 "whatever value 206" ;
+		:pred7 "whatever value 306" ;
+		:pred3 _:id5f6 .
+
+	_:id5f62 a :type462 ;
+		:pred7 _:id5f62 .
+
+	_:id5f90 :pred2 "whatever value 990" ;
+		a :type990 .
+
+	_:id5f2 a :type902 ;
+		:pred5 "whatever value 902" .
+
+	_:id5f58 :pred0 "whatever value 858" ;
+		a :type858 .
+
+	:subj44 :pred2 "whatever value 444" ;
+		:pred10 "whatever value 244" ;
+		:pred1 "whatever value 144" ;
+		:pred8 "whatever value 944" ;
+		:pred12 "whatever value 844" ;
+		a :type644 , :type544 , :type744 , :type844 , :type144 , :type944 , :type244 , :type344 , :type444 ;
+		:pred6 "whatever value 344" ;
+		:pred11 "whatever value 544" ;
+		:pred7 _:id5f44 ;
+		:pred3 "whatever value 744" .
+
+	_:id5f28 :pred8 "whatever value 528" ;
+		a :type528 .
+
+	_:id5f50 :pred4 "whatever value 550" ;
+		a :type550 .
+
+	_:id5f94 a :type594 ;
+		:pred9 "whatever value 594" .
+
+	_:id5f16 a :type616 ;
+		:pred5 _:id5f16 .
+
+	_:id5f46 :pred10 "whatever value 946" ;
+		a :type946 .
+
+	_:id5f54 a :type154 ;
+		:pred11 _:id5f54 .
+
+	_:id5f26 a :type726 ;
+		:pred11 "whatever value 726" .
+
+	_:id5f42 :pred8 "whatever value 242" ;
+		a :type242 .
+
+	_:id5f86 :pred0 "whatever value 286" ;
+		a :type286 .
+
+	_:id5f10 a :type110 ;
+		:pred6 "whatever value 110" .
+
+	_:id5f80 a :type880 ;
+		:pred9 "whatever value 880" .
+
+	_:id5f82 a :type682 ;
+		:pred6 "whatever value 682" .
+
+	_:id5f30 a :type330 ;
+		:pred5 "whatever value 330" .
+
+	_:id5f18 :pred2 "whatever value 418" ;
+		a :type418 .
+
+	_:id5f52 :pred1 "whatever value 352" ;
+		a :type352 .
+
+	_:id5f70 a :type770 ;
+		:pred3 _:id5f70 .
+
+	_:id5f72 :pred0 "whatever value 572" ;
+		a :type572 .
+
+	_:id5f32 :pred2 "whatever value 132" ;
+		a :type132 .
+
+	_:id5f40 a :type440 ;
+		:pred11 "whatever value 440" .
+
+	_:id5f48 a :type748 ;
+		:pred7 "whatever value 748" .
+
+	_:id5f74 :pred10 "whatever value 374" ;
+		a :type374 .
+
+	_:id5f6 :pred12 "whatever value 506" ;
+		a :type506 .
+
+	:subj88 :pred0 "whatever value 988" ;
+		:pred2 "whatever value 288" ;
+		:pred8 "whatever value 788" ;
+		:pred4 "whatever value 888" ;
+		:pred12 "whatever value 688" ;
+		a :type588 , :type488 , :type988 , :type688 , :type388 , :type288 , :type788 , :type188 , :type888 ;
+		:pred6 "whatever value 188" ;
+		:pred11 "whatever value 388" ;
+		:pred7 "whatever value 488" ;
+		:pred3 _:id5f88 .
+
+	_:id5f64 :pred4 "whatever value 264" ;
+		a :type264 .
+
+	_:id5f4 :pred2 "whatever value 704" ;
+		a :type704 .
+
+	_:id5f20 :pred12 "whatever value 220" ;
+		a :type220 .
+
+	_:id5f14 :pred8 "whatever value 814" ;
+		a :type814 .
+
+	_:id5f38 :pred1 "whatever value 638" ;
+		a :type638 .
+
+	:subj0 :pred2 "whatever value 600" ;
+		:pred10 "whatever value 400" ;
+		:pred1 "whatever value 300" ;
+		a :type600 , :type500 , :type900 , :type700 , :type200 , :type400 , :type100 , :type800 , :type300 ;
+		:pred6 "whatever value 500" ;
+		:pred9 "whatever value 100" ;
+		:pred11 _:id5f0 ;
+		:pred7 "whatever value 800" ;
+		:pred5 "whatever value 200" ;
+		:pred3 "whatever value 900" .
+
+	_:id5f68 a :type968 ;
+		:pred6 "whatever value 968" .
+
+	_:id5f96 a :type396 ;
+		:pred6 "whatever value 396" .
+
+	_:id5f24 :pred1 _:id5f24 ;
+		a :type924 .
+
+	:subj22 :pred2 "whatever value 522" ;
+		:pred10 _:id5f22 ;
+		:pred1 "whatever value 222" ;
+		:pred12 "whatever value 922" ;
+		a :type922 , :type422 , :type722 , :type222 , :type122 , :type622 , :type822 , :type522 , :type322 ;
+		:pred6 "whatever value 422" ;
+		:pred11 "whatever value 622" ;
+		:pred7 "whatever value 722" ;
+		:pred5 "whatever value 122" ;
+		:pred3 "whatever value 822" .
+
+	_:id5f8 a :type308 ;
+		:pred9 _:id5f8 .
+
+	:subj66 :pred2 "whatever value 366" ;
+		:pred10 "whatever value 166" ;
+		:pred8 "whatever value 866" ;
+		:pred4 _:id5f66 ;
+		:pred12 "whatever value 766" ;
+		a :type366 , :type266 , :type166 , :type566 , :type466 , :type866 , :type766 , :type666 , :type966 ;
+		:pred6 _:id5f66 ;
+		:pred11 "whatever value 466" ;
+		:pred7 "whatever value 566" ;
+		:pred3 "whatever value 666" .
+
+	_:id5f76 a :type176 ;
+		:pred7 "whatever value 176" .
+
+	_:id5f60 :pred10 "whatever value 660" ;
+		a :type660 .
+
+	_:id5f98 a :type198 ;
+		:pred3 "whatever value 198" .
+
+	_:id5f36 :pred4 "whatever value 836" ;
+		a :type836 .
+
+	_:id5f84 a :type484 ;
+		:pred3 "whatever value 484" .
+
+	_:id5f92 :pred12 "whatever value 792" ;
+		a :type792 .
+}
+
+:graph2 {
+	:subj0 :pred0 "whatever value 1" .
+}
