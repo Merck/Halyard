@@ -115,7 +115,7 @@ public class HalyardStats implements Tool {
         long counter = 0;
         boolean update;
 
-        IRI graph = HALYARD.STATS_ROOT_NODE;
+        IRI graph = HALYARD.STATS_ROOT_NODE, lastGraph = HALYARD.STATS_ROOT_NODE;
         long triples, distinctSubjects, properties, distinctObjects, classes, removed;
         long distinctIRIReferenceSubjects, distinctIRIReferenceObjects, distinctBlankNodeObjects, distinctBlankNodeSubjects, distinctLiterals;
         IRI subsetType;
@@ -147,9 +147,6 @@ public class HalyardStats implements Tool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
-            if ((counter++ % 100000) == 0) {
-                output.setStatus(MessageFormat.format("reg:{0} {1} t:{2} s:{3} p:{4} o:{5} c:{6} r:{7}", region, counter, triples, distinctSubjects, properties, distinctObjects, classes, removed));
-            }
             int hashShift;
             if (region < HalyardTableUtils.CSPO_PREFIX) {
                 hashShift = 1;
@@ -183,7 +180,7 @@ public class HalyardStats implements Tool {
                     }
                 }
             }
-            boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, lastKeyFragment) || region != lastRegion;
+            boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, lastKeyFragment) || region != lastRegion || lastGraph != graph;
             if (hashChange) {
                 cleanupSubset(output);
                 Cell c = value.rawCells()[0];
@@ -246,6 +243,10 @@ public class HalyardStats implements Tool {
             subsetCounter += value.rawCells().length;
             setCounter += value.rawCells().length;
             lastRegion = region;
+            lastGraph = graph;
+            if ((counter++ % 100000) == 0) {
+                output.setStatus(MessageFormat.format("reg:{0} {1} t:{2} s:{3} p:{4} o:{5} c:{6} r:{7}", region, counter, triples, distinctSubjects, properties, distinctObjects, classes, removed));
+            }
         }
 
         private void report(Context output, IRI property, String partitionId, long value) throws IOException, InterruptedException {

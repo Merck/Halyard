@@ -28,7 +28,7 @@ halyard:statsContext {
 		void:classes "450"^^xsd:long ;
 		void:triples "900"^^xsd:long ;
 		void:propertyPartition :graph0_property_v0EPmHVxqhkyM3Yh_Wfu7gMOZGU ;
-		void:properties "13"^^xsd:long ;
+		void:properties "14"^^xsd:long ;
 		void-ext:distinctLiterals "386"^^xsd:long ;
 		void:distinctObjects "886"^^xsd:long ;
 		void:distinctSubjects "91"^^xsd:long ;
