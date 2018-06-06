@@ -374,19 +374,28 @@ public final class HalyardTableUtils {
     public static List<Statement> parseStatements(Result res) {
         ArrayList<Statement> st = new ArrayList<>();
         if (res.rawCells() != null) for (Cell c : res.rawCells()) {
-            ByteBuffer bb = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
-            byte[] sb = new byte[bb.getInt()];
-            byte[] pb = new byte[bb.getInt()];
-            byte[] ob = new byte[bb.getInt()];
-            bb.get(sb);
-            bb.get(pb);
-            bb.get(ob);
-            byte[] cb = new byte[bb.remaining()];
-            bb.get(cb);
-            ValueFactory vf = SimpleValueFactory.getInstance();
-            st.add(vf.createStatement(NTriplesUtil.parseResource(new String(sb, UTF8), vf), NTriplesUtil.parseURI(new String(pb, UTF8), vf), NTriplesUtil.parseValue(new String(ob,UTF8), vf), cb.length == 0 ? null : NTriplesUtil.parseResource(new String(cb,UTF8), vf)));
+            st.add(parseStatement(c));
         }
         return st;
+    }
+
+    /**
+     * Parser method returning Statement from a single HBase Result Cell
+     * @param c HBase Result Cell
+     * @return Statements
+     */
+    public static Statement parseStatement(Cell c) {
+        ByteBuffer bb = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
+        byte[] sb = new byte[bb.getInt()];
+        byte[] pb = new byte[bb.getInt()];
+        byte[] ob = new byte[bb.getInt()];
+        bb.get(sb);
+        bb.get(pb);
+        bb.get(ob);
+        byte[] cb = new byte[bb.remaining()];
+        bb.get(cb);
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        return vf.createStatement(NTriplesUtil.parseResource(new String(sb, UTF8), vf), NTriplesUtil.parseURI(new String(pb, UTF8), vf), NTriplesUtil.parseValue(new String(ob,UTF8), vf), cb.length == 0 ? null : NTriplesUtil.parseResource(new String(cb,UTF8), vf));
     }
 
     /**
