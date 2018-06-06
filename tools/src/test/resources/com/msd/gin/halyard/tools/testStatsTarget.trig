@@ -9,7 +9,7 @@
 halyard:statsContext {
 	halyard:statsRoot a void:Dataset , sd:Dataset , sd:Graph ;
 		sd:defaultGraph halyard:statsRoot ;
-		sd:namedGraph :graph0 , :graph1 ;
+		sd:namedGraph :graph0 , :graph1 , :graph2 ;
 		void:classes "1000"^^xsd:long ;
 		void:triples "2001"^^xsd:long ;
 		void:propertyPartition halyard:statsRoot_property_v0EPmHVxqhkyM3Yh_Wfu7gMOZGU ;

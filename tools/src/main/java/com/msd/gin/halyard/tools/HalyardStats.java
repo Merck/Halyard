@@ -287,6 +287,8 @@ public class HalyardStats implements Tool {
                 report(output, VOID_EXT.DISTINCT_BLANK_NODE_OBJECTS, null, distinctBlankNodeObjects);
                 report(output, VOID_EXT.DISTINCT_BLANK_NODE_SUBJECTS, null, distinctBlankNodeSubjects);
                 report(output, VOID_EXT.DISTINCT_LITERALS, null, distinctLiterals);
+            } else {
+                report(output, SD.NAMED_GRAPH_PROPERTY, null, 1);
             }
             setCounter = 0;
             triples = 0;
@@ -388,32 +390,36 @@ public class HalyardStats implements Tool {
                 partitionId = new byte[dis.readInt()];
                 dis.readFully(partitionId);
             }
-            IRI graphNode;
-            if (graph.equals(HALYARD.STATS_ROOT_NODE.stringValue())) {
-                graphNode = HALYARD.STATS_ROOT_NODE;
+            if (SD.NAMED_GRAPH_PROPERTY.toString().equals(predicate)) { //workaround to at least count all small named graph that are below the treshold
+                writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, SVF.createIRI(graph));
             } else {
-                graphNode = SVF.createIRI(graph);
-                if (graphs.putIfAbsent(graph, false) == null) {
-                    writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, graphNode);
-                    writeStatement(graphNode, SD.NAME, SVF.createIRI(graph));
-                    writeStatement(graphNode, SD.GRAPH_PROPERTY, graphNode);
-                    writeStatement(graphNode, RDF.TYPE, SD.NAMED_GRAPH_CLASS);
-                    writeStatement(graphNode, RDF.TYPE, SD.GRAPH_CLASS);
-                    writeStatement(graphNode, RDF.TYPE, VOID.DATASET);
+                IRI graphNode;
+                if (graph.equals(HALYARD.STATS_ROOT_NODE.stringValue())) {
+                    graphNode = HALYARD.STATS_ROOT_NODE;
+                } else {
+                    graphNode = SVF.createIRI(graph);
+                    if (graphs.putIfAbsent(graph, false) == null) {
+                        writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, graphNode);
+                        writeStatement(graphNode, SD.NAME, SVF.createIRI(graph));
+                        writeStatement(graphNode, SD.GRAPH_PROPERTY, graphNode);
+                        writeStatement(graphNode, RDF.TYPE, SD.NAMED_GRAPH_CLASS);
+                        writeStatement(graphNode, RDF.TYPE, SD.GRAPH_CLASS);
+                        writeStatement(graphNode, RDF.TYPE, VOID.DATASET);
+                    }
                 }
-            }
-            if (partitionId.length > 0) {
-                IRI pred = SVF.createIRI(predicate);
-                IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(partitionId)));
-                writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);
-                writeStatement(subset, RDF.TYPE, VOID.DATASET);
-                writeStatement(subset, pred, NTriplesUtil.parseValue(new String(partitionId, UTF8), SVF));
-                writeStatement(subset, VOID.TRIPLES, SVF.createLiteral(count));
-            } else {
-                writeStatement(graphNode, SVF.createIRI(predicate), SVF.createLiteral(count));
-            }
-            if ((added % 1000) == 0) {
-                context.setStatus(MessageFormat.format("statements removed: {0} added: {1}", removed, added));
+                if (partitionId.length > 0) {
+                    IRI pred = SVF.createIRI(predicate);
+                    IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(partitionId)));
+                    writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);
+                    writeStatement(subset, RDF.TYPE, VOID.DATASET);
+                    writeStatement(subset, pred, NTriplesUtil.parseValue(new String(partitionId, UTF8), SVF));
+                    writeStatement(subset, VOID.TRIPLES, SVF.createLiteral(count));
+                } else {
+                    writeStatement(graphNode, SVF.createIRI(predicate), SVF.createLiteral(count));
+                }
+                if ((added % 1000) == 0) {
+                    context.setStatus(MessageFormat.format("statements removed: {0} added: {1}", removed, added));
+                }
             }
 	}
 
