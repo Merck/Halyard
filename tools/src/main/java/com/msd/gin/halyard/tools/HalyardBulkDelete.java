@@ -29,6 +29,7 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.PosixParser;
@@ -150,7 +151,7 @@ public class HalyardBulkDelete implements Tool {
     }
 
     private static void printHelp(Options options) {
-//        new HelpFormatter().printHelp(100, "stats", "Updates or exports statistics about Halyard dataset.", options, "Example: stats [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + GRAPH_CONTEXT + "='http://whatever/mystats'] -s my_dataset [-t hdfs:/my_folder/my_stats.trig]", true);
+        new HelpFormatter().printHelp(100, "bulkdelete", "Deletes large set of triples or whole named graphs, based on specified statement pattern and/or graph context.", options, "Example: bulkdelete -t my_data -f bulkdelete_temp1 -s <http://whatever/mysubj> -c <http://whatever/myctx1> -c <http://whatever/myctx2>", true);
     }
 
     @Override
@@ -163,7 +164,7 @@ public class HalyardBulkDelete implements Tool {
         options.addOption(newOption("s", "subject", "Optional subject to delete"));
         options.addOption(newOption("p", "predicate", "Optional predicate to delete"));
         options.addOption(newOption("o", "object", "Optional object to delete"));
-        options.addOption(newOption("c", "context", "Optional graph context to delete"));
+        options.addOption(newOption("c", "context", "Optional graph context(s) to delete, NONE represents context of triples outside of any named graph"));
         try {
             CommandLine cmd = new PosixParser().parse(options, args);
             if (args.length == 0 || cmd.hasOption('h')) {
@@ -240,6 +241,7 @@ public class HalyardBulkDelete implements Tool {
             job.setMapOutputKeyClass(ImmutableBytesWritable.class);
             job.setMapOutputValueClass(KeyValue.class);
             job.setSpeculativeExecution(false);
+            job.setMapSpeculativeExecution(false);
             job.setReduceSpeculativeExecution(false);
             try (HTable hTable = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
                 HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
