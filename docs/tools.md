@@ -98,14 +98,14 @@ Usage: bulkload [-Dmapreduce.job.queuename=proofofconcepts] \
 2. Don't forget to `kinit` with your credentials if on a secured cluster.
 3. You may optionally execute `hdfs dfs -ls -R <path_to_RDF_files>` command to verify your RDF files location and access.
 4. Execute `./bulkload <input_path(s)_of_the_RDF_files> <temporary_path_for_HTable files> <HBase_table_name>` to launch the Bulk Load application. Following features are supported:
-	* More input paths can be delimited by comma.
-	* The input paths are searched for the supported files recurrently.
-	* Temporary path for HTable files is used to store temporary HBase table files and the files are moved to their final HBase locations during the last stage of the Bulk Load process.
-	* Optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify YARN queue to be used by the application.
-	* Optional property `-Dhalyard.parser.skipinvalid=true` can be used to continue the Bulk Load process even in case of RDF parsing exceptions for particular files.
-	* Optional property `-Dhalyard.table.splitbits=<split_bits>` can specify number of pre-computed HBase table region splits when the table does not exist yet and it is created during the Bulk Load. Number of table pre-splits is calculated as 3 * 2^\<split_bits>. Default number of split_bits is 0, so each new HBase table is pre-split into 3 regions by default. Use this option wisely as a large number of table pre-splits can overload HBase as well as significantly affect Bulk Load performance.
-	* Optional property `-Dhalyard.parser.context.default=<default graph context>` can specify default graph context for the ingested RDF triples
-	* Optional property `-Dhalyard.parser.context.override=true` can override graph context of the loaded RDF quads with the default graph context
+  * More input paths can be delimited by comma.
+  * The input paths are searched for the supported files recurrently.
+  * Temporary path for HTable files is used to store temporary HBase table files and the files are moved to their final HBase locations during the last stage of the Bulk Load process.
+  * Optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify YARN queue to be used by the application.
+  * Optional property `-Dhalyard.parser.skipinvalid=true` can be used to continue the Bulk Load process even in case of RDF parsing exceptions for particular files.
+  * Optional property `-Dhalyard.table.splitbits=<split_bits>` can specify number of pre-computed HBase table region splits when the table does not exist yet and it is created during the Bulk Load. Number of table pre-splits is calculated as 3 * 2^\<split_bits>. Default number of split_bits is 0, so each new HBase table is pre-split into 3 regions by default. Use this option wisely as a large number of table pre-splits can overload HBase as well as significantly affect Bulk Load performance.
+  * Optional property `-Dhalyard.parser.context.default=<default graph context>` can specify default graph context for the ingested RDF triples
+  * Optional property `-Dhalyard.parser.context.override=true` can override graph context of the loaded RDF quads with the default graph context
 5. Executed process will inform you about the tracking URL of the MapReduce application and about the bulk load progress.
 
 ### Halyard PreSplit
@@ -130,12 +130,12 @@ Usage: presplit [-Dmapreduce.job.queuename=proofofconcepts] \
 2. Don't forget to `kinit` with your credentials if on a secured cluster.
 3. You may optionally execute `hdfs dfs -ls -R <path_to_RDF_files>` command to verify the location and access to your RDF files.
 4. Execute `./presplit <input_path(s)_of_the_RDF_files> <HBase_table_name>` to launch the Bulk Load application. The following features are supported:
-	* More input paths can be delimited by comma.
-	* The input paths are searched recursively for files in the supported formats.
-	* The optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify a YARN queue to be used by the application.
-	* The optional property `-Dhalyard.parser.skipinvalid=true` can be used to continue the Bulk Load process even in case of RDF parsing exceptions for particular files.
-	* The optional property `-Dhalyard.parser.context.default=<default graph context>` can specify the default graph context for the ingested RDF triples.
-	* The optional property `-Dhalyard.parser.context.override=true` can override the graph context of the loaded RDF quads with the default graph context.
+  * More input paths can be delimited by comma.
+  * The input paths are searched recursively for files in the supported formats.
+  * The optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify a YARN queue to be used by the application.
+  * The optional property `-Dhalyard.parser.skipinvalid=true` can be used to continue the Bulk Load process even in case of RDF parsing exceptions for particular files.
+  * The optional property `-Dhalyard.parser.context.default=<default graph context>` can specify the default graph context for the ingested RDF triples.
+  * The optional property `-Dhalyard.parser.context.override=true` can override the graph context of the loaded RDF quads with the default graph context.
 5. The executed process will inform you about the tracking URL of the MapReduce application and about the presplit progress.
 
 ### Halyard Hive Load
@@ -174,12 +174,12 @@ Usage: hiveload -Dhalyard.rdf.mime.type='application/ld+json' \
 2. Don't forget to `kinit` with your credentials if on a secured cluster.
 3. Use the Apache Hive client to verify access to your table and index of the column with RDF data.
 4. Execute `./hiveload -Dhalyard.rdf.mime.type='<RDF_MIME_Type>' -Dhalyard.hive.data.column.index=<column_index> <Hive_table_name> <temporary_path_for_HTable files> <HBase_table_name>` to launch the Hive Load application. The following features are supported:
-	* A temporary path for the HTable files is used to store temporary HBase table files. The files are moved to their final HBase locations during the last stage of the Bulk Load process.
-	* The optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify YARN queue to be used by the application.
-	* The optional property `-Dhalyard.parser.skipinvalid=true` can be used to continue the Bulk Load process even in case of RDF parsing exceptions for particular files.
-	* The optional property `-Dhalyard.table.splitbits=<split_bits>` can specify the number of pre-computed HBase table region splits when the table does not exist yet and it is created during the Bulk Load. The number of table pre-splits is calculated as 3 * 2<sup>split\_bits</sup>. The default number of split\_bits is 0, so that each new HBase table is pre-split into 3 regions by default. Use this option wisely as a large number of table pre-splits can overload the HBase as well as significantly affect the Bulk Load performance.
-	* The optional property `-Dhalyard.parser.context.default=<default graph context>` can specify the default graph context for the ingested RDF triples.
-	* The optional property `-Dhalyard.parser.context.override=true` can override the graph context of the loaded RDF quads with the default graph context.
+  * A temporary path for the HTable files is used to store temporary HBase table files. The files are moved to their final HBase locations during the last stage of the Bulk Load process.
+  * The optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify YARN queue to be used by the application.
+  * The optional property `-Dhalyard.parser.skipinvalid=true` can be used to continue the Bulk Load process even in case of RDF parsing exceptions for particular files.
+  * The optional property `-Dhalyard.table.splitbits=<split_bits>` can specify the number of pre-computed HBase table region splits when the table does not exist yet and it is created during the Bulk Load. The number of table pre-splits is calculated as 3 * 2<sup>split\_bits</sup>. The default number of split\_bits is 0, so that each new HBase table is pre-split into 3 regions by default. Use this option wisely as a large number of table pre-splits can overload the HBase as well as significantly affect the Bulk Load performance.
+  * The optional property `-Dhalyard.parser.context.default=<default graph context>` can specify the default graph context for the ingested RDF triples.
+  * The optional property `-Dhalyard.parser.context.override=true` can override the graph context of the loaded RDF quads with the default graph context.
 5. The executed process will inform you about the tracking URL of the MapReduce application and about the bulk load progress.
 
 ### Halyard Update
@@ -221,8 +221,8 @@ Usage: bulkupdate [-Dmapreduce.job.queuename=proofofconcepts] \
 3. Write the SPARQL Update operations into a file, in which each operation is on a single line.
 4. Move the file with the SPARQL Update operations to the shared filesystem (HDFS).
 5. Execute `./bulkupdate <shared_path_of_file_with_SPARQL_Update_operations> <temporary_path_for_HTable_files> <HBase_table_name>` to launch the Bulk Update application. The following features are supported:
-	* The temporary path for the HTable files is used to store the temporary HBase table files. The files are moved to their final HBase locations during the last stage of the Bulk Load process.
-	* The optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify the YARN queue to be used by the application.
+  * The temporary path for the HTable files is used to store the temporary HBase table files. The files are moved to their final HBase locations during the last stage of the Bulk Load process.
+  * The optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify the YARN queue to be used by the application.
 
 ### Halyard Export
 
@@ -294,13 +294,13 @@ Example: export -s my_dataset \
 1. Open terminal on a Hadoop cluster node with a configured HBase.
 2. Don't forget to `kinit` with your credentials if on a secured cluster.
 3. Execute `./export -s <HBase_table_name> -q '<sparql_query>' -t <target_URL>` to launch the export. The following features are supported:
-	* Target file format and optional compression (for file: and hdfs: targets) is determined from the target file extension.
-	* Target table name (for jdbc: targets) must be added behind the additional slash at the end of the standard JDBC URL connection string.
-	* The SPARQL query type must match the target URL (and the target file type if applicable). For example, only SELECT queries can be used for the jdbc: targets.
-	* The option `-c <driver_class>` is mandatory for jdbc: targets to determine the JDBC driver class used to connect the target.
-	* The option `-l <driver_classpath>` allows to specify additional Java classpath necessary to load a particular JDBC driver for the jdbc: targets.
-	* The option `-p <property=value>` allows to pass additional properties to the JDBC connections for jdbc: targets. The most frequent JDBC connection properties are `-p user=<jdbc_connection_username>` and `-p password=<jdbc_connection_password>`.
-	* The option `-r` trims the jdbc: target table before the export.
+  * Target file format and optional compression (for file: and hdfs: targets) is determined from the target file extension.
+  * Target table name (for jdbc: targets) must be added behind the additional slash at the end of the standard JDBC URL connection string.
+  * The SPARQL query type must match the target URL (and the target file type if applicable). For example, only SELECT queries can be used for the jdbc: targets.
+  * The option `-c <driver_class>` is mandatory for jdbc: targets to determine the JDBC driver class used to connect the target.
+  * The option `-l <driver_classpath>` allows to specify additional Java classpath necessary to load a particular JDBC driver for the jdbc: targets.
+  * The option `-p <property=value>` allows to pass additional properties to the JDBC connections for jdbc: targets. The most frequent JDBC connection properties are `-p user=<jdbc_connection_username>` and `-p password=<jdbc_connection_password>`.
+  * The option `-r` trims the jdbc: target table before the export.
 
 ### Halyard Parallel Export <a id="Halyard_Parallel_Export"></a>
 
@@ -344,13 +344,13 @@ Example: pexport [-Dmapreduce.job.maps=10] \
 1. Open terminal on a Hadoop cluster node with a configured HBase.
 2. Don't forget to `kinit` with your credentials if on a secured cluster.
 3. Execute `./pexport -Dmapreduce.job.maps=<number_of_maps> -s <HBase_table_name> -q '<sparql_query>' -t <target_URL>` to launch the export. The following features are supported:
-	* The target file format and optional compression (for file: and hdfs: targets) is determined from the target file extension.
-	* The target table name (for the jdbc: targets) must be added behind the additional slash at the end of the standard JDBC URL connection string.
-	* The target file name (for file: and hdfs: targets) must contain a parallel index marker `{0}` anywhere within the path to avoid parallel write conflicts and corruption of the exported data.
-	* The SPARQL query type must match the target URL (and the target file type if applicable). For example, only SELECT queries can be used for the jdbc: targets.
-	* The option `-c <driver_class>` is mandatory for the jdbc: targets to determine the JDBC Driver class used to connect to the target.
-	* The option `-l <driver_classpath>` allows to specify additional Java classpath necessary to load a particular JDBC driver for the jdbc: targets.
-	* The option `-p <property=value>` allows to pass additional properties to JDBC connections for the jdbc: targets. The most frequent JDBC connection properties are `-p user=<jdbc_connection_username>` and `-p password=<jdbc_connection_password>`.
+  * The target file format and optional compression (for file: and hdfs: targets) is determined from the target file extension.
+  * The target table name (for the jdbc: targets) must be added behind the additional slash at the end of the standard JDBC URL connection string.
+  * The target file name (for file: and hdfs: targets) must contain a parallel index marker `{0}` anywhere within the path to avoid parallel write conflicts and corruption of the exported data.
+  * The SPARQL query type must match the target URL (and the target file type if applicable). For example, only SELECT queries can be used for the jdbc: targets.
+  * The option `-c <driver_class>` is mandatory for the jdbc: targets to determine the JDBC Driver class used to connect to the target.
+  * The option `-l <driver_classpath>` allows to specify additional Java classpath necessary to load a particular JDBC driver for the jdbc: targets.
+  * The option `-p <property=value>` allows to pass additional properties to JDBC connections for the jdbc: targets. The most frequent JDBC connection properties are `-p user=<jdbc_connection_username>` and `-p password=<jdbc_connection_password>`.
 
 ### Halyard Bulk Delete
 
@@ -358,17 +358,17 @@ Halyard Bulk Delete is a MapReduce application that effectively deletes large se
 
 ```
 $ ./bulkdelete
-usage: bulkdelete [-c <context>] \
-	               [-f <temporary_folder>] \
-	               [-h] [-o <object>] \
-	               [-p <predicate>] \
-	               [-s <subject>] \
-	               [-t <dataset_table>] \
-	               [-v]
-Deletes large set of triples or whole named graphs, \
-based on specified statement pattern and/or
-graph context.
- -c <context>            Optional graph context(s) to delete, \
+usage: bulkdelete [-c <context> ] \
+                  [-f <temporary_folder> ] \
+                  [-h] \
+                  [-o <object> ] \
+                  [-p <predicate> ] \
+                  [-s <subject> ] \
+                  [-t <dataset_table> ] \
+                  [-v]
+Deletes large set of triples or whole named graphs,
+based on specified statement pattern and/or graph context.
+ -c <context>            Optional graph context(s) to delete,
                          NONE represents context of triples
                          outside of any named graph
  -f <temporary_folder>   Temporary folder for HBase files
@@ -376,24 +376,25 @@ graph context.
  -o <object>             Optional object to delete
  -p <predicate>          Optional predicate to delete
  -s <subject>            Optional subject to delete
- -t <dataset_table>      HBase table with Halyard RDF store
+ -t dataset_table        HBase table with Halyard RDF store
  -v                      Prints version
-Example: bulkdelete -t my_data -f bulkdelete_temp1 \
-                    -s <http://whatever/mysubj> \
-                    -c <http://whatever/myctx1> \
-                    -c <http://whatever/myctx2>
+Example: bulkdelete -t my_data \
+                    -f bulkdelete_temp1 \
+                    -s "<http://whatever/mysubj>" \
+                    -c "<http://whatever/myctx1>" \
+                    -c "<http://whatever/myctx2>"
 ```
 
 **Bulk Delete usage:**
 
 1. Open terminal on a Hadoop cluster node with a configured HBase.
 2. Don't forget to `kinit` with your credentials if on a secured cluster.
-3. Execute `./bulkupdate -t <HBase_table_name> -f '<temporary_path_for_HTable files>' -c <graph_context_to_delete>` to launch the bulk delete. The following features are supported:
-	* The option `-c <context>` may specify graph context to delete. The option may be specified multiple times. `-c NONE` represents triples without any graph context.
-	* The option `-s <subject>` may specify subject to delete.
-	* The option `-p <predicate>` may specify predicate to delete.
-	* The option `-o <object>` may specify object to delete.
-	It is mandatory to specify at least one of the `-c`, `-s`, `-p`, `-o` options to formulate a valid statement pattern.
+3. Execute `./bulkupdate -t HBase_table_name -f temporary_path_for_HTable_files -c "<graph_context_to_delete>"` to launch the bulk delete. The following features are supported:
+  * The option `-c "<context>"` may specify graph context to delete. The option may be specified multiple times. `-c NONE` represents triples without any graph context.
+  * The option `-s "<subject>"` may specify subject to delete.
+  * The option `-p "<predicate>"` may specify predicate to delete.
+  * The option `-o <object>` may specify object to delete.
+  It is mandatory to specify at least one of the `-c`, `-s`, `-p`, `-o` options to formulate a valid statement pattern. The values of `-c`, `-s`, `-p`, and `-o` are RDF terms serialized using the [N-Triples](https://www.w3.org/TR/n-triples) syntax. Note that when IRIs are used as values of the options, they have to be delimited by angle braces and double quotes to avoid shell interpreting them as stream redirection.
 
 ### Halyard Stats
 
@@ -537,9 +538,9 @@ halyard:statsContext {
 1. Open terminal on a Hadoop cluster node with a configured HBase.
 2. Don't forget to `kinit` with your credentials if on a secured cluster.
 3. Execute `./stats -s <HBase_table_name>` to launch the calculation of the statistics. The following features are supported:
-	* The target file format and optional compression (for hdfs: targets) is determined from the target file extension. The statistics are stored in the dataset when target file is not specified.
-	* The option `-Dhalyard.stats.graph.context=<graph context url>` can override the default statistics target graph context `http://merck.github.io/Halyard/ns#statsContext`.
-	* The option `-Dhalyard.stats.subset.threshold=<long value>` can override the default threshold value `1000` for the generation of subsets in statistics. The statistics will include virtual partitions for all subjects, properties, and objects with cardinality higher than the given threshold. Lower value may produce the statistics with many virtual partitions.
+  * The target file format and optional compression (for hdfs: targets) is determined from the target file extension. The statistics are stored in the dataset when target file is not specified.
+  * The option `-Dhalyard.stats.graph.context=<graph context url>` can override the default statistics target graph context `http://merck.github.io/Halyard/ns#statsContext`.
+  * The option `-Dhalyard.stats.subset.threshold=<long value>` can override the default threshold value `1000` for the generation of subsets in statistics. The statistics will include virtual partitions for all subjects, properties, and objects with cardinality higher than the given threshold. Lower value may produce the statistics with many virtual partitions.
 
 ### Halyard ElasticSearch Index
 
