@@ -352,6 +352,49 @@ Example: pexport [-Dmapreduce.job.maps=10] \
 	* The option `-l <driver_classpath>` allows to specify additional Java classpath necessary to load a particular JDBC driver for the jdbc: targets.
 	* The option `-p <property=value>` allows to pass additional properties to JDBC connections for the jdbc: targets. The most frequent JDBC connection properties are `-p user=<jdbc_connection_username>` and `-p password=<jdbc_connection_password>`.
 
+### Halyard Bulk Delete
+
+Halyard Bulk Delete is a MapReduce application that effectively deletes large set of triples or whole named graphs, based on specified statement pattern and/or graph context.
+
+```
+$ ./bulkdelete
+usage: bulkdelete [-c <context>] \
+	               [-f <temporary_folder>] \
+	               [-h] [-o <object>] \
+	               [-p <predicate>] \
+	               [-s <subject>] \
+	               [-t <dataset_table>] \
+	               [-v]
+Deletes large set of triples or whole named graphs, \
+based on specified statement pattern and/or
+graph context.
+ -c <context>            Optional graph context(s) to delete, \
+                         NONE represents context of triples
+                         outside of any named graph
+ -f <temporary_folder>   Temporary folder for HBase files
+ -h                      Prints this help
+ -o <object>             Optional object to delete
+ -p <predicate>          Optional predicate to delete
+ -s <subject>            Optional subject to delete
+ -t <dataset_table>      HBase table with Halyard RDF store
+ -v                      Prints version
+Example: bulkdelete -t my_data -f bulkdelete_temp1 \
+                    -s <http://whatever/mysubj> \
+                    -c <http://whatever/myctx1> \
+                    -c <http://whatever/myctx2>
+```
+
+**Bulk Delete usage:**
+
+1. Open terminal on a Hadoop cluster node with a configured HBase.
+2. Don't forget to `kinit` with your credentials if on a secured cluster.
+3. Execute `./bulkupdate -t <HBase_table_name> -f '<temporary_path_for_HTable files>' -c <graph_context_to_delete>` to launch the bulk delete. The following features are supported:
+	* The option `-c <context>` may specify graph context to delete. The option may be specified multiple times. `-c NONE` represents triples without any graph context.
+	* The option `-s <subject>` may specify subject to delete.
+	* The option `-p <predicate>` may specify predicate to delete.
+	* The option `-o <object>` may specify object to delete.
+	It is mandatory to specify at least one of the `-c`, `-s`, `-p`, `-o` options to formulate a valid statement pattern.
+
 ### Halyard Stats
 
 Halyard Stats is a MapReduce application that calculates dataset statistics and stores them in the dataset in the `http://merck.github.io/Halyard/ns#statsContext` named graph. The generated statistics are described by the [VoID vocabulary](http://www.w3.org/TR/void/#statistics), its [extensions](http://ldf.fi/void-ext), and the [SPARQL 1.1 Service Description](http://www.w3.org/TR/sparql11-service-description).
