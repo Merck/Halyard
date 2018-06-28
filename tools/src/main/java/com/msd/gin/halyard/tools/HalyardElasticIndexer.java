@@ -70,7 +70,7 @@ public class HalyardElasticIndexer implements Tool {
 
     private static final String SOURCE = "halyard.elastic.source";
     private static final String TARGET = "halyard.elastic.target";
-    private static final int BUFFER_LIMIT = 1000000;
+    private static final String BUFFER_LIMIT = "halyard.elastic.buffer";
 
     private static final Logger LOG = Logger.getLogger(HalyardElasticIndexer.class.getName());
     private static final Charset UTF8 = Charset.forName("UTF-8");
@@ -87,10 +87,12 @@ public class HalyardElasticIndexer implements Tool {
         ArrayList<String> literals = new ArrayList<>();
         StringBuilder batch = new StringBuilder();
         URL url;
+        int bufferLimit;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             url = new URL(context.getConfiguration().get(TARGET)+"/l/_bulk");
+            bufferLimit = context.getConfiguration().getInt(BUFFER_LIMIT, 100000);
         }
 
 
@@ -129,7 +131,7 @@ public class HalyardElasticIndexer implements Tool {
                 literals.clear();
                 exports++;
             }
-            if ((flush && batch.length() > 0) || batch.length() > BUFFER_LIMIT) {
+            if ((flush && batch.length() > 0) || batch.length() > bufferLimit) {
                 HttpURLConnection http = (HttpURLConnection)url.openConnection();
                 http.setRequestMethod("POST");
                 http.setDoOutput(true);
@@ -174,6 +176,7 @@ public class HalyardElasticIndexer implements Tool {
         options.addOption(newOption("v", null, "Prints version"));
         options.addOption(newOption("s", "source_htable", "Source HBase table with Halyard RDF store"));
         options.addOption(newOption("t", "target_url", "Elasticsearch target index url <server>:<port>/<index_name>"));
+        options.addOption(newOption("b", "batch_size", "Number of literals sent to Elasticsearch for indexing in one batch (default is 100000)"));
         try {
             CommandLine cmd = new PosixParser().parse(options, args);
             if (args.length == 0 || cmd.hasOption('h')) {
@@ -214,6 +217,9 @@ public class HalyardElasticIndexer implements Tool {
             Job job = Job.getInstance(getConf(), "HalyardElasticIndexer " + source + " -> " + target);
             job.getConfiguration().set(SOURCE, source);
             job.getConfiguration().set(TARGET, target);
+            if (cmd.hasOption('b')) {
+                job.getConfiguration().setInt(BUFFER_LIMIT, Integer.parseInt(cmd.getOptionValue('b')));
+            }
             job.setJarByClass(HalyardElasticIndexer.class);
             TableMapReduceUtil.initCredentials(job);
 
