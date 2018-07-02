@@ -548,7 +548,7 @@ Halyard ElasticSearch Index is a MapReduce application that indexes all literals
 
 ```
 $ ./esindex
-Usage: stats [-h] \
+Usage: esindex [-h] \
              [-s <source_htable>] \
              [-t <target_url>] \
              [-v]

@@ -166,7 +166,7 @@ public class HalyardElasticIndexer implements Tool {
     }
 
     private static void printHelp(Options options) {
-        new HelpFormatter().printHelp(100, "stats", "Indexes all literals from Halyard dataset into Elasticsearch.", options, "Example: esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index", true);
+        new HelpFormatter().printHelp(100, "esindex", "Indexes all literals from Halyard dataset into Elasticsearch.", options, "Example: esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index", true);
     }
 
     @Override
