@@ -15,7 +15,7 @@ Multiple repositories configured in various RDF4J Servers or in multiple RDF4J C
 
 **Deleting a repository** from a particular RDF4J Server or RDF4J Console does not delete the associated Halyard dataset and so it does not affect the data and other users. However **clearing** the repository or **deleting its statements** has global effect for all users.
 
-## Create repository
+## Create repository <a id="Create_repository"></a>
 
 ### HBase repository settings
 
@@ -396,3 +396,35 @@ hbase(main):001:0> disable 'testRepo'
 hbase(main):002:0> drop 'testRepo'
 0 row(s) in 0.2070 seconds
 ```
+
+## Cooperation with ElasticSearch
+### Prerequisites
+Halyard expect pre-installed ElasticSearch server accessible through REST APIs and pre-configured index(es). Index requirements are minimal: there are no stored attributes, just `_id` and reverse search index for attribute named `l`.
+
+Halyard indexes only each individual literal values from the statement objects, so the resulting index is small and efficient. One index can be shared across multiple Halyard datasets. 
+
+### Indexing of literals in ElasticSearch
+Halyard only cooperates with ElasticSearch indexes loaded by [Halyard ElasticSearch Index](https://merck.github.io/Halyard/tools.html#Halyard_ElasticSearch_Index) tool.
+
+### Dataset configuration to cooperate with Elastic Search
+Only dataset configured with reference to the ElasticSearch index cooperates with the index to search for literals. Please follow instructions at [Create repository](#Create_repository) section above in this document.
+
+### Custom search data type usage
+Custom data type <a id="search" href="http://merck.github.io/Halyard/ns#search">`halyard:search`</a> is used to pass the value as a query string to Elastic Search index (when configured). The value is replaced with all matching values retrieved from Elastic Search index during SPARQL query, during direct API repository operations, or during RDF4J Workbench exploration of the datasets. 
+
+For example `"(search~1 algorithm~1) AND (grant ingersoll)"^^halyard:search` will execute a fuzzy search over all indexed literals for the terms “search algorithm” and “grant ingersoll”. And it will pass relevant literals back to the statement evaluation where used in SPARQL query or RDF4J API or in Explorer. 
+
+The whole SPARQL query that will retrieve subject(s) and predicate(s) related to the found literals might for example look like this:
+
+```
+SELECT ?subj ?pred
+WHERE {
+    ?subj ?pred "(search~1 algorithm~1) AND (grant ingersoll)"^^halyard:search
+}
+```
+
+The cooperation with ElasticSearch is implemented on a very low level, so it can be used almost anywhere, including:
+
+ * In SPARQL queries or updates anywhere in Console, Workbench, API, or Halyard command line and MapReduce tools
+ * In statements retrieval or deletion through Console, Workbench, or API
+ * In RDF4J Workbench Explorer

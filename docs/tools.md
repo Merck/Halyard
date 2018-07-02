@@ -542,7 +542,7 @@ halyard:statsContext {
   * The option `-Dhalyard.stats.graph.context=<graph context url>` can override the default statistics target graph context `http://merck.github.io/Halyard/ns#statsContext`.
   * The option `-Dhalyard.stats.subset.threshold=<long value>` can override the default threshold value `1000` for the generation of subsets in statistics. The statistics will include virtual partitions for all subjects, properties, and objects with cardinality higher than the given threshold. Lower value may produce the statistics with many virtual partitions.
 
-### Halyard ElasticSearch Index
+### Halyard ElasticSearch Index <a id="Halyard_ElasticSearch_Index"></a>
 
 Halyard ElasticSearch Index is a MapReduce application that indexes all literals in the given dataset into a supplementary ElasticSearch server/cluster. A Halyard repository configured with such supplementary ElasticSearch index can then provide more advanced text search features over the indexed literals.
 

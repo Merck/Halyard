@@ -31,6 +31,12 @@ Custom SPARQL function used in [Halyard Parallel Export](tools#Halyard_Parallel_
 
 ### <a id="decimateBy" href="http://merck.github.io/Halyard/ns#decimateBy">`halyard:decimateBy`</a>
 
+## Custom data types
+
+### <a id="search" href="http://merck.github.io/Halyard/ns#search">`halyard:search`</a>
+
+Custom data type passing the value as a query string to Elastic Search index (when configured). The value is replaced with all matching values retrieved from Elastic Search index during SPARQL query, during direct API repository operations, or during RDF4J Workbench exploration of the datasets.  
+
 ## SAIL configuration predicates
 
 ### <a id="tableName" href="http://merck.github.io/Halyard/ns#tableName">`halyard:tableName`</a>
