@@ -26,11 +26,27 @@ import org.eclipse.rdf4j.repository.sail.SailRepository;
  */
 public class HalyardComplexSPARQLQueryTest extends ComplexSPARQLQueryTest {
 
-	@Override
-	protected Repository newRepository()
-		throws Exception
-	{
-		return new SailRepository(new MemoryStoreWithHalyardStrategy());
-	}
+    @Override
+    protected Repository newRepository() throws Exception {
+        return new SailRepository(new MemoryStoreWithHalyardStrategy());
+    }
+
+//    @Rule
+//    public SingleTestRule test = new SingleTestRule();
+//
+//    public class SingleTestRule implements MethodRule {
+//
+//        @Override
+//        public Statement apply(final Statement statement, final FrameworkMethod method, final Object target) {
+//            return new Statement() {
+//                @Override
+//                public void evaluate() throws Throwable {
+//                    if ("test27NormalizeIRIFunction".equals(method.getName())) {
+//                        statement.evaluate();
+//                    }
+//                }
+//            };
+//        }
+//    }
 
 }

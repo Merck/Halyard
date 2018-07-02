@@ -586,6 +586,11 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     }
 
     @Override
+    public boolean pendingRemovals() {
+        return false;
+    }
+
+    @Override
     public void startUpdate(UpdateContext op) throws SailException {
     }
 

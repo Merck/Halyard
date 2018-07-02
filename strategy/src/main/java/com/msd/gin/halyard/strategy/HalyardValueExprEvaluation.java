@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
+import org.eclipse.rdf4j.common.net.ParsedIRI;
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -94,7 +95,7 @@ class HalyardValueExprEvaluation {
     }
 
     /**
-     * Determines the "effective boolean value" of the {@link Value} returned by evaluating the expression. 
+     * Determines the "effective boolean value" of the {@link Value} returned by evaluating the expression.
      * See {@link QueryEvaluationUtil#getEffectiveBooleanValue(Value)} for the definition of "effective boolean value.
      * @param expr
      * @param bindings the set of named value bindings
@@ -193,7 +194,7 @@ class HalyardValueExprEvaluation {
     }
 
     /**
-     * Evaluate a {@link Var} query model node. 
+     * Evaluate a {@link Var} query model node.
      * @param var
      * @param bindings the set of named value bindings
      * @return the result of {@link Var#getValue()} from either {@code var}, or if {@code null}, from the {@ bindings}
@@ -312,8 +313,8 @@ class HalyardValueExprEvaluation {
      * Evaluate a {@link Lang} node
      * @param node the node to evaluate
      * @param bindings the set of named value bindings
-     * @return a {@link Literal} of the language tag of the {@code Literal} returned by evaluating the argument of the {@code node} or a 
-     * {code Literal} representing an empty {@code String} if there is no tag 
+     * @return a {@link Literal} of the language tag of the {@code Literal} returned by evaluating the argument of the {@code node} or a
+     * {code Literal} representing an empty {@code String} if there is no tag
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
@@ -334,7 +335,7 @@ class HalyardValueExprEvaluation {
      * Evaluate a {@link Datatype} node
      * @param node the node to evaluate
      * @param bindings the set of named value bindings
-     * @return a {@link Literal} representing the evaluation of the argument of the {@link Datatype}. 
+     * @return a {@link Literal} representing the evaluation of the argument of the {@link Datatype}.
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
@@ -468,16 +469,18 @@ class HalyardValueExprEvaluation {
             final Literal lit = (Literal) argValue;
             String uriString = lit.getLabel();
             final String baseURI = node.getBaseURI();
-            if (!URIUtil.isValidURIReference(uriString)) {
-                // uri string may be a relative reference. Try appending base URI
-                if (baseURI != null) {
-                    uriString = baseURI + uriString;
-                    if (!URIUtil.isValidURIReference(uriString)) {
-                        throw new ValueExprEvaluationException("not a valid URI reference: " + uriString);
+            try {
+                    ParsedIRI iri = ParsedIRI.create(uriString);
+                    if (!iri.isAbsolute() && baseURI != null) {
+                            // uri string may be a relative reference.
+                            uriString = ParsedIRI.create(baseURI).resolve(iri).toString();
                     }
-                } else {
-                    throw new ValueExprEvaluationException("not a valid URI reference: " + uriString);
-                }
+                    else if (!iri.isAbsolute()) {
+                            throw new ValueExprEvaluationException("not an absolute IRI reference: " + uriString);
+                    }
+            }
+            catch (IllegalArgumentException e) {
+                    throw new ValueExprEvaluationException("not a valid IRI reference: " + uriString);
             }
             IRI result = null;
             try {
