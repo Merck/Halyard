@@ -26,6 +26,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.Model;
@@ -176,5 +177,15 @@ public class HalyardStatsTest {
 
     public void testRunNoArgs() throws Exception {
         assertEquals(-1, new HalyardStats().run(new String[0]));
+    }
+
+    @Test
+    public void testRunVersion() throws Exception {
+        assertEquals(0, new HalyardStats().run(new String[]{"-v"}));
+    }
+
+    @Test(expected = UnrecognizedOptionException.class)
+    public void testRunInvalid() throws Exception {
+        new HalyardStats().run(new String[]{"-invalid"});
     }
 }

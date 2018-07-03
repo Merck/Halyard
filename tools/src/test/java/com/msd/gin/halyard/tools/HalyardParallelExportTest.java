@@ -19,6 +19,7 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.File;
+import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -59,5 +60,15 @@ public class HalyardParallelExportTest {
     @Test
     public void testRunNoArgs() throws Exception {
         assertEquals(-1, new HalyardParallelExport().run(new String[0]));
+    }
+
+    @Test
+    public void testRunVersion() throws Exception {
+        assertEquals(0, new HalyardParallelExport().run(new String[]{"-v"}));
+    }
+
+    @Test(expected = UnrecognizedOptionException.class)
+    public void testRunInvalid() throws Exception {
+        new HalyardParallelExport().run(new String[]{"-invalid"});
     }
 }

@@ -29,6 +29,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import org.apache.avro.data.Json;
+import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -90,5 +91,15 @@ public class HalyardElasticIndexerTest {
     @Test
     public void testRunNoArgs() throws Exception {
         assertEquals(-1, new HalyardElasticIndexer().run(new String[0]));
+    }
+
+    @Test
+    public void testRunVersion() throws Exception {
+        assertEquals(0, new HalyardElasticIndexer().run(new String[]{"-v"}));
+    }
+
+    @Test(expected = UnrecognizedOptionException.class)
+    public void testRunInvalid() throws Exception {
+        new HalyardElasticIndexer().run(new String[]{"-invalid"});
     }
 }
