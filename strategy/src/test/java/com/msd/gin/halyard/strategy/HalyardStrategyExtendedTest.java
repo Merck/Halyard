@@ -135,4 +135,9 @@ public class HalyardStrategyExtendedTest {
         TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, "PREFIX : <http://example.com/>\n" + "PREFIX schema: <http://schema.org/>\n" + "\n" + "SELECT (COUNT(*) AS ?count)\n" + "WHERE {\n" + "  {\n" + "    SELECT ?person\n" + "    WHERE {\n" + "      ?person a schema:Person .\n" + "    }\n" + "    LIMIT 5\n" + "  }\n" + "  OPTIONAL {\n" + "    [] :nonexistent [] .\n" + "  }\n" + "}").evaluate();
         assertEquals(5, ((Literal) res.next().getBinding("count").getValue()).intValue());
     }
+
+    @Test (expected = QueryEvaluationException.class)
+    public void testInvalidFunction() {
+        con.prepareTupleQuery(QueryLanguage.SPARQL, "PREFIX fn: <http://example.com/>\nSELECT ?whatever\nWHERE {\nBIND (fn:whatever(\"foo\") AS ?whatever)\n}").evaluate().hasNext();
+    }
 }

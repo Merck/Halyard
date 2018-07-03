@@ -1222,7 +1222,7 @@ final class HalyardTupleExprEvaluation {
                 if (exception != null) e.addSuppressed(exception);
                 exception = e;
                 try {
-                    close();
+                    handleClose();
                 } catch (QueryEvaluationException ex) {
                     exception.addSuppressed(ex);
                 }
@@ -1230,9 +1230,11 @@ final class HalyardTupleExprEvaluation {
 
             @Override
             protected boolean isClosed() {
-                return BindingSetPipeIterator.this.isClosed();
+                return exception != null || BindingSetPipeIterator.super.isClosed();
             }
         };
+
+
 
         @Override
         protected BindingSet getNextElement() throws QueryEvaluationException {
