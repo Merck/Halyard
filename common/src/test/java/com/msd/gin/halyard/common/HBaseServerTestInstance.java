@@ -56,8 +56,15 @@ public class HBaseServerTestInstance {
             yconf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class, ResourceScheduler.class);
             MiniMRYarnCluster miniCluster = new MiniMRYarnCluster("testCluster");
             miniCluster.init(yconf);
+            String resourceManagerLink = yconf.get(YarnConfiguration.RM_ADDRESS);
             yconf.setBoolean(MRJobConfig.JOB_UBERTASK_ENABLE, true);
             miniCluster.start();
+            miniCluster.waitForNodeManagersToConnect(10000);
+            // following condition set in MiniYarnCluster:273
+            while (resourceManagerLink.endsWith(":0")) {
+                Thread.sleep(100);
+                resourceManagerLink = yconf.get(YarnConfiguration.RM_ADDRESS);
+            }
 
             File hbaseRoot = File.createTempFile("hbase-root", "");
             hbaseRoot.delete();
