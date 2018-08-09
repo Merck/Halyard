@@ -18,24 +18,18 @@ package com.msd.gin.halyard.tools;
 
 import static com.msd.gin.halyard.tools.HalyardBulkUpdate.DECIMATE_FUNCTION_URI;
 import com.yammer.metrics.core.Gauge;
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.Arrays;
-import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.PosixParser;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
 
@@ -44,12 +38,10 @@ import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.Literal;
@@ -68,7 +60,7 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  * Apache Hadoop MapReduce tool for batch exporting of SPARQL queries.
  * @author Adam Sotona (MSD)
  */
-public class HalyardBulkExport implements Tool {
+public class HalyardBulkExport extends HalyardTool {
 
     private static final Logger LOG = Logger.getLogger(HalyardBulkExport.class.getName());
     private static final String SOURCE = "halyard.bulkexport.source";
@@ -76,7 +68,6 @@ public class HalyardBulkExport implements Tool {
     private static final String JDBC_DRIVER = "halyard.bulkexport.jdbc.driver";
     private static final String JDBC_CLASSPATH = "halyard.bulkexport.jdbc.classpath";
     private static final String JDBC_PROPERTIES = "halyard.bulkexport.jdbc.properties";
-    private Configuration conf;
 
     /**
      * Mapper class performing SPARQL Graph query evaluation and producing Halyard KeyValue pairs for HBase BulkLoad Reducers
@@ -128,7 +119,7 @@ public class HalyardBulkExport implements Tool {
                 if (cp != null) {
                     drCp = new URL[cp.length];
                     for (int i=0; i<cp.length; i++) {
-                        drCp[i] = HalyardParallelExport.class.getResource(cp[i]);
+                        drCp[i] = new File(cp[i]).toURI().toURL();
                     }
                 }
                 String[] props = cfg.getStrings(JDBC_PROPERTIES);
@@ -145,127 +136,82 @@ public class HalyardBulkExport implements Tool {
         }
     }
 
-
-    private static Option newOption(String opt, String argName, String description) {
-        Option o = new Option(opt, null, argName != null, description);
-        o.setArgName(argName);
-        return o;
-    }
-
-    private static void printHelp(Options options) {
-        new HelpFormatter().printHelp(100, "bulkexport", "Exports graph or table data from Halyard RDF store, using batch of SPARQL queries", options, "Example: bulkexport [-D" + MRJobConfig.NUM_MAPS + "=10] -s my_dataset -q hdfs:///myqueries/*.sparql -t hdfs:/my_folder/{0}.csv.gz", true);
+    public HalyardBulkExport() {
+        super(
+            "bulkexport",
+            "Exports graph or table data from Halyard RDF store, using batch of SPARQL queries",
+            "Example: bulkexport -s my_dataset -q hdfs:///myqueries/*.sparql -t hdfs:/my_folder/{0}.csv.gz"
+        );
+        addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
+        addOption("q", "queries", "sparql_queries", "folder or path pattern with SPARQL tuple or graph queries", true, true);
+        addOption("t", "target-url", "target_url", "file://<path>/{0}.<ext> or hdfs://<path>/{0}.<ext> or jdbc:<jdbc_connection>/{0}", true, true);
+        addOption("p", "jdbc-property", "property=value", "JDBC connection property", false, false);
+        addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
+        addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name", false, true);
     }
 
     @Override
-    public int run(String[] args) throws Exception {
-        Options options = new Options();
-        options.addOption(newOption("h", null, "Prints this help"));
-        options.addOption(newOption("v", null, "Prints version"));
-        options.addOption(newOption("s", "source_htable", "Source HBase table with Halyard RDF store"));
-        options.addOption(newOption("q", "sparql_queries", "folder or path pattern with SPARQL tuple or graph queries"));
-        options.addOption(newOption("t", "target_url", "file://<path>/{0}.<ext> or hdfs://<path>/{0}.<ext> or jdbc:<jdbc_connection>/{0}"));
-        options.addOption(newOption("p", "property=value", "JDBC connection properties"));
-        options.addOption(newOption("l", "driver_classpath", "JDBC driver classpath delimited by ':'"));
-        options.addOption(newOption("c", "driver_class", "JDBC driver class name"));
-        try {
-            CommandLine cmd = new PosixParser().parse(options, args);
-            if (args.length == 0 || cmd.hasOption('h')) {
-                printHelp(options);
-                return -1;
-            }
-            if (cmd.hasOption('v')) {
-                Properties p = new Properties();
-                try (InputStream in = HalyardExport.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/halyard-tools/pom.properties")) {
-                    if (in != null) p.load(in);
-                }
-                System.out.println("Halyard Bulk Export version " + p.getProperty("version", "unknown"));
-                return 0;
-            }
-            if (!cmd.getArgList().isEmpty()) throw new HalyardExport.ExportException("Unknown arguments: " + cmd.getArgList().toString());
-            for (char c : "sqt".toCharArray()) {
-                if (!cmd.hasOption(c))  throw new HalyardExport.ExportException("Missing mandatory option: " + c);
-            }
-            for (char c : "sqtlc".toCharArray()) {
-                String s[] = cmd.getOptionValues(c);
-                if (s != null && s.length > 1)  throw new HalyardExport.ExportException("Multiple values for option: " + c);
-            }
-            String source = cmd.getOptionValue('s');
-            String queryFiles = cmd.getOptionValue('q');
+    protected int run(CommandLine cmd) throws Exception {
+        if (!cmd.getArgList().isEmpty()) throw new HalyardExport.ExportException("Unknown arguments: " + cmd.getArgList().toString());
+        String source = cmd.getOptionValue('s');
+        String queryFiles = cmd.getOptionValue('q');
 
 
-            String target = cmd.getOptionValue('t');
-            if (!target.contains("{0}")) {
-                throw new HalyardExport.ExportException("Bulk export target must contain '{0}' to be replaced by stripped filename of the actual SPARQL query.");
-            }
-            getConf().set(SOURCE, source);
-            getConf().set(TARGET, target);
-            String driver = cmd.getOptionValue('c');
-            if (driver != null) {
-                getConf().set(JDBC_DRIVER, driver);
-            }
-            String props[] = cmd.getOptionValues('p');
-            if (props != null) {
-                for (int i=0; i<props.length; i++) {
-                    props[i] = Base64.encodeBase64String(props[i].getBytes(StandardCharsets.UTF_8));
-                }
-                getConf().setStrings(JDBC_PROPERTIES, props);
-            }
-            TableMapReduceUtil.addDependencyJars(getConf(),
-                   HalyardExport.class,
-                   NTriplesUtil.class,
-                   Rio.class,
-                   AbstractRDFHandler.class,
-                   RDFFormat.class,
-                   RDFParser.class,
-                   HTable.class,
-                   HBaseConfiguration.class,
-                   AuthenticationProtos.class,
-                   Trace.class,
-                   Gauge.class);
-            HBaseConfiguration.addHbaseResources(getConf());
-            Job job = Job.getInstance(getConf(), "HalyardBulkExport " + source + " -> " + target);
-            String cp = cmd.getOptionValue('l');
-            if (cp != null) {
-                String jars[] = cp.split(":");
-                for (int i=0; i<jars.length; i++) {
-                    Path p = new Path(jars[i]);
-                    job.addFileToClassPath(p);
-                    jars[i] = p.getName();
-                }
-                job.getConfiguration().setStrings(JDBC_CLASSPATH, jars);
-            }
-            job.setJarByClass(HalyardBulkExport.class);
-            job.setMaxMapAttempts(1);
-            job.setMapperClass(BulkExportMapper.class);
-            job.setMapOutputKeyClass(NullWritable.class);
-            job.setMapOutputValueClass(Void.class);
-            job.setNumReduceTasks(0);
-            job.setInputFormatClass(WholeFileTextInputFormat.class);
-            FileInputFormat.setInputDirRecursive(job, true);
-            FileInputFormat.setInputPaths(job, queryFiles);
-            job.setOutputFormatClass(NullOutputFormat.class);
-            TableMapReduceUtil.initCredentials(job);
-            if (job.waitForCompletion(true)) {
-                LOG.info("Bulk Export Completed..");
-                return 0;
-            }
-            return -1;
-        } catch (RuntimeException exp) {
-            System.out.println(exp.getMessage());
-            printHelp(options);
-            throw exp;
+        String target = cmd.getOptionValue('t');
+        if (!target.contains("{0}")) {
+            throw new HalyardExport.ExportException("Bulk export target must contain '{0}' to be replaced by stripped filename of the actual SPARQL query.");
         }
-
-    }
-
-    @Override
-    public Configuration getConf() {
-        return this.conf;
-    }
-
-    @Override
-    public void setConf(final Configuration c) {
-        this.conf = c;
+        getConf().set(SOURCE, source);
+        getConf().set(TARGET, target);
+        String driver = cmd.getOptionValue('c');
+        if (driver != null) {
+            getConf().set(JDBC_DRIVER, driver);
+        }
+        String props[] = cmd.getOptionValues('p');
+        if (props != null) {
+            for (int i=0; i<props.length; i++) {
+                props[i] = Base64.encodeBase64String(props[i].getBytes(StandardCharsets.UTF_8));
+            }
+            getConf().setStrings(JDBC_PROPERTIES, props);
+        }
+        TableMapReduceUtil.addDependencyJars(getConf(),
+               HalyardExport.class,
+               NTriplesUtil.class,
+               Rio.class,
+               AbstractRDFHandler.class,
+               RDFFormat.class,
+               RDFParser.class,
+               HTable.class,
+               HBaseConfiguration.class,
+               AuthenticationProtos.class,
+               Trace.class,
+               Gauge.class);
+        HBaseConfiguration.addHbaseResources(getConf());
+        String cp = cmd.getOptionValue('l');
+        if (cp != null) {
+            String jars[] = cp.split(":");
+            for (int i=0; i<jars.length; i++) {
+                jars[i] = addTmpFile(jars[i]);
+            }
+            getConf().setStrings(JDBC_CLASSPATH, jars);
+        }
+        Job job = Job.getInstance(getConf(), "HalyardBulkExport " + source + " -> " + target);
+        job.setJarByClass(HalyardBulkExport.class);
+        job.setMaxMapAttempts(1);
+        job.setMapperClass(BulkExportMapper.class);
+        job.setMapOutputKeyClass(NullWritable.class);
+        job.setMapOutputValueClass(Void.class);
+        job.setNumReduceTasks(0);
+        job.setInputFormatClass(WholeFileTextInputFormat.class);
+        FileInputFormat.setInputDirRecursive(job, true);
+        FileInputFormat.setInputPaths(job, queryFiles);
+        job.setOutputFormatClass(NullOutputFormat.class);
+        TableMapReduceUtil.initCredentials(job);
+        if (job.waitForCompletion(true)) {
+            LOG.info("Bulk Export Completed..");
+            return 0;
+        }
+        return -1;
     }
 
      /**
@@ -274,7 +220,7 @@ public class HalyardBulkExport implements Tool {
      * @throws Exception throws Exception in case of any problem
      */
     public static void main(String[] args) throws Exception {
-        System.exit(ToolRunner.run(new Configuration(), new HalyardBulkExport(), args));
+        System.exit(ToolRunner.run(new HalyardBulkExport(), args));
     }
 
 }
