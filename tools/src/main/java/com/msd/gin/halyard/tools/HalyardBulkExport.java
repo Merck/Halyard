@@ -62,7 +62,6 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  */
 public class HalyardBulkExport extends HalyardTool {
 
-    private static final Logger LOG = Logger.getLogger(HalyardBulkExport.class.getName());
     private static final String SOURCE = "halyard.bulkexport.source";
     private static final String TARGET = "halyard.bulkexport.target";
     private static final String JDBC_DRIVER = "halyard.bulkexport.jdbc.driver";

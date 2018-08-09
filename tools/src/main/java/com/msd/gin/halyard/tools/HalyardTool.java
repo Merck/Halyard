@@ -24,6 +24,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
@@ -40,6 +41,8 @@ import org.apache.hadoop.util.Tool;
  * @author Adam Sotona (MSD)
  */
 public abstract class HalyardTool implements Tool {
+
+    static final Logger LOG = Logger.getLogger(HalyardTool.class.getName());
 
     private Configuration conf = new Configuration();
     private final String name, header, footer;

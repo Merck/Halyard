@@ -67,8 +67,6 @@ public class HalyardBulkDelete extends HalyardTool {
     private static final String OBJECT = "halyard.delete.object";
     private static final String CONTEXTS = "halyard.delete.contexts";
 
-    private static final Logger LOG = Logger.getLogger(HalyardBulkDelete.class.getName());
-
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
     static final class DeleteMapper extends TableMapper<ImmutableBytesWritable, KeyValue> {
