@@ -40,9 +40,9 @@ import org.apache.hadoop.util.Tool;
  *
  * @author Adam Sotona (MSD)
  */
-public abstract class HalyardTool implements Tool {
+public abstract class AbstractHalyardTool implements Tool {
 
-    static final Logger LOG = Logger.getLogger(HalyardTool.class.getName());
+    static final Logger LOG = Logger.getLogger(AbstractHalyardTool.class.getName());
 
     private Configuration conf = new Configuration();
     private final String name, header, footer;
@@ -50,7 +50,7 @@ public abstract class HalyardTool implements Tool {
     private final List<String> singleOptions = new ArrayList<>();
     private final List<String> requiredOptions = new ArrayList<>();
 
-    protected HalyardTool(String name, String header, String footer) {
+    protected AbstractHalyardTool(String name, String header, String footer) {
         this.name = name;
         this.header = header;
         this.footer = footer;

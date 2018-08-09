@@ -21,24 +21,17 @@ import com.msd.gin.halyard.tools.HalyardExport.ExportException;
 import com.yammer.metrics.core.Gauge;
 import java.io.DataInput;
 import java.io.DataOutput;
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URL;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
-import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.PosixParser;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
@@ -54,7 +47,6 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.Value;
@@ -72,7 +64,7 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  * Map-only MapReduce tool providing the ability to export the results of a SPARQL query. A parallel version of {@link HalyardExport}
  * @author Adam Sotona (MSD)
  */
-public class HalyardParallelExport implements Tool {
+public class HalyardParallelExport extends AbstractHalyardTool {
 
     /**
      * String name of the custom SPARQL parallel split filter function
@@ -89,12 +81,6 @@ public class HalyardParallelExport implements Tool {
     private static final String JDBC_DRIVER = "halyard.parallelexport.jdbc.driver";
     private static final String JDBC_CLASSPATH = "halyard.parallelexport.jdbc.classpath";
     private static final String JDBC_PROPERTIES = "halyard.parallelexport.jdbc.properties";
-
-    private static final Logger LOG = Logger.getLogger(HalyardParallelExport.class.getName());
-    private static final Charset UTF8 = Charset.forName("UTF-8");
-
-
-    private Configuration conf;
 
     static class IndexedInputSplit extends InputSplit implements Writable {
 
@@ -188,13 +174,13 @@ public class HalyardParallelExport implements Tool {
                 if (cp != null) {
                     drCp = new URL[cp.length];
                     for (int i=0; i<cp.length; i++) {
-                        drCp[i] = HalyardParallelExport.class.getResource(cp[i]);
+                        drCp[i] = new File(cp[i]).toURI().toURL();
                     }
                 }
                 String[] props = cfg.getStrings(JDBC_PROPERTIES);
                 if (props != null) {
                     for (int i=0; i<props.length; i++) {
-                        props[i] = new String(Base64.decodeBase64(props[i]), UTF8);
+                        props[i] = new String(Base64.decodeBase64(props[i]), StandardCharsets.UTF_8);
                     }
                 }
                 HalyardExport.export(cfg, log, cfg.get(SOURCE), cfg.get(QUERY), MessageFormat.format(cfg.get(TARGET), iis.index), cfg.get(JDBC_DRIVER), drCp, props, false, cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL));
@@ -252,126 +238,80 @@ public class HalyardParallelExport implements Tool {
 
     }
 
-    private static Option newOption(String opt, String argName, String description) {
-        Option o = new Option(opt, null, argName != null, description);
-        o.setArgName(argName);
-        return o;
+    public HalyardParallelExport() {
+        super(
+            "pexport",
+            "Exports graph or table data from Halyard RDF store, using parallalel SPARQL query",
+            "Example: pexport [-D" + MRJobConfig.NUM_MAPS + "=10] [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] -s my_dataset -q '\nPREFIX halyard: <" + HALYARD.NAMESPACE + ">\nselect * where {?s ?p ?o .\nFILTER (halyard:" + PARALLEL_SPLIT_FUNCTION_NAME + " (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz"
+        );
+        addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
+        addOption("q", "sparql-query", "sparql_query", "SPARQL tuple or graph query with use of '" + PARALLEL_SPLIT_FUNCTION_URI + "' function", true, true);
+        addOption("t", "target-url", "target_url", "file://<path>/<file_name>{0}.<ext> or hdfs://<path>/<file_name>{0}.<ext> or jdbc:<jdbc_connection>/<table_name>", true, true);
+        addOption("p", "jdbc-property", "property=value", "JDBC connection property", false, false);
+        addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
+        addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name", false, true);
     }
-
-    private static void printHelp(Options options) {
-        new HelpFormatter().printHelp(100, "pexport", "Exports graph or table data from Halyard RDF store, using parallalel SPARQL query", options, "Example: pexport [-D" + MRJobConfig.NUM_MAPS + "=10] [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] -s my_dataset -q '\nPREFIX halyard: <" + HALYARD.NAMESPACE + ">\nselect * where {?s ?p ?o .\nFILTER (halyard:" + PARALLEL_SPLIT_FUNCTION_NAME + " (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz", true);
-    }
-
     @Override
-    public int run(String[] args) throws Exception {
-        Options options = new Options();
-        options.addOption(newOption("h", null, "Prints this help"));
-        options.addOption(newOption("v", null, "Prints version"));
-        options.addOption(newOption("s", "source_htable", "Source HBase table with Halyard RDF store"));
-        options.addOption(newOption("q", "sparql_query", "SPARQL tuple or graph query with use of '" + PARALLEL_SPLIT_FUNCTION_URI + "' function"));
-        options.addOption(newOption("t", "target_url", "file://<path>/<file_name>{0}.<ext> or hdfs://<path>/<file_name>{0}.<ext> or jdbc:<jdbc_connection>/<table_name>"));
-        options.addOption(newOption("p", "property=value", "JDBC connection properties"));
-        options.addOption(newOption("l", "driver_classpath", "JDBC driver classpath delimited by ':'"));
-        options.addOption(newOption("c", "driver_class", "JDBC driver class name"));
-        try {
-            CommandLine cmd = new PosixParser().parse(options, args);
-            if (args.length == 0 || cmd.hasOption('h')) {
-                printHelp(options);
-                return -1;
-            }
-            if (cmd.hasOption('v')) {
-                Properties p = new Properties();
-                try (InputStream in = HalyardExport.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/halyard-tools/pom.properties")) {
-                    if (in != null) p.load(in);
-                }
-                System.out.println("Halyard Parallel Export version " + p.getProperty("version", "unknown"));
-                return 0;
-            }
-            if (!cmd.getArgList().isEmpty()) throw new ExportException("Unknown arguments: " + cmd.getArgList().toString());
-            for (char c : "sqt".toCharArray()) {
-                if (!cmd.hasOption(c))  throw new ExportException("Missing mandatory option: " + c);
-            }
-            for (char c : "sqtlc".toCharArray()) {
-                String s[] = cmd.getOptionValues(c);
-                if (s != null && s.length > 1)  throw new ExportException("Multiple values for option: " + c);
-            }
-            String source = cmd.getOptionValue('s');
-            String query = cmd.getOptionValue('q');
-            if (!query.contains(PARALLEL_SPLIT_FUNCTION_NAME)) {
-                throw new ExportException("Parallel export SPARQL query must contain '" + PARALLEL_SPLIT_FUNCTION_URI + "' function.");
-            }
-            String target = cmd.getOptionValue('t');
-            if ((target.startsWith("file:") || target.startsWith("hdfs:")) && !target.contains("{0}")) {
-                throw new ExportException("Parallel export file target must contain '{0}' counter in the file path or name.");
-            }
-            getConf().set(SOURCE, source);
-            getConf().set(QUERY, query);
-            getConf().set(TARGET, target);
-            String driver = cmd.getOptionValue('c');
-            if (driver != null) {
-                getConf().set(JDBC_DRIVER, driver);
-            }
-            String props[] = cmd.getOptionValues('p');
-            if (props != null) {
-                for (int i=0; i<props.length; i++) {
-                    props[i] = Base64.encodeBase64String(props[i].getBytes(UTF8));
-                }
-                getConf().setStrings(JDBC_PROPERTIES, props);
-            }
-            TableMapReduceUtil.addDependencyJars(getConf(),
-                   HalyardExport.class,
-                   NTriplesUtil.class,
-                   Rio.class,
-                   AbstractRDFHandler.class,
-                   RDFFormat.class,
-                   RDFParser.class,
-                   HTable.class,
-                   HBaseConfiguration.class,
-                   AuthenticationProtos.class,
-                   Trace.class,
-                   Gauge.class);
-            HBaseConfiguration.addHbaseResources(getConf());
-            Job job = Job.getInstance(getConf(), "HalyardParallelExport " + source + " -> " + target);
-            String cp = cmd.getOptionValue('l');
-            if (cp != null) {
-                String jars[] = cp.split(":");
-                for (int i=0; i<jars.length; i++) {
-                    Path p = new Path(jars[i]);
-                    job.addFileToClassPath(p);
-                    jars[i] = p.getName();
-                }
-                job.getConfiguration().setStrings(JDBC_CLASSPATH, jars);
-            }
-            job.setJarByClass(HalyardParallelExport.class);
-            job.setMaxMapAttempts(1);
-            job.setMapperClass(ParallelExportMapper.class);
-            job.setMapOutputKeyClass(NullWritable.class);
-            job.setMapOutputValueClass(Void.class);
-            job.setNumReduceTasks(0);
-            job.setInputFormatClass(IndexedInputFormat.class);
-            job.setOutputFormatClass(NullOutputFormat.class);
-            TableMapReduceUtil.initCredentials(job);
-            if (job.waitForCompletion(true)) {
-                LOG.info("Parallel Export Completed..");
-                return 0;
-            }
-            return -1;
-        } catch (RuntimeException exp) {
-            System.out.println(exp.getMessage());
-            printHelp(options);
-            throw exp;
+    public int run(CommandLine cmd) throws Exception {
+        String source = cmd.getOptionValue('s');
+        String query = cmd.getOptionValue('q');
+        if (!query.contains(PARALLEL_SPLIT_FUNCTION_NAME)) {
+            throw new ExportException("Parallel export SPARQL query must contain '" + PARALLEL_SPLIT_FUNCTION_URI + "' function.");
         }
-
-    }
-
-    @Override
-    public Configuration getConf() {
-        return this.conf;
-    }
-
-    @Override
-    public void setConf(final Configuration c) {
-        this.conf = c;
+        String target = cmd.getOptionValue('t');
+        if ((target.startsWith("file:") || target.startsWith("hdfs:")) && !target.contains("{0}")) {
+            throw new ExportException("Parallel export file target must contain '{0}' counter in the file path or name.");
+        }
+        getConf().set(SOURCE, source);
+        getConf().set(QUERY, query);
+        getConf().set(TARGET, target);
+        String driver = cmd.getOptionValue('c');
+        if (driver != null) {
+            getConf().set(JDBC_DRIVER, driver);
+        }
+        String props[] = cmd.getOptionValues('p');
+        if (props != null) {
+            for (int i=0; i<props.length; i++) {
+                props[i] = Base64.encodeBase64String(props[i].getBytes(StandardCharsets.UTF_8));
+            }
+            getConf().setStrings(JDBC_PROPERTIES, props);
+        }
+        TableMapReduceUtil.addDependencyJars(getConf(),
+               HalyardExport.class,
+               NTriplesUtil.class,
+               Rio.class,
+               AbstractRDFHandler.class,
+               RDFFormat.class,
+               RDFParser.class,
+               HTable.class,
+               HBaseConfiguration.class,
+               AuthenticationProtos.class,
+               Trace.class,
+               Gauge.class);
+        HBaseConfiguration.addHbaseResources(getConf());
+        String cp = cmd.getOptionValue('l');
+        if (cp != null) {
+            String jars[] = cp.split(":");
+            for (int i=0; i<jars.length; i++) {
+                jars[i] = addTmpFile(jars[i]);
+            }
+            getConf().setStrings(JDBC_CLASSPATH, jars);
+        }
+        Job job = Job.getInstance(getConf(), "HalyardParallelExport " + source + " -> " + target);
+        job.setJarByClass(HalyardParallelExport.class);
+        job.setMaxMapAttempts(1);
+        job.setMapperClass(ParallelExportMapper.class);
+        job.setMapOutputKeyClass(NullWritable.class);
+        job.setMapOutputValueClass(Void.class);
+        job.setNumReduceTasks(0);
+        job.setInputFormatClass(IndexedInputFormat.class);
+        job.setOutputFormatClass(NullOutputFormat.class);
+        TableMapReduceUtil.initCredentials(job);
+        if (job.waitForCompletion(true)) {
+            LOG.info("Parallel Export Completed..");
+            return 0;
+        }
+        return -1;
     }
 
     /**
@@ -380,6 +320,6 @@ public class HalyardParallelExport implements Tool {
      * @throws Exception throws Exception in case of any problem
      */
     public static void main(String[] args) throws Exception {
-        System.exit(ToolRunner.run(new Configuration(), new HalyardParallelExport(), args));
+        System.exit(ToolRunner.run(new HalyardParallelExport(), args));
     }
 }

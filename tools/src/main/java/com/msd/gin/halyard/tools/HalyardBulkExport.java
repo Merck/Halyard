@@ -25,7 +25,6 @@ import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.StringEscapeUtils;
@@ -60,7 +59,7 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  * Apache Hadoop MapReduce tool for batch exporting of SPARQL queries.
  * @author Adam Sotona (MSD)
  */
-public class HalyardBulkExport extends HalyardTool {
+public class HalyardBulkExport extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.bulkexport.source";
     private static final String TARGET = "halyard.bulkexport.target";
@@ -154,8 +153,6 @@ public class HalyardBulkExport extends HalyardTool {
         if (!cmd.getArgList().isEmpty()) throw new HalyardExport.ExportException("Unknown arguments: " + cmd.getArgList().toString());
         String source = cmd.getOptionValue('s');
         String queryFiles = cmd.getOptionValue('q');
-
-
         String target = cmd.getOptionValue('t');
         if (!target.contains("{0}")) {
             throw new HalyardExport.ExportException("Bulk export target must contain '{0}' to be replaced by stripped filename of the actual SPARQL query.");
