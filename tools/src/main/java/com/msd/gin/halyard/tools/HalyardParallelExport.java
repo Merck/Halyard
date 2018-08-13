@@ -233,7 +233,7 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
         super(
             "pexport",
             "Exports graph or table data from Halyard RDF store, using parallalel SPARQL query",
-            "Example: pexport [-D" + MRJobConfig.NUM_MAPS + "=10] [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] -s my_dataset -q '\nPREFIX halyard: <" + HALYARD.NAMESPACE + ">\nselect * where {?s ?p ?o .\nFILTER (halyard:" + PARALLEL_SPLIT_FUNCTION_NAME + " (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz"
+            "Example: pexport -s my_dataset -j 10 -q '\nPREFIX halyard: <" + HALYARD.NAMESPACE + ">\nselect * where {?s ?p ?o .\nFILTER (halyard:" + PARALLEL_SPLIT_FUNCTION_NAME + " (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "sparql-query", "sparql_query", "SPARQL tuple or graph query with use of '" + PARALLEL_SPLIT_FUNCTION_URI + "' function", true, true);
