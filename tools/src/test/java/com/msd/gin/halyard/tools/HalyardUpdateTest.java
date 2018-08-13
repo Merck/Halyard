@@ -66,7 +66,7 @@ public class HalyardUpdateTest {
         }
         sail.commit();
         sail.shutDown();
-        HalyardUpdate.conf = HBaseServerTestInstance.getInstanceConfig();
+        HalyardUpdate.CONF = HBaseServerTestInstance.getInstanceConfig();
     }
 
     @AfterClass

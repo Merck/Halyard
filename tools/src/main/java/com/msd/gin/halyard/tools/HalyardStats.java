@@ -36,7 +36,6 @@ import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
 import java.util.WeakHashMap;
-import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
@@ -87,7 +86,6 @@ public final class HalyardStats extends  AbstractHalyardTool {
     private static final String THRESHOLD = "halyard.stats.threshold";
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
-    private static final Logger LOG = Logger.getLogger(HalyardStats.class.getName());
     private static final Charset UTF8 = Charset.forName("UTF-8");
     private static final byte[] TYPE_HASH = HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(RDF.TYPE).getBytes(UTF8));
 
