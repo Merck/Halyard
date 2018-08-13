@@ -56,7 +56,7 @@ import org.json.JSONObject;
  * MapReduce tool indexing all RDF literals in Elasticsearch
  * @author Adam Sotona (MSD)
  */
-public class HalyardElasticIndexer extends AbstractHalyardTool {
+public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.elastic.source";
     private static final String TARGET = "halyard.elastic.target";

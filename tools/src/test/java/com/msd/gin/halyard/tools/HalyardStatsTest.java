@@ -48,7 +48,6 @@ import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
 import org.eclipse.rdf4j.rio.helpers.ParseErrorLogger;
 import org.eclipse.rdf4j.sail.SailException;
 import static org.junit.Assert.*;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -79,14 +78,14 @@ public class HalyardStatsTest {
         root.mkdirs();
 
         assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(),
-                new String[]{ "-D" + HalyardStats.THRESHOLD + "=100", "-s", "statsTable", "-t", root.toURI().toURL().toString() + "stats{0}.trig"}));
+                new String[]{"-s", "statsTable", "-t", root.toURI().toURL().toString() + "stats{0}.trig", "-r", "100", "-g", "http://whatever/myStats"}));
 
         File stats = new File(root, "stats0.trig");
         assertTrue(stats.isFile());
         try (InputStream statsStream = new FileInputStream(stats)) {
             try (InputStream refStream = HalyardStatsTest.class.getResourceAsStream("testStatsTarget.trig")) {
                 Model statsM = Rio.parse(statsStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger());
-                Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger());
+                Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger(), SimpleValueFactory.getInstance().createIRI("http://whatever/myStats"));
                 assertEqualModels(refM, statsM);
             }
         }
@@ -160,7 +159,7 @@ public class HalyardStatsTest {
         sail.commit();
 
         assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(),
-                new String[]{"-s", "statsTable2"}));
+                new String[]{"-s", "statsTable2", "-r", "100"}));
 
         Set<Statement> statsM = new HashSet<>();
         try (CloseableIteration<? extends Statement,SailException> it = sail.getStatements(null, null, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {

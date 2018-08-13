@@ -59,7 +59,7 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardBulkDelete extends AbstractHalyardTool {
+public final class HalyardBulkDelete extends AbstractHalyardTool {
 
     private static final String SUBJECT = "halyard.delete.subject";
     private static final String PREDICATE = "halyard.delete.predicate";

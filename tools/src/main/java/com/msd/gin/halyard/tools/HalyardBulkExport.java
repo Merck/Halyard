@@ -18,9 +18,7 @@ package com.msd.gin.halyard.tools;
 
 import static com.msd.gin.halyard.tools.HalyardBulkUpdate.DECIMATE_FUNCTION_URI;
 import com.yammer.metrics.core.Gauge;
-import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.Arrays;
@@ -59,7 +57,7 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  * Apache Hadoop MapReduce tool for batch exporting of SPARQL queries.
  * @author Adam Sotona (MSD)
  */
-public class HalyardBulkExport extends AbstractHalyardTool {
+public final class HalyardBulkExport extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.bulkexport.source";
     private static final String TARGET = "halyard.bulkexport.target";
@@ -70,7 +68,7 @@ public class HalyardBulkExport extends AbstractHalyardTool {
     /**
      * Mapper class performing SPARQL Graph query evaluation and producing Halyard KeyValue pairs for HBase BulkLoad Reducers
      */
-    public static class BulkExportMapper extends Mapper<NullWritable, Text, NullWritable, Void> {
+    public static final class BulkExportMapper extends Mapper<NullWritable, Text, NullWritable, Void> {
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {

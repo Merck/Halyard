@@ -84,7 +84,7 @@ public final class HalyardExport extends AbstractHalyardTool {
     /**
      * A generic exception during export
      */
-    public static class ExportException extends Exception {
+    public static final class ExportException extends Exception {
         private static final long serialVersionUID = 2946182537302463011L;
 
         /**

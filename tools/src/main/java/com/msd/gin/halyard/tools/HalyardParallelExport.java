@@ -62,7 +62,7 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  * Map-only MapReduce tool providing the ability to export the results of a SPARQL query. A parallel version of {@link HalyardExport}
  * @author Adam Sotona (MSD)
  */
-public class HalyardParallelExport extends AbstractHalyardTool {
+public final class HalyardParallelExport extends AbstractHalyardTool {
 
     /**
      * String name of the custom SPARQL parallel split filter function
@@ -80,7 +80,7 @@ public class HalyardParallelExport extends AbstractHalyardTool {
     private static final String JDBC_CLASSPATH = "halyard.parallelexport.jdbc.classpath";
     private static final String JDBC_PROPERTIES = "halyard.parallelexport.jdbc.properties";
 
-    static class IndexedInputSplit extends InputSplit implements Writable {
+    static final class IndexedInputSplit extends InputSplit implements Writable {
 
         public static IndexedInputSplit read(DataInput in) throws IOException {
             IndexedInputSplit iis = new IndexedInputSplit();
@@ -130,7 +130,7 @@ public class HalyardParallelExport extends AbstractHalyardTool {
 
     }
 
-    static class ParallelExportMapper extends Mapper<NullWritable, Void, NullWritable, Void> {
+    static final class ParallelExportMapper extends Mapper<NullWritable, Void, NullWritable, Void> {
 
         @Override
         public void run(final Context context) throws IOException, InterruptedException {
@@ -182,7 +182,7 @@ public class HalyardParallelExport extends AbstractHalyardTool {
         }
     }
 
-    static class IndexedInputFormat extends InputFormat<NullWritable, Void> {
+    static final class IndexedInputFormat extends InputFormat<NullWritable, Void> {
 
         @Override
         public List<InputSplit> getSplits(JobContext context) throws IOException, InterruptedException {

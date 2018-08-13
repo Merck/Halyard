@@ -20,14 +20,12 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.VOID_EXT;
-import com.msd.gin.halyard.tools.HalyardExport.ExportException;
 import com.yammer.metrics.core.Gauge;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -37,14 +35,9 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.WeakHashMap;
 import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.PosixParser;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -62,11 +55,9 @@ import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.IRI;
@@ -89,11 +80,11 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  * to summarize a graph and it implicitly shows how the subjects, predicates and objects are used. In the absence of schema information this information can be vital.
  * @author Adam Sotona (MSD)
  */
-public class HalyardStats implements Tool {
+public final class HalyardStats extends  AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.stats.source";
     private static final String TARGET = "halyard.stats.target";
-    static final String THRESHOLD = "halyard.stats.threshold";
+    private static final String THRESHOLD = "halyard.stats.threshold";
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
     private static final Logger LOG = Logger.getLogger(HalyardStats.class.getName());
@@ -101,8 +92,6 @@ public class HalyardStats implements Tool {
     private static final byte[] TYPE_HASH = HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(RDF.TYPE).getBytes(UTF8));
 
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
-
-    private Configuration conf;
 
     static final class StatsMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
 
@@ -311,7 +300,7 @@ public class HalyardStats implements Tool {
 
     }
 
-    static class StatsPartitioner extends Partitioner<ImmutableBytesWritable, LongWritable> {
+    static final class StatsPartitioner extends Partitioner<ImmutableBytesWritable, LongWritable> {
         @Override
         public int getPartition(ImmutableBytesWritable key, LongWritable value, int numPartitions) {
             try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
@@ -322,7 +311,7 @@ public class HalyardStats implements Tool {
         }
     }
 
-    static class StatsReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
+    static final class StatsReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
 
         final static Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
 
@@ -443,103 +432,63 @@ public class HalyardStats implements Tool {
             }
         }
     }
-    private static Option newOption(String opt, String argName, String description) {
-        Option o = new Option(opt, null, argName != null, description);
-        o.setArgName(argName);
-        return o;
-    }
 
-    private static void printHelp(Options options) {
-        new HelpFormatter().printHelp(100, "stats", "Updates or exports statistics about Halyard dataset.", options, "Example: stats [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + GRAPH_CONTEXT + "='http://whatever/mystats'] -s my_dataset [-t hdfs:/my_folder/my_stats.trig]", true);
+    public HalyardStats() {
+        super("stats", "Updates or exports statistics about Halyard dataset.", "Example: stats -s my_dataset [-g 'http://whatever/mystats'] [-t hdfs:/my_folder/my_stats.trig]");
+        addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
+        addOption("t", "target-file", "target_url", "Optional target file to export the statistics (instead of update) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]", false, true);
+        addOption("r", "threshold", "size", "Optional minimal size of a named graph to calculate statistics for (default is 1000)", false, true);
+        addOption("g", "target-graph", "target_graph", "Optional target graph context of the exported statistics (default is " + HALYARD.STATS_GRAPH_CONTEXT.stringValue(), false, true);
     }
 
     @Override
-    public int run(String[] args) throws Exception {
-        Options options = new Options();
-        options.addOption(newOption("h", null, "Prints this help"));
-        options.addOption(newOption("v", null, "Prints version"));
-        options.addOption(newOption("s", "source_htable", "Source HBase table with Halyard RDF store"));
-        options.addOption(newOption("t", "target_url", "Optional target file to export the statistics (instead of update) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]"));
-        try {
-            CommandLine cmd = new PosixParser().parse(options, args);
-            if (args.length == 0 || cmd.hasOption('h')) {
-                printHelp(options);
-                return -1;
-            }
-            if (cmd.hasOption('v')) {
-                Properties p = new Properties();
-                try (InputStream in = HalyardStats.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/halyard-tools/pom.properties")) {
-                    if (in != null) p.load(in);
-                }
-                System.out.println("Halyard Stats version " + p.getProperty("version", "unknown"));
-                return 0;
-            }
-            if (!cmd.getArgList().isEmpty()) throw new ExportException("Unknown arguments: " + cmd.getArgList().toString());
-            for (char c : "s".toCharArray()) {
-                if (!cmd.hasOption(c))  throw new ExportException("Missing mandatory option: " + c);
-            }
-            for (char c : "st".toCharArray()) {
-                String s[] = cmd.getOptionValues(c);
-                if (s != null && s.length > 1)  throw new ExportException("Multiple values for option: " + c);
-            }
-            String source = cmd.getOptionValue('s');
-            String target = cmd.getOptionValue('t');
-            TableMapReduceUtil.addDependencyJars(getConf(),
-                   HalyardExport.class,
-                   NTriplesUtil.class,
-                   Rio.class,
-                   AbstractRDFHandler.class,
-                   RDFFormat.class,
-                   RDFParser.class,
-                   HTable.class,
-                   HBaseConfiguration.class,
-                   AuthenticationProtos.class,
-                   Trace.class,
-                   Gauge.class);
-            HBaseConfiguration.addHbaseResources(getConf());
-            Job job = Job.getInstance(getConf(), "HalyardStats " + source + (target == null ? " update" : " -> " + target));
-            job.getConfiguration().set(SOURCE, source);
-            if (target != null) job.getConfiguration().set(TARGET, target);
-            job.setJarByClass(HalyardStats.class);
-            TableMapReduceUtil.initCredentials(job);
+    public int run(CommandLine cmd) throws Exception {
+        String source = cmd.getOptionValue('s');
+        String target = cmd.getOptionValue('t');
+        String graph = cmd.getOptionValue('g');
+        String thresh = cmd.getOptionValue('r');
+        TableMapReduceUtil.addDependencyJars(getConf(),
+               HalyardExport.class,
+               NTriplesUtil.class,
+               Rio.class,
+               AbstractRDFHandler.class,
+               RDFFormat.class,
+               RDFParser.class,
+               HTable.class,
+               HBaseConfiguration.class,
+               AuthenticationProtos.class,
+               Trace.class,
+               Gauge.class);
+        HBaseConfiguration.addHbaseResources(getConf());
+        Job job = Job.getInstance(getConf(), "HalyardStats " + source + (target == null ? " update" : " -> " + target));
+        job.getConfiguration().set(SOURCE, source);
+        if (target != null) job.getConfiguration().set(TARGET, target);
+        if (graph != null) job.getConfiguration().set(GRAPH_CONTEXT, graph);
+        if (thresh != null) job.getConfiguration().setLong(THRESHOLD, Long.parseLong(thresh));
+        job.setJarByClass(HalyardStats.class);
+        TableMapReduceUtil.initCredentials(job);
 
-            Scan scan = new Scan();
-            scan.addFamily("e".getBytes(UTF8));
-            scan.setMaxVersions(1);
-            scan.setBatch(10);
-            scan.setAllowPartialResults(true);
+        Scan scan = new Scan();
+        scan.addFamily("e".getBytes(UTF8));
+        scan.setMaxVersions(1);
+        scan.setBatch(10);
+        scan.setAllowPartialResults(true);
 
-            TableMapReduceUtil.initTableMapperJob(
-                    source,
-                    scan,
-                    StatsMapper.class,
-                    ImmutableBytesWritable.class,
-                    LongWritable.class,
-                    job);
-            job.setPartitionerClass(StatsPartitioner.class);
-            job.setReducerClass(StatsReducer.class);
-            job.setOutputFormatClass(NullOutputFormat.class);
-            if (job.waitForCompletion(true)) {
-                LOG.info("Stats Generation Completed..");
-                return 0;
-            }
-            return -1;
-        } catch (RuntimeException exp) {
-            System.out.println(exp.getMessage());
-            printHelp(options);
-            throw exp;
+        TableMapReduceUtil.initTableMapperJob(
+                source,
+                scan,
+                StatsMapper.class,
+                ImmutableBytesWritable.class,
+                LongWritable.class,
+                job);
+        job.setPartitionerClass(StatsPartitioner.class);
+        job.setReducerClass(StatsReducer.class);
+        job.setOutputFormatClass(NullOutputFormat.class);
+        if (job.waitForCompletion(true)) {
+            LOG.info("Stats Generation Completed..");
+            return 0;
         }
-
-    }
-
-    @Override
-    public Configuration getConf() {
-        return this.conf;
-    }
-
-    @Override
-    public void setConf(final Configuration c) {
-        this.conf = c;
+        return -1;
     }
 
     /**
