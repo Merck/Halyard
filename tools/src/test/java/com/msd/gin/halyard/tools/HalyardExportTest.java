@@ -84,7 +84,7 @@ public class HalyardExportTest {
         }
         sail.commit();
         sail.shutDown();
-        HalyardExport.conf = HBaseServerTestInstance.getInstanceConfig();
+        AbstractHalyardTool.CONF = HBaseServerTestInstance.getInstanceConfig();
     }
 
     @AfterClass
@@ -102,7 +102,7 @@ public class HalyardExportTest {
         HalyardExport.main(new String[] {"-v"});
     }
 
-    @Test(expected = ExportException.class)
+    @Test(expected = ParseException.class)
     public void testMissingArgs() throws Exception {
         HalyardExport.main(new String[] {"-s", "whatever", "-q", "query"});
     }
@@ -112,7 +112,7 @@ public class HalyardExportTest {
         HalyardExport.main(new String[] {"-y"});
     }
 
-    @Test(expected = ExportException.class)
+    @Test(expected = ParseException.class)
     public void testDupArgs() throws Exception {
         HalyardExport.main(new String[] {"-s", "whatever", "-q", "query", "-t", "target", "-s", "whatever2"});
     }

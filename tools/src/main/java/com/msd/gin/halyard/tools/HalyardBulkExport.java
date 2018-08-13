@@ -112,21 +112,13 @@ public class HalyardBulkExport extends AbstractHalyardTool {
                     }
                 };
                 Configuration cfg = context.getConfiguration();
-                String[] cp = cfg.getStrings(JDBC_CLASSPATH);
-                URL[] drCp = null;
-                if (cp != null) {
-                    drCp = new URL[cp.length];
-                    for (int i=0; i<cp.length; i++) {
-                        drCp[i] = new File(cp[i]).toURI().toURL();
-                    }
-                }
                 String[] props = cfg.getStrings(JDBC_PROPERTIES);
                 if (props != null) {
                     for (int i=0; i<props.length; i++) {
                         props[i] = new String(Base64.decodeBase64(props[i]), StandardCharsets.UTF_8);
                     }
                 }
-                HalyardExport.export(cfg, log, cfg.get(SOURCE), query, MessageFormat.format(cfg.get(TARGET), bName), cfg.get(JDBC_DRIVER), drCp, props, false, cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL));
+                HalyardExport.export(cfg, log, cfg.get(SOURCE), query, MessageFormat.format(cfg.get(TARGET), bName), cfg.get(JDBC_DRIVER), cfg.get(JDBC_CLASSPATH), props, false, cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL));
             } catch (Exception e) {
                 throw new IOException(e);
             }
@@ -186,10 +178,12 @@ public class HalyardBulkExport extends AbstractHalyardTool {
         String cp = cmd.getOptionValue('l');
         if (cp != null) {
             String jars[] = cp.split(":");
+            StringBuilder newCp = new StringBuilder();
             for (int i=0; i<jars.length; i++) {
-                jars[i] = addTmpFile(jars[i]);
+                if (i > 0) newCp.append(':');
+                newCp.append(addTmpFile(jars[i])); //append clappspath entris to tmpfiles and trim paths from the classpath
             }
-            getConf().setStrings(JDBC_CLASSPATH, jars);
+            getConf().set(JDBC_CLASSPATH, newCp.toString());
         }
         Job job = Job.getInstance(getConf(), "HalyardBulkExport " + source + " -> " + target);
         job.setJarByClass(HalyardBulkExport.class);

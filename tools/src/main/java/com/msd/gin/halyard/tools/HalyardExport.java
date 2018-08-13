@@ -19,7 +19,6 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -48,19 +47,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.PosixParser;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -84,7 +79,7 @@ import org.eclipse.rdf4j.rio.Rio;
  * export targets.
  * @author Adam Sotona (MSD)
  */
-public final class HalyardExport {
+public final class HalyardExport extends AbstractHalyardTool {
 
     /**
      * A generic exception during export
@@ -460,58 +455,6 @@ public final class HalyardExport {
         }
     }
 
-    static Configuration conf = null; // this is a hook to pass custom configuration in tests
-
-    private final String htableName;
-    private final String sparqlQuery;
-    private final QueryResultWriter writer;
-    private final String elasticIndexURL;
-    private final StatusLog log;
-
-    HalyardExport(String htableName, String sparqlQuery, QueryResultWriter writer, String elasticIndexURL, StatusLog log) {
-        this.htableName = htableName;
-        this.sparqlQuery = sparqlQuery;
-        this.writer = writer;
-        this.elasticIndexURL = elasticIndexURL;
-        this.log = log;
-    }
-
-    void run(Configuration configuration) throws ExportException {
-        try {
-            SailRepository rep = new SailRepository(new HBaseSail(configuration, htableName, false, 0, true, 0, elasticIndexURL, null));
-            rep.initialize();
-            try {
-                writer.initTimer();
-                log.logStatus("Query execution started");
-                Query q = rep.getConnection().prepareQuery(QueryLanguage.SPARQL, sparqlQuery);
-                if (q instanceof TupleQuery) {
-                    writer.writeTupleQueryResult(((TupleQuery)q).evaluate());
-                } else if (q instanceof GraphQuery) {
-                    writer.writeGraphQueryResult(((GraphQuery)q).evaluate());
-                } else {
-                    throw new ExportException("Only SPARQL Tuple and Graph query types are supported.");
-                }
-                log.logStatus("Export finished");
-            } finally {
-                rep.shutDown();
-            }
-        } catch (RepositoryException | MalformedQueryException | QueryEvaluationException e) {
-            throw new ExportException(e);
-        } finally {
-            writer.close();
-        }
-    }
-
-    private static Option newOption(String opt, String argName, String description) {
-        Option o = new Option(opt, null, argName != null, description);
-        o.setArgName(argName);
-        return o;
-    }
-
-    private static void printHelp(Options options) {
-        new HelpFormatter().printHelp(100, "export", "Exports graph or table data from Halyard RDF store based on SPARQL query", options, "Example: export -s my_dataset -q 'select * where {?subjet ?predicate ?object}' -t hdfs:/my_folder/my_data.csv.gz", true);
-    }
-
     /**
      * Export function is called for the export execution with given arguments.
      * @param conf Hadoop Configuration instance
@@ -520,12 +463,12 @@ public final class HalyardExport {
      * @param query String SPARQL Graph query
      * @param targetUrl String URL of the target system (+folder or schema, +table or file name)
      * @param driverClass String JDBC Driver class name (for JDBC export only)
-     * @param driverClasspath Array of URLs with JDBC Driver classpath (for DB export only)
+     * @param driverClasspath String with JDBC Driver classpath delimited by : (for DB export only)
      * @param jdbcProperties Arrays of String JDBC connection properties (for DB export only)
      * @param trimTable boolean option to trim target JDBC table before export (for DB export only)
      * @throws ExportException in case of an export problem
      */
-    public static void export(Configuration conf, StatusLog log, String source, String query, String targetUrl, String driverClass, URL[] driverClasspath, String[] jdbcProperties, boolean trimTable, String elasticIndexURL) throws ExportException {
+    public static void export(Configuration conf, StatusLog log, String source, String query, String targetUrl, String driverClass, String driverClasspath, String[] jdbcProperties, boolean trimTable, String elasticIndexURL) throws ExportException {
         try {
             QueryResultWriter writer = null;
             if (targetUrl.startsWith("null:")) {
@@ -534,7 +477,17 @@ public final class HalyardExport {
                 int i = targetUrl.lastIndexOf('/');
                 if (i < 0) throw new ExportException("Taret URL does not end with /<table_name>");
                 if (driverClass == null) throw new ExportException("Missing mandatory JDBC driver class name argument -c <driver_class>");
-                writer = new JDBCResultWriter(log, targetUrl.substring(0, i), targetUrl.substring(i+1), jdbcProperties, driverClass, driverClasspath, trimTable);
+                URL driverCP[] = null;
+                if (driverClasspath != null) {
+                    String jars[] = driverClasspath.split(":");
+                    driverCP = new URL[jars.length];
+                    for (int j=0; j<jars.length; j++) {
+                        File f = new File(jars[j]);
+                        if (!f.isFile()) throw new ExportException("Invalid JDBC driver classpath element: " + jars[j]);
+                        driverCP[j] = f.toURI().toURL();
+                    }
+                }
+                writer = new JDBCResultWriter(log, targetUrl.substring(0, i), targetUrl.substring(i+1), jdbcProperties, driverClass, driverCP, trimTable);
             } else {
                 OutputStream out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
                 try {
@@ -557,10 +510,56 @@ public final class HalyardExport {
                     writer = new RIOResultWriter(log, form.get(), out);
                 }
             }
-            new HalyardExport(source, query, writer, elasticIndexURL, log).run(conf);
-        } catch (IOException e) {
+            try {
+                SailRepository rep = new SailRepository(new HBaseSail(conf, source, false, 0, true, 0, elasticIndexURL, null));
+                rep.initialize();
+                try {
+                    writer.initTimer();
+                    log.logStatus("Query execution started");
+                    Query q = rep.getConnection().prepareQuery(QueryLanguage.SPARQL, query);
+                    if (q instanceof TupleQuery) {
+                        writer.writeTupleQueryResult(((TupleQuery)q).evaluate());
+                    } else if (q instanceof GraphQuery) {
+                        writer.writeGraphQueryResult(((GraphQuery)q).evaluate());
+                    } else {
+                        throw new ExportException("Only SPARQL Tuple and Graph query types are supported.");
+                    }
+                    log.logStatus("Export finished");
+                } finally {
+                    rep.shutDown();
+                }
+            } finally {
+                writer.close();
+            }
+        } catch (RepositoryException | MalformedQueryException | QueryEvaluationException | IOException e) {
             throw new ExportException(e);
         }
+    }
+
+    public HalyardExport() {
+        super("export", "Exports graph or table data from Halyard RDF store based on SPARQL query", "Example: export -s my_dataset -q 'select * where {?subjet ?predicate ?object}' -t hdfs:/my_folder/my_data.csv.gz");
+        addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
+        addOption("q", "query", "sparql_query", "SPARQL tuple or graph query executed to export the data", true, true);
+        addOption("t", "target-url", "target_url", "file://<path>/<file_name>.<ext> or hdfs://<path>/<file_name>.<ext> or jdbc:<jdbc_connection>/<table_name>", true, true);
+        addOption("p", "jdbc-property", "property=value", "JDBC connection property", false, false);
+        addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
+        addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name", false, true);
+        addOption("r", "trim", null, "Trim target table before export (apply for JDBC only)", false, false);
+        addOption("e", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
+    }
+
+    @Override
+    protected int run(CommandLine cmd) throws Exception {
+        export(getConf(), new StatusLog() {
+            @Override
+            public void tick() {}
+
+            @Override
+            public void logStatus(String status) {
+                LOG.info(status);
+            }
+        }, cmd.getOptionValue('s'), cmd.getOptionValue('q'), cmd.getOptionValue('t'), cmd.getOptionValue('c'), cmd.getOptionValue('l'), cmd.getOptionValues('p'), cmd.hasOption('r'), cmd.getOptionValue('e'));
+        return 0;
     }
 
     /**
@@ -569,66 +568,6 @@ public final class HalyardExport {
      * @throws Exception throws Exception in case of any problem
      */
     public static void main(final String args[]) throws Exception {
-        if (conf == null) conf = new Configuration();
-        Options options = new Options();
-        options.addOption(newOption("h", null, "Prints this help"));
-        options.addOption(newOption("v", null, "Prints version"));
-        options.addOption(newOption("s", "source_htable", "Source HBase table with Halyard RDF store"));
-        options.addOption(newOption("q", "sparql_query", "SPARQL tuple or graph query executed to export the data"));
-        options.addOption(newOption("t", "target_url", "file://<path>/<file_name>.<ext> or hdfs://<path>/<file_name>.<ext> or jdbc:<jdbc_connection>/<table_name>"));
-        options.addOption(newOption("p", "property=value", "JDBC connection properties"));
-        options.addOption(newOption("l", "driver_classpath", "JDBC driver classpath delimited by ':'"));
-        options.addOption(newOption("c", "driver_class", "JDBC driver class name"));
-        options.addOption(newOption("r", null, "Trim target table before export (apply for JDBC only)"));
-        options.addOption(newOption("e", "elastic_index_url", "Optional ElasticSearch index URL"));
-        try {
-            CommandLine cmd = new PosixParser().parse(options, args);
-            if (args.length == 0 || cmd.hasOption('h')) {
-                printHelp(options);
-                return;
-            }
-            if (cmd.hasOption('v')) {
-                Properties p = new Properties();
-                try (InputStream in = HalyardExport.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/halyard-tools/pom.properties")) {
-                    if (in != null) p.load(in);
-                }
-                System.out.println("Halyard Export version " + p.getProperty("version", "unknown"));
-                return;
-            }
-            if (!cmd.getArgList().isEmpty()) throw new ExportException("Unknown arguments: " + cmd.getArgList().toString());
-            for (char c : "sqt".toCharArray()) {
-                if (!cmd.hasOption(c))  throw new ExportException("Missing mandatory option: " + c);
-            }
-            for (char c : "sqtlce".toCharArray()) {
-                String s[] = cmd.getOptionValues(c);
-                if (s != null && s.length > 1)  throw new ExportException("Multiple values for option: " + c);
-            }
-            StatusLog log = new StatusLog() {
-                private final Logger l = Logger.getLogger(HalyardExport.class.getName());
-                @Override
-                public void tick() {}
-
-                @Override
-                public void logStatus(String status) {
-                    l.info(status);
-                }
-            };
-            String driverClasspath = cmd.getOptionValue('l');
-            URL driverCP[] = null;
-            if (driverClasspath != null) {
-                String jars[] = driverClasspath.split(":");
-                driverCP = new URL[jars.length];
-                for (int j=0; j<jars.length; j++) {
-                    File f = new File(jars[j]);
-                    if (!f.isFile()) throw new ExportException("Invalid JDBC driver classpath element: " + jars[j]);
-                    driverCP[j] = f.toURI().toURL();
-                }
-            }
-            export(conf, log, cmd.getOptionValue('s'), cmd.getOptionValue('q'), cmd.getOptionValue('t'), cmd.getOptionValue('c'), driverCP, cmd.getOptionValues('p'), cmd.hasOption('r'), cmd.getOptionValue('e'));
-        } catch (RuntimeException exp) {
-            System.out.println(exp.getMessage());
-            printHelp(options);
-            throw exp;
-        }
+        ToolRunner.run(new HalyardExport(), args);
     }
 }

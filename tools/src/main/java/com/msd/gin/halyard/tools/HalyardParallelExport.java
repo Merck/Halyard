@@ -21,9 +21,7 @@ import com.msd.gin.halyard.tools.HalyardExport.ExportException;
 import com.yammer.metrics.core.Gauge;
 import java.io.DataInput;
 import java.io.DataOutput;
-import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -169,14 +167,7 @@ public class HalyardParallelExport extends AbstractHalyardTool {
                     }
                 };
                 Configuration cfg = context.getConfiguration();
-                String[] cp = cfg.getStrings(JDBC_CLASSPATH);
-                URL[] drCp = null;
-                if (cp != null) {
-                    drCp = new URL[cp.length];
-                    for (int i=0; i<cp.length; i++) {
-                        drCp[i] = new File(cp[i]).toURI().toURL();
-                    }
-                }
+                String drCp = cfg.get(JDBC_CLASSPATH);
                 String[] props = cfg.getStrings(JDBC_PROPERTIES);
                 if (props != null) {
                     for (int i=0; i<props.length; i++) {
@@ -292,10 +283,12 @@ public class HalyardParallelExport extends AbstractHalyardTool {
         String cp = cmd.getOptionValue('l');
         if (cp != null) {
             String jars[] = cp.split(":");
+            StringBuilder newCp = new StringBuilder();
             for (int i=0; i<jars.length; i++) {
-                jars[i] = addTmpFile(jars[i]);
+                if (i > 0) newCp.append(':');
+                newCp.append(addTmpFile(jars[i])); //append clappspath entris to tmpfiles and trim paths from the classpath
             }
-            getConf().setStrings(JDBC_CLASSPATH, jars);
+            getConf().set(JDBC_CLASSPATH, newCp.toString());
         }
         Job job = Job.getInstance(getConf(), "HalyardParallelExport " + source + " -> " + target);
         job.setJarByClass(HalyardParallelExport.class);

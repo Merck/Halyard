@@ -66,7 +66,7 @@ public class HalyardExportJDBCTypesTest {
         }
         sail.commit();
         sail.shutDown();
-        HalyardExport.conf = HBaseServerTestInstance.getInstanceConfig();
+        AbstractHalyardTool.CONF = HBaseServerTestInstance.getInstanceConfig();
     }
 
 

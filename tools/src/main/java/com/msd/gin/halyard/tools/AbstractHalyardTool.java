@@ -42,9 +42,10 @@ import org.apache.hadoop.util.Tool;
  */
 public abstract class AbstractHalyardTool implements Tool {
 
+    static Configuration CONF = new Configuration();
     static final Logger LOG = Logger.getLogger(AbstractHalyardTool.class.getName());
 
-    private Configuration conf = new Configuration();
+    private Configuration conf = CONF;
     private final String name, header, footer;
     private final Options options = new Options();
     private final List<String> singleOptions = new ArrayList<>();
