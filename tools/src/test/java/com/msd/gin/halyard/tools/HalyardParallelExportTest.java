@@ -48,7 +48,7 @@ public class HalyardParallelExportTest {
         root.mkdirs();
 
         assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardParallelExport(),
-                new String[]{"-Dmapreduce.job.maps=2", "-s", "exportTable", "-q", "PREFIX halyard: <http://merck.github.io/Halyard/ns#>\nselect * where {?s ?p ?o .\nFILTER (halyard:parallelSplitBy (?p))}", "-t", root.toURI().toURL().toString() + "data{0}.csv"}));
+                new String[]{"-j", "2", "-s", "exportTable", "-q", "PREFIX halyard: <http://merck.github.io/Halyard/ns#>\nselect * where {?s ?p ?o .\nFILTER (halyard:parallelSplitBy (?p))}", "-t", root.toURI().toURL().toString() + "data{0}.csv"}));
 
         File f0 = new File(root, "data0.csv");
         File f1 = new File(root, "data1.csv");

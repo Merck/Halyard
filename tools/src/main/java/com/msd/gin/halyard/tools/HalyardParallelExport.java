@@ -238,6 +238,7 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "sparql-query", "sparql_query", "SPARQL tuple or graph query with use of '" + PARALLEL_SPLIT_FUNCTION_URI + "' function", true, true);
         addOption("t", "target-url", "target_url", "file://<path>/<file_name>{0}.<ext> or hdfs://<path>/<file_name>{0}.<ext> or jdbc:<jdbc_connection>/<table_name>", true, true);
+        addOption("j", "jobs", "number", "number of parallel jobs (default is 1)", false, true);
         addOption("p", "jdbc-property", "property=value", "JDBC connection property", false, false);
         addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
         addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name", false, true);
@@ -256,6 +257,7 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
         getConf().set(SOURCE, source);
         getConf().set(QUERY, query);
         getConf().set(TARGET, target);
+        getConf().setInt(MRJobConfig.NUM_MAPS, Integer.parseInt(cmd.getOptionValue('j', "1")));
         String driver = cmd.getOptionValue('c');
         if (driver != null) {
             getConf().set(JDBC_DRIVER, driver);

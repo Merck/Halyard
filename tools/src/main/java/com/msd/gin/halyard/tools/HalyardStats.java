@@ -79,7 +79,7 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  * to summarize a graph and it implicitly shows how the subjects, predicates and objects are used. In the absence of schema information this information can be vital.
  * @author Adam Sotona (MSD)
  */
-public final class HalyardStats extends  AbstractHalyardTool {
+public final class HalyardStats extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.stats.source";
     private static final String TARGET = "halyard.stats.target";
