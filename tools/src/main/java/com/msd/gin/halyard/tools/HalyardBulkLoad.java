@@ -358,6 +358,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the job", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store", true, true);
         addOption("i", "skip-invalid", null, "Optionally skip invalid source files and parsing errors", false, false);
+        addOption("d", "verify-data-types", null, "Optionally verify RDF data type values while parsing", false, false);
         addOption("r", "truncate-target", null, "Optionally truncate target table just before the loading the new data", false, false);
         addOption("b", "pre-split-bits", "bits", "Optionally specify bit depth of region pre-splits for a case when target table does not exist (default is 3)", false, true);
         addOption("g", "graph-context", "graph_context", "Optionally specify default target named graph context", false, true);
@@ -371,6 +372,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         String workdir = cmd.getOptionValue('w');
         String target = cmd.getOptionValue('t');
         getConf().setBoolean(SKIP_INVALID_PROPERTY, cmd.hasOption('i'));
+        getConf().setBoolean(VERIFY_DATATYPE_VALUES_PROPERTY, cmd.hasOption('d'));
         getConf().setBoolean(TRUNCATE_PROPERTY, cmd.hasOption('r'));
         getConf().setInt(SPLIT_BITS_PROPERTY, Integer.parseInt(cmd.getOptionValue('b', "3")));
         if (cmd.hasOption('g')) getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));

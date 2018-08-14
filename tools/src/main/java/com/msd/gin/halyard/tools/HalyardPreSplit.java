@@ -57,7 +57,7 @@ import org.apache.commons.cli.CommandLine;
  * Splits are based on the keys of a sample of the data to be loaded.
  * @author Adam Sotona (MSD)
  */
-public class HalyardPreSplit extends AbstractHalyardTool {
+public final class HalyardPreSplit extends AbstractHalyardTool {
 
     static final String TABLE_PROPERTY = "halyard.presplit.table";
     static final String SPLIT_LIMIT_PROPERTY = "halyard.presplit.limit";
@@ -69,7 +69,7 @@ public class HalyardPreSplit extends AbstractHalyardTool {
     /**
      * Mapper class transforming randomly selected sample of parsed Statement into set of HBase Keys and sizes
      */
-    public static class RDFDecimatingMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, LongWritable> {
+    public final static class RDFDecimatingMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, LongWritable> {
 
         private IRI defaultRdfContext;
         private boolean overrideRdfContext;
@@ -106,7 +106,7 @@ public class HalyardPreSplit extends AbstractHalyardTool {
         }
     }
 
-    static class PreSplitReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
+    static final class PreSplitReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
 
         private long size = 0, splitLimit;
         private byte lastRegion = 0;

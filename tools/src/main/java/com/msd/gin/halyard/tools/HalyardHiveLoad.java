@@ -17,9 +17,9 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import static com.msd.gin.halyard.tools.AbstractHalyardTool.LOG;
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -32,11 +32,8 @@ import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hive.hcatalog.data.HCatRecord;
 import org.apache.hive.hcatalog.mapreduce.HCatInputFormat;
@@ -46,18 +43,19 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
-import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
-import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY;
+import java.util.logging.Level;
+import org.apache.commons.cli.CommandLine;
+import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 
 /**
  * MapReduce tool for bulk loading of RDF data (in any standard RDF form) from given Hive table and column
  * @author Adam Sotona (MSD)
  */
-public class HalyardHiveLoad implements Tool {
+public final class HalyardHiveLoad extends AbstractHalyardTool {
 
     private static final String HIVE_DATA_COLUMN_INDEX_PROPERTY = "halyard.hive.data.column.index";
 
@@ -66,9 +64,6 @@ public class HalyardHiveLoad implements Tool {
      */
     public static final String BASE_URI_PROPERTY = "halyard.base.uri";
     private static final String RDF_MIME_TYPE_PROPERTY = "halyard.rdf.mime.type";
-    private static final Logger LOG = Logger.getLogger(HalyardHiveLoad.class.getName());
-
-    private Configuration conf;
 
     /**
      * HiveMapper reads specified Hive table and column data and produces Halyard KeyValue pairs for HBase Reducers
@@ -76,7 +71,7 @@ public class HalyardHiveLoad implements Tool {
     public static class HiveMapper extends Mapper<WritableComparable<Object>, HCatRecord, ImmutableBytesWritable, KeyValue> {
 
         private IRI defaultRdfContext;
-        private boolean overrideRdfContext;
+        private boolean overrideRdfContext, skipInvalid, verifyDataTypeValues;
         private int dataColumnIndex;
         private RDFFormat rdfFormat;
         private String baseUri;
@@ -91,13 +86,17 @@ public class HalyardHiveLoad implements Tool {
             dataColumnIndex = conf.getInt(HIVE_DATA_COLUMN_INDEX_PROPERTY, 0);
             rdfFormat = Rio.getParserFormatForMIMEType(conf.get(RDF_MIME_TYPE_PROPERTY)).get();
             baseUri = conf.get(BASE_URI_PROPERTY);
-            timestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
+            timestamp = conf.getLong(HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
+            skipInvalid = conf.getBoolean(HalyardBulkLoad.SKIP_INVALID_PROPERTY, false);
+            verifyDataTypeValues = conf.getBoolean(HalyardBulkLoad.VERIFY_DATATYPE_VALUES_PROPERTY, false);
         }
 
         @Override
         protected void map(WritableComparable<Object> key, HCatRecord value, final Context context) throws IOException, InterruptedException {
             String text = (String)value.get(dataColumnIndex);
             RDFParser parser = Rio.createParser(rdfFormat);
+            parser.setStopAtFirstError(!skipInvalid);
+            parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
             parser.setRDFHandler(new AbstractRDFHandler() {
                 @Override
                 public void handleStatement(Statement st) throws RDFHandlerException {
@@ -114,18 +113,48 @@ public class HalyardHiveLoad implements Tool {
             });
             try {
                 parser.parse(new StringReader(text), baseUri);
-            } catch (RDFParseException | RDFHandlerException e) {
-                throw new IOException(e);
+            } catch (Exception e) {
+                if (skipInvalid) {
+                    LOG.log(Level.WARNING, "Exception while parsing RDF", e);
+                } else {
+                    throw e;
+                }
             }
         }
     }
 
+    public HalyardHiveLoad() {
+        super("hiveload", "loads a bulk of RDF fragments from Hive table using MapReduce framework", "Example: hiveload -s myHiveTable -c 3 -m 'application/ld+json' -u 'http://my_base_uri/' -w hdfs:///my_tmp_workdir -t mydataset");
+        addOption("s", "source", "hive_table", "Source Hive table with RDF fragments", true, true);
+        addOption("c", "column-index", "column_index", "Index of column with RDF fragments within the source Hive table", true, true);
+        addOption("m", "mime-type", "mime_type", "MIME-Type of the RDF fragments", true, true);
+        addOption("u", "base-uri", "base_uri", "Base URI for the RDF fragments", true, true);
+        addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the job", true, true);
+        addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store", true, true);
+        addOption("i", "skip-invalid", null, "Optionally skip invalid source files and parsing errors", false, false);
+        addOption("d", "verify-data-types", null, "Optionally verify RDF data type values while parsing", false, false);
+        addOption("r", "truncate-target", null, "Optionally truncate target table just before the loading the new data", false, false);
+        addOption("b", "pre-split-bits", "bits", "Optionally specify bit depth of region pre-splits for a case when target table does not exist (default is 3)", false, true);
+        addOption("g", "graph-context", "graph_context", "Optionally specify default target named graph context", false, true);
+        addOption("o", "graph-context-override", null, "Optionally override named graph context also for loaded quads", false, false);
+        addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (defaul is actual time of the operation)", false, true);
+    }
+
     @Override
-    public int run(String[] args) throws Exception {
-        if (args.length != 3) {
-            System.err.println("Usage: hiveload -D" + RDF_MIME_TYPE_PROPERTY + "='application/ld+json' [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + HIVE_DATA_COLUMN_INDEX_PROPERTY + "=3] [-D" + BASE_URI_PROPERTY + "='http://my_base_uri/'] [-D" + HalyardBulkLoad.SPLIT_BITS_PROPERTY + "=8] [-D" + HalyardBulkLoad.DEFAULT_CONTEXT_PROPERTY + "=http://new_context] [-D" + HalyardBulkLoad.OVERRIDE_CONTEXT_PROPERTY + "=true] <hive_table_name> <output_path> <hbase_table_name>");
-            return -1;
-        }
+    protected int run(CommandLine cmd) throws Exception {
+        String source = cmd.getOptionValue('s');
+        getConf().set(HIVE_DATA_COLUMN_INDEX_PROPERTY, cmd.getOptionValue('c'));
+        getConf().set(RDF_MIME_TYPE_PROPERTY, cmd.getOptionValue('m'));
+        getConf().set(BASE_URI_PROPERTY, cmd.getOptionValue('u'));
+        String workdir = cmd.getOptionValue('w');
+        String target = cmd.getOptionValue('t');
+        getConf().setBoolean(HalyardBulkLoad.SKIP_INVALID_PROPERTY, cmd.hasOption('i'));
+        getConf().setBoolean(HalyardBulkLoad.VERIFY_DATATYPE_VALUES_PROPERTY, cmd.hasOption('d'));
+        getConf().setBoolean(HalyardBulkLoad.TRUNCATE_PROPERTY, cmd.hasOption('r'));
+        getConf().setInt(HalyardBulkLoad.SPLIT_BITS_PROPERTY, Integer.parseInt(cmd.getOptionValue('b', "3")));
+        if (cmd.hasOption('g')) getConf().set(HalyardBulkLoad.DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
+        getConf().setBoolean(HalyardBulkLoad.OVERRIDE_CONTEXT_PROPERTY, cmd.hasOption('o'));
+        getConf().setLong(HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY, Long.parseLong(cmd.getOptionValue('e', String.valueOf(System.currentTimeMillis()))));
         TableMapReduceUtil.addDependencyJars(getConf(),
                 NTriplesUtil.class,
                 Rio.class,
@@ -133,10 +162,9 @@ public class HalyardHiveLoad implements Tool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
-        Job job = Job.getInstance(getConf(), "HalyardHiveLoad -> " + args[1] + " -> " + args[2]);
-        int i = args[0].indexOf('.');
-        HCatInputFormat.setInput(job, i > 0 ? args[0].substring(0, i) : null, args[0].substring(i + 1));
+        Job job = Job.getInstance(getConf(), "HalyardHiveLoad " + source + " -> " + workdir + " -> " + target);
+        int i = source.indexOf('.');
+        HCatInputFormat.setInput(job, i > 0 ? source.substring(0, i) : null, source.substring(i + 1));
         job.setJarByClass(HalyardHiveLoad.class);
         job.setMapperClass(HiveMapper.class);
         job.setMapOutputKeyClass(ImmutableBytesWritable.class);
@@ -144,30 +172,21 @@ public class HalyardHiveLoad implements Tool {
         job.setInputFormatClass(HCatInputFormat.class);
         job.setSpeculativeExecution(false);
         job.setReduceSpeculativeExecution(false);
-        try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], true, getConf().getInt(HalyardBulkLoad.SPLIT_BITS_PROPERTY, 3))) {
+        try (HTable hTable = HalyardTableUtils.getTable(getConf(), target, true, getConf().getInt(HalyardBulkLoad.SPLIT_BITS_PROPERTY, 3))) {
             HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
-            FileInputFormat.setInputDirRecursive(job, true);
-            FileInputFormat.setInputPaths(job, args[0]);
-            FileOutputFormat.setOutputPath(job, new Path(args[1]));
+            FileOutputFormat.setOutputPath(job, new Path(workdir));
             TableMapReduceUtil.addDependencyJars(job);
             TableMapReduceUtil.initCredentials(job);
             if (job.waitForCompletion(true)) {
-                new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(args[1]), hTable);
-                LOG.info("Bulk Load Completed..");
+                if (getConf().getBoolean(HalyardBulkLoad.TRUNCATE_PROPERTY, false)) {
+                    HalyardTableUtils.truncateTable(hTable).close();
+                }
+                new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(workdir), hTable);
+                LOG.info("Hive Load Completed..");
                 return 0;
             }
         }
         return -1;
-    }
-
-    @Override
-    public Configuration getConf() {
-        return this.conf;
-    }
-
-    @Override
-    public void setConf(final Configuration c) {
-        this.conf = c;
     }
 
     /**
