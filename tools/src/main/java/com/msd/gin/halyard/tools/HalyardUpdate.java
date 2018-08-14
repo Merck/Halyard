@@ -30,7 +30,11 @@ import org.eclipse.rdf4j.repository.sail.SailRepository;
 public final class HalyardUpdate extends AbstractHalyardTool {
 
     public HalyardUpdate() {
-        super("update", "Updates Halyard RDF store based on provided SPARQL update query", "Example: update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs ?o}'");
+        super(
+            "update",
+            "Halyard Update is a command-line application designed to run SPARQL Update operations to transform data in an HBase Halyard dataset",
+            "Example: update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs ?o}'"
+        );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "query", "sparql_update_query", "SPARQL update query to be executed", true, true);
         addOption("e", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);

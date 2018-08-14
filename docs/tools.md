@@ -192,45 +192,41 @@ hdfs:///my_tmp_workdir -t mydataset
 
 ### Halyard Update
 
-Halyard Update is a command-line application designed to run SPARQL Update operations to transform data in an HBase Halyard dataset.
-
 ```
 $ ./update
-usage: update [-e <elastic_index_url>] [-h] [-q <sparql_query>] [-s <source_htable>] [-v]
-Updates Halyard RDF store based on provided SPARQL update query
- -e <elastic_index_url>   Optional ElasticSearch index URL
- -h                       Prints this help
- -q <sparql_query>        SPARQL tuple or graph query executed to export the data
- -s <source_htable>       Source HBase table with Halyard RDF store
- -v                       Prints version
+usage: update [-e <elastic_index_url>] [-h] -q <sparql_update_query> -s <dataset_table> [-v]
+Halyard Update is a command-line application designed to run SPARQL Update operations to transform
+data in an HBase Halyard dataset
+ -e,--elastic-index <elastic_index_url>   Optional ElasticSearch index URL
+ -h,--help                                Prints this help
+ -q,--query <sparql_update_query>         SPARQL update query to be executed
+ -s,--source-dataset <dataset_table>      Source HBase table with Halyard RDF store
+ -v,--version                             Prints version
 Example: update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs ?o}'
 ```
 
-**Update usage:**
-
-1. Open terminal on a Hadoop cluster node with a configured HBase.
-2. Don't forget to `kinit` with your credentials if on a secured cluster.
-3. Execute `./update -s <HBase_table_name> -q '<sparql_operation>'` to launch the update.
-
 ### Halyard Bulk Update
 
-Halyard Bulk Update is a MapReduce application that executes multiple SPARQL Update operations in parallel in the Mapper phase. The Shuffle and Reduce phase are responsible for the efficient update of the dataset in a bulk mode (similar to the Halyard Bulk Load). Halyard Bulk Update supports large-scale DELETE/INSERT operations that are not executed separately, but instead they are processed as a single atomic bulk operation at the end of the execution.
-
 ```
-$ ./bulkupdate
-Usage: bulkupdate [-Dmapreduce.job.queuename=proofofconcepts] \
-                  <input_file_with_SPARQL_queries> <output_path> <table_name>
+usage: bulkupdate [-e <timestamp>] [-h] -q <sparql_queries> -s <dataset_table> [-v] -w
+       <shared_folder>
+Halyard Bulk Update is a MapReduce application that executes multiple SPARQL Update operations in
+parallel in the Mapper phase. The Shuffle and Reduce phase are responsible for the efficient update
+of the dataset in a bulk mode (similar to the Halyard Bulk Load). Halyard Bulk Update supports
+large-scale DELETE/INSERT operations that are not executed separately, but instead they are
+processed as a single atomic bulk operation at the end of the execution.
+ -e,--target-timestamp <timestamp>     Optionally specify timestamp of all loaded records (defaul is
+                                       actual time of the operation)
+ -h,--help                             Prints this help
+ -q,--queries <sparql_queries>         folder or path pattern with SPARQL tuple or graph queries
+ -s,--source-dataset <dataset_table>   Source HBase table with Halyard RDF store
+ -v,--version                          Prints version
+ -w,--work-dir <shared_folder>         Unique non-existent folder within shared filesystem to server
+                                       as a working directory for the temporary HBase files,  the
+                                       files are moved to their final HBase locations during the
+                                       last stage of the load process
+Example: bulkupdate -s my_dataset -q hdfs:///myqueries/*.sparql -w hdfs:///my_tmp_workdir
 ```
-
-**Update usage:**
-
-1. Open terminal on a Hadoop cluster node with a configured HBase.
-2. Don't forget to `kinit` with your credentials if on a secured cluster.
-3. Write the SPARQL Update operations into a file, in which each operation is on a single line.
-4. Move the file with the SPARQL Update operations to the shared filesystem (HDFS).
-5. Execute `./bulkupdate <shared_path_of_file_with_SPARQL_Update_operations> <temporary_path_for_HTable_files> <HBase_table_name>` to launch the Bulk Update application. The following features are supported:
-  * The temporary path for the HTable files is used to store the temporary HBase table files. The files are moved to their final HBase locations during the last stage of the Bulk Load process.
-  * The optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify the YARN queue to be used by the application.
 
 ### Halyard Export
 
