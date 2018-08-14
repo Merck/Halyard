@@ -27,7 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -45,12 +45,10 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -89,7 +87,7 @@ import org.eclipse.rdf4j.sail.SailException;
  * and bulk load the results.
  * @author Adam Sotona (MSD)
  */
-public class HalyardBulkUpdate implements Tool {
+public final class HalyardBulkUpdate extends AbstractHalyardTool {
 
     /**
      * String name of a custom SPARQL function to decimate parallel evaluation based on Mapper index
@@ -110,13 +108,11 @@ public class HalyardBulkUpdate implements Tool {
     public static final String DECIMATE_FUNCTION_URI = HALYARD.NAMESPACE + DECIMATE_FUNCTION_NAME;
     private static final String TABLE_NAME_PROPERTY = "halyard.table.name";
     private static final String STAGE_PROPERTY = "halyard.update.stage";
-    private static final Logger LOG = Logger.getLogger(HalyardBulkUpdate.class.getName());
-    private Configuration conf;
 
     /**
      * Mapper class performing SPARQL Graph query evaluation and producing Halyard KeyValue pairs for HBase BulkLoad Reducers
      */
-    public static class SPARQLUpdateMapper extends Mapper<NullWritable, Text, ImmutableBytesWritable, KeyValue> {
+    public static final class SPARQLUpdateMapper extends Mapper<NullWritable, Text, ImmutableBytesWritable, KeyValue> {
 
         private String tableName;
         private String elasticIndexURL;
@@ -242,13 +238,20 @@ public class HalyardBulkUpdate implements Tool {
             }
         }
     }
+   public HalyardBulkUpdate() {
+        super("bulkupdate", "Updates Halyard RDF store based on provided SPARQL update queries in bulk mode using MapReduce framework", "Example: bulkupdate -s my_dataset -q hdfs:///myqueries/*.sparql -w hdfs:///my_tmp_workdir");
+        addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
+        addOption("q", "queries", "sparql_queries", "folder or path pattern with SPARQL tuple or graph queries", true, true);
+        addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the job", true, true);
+        addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (defaul is actual time of the operation)", false, true);
+    }
 
-    @Override
-    public int run(String[] args) throws Exception {
-        if (args.length != 3) {
-            System.err.println("Usage: bulkupdate [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] <SPARQL_queries_input_path(s)> <output_path> <table_name>");
-            return -1;
-        }
+
+    public int run(CommandLine cmd) throws Exception {
+        String source = cmd.getOptionValue('s');
+        String queryFiles = cmd.getOptionValue('q');
+        String workdir = cmd.getOptionValue('w');
+        getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, Long.parseLong(cmd.getOptionValue('e', String.valueOf(System.currentTimeMillis()))));
         TableMapReduceUtil.addDependencyJars(getConf(),
                HalyardExport.class,
                NTriplesUtil.class,
@@ -262,11 +265,11 @@ public class HalyardBulkUpdate implements Tool {
                Trace.class,
                Gauge.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        getConf().setStrings(TABLE_NAME_PROPERTY, args[2]);
+        getConf().setStrings(TABLE_NAME_PROPERTY, source);
         getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
         int stages = 1;
         for (int stage = 0; stage < stages; stage++) {
-            Job job = Job.getInstance(getConf(), "HalyardBulkUpdate -> " + args[1] + " -> " + args[2] + " stage #" + stage);
+            Job job = Job.getInstance(getConf(), "HalyardBulkUpdate -> " + workdir + " -> " + source + " stage #" + stage);
             job.getConfiguration().setInt(STAGE_PROPERTY, stage);
             job.setJarByClass(HalyardBulkUpdate.class);
             job.setMapperClass(SPARQLUpdateMapper.class);
@@ -275,11 +278,11 @@ public class HalyardBulkUpdate implements Tool {
             job.setInputFormatClass(WholeFileTextInputFormat.class);
             job.setSpeculativeExecution(false);
             job.setReduceSpeculativeExecution(false);
-            try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], false, 0)) {
+            try (HTable hTable = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
                 HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
                 FileInputFormat.setInputDirRecursive(job, true);
-                FileInputFormat.setInputPaths(job, args[0]);
-                Path outPath = new Path(args[1], "stage"+stage);
+                FileInputFormat.setInputPaths(job, queryFiles);
+                Path outPath = new Path(workdir, "stage"+stage);
                 FileOutputFormat.setOutputPath(job, outPath);
                 TableMapReduceUtil.addDependencyJars(job);
                 TableMapReduceUtil.initCredentials(job);
@@ -287,7 +290,7 @@ public class HalyardBulkUpdate implements Tool {
                     WholeFileTextInputFormat inf = new WholeFileTextInputFormat();
                     for (FileStatus file : inf.listStatus(job)) {
                         byte[] contents = new byte[(int) file.getLen()];
-                        try (FSDataInputStream in = file.getPath().getFileSystem(conf).open(file.getPath())) {
+                        try (FSDataInputStream in = file.getPath().getFileSystem(getConf()).open(file.getPath())) {
                             IOUtils.readFully(in, contents, 0, contents.length);
                             int updates = QueryParserUtil.parseUpdate(QueryLanguage.SPARQL, new String(contents, StandardCharsets.UTF_8), null).getUpdateExprs().size();
                             if (updates > stages) {
@@ -310,16 +313,6 @@ public class HalyardBulkUpdate implements Tool {
         }
         LOG.info("Bulk Update Completed..");
         return 0;
-    }
-
-    @Override
-    public Configuration getConf() {
-        return this.conf;
-    }
-
-    @Override
-    public void setConf(final Configuration c) {
-        this.conf = c;
     }
 
      /**

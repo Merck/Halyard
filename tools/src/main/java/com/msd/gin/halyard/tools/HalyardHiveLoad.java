@@ -68,7 +68,7 @@ public final class HalyardHiveLoad extends AbstractHalyardTool {
     /**
      * HiveMapper reads specified Hive table and column data and produces Halyard KeyValue pairs for HBase Reducers
      */
-    public static class HiveMapper extends Mapper<WritableComparable<Object>, HCatRecord, ImmutableBytesWritable, KeyValue> {
+    public static final class HiveMapper extends Mapper<WritableComparable<Object>, HCatRecord, ImmutableBytesWritable, KeyValue> {
 
         private IRI defaultRdfContext;
         private boolean overrideRdfContext, skipInvalid, verifyDataTypeValues;

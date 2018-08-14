@@ -79,7 +79,7 @@ public class HalyardBulkUpdateTest {
         File htableDir = File.createTempFile("test_htable", "");
         htableDir.delete();
 
-        assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ queries.toURI().toURL().toString(), htableDir.toURI().toURL().toString(), TABLE}));
+        assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", TABLE}));
 
         for (int i=0; i<3; i++) {
             new File(queries, "test_update_query"+ i + ".sparql").delete();
@@ -217,7 +217,7 @@ public class HalyardBulkUpdateTest {
         htableDir.delete();
 
         //execute BulkUpdate
-        assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ queries.toURI().toURL().toString(), htableDir.toURI().toURL().toString(), "timebulkupdatetesttable"}));
+        assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", "timebulkupdatetesttable"}));
 
         for (i=0; i<3; i++) {
             new File(queries, "test_update_query"+ i + ".sparql").delete();
