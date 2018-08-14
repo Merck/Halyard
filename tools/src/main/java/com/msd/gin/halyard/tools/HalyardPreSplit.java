@@ -140,8 +140,16 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
     }
 
     public HalyardPreSplit() {
-        super("presplit", "calculates region pre-splits for a new dataset table based on simulated load of the specific data", "Example: presplit -s hdfs://my_RDF_files -t mydataset");
-        addOption("s", "source", "source_paths", "Source path(s) with RDF files (scanned recursivelly)", true, true);
+        super(
+            "presplit",
+            "Halyard PreSplit is a MapReduce application designed to estimate optimal HBase region splits for big datasets before the Bulk Load."
+                + "Halyard PreSplit creates an empty HBase table based on calculations from the dataset sources sampling. "
+                + "For very large datasets it is wise to calculate the pre-splits before the HBase table is created to allow more efficient following Bulk Load process of the data. "
+                + "Optional definition or override of the graph context should be specified exactly the same as for the following Bulk Load process so the region presplits estimations are precise.\n"
+                + "Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.",
+            "Example: presplit -s hdfs://my_RDF_files -t mydataset"
+        );
+        addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are searched for the supported files recurrently", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store", true, true);
         addOption("i", "skip-invalid", null, "Optionally skip invalid source files and parsing errors", false, false);
         addOption("g", "graph-context", "graph_context", "Optionally specify default target named graph context", false, true);

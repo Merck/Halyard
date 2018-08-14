@@ -20,6 +20,7 @@ import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.File;
 import java.net.URI;
+import org.apache.commons.cli.MissingOptionException;
 import org.junit.Test;
 import org.junit.BeforeClass;
 import org.apache.commons.cli.ParseException;
@@ -76,6 +77,11 @@ public class HalyardUpdateTest {
 
     @Test
     public void testHelp() throws Exception {
+        HalyardUpdate.main(new String[] {"-h"});
+    }
+
+    @Test(expected = MissingOptionException.class)
+    public void testRunNoArgs() throws Exception {
         HalyardUpdate.main(new String[] {});
     }
 

@@ -19,6 +19,7 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.File;
+import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ToolRunner;
@@ -75,8 +76,13 @@ public class HalyardBulkDeleteTest {
     }
 
     @Test
+    public void testHelp() throws Exception {
+        assertEquals(-1, new HalyardBulkDelete().run(new String[]{"-h"}));
+    }
+
+    @Test(expected = MissingOptionException.class)
     public void testRunNoArgs() throws Exception {
-        assertEquals(-1, new HalyardBulkDelete().run(new String[0]));
+        assertEquals(-1, new HalyardBulkDelete().run(new String[]{}));
     }
 
     @Test

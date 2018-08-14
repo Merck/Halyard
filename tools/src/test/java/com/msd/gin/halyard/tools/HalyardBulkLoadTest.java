@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.util.zip.GZIPOutputStream;
+import org.apache.commons.cli.MissingOptionException;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
@@ -85,7 +86,7 @@ public class HalyardBulkLoadTest {
         rep.shutDown();
     }
 
-    @Test
+    @Test(expected = MissingOptionException.class)
     public void testRunNoArgs() throws Exception {
         assertEquals(-1, new HalyardBulkLoad().run(new String[0]));
     }

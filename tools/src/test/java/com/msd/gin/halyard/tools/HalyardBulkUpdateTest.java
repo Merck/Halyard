@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Random;
 import java.util.TreeMap;
+import org.apache.commons.cli.MissingOptionException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -265,7 +266,12 @@ public class HalyardBulkUpdateTest {
     }
 
     @Test
+    public void testHelp() throws Exception {
+        assertEquals(-1, new HalyardBulkUpdate().run(new String[]{"-h"}));
+    }
+
+    @Test(expected = MissingOptionException.class)
     public void testRunNoArgs() throws Exception {
-        assertEquals(-1, new HalyardBulkUpdate().run(new String[0]));
+        assertEquals(-1, new HalyardBulkUpdate().run(new String[]{}));
     }
 }

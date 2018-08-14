@@ -29,6 +29,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.cli.MissingOptionException;
 import org.junit.Test;
 import org.junit.BeforeClass;
 import org.apache.commons.cli.ParseException;
@@ -94,6 +95,11 @@ public class HalyardExportTest {
 
     @Test
     public void testHelp() throws Exception {
+        HalyardExport.main(new String[] {"-h"});
+    }
+
+    @Test(expected = MissingOptionException.class)
+    public void testRunNoArgs() throws Exception {
         HalyardExport.main(new String[] {});
     }
 

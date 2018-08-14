@@ -27,6 +27,7 @@ import java.util.Properties;
 import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
@@ -49,7 +50,6 @@ public abstract class AbstractHalyardTool implements Tool {
     private final String name, header, footer;
     private final Options options = new Options();
     private final List<String> singleOptions = new ArrayList<>();
-    private final List<String> requiredOptions = new ArrayList<>();
 
     protected AbstractHalyardTool(String name, String header, String footer) {
         this.name = name;
@@ -76,13 +76,12 @@ public abstract class AbstractHalyardTool implements Tool {
     protected final void addOption(String opt, String longOpt, String argName, String description, boolean required, boolean single) {
         Option o = new Option(opt, longOpt, argName != null, description);
         o.setArgName(argName);
+        o.setRequired(required);
         options.addOption(o);
         if (single) {
             singleOptions.add(opt == null ? longOpt : opt);
         }
-        if (required) {
-            requiredOptions.add(opt == null ? longOpt : opt);
-        }
+
     }
 
     protected final String addTmpFile(String file) throws IOException {
@@ -120,7 +119,14 @@ public abstract class AbstractHalyardTool implements Tool {
     @Override
     public final int run(String[] args) throws Exception {
         try {
-            CommandLine cmd = new PosixParser().parse(options, args);
+            CommandLine cmd = new PosixParser(){
+                @Override
+                protected void checkRequiredOptions() throws MissingOptionException {
+                    if (!cmd.hasOption('h') && !cmd.hasOption('v')) {
+                        super.checkRequiredOptions();
+                    }
+                }
+            }.parse(options, args);
             if (args.length == 0 || cmd.hasOption('h')) {
                 printHelp();
                 return -1;
@@ -135,9 +141,6 @@ public abstract class AbstractHalyardTool implements Tool {
             }
             if (!cmd.getArgList().isEmpty()) {
                 throw new ParseException("Unknown arguments: " + cmd.getArgList().toString());
-            }
-            for (String opt : requiredOptions) {
-                if (!cmd.hasOption(opt))  throw new ParseException("Missing mandatory option: " + opt);
             }
             for (String opt : singleOptions) {
                 String s[] = cmd.getOptionValues(opt);

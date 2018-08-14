@@ -20,6 +20,7 @@ import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.File;
 import java.io.PrintStream;
+import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -67,8 +68,13 @@ public class HalyardBulkExportTest {
     }
 
     @Test
+    public void testHelp() throws Exception {
+        assertEquals(-1, new HalyardBulkExport().run(new String[]{"-h"}));
+    }
+
+    @Test(expected = MissingOptionException.class)
     public void testRunNoArgs() throws Exception {
-        assertEquals(-1, new HalyardBulkExport().run(new String[0]));
+        assertEquals(-1, new HalyardBulkExport().run(new String[]{}));
     }
 
     @Test

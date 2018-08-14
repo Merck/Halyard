@@ -352,10 +352,39 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         }
     }
 
+    private static String listRDF() {
+        StringBuilder sb = new StringBuilder();
+        for (RDFFormat fmt : RDFParserRegistry.getInstance().getKeys()) {
+            sb.append("* ").append(fmt.getName()).append(" (");
+            boolean first = true;
+            for (String ext : fmt.getFileExtensions()) {
+                if (first) {
+                    first = false;
+                } else {
+                    sb.append(", ");
+                }
+                sb.append('.').append(ext);
+            }
+            sb.append(")\n");
+        }
+        return sb.toString();
+    }
+
     public HalyardBulkLoad() {
-        super("bulkload", "loads a bulk of source RDF files using MapReduce framework", "Example: bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t mydataset");
-        addOption("s", "source", "source_paths", "Source path(s) with RDF files (scanned recursivelly)", true, true);
-        addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the job", true, true);
+        super(
+            "bulkload",
+            "Halyard Bulk Load is a MapReduce application designed to efficiently load RDF data from Hadoop Filesystem (HDFS) into HBase in the form of a Halyard dataset.",
+            "Halyard Bulk Load consumes RDF files in various formats supported by RDF4J RIO, including:\n"
+                + listRDF()
+                + "All the supported RDF formats can be also compressed with one of the compression codecs supported by Hadoop, including:\n"
+                + "* Gzip (.gz)\n"
+                + "* Bzip2 (.bz2)\n"
+                + "* LZO (.lzo)\n"
+                + "* Snappy (.snappy)\n"
+                + "Example: bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t mydataset"
+        );
+        addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are searched for the supported files recurrently", true, true);
+        addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store", true, true);
         addOption("i", "skip-invalid", null, "Optionally skip invalid source files and parsing errors", false, false);
         addOption("d", "verify-data-types", null, "Optionally verify RDF data type values while parsing", false, false);

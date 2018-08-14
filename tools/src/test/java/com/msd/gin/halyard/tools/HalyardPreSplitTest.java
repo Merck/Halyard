@@ -21,6 +21,7 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import org.apache.commons.cli.MissingOptionException;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.util.ToolRunner;
 import static org.junit.Assert.*;
@@ -48,7 +49,12 @@ public class HalyardPreSplitTest {
     }
 
     @Test
+    public void testHelp() throws Exception {
+        assertEquals(-1, new HalyardPreSplit().run(new String[]{"-h"}));
+    }
+
+    @Test(expected = MissingOptionException.class)
     public void testRunNoArgs() throws Exception {
-        assertEquals(-1, new HalyardPreSplit().run(new String[0]));
+        assertEquals(-1, new HalyardPreSplit().run(new String[]{}));
     }
 }
