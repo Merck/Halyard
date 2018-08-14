@@ -40,7 +40,7 @@ public class HalyardPreSplitTest {
             ps.println("<http://whatever/NTsubj2> <http://whatever/NTpred2> \"whatever NT value 2\" <http://whatever/ctx2> .");
         }
 
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardPreSplit(), new String[]{"-D" + HalyardPreSplit.DECIMATION_FACTOR_PROPERTY + "=1", "-D" + HalyardPreSplit.SPLIT_LIMIT_PROPERTY + "=0", file.toURI().toURL().toString(), "preSplitTable"}));
+        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardPreSplit(), new String[]{"-d", "1", "-l",  "0", "-s", file.toURI().toURL().toString(), "-t", "preSplitTable"}));
 
         try (HTable t = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "preSplitTable", false, 0)) {
             assertEquals(17, t.getRegionLocator().getStartKeys().length);

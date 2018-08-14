@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
@@ -35,13 +34,11 @@ import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
@@ -53,13 +50,14 @@ import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY;
+import org.apache.commons.cli.CommandLine;
 
 /**
  * Apache Hadoop MapReduce Tool for calculating pre-splits of an HBase table before a large dataset bulk-load.
  * Splits are based on the keys of a sample of the data to be loaded.
  * @author Adam Sotona (MSD)
  */
-public class HalyardPreSplit implements Tool {
+public class HalyardPreSplit extends AbstractHalyardTool {
 
     static final String TABLE_PROPERTY = "halyard.presplit.table";
     static final String SPLIT_LIMIT_PROPERTY = "halyard.presplit.limit";
@@ -67,10 +65,6 @@ public class HalyardPreSplit implements Tool {
 
     private static final long DEFAULT_SPLIT_LIMIT = 80000000l;
     private static final int DEFAULT_DECIMATION_FACTOR = 1000;
-
-    private static final Logger LOG = Logger.getLogger(HalyardPreSplit.class.getName());
-
-    private Configuration conf;
 
     /**
      * Mapper class transforming randomly selected sample of parsed Statement into set of HBase Keys and sizes
@@ -145,12 +139,24 @@ public class HalyardPreSplit implements Tool {
         }
     }
 
+    public HalyardPreSplit() {
+        super("presplit", "calculates region pre-splits for a new dataset table based on simulated load of the specific data", "Example: presplit -s hdfs://my_RDF_files -t mydataset");
+        addOption("s", "source", "source_paths", "Source path(s) with RDF files (scanned recursivelly)", true, true);
+        addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store", true, true);
+        addOption("i", "skip-invalid", null, "Optionally skip invalid source files and parsing errors", false, false);
+        addOption("g", "graph-context", "graph_context", "Optionally specify default target named graph context", false, true);
+        addOption("o", "graph-context-override", null, "Optionally override named graph context also for loaded quads", false, false);
+        addOption("d", "decimation-factor", "decimation_factor", "Optionally overide pre-split random decimation factor (default is 1000)", false, true);
+        addOption("l", "split-limit-size", "size", "Optionally override calculated split size (default is 80000000)", false, true);
+    }
+
     @Override
-    public int run(String[] args) throws Exception {
-        if (args.length != 2) {
-            System.err.println("Usage: presplit [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + SKIP_INVALID_PROPERTY + "=true] [-D" + DEFAULT_CONTEXT_PROPERTY + "=http://new_context] [-D" + OVERRIDE_CONTEXT_PROPERTY + "=true] <input_path(s)> <table_name>");
-            return -1;
-        }
+    protected int run(CommandLine cmd) throws Exception {
+        String source = cmd.getOptionValue('s');
+        String target = cmd.getOptionValue('t');
+        getConf().setBoolean(SKIP_INVALID_PROPERTY, cmd.hasOption('i'));
+        if (cmd.hasOption('g')) getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
+        getConf().setBoolean(OVERRIDE_CONTEXT_PROPERTY, cmd.hasOption('o'));
         TableMapReduceUtil.addDependencyJars(getConf(),
                 NTriplesUtil.class,
                 Rio.class,
@@ -159,15 +165,17 @@ public class HalyardPreSplit implements Tool {
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
         getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
-        Job job = Job.getInstance(getConf(), "HalyardPreSplit -> " + args[1]);
-         job.getConfiguration().set(TABLE_PROPERTY, args[1]);
+        getConf().setInt(DECIMATION_FACTOR_PROPERTY, Integer.parseInt(cmd.getOptionValue('d', String.valueOf(DEFAULT_DECIMATION_FACTOR))));
+        getConf().setLong(SPLIT_LIMIT_PROPERTY, Long.parseLong(cmd.getOptionValue('l', String.valueOf(DEFAULT_SPLIT_LIMIT))));
+        Job job = Job.getInstance(getConf(), "HalyardPreSplit -> " + target);
+         job.getConfiguration().set(TABLE_PROPERTY, target);
         job.setJarByClass(HalyardPreSplit.class);
         job.setMapperClass(RDFDecimatingMapper.class);
         job.setMapOutputKeyClass(ImmutableBytesWritable.class);
         job.setMapOutputValueClass(LongWritable.class);
         job.setInputFormatClass(RioFileInputFormat.class);
         FileInputFormat.setInputDirRecursive(job, true);
-        FileInputFormat.setInputPaths(job, args[0]);
+        FileInputFormat.setInputPaths(job, source);
         TableMapReduceUtil.addDependencyJars(job);
         TableMapReduceUtil.initCredentials(job);
         job.setReducerClass(PreSplitReducer.class);
@@ -178,16 +186,6 @@ public class HalyardPreSplit implements Tool {
             return 0;
         }
         return -1;
-    }
-
-    @Override
-    public Configuration getConf() {
-        return this.conf;
-    }
-
-    @Override
-    public void setConf(final Configuration c) {
-        this.conf = c;
     }
 
     /**
