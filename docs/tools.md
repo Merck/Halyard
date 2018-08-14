@@ -59,128 +59,136 @@ exit, quit  Exit the console
 
 ### Halyard Bulk Load
 
-Halyard Bulk Load is a MapReduce application designed to efficiently load RDF data from Hadoop Filesystem (HDFS) into HBase in the form of a Halyard dataset.
-
-Halyard Bulk Load consumes RDF files in various formats supported by [RDF4J RIO](http://docs.rdf4j.org/programming/#_parsing_and_writing_rdf_with_rio), including:
-
-* Binary RDF (.brf)
-* Json-LD (.jsonld)
-* N3 (.n3)
-* N-Quads (.nq)
+```
+$ ./bulkload
+usage: bulkload [-b <bits>] [-d] [-e <timestamp>] [-g <graph_context>] [-h] [-i] [-o] [-r] -s
+       <source_paths> -t <dataset_table> [-v] -w <shared_folder>
+Halyard Bulk Load is a MapReduce application designed to efficiently load RDF data from Hadoop
+Filesystem (HDFS) into HBase in the form of a Halyard dataset.
+ -b,--pre-split-bits <bits>           Optionally specify bit depth of region pre-splits for a case
+                                      when target table does not exist (default is 3)
+ -d,--verify-data-types               Optionally verify RDF data type values while parsing
+ -e,--target-timestamp <timestamp>    Optionally specify timestamp of all loaded records (defaul is
+                                      actual time of the operation)
+ -g,--graph-context <graph_context>   Optionally specify default target named graph context
+ -h,--help                            Prints this help
+ -i,--skip-invalid                    Optionally skip invalid source files and parsing errors
+ -o,--graph-context-override          Optionally override named graph context also for loaded quads
+ -r,--truncate-target                 Optionally truncate target table just before the loading the
+                                      new data
+ -s,--source <source_paths>           Source path(s) with RDF files, more paths can be delimited by
+                                      comma, the paths are searched for the supported files
+                                      recurrently
+ -t,--target <dataset_table>          Target HBase table with Halyard RDF store
+ -v,--version                         Prints version
+ -w,--work-dir <shared_folder>        Unique non-existent folder within shared filesystem to server
+                                      as a working directory for the temporary HBase files,  the
+                                      files are moved to their final HBase locations during the last
+                                      stage of the load process
+Halyard Bulk Load consumes RDF files in various formats supported by RDF4J RIO, including:
 * N-Triples (.nt)
-* RDFa (.xhtml, .html)
-* RDF JSON (.rj)
-* RDF XML (.rdf, .rdfs, .owl, .xml)
-* TriG (.trig)
-* TriX (.xml, .trix)
+* RDF/XML (.rdf, .rdfs, .owl, .xml)
 * Turtle (.ttl)
-
-All the supported RDF formats can be also compressed with one of the compression codecs supported by Hadoop, including:
-
+* N3 (.n3)
+* RDF/JSON (.rj)
+* TriG (.trig)
+* N-Quads (.nq)
+* BinaryRDF (.brf)
+* JSON (.json)
+* ND-JSON-LD (.ndjsonld)
+* TriX (.xml, .trix)
+* JSON-LD (.jsonld)
+All the supported RDF formats can be also compressed with one of the compression codecs supported by
+Hadoop, including:
 * Gzip (.gz)
 * Bzip2 (.bz2)
 * LZO (.lzo)
 * Snappy (.snappy)
-
+Example: bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t mydataset
 ```
-$ ./bulkload
-Usage: bulkload [-Dmapreduce.job.queuename=proofofconcepts] \
-                [-Dhalyard.parser.skipinvalid=true] \
-                [-Dhalyard.table.splitbits=8] \
-                [-Dhalyard.parser.context.default=http://new_context] \
-                [-Dhalyard.parser.context.override=true] \
-                <input path(s)> <output path> <table name>
-```
-
-**Bulk Load usage:**
-
-1. Open terminal on a Hadoop cluster node with a configured HBase.
-2. Don't forget to `kinit` with your credentials if on a secured cluster.
-3. You may optionally execute `hdfs dfs -ls -R <path_to_RDF_files>` command to verify your RDF files location and access.
-4. Execute `./bulkload <input_path(s)_of_the_RDF_files> <temporary_path_for_HTable files> <HBase_table_name>` to launch the Bulk Load application. Following features are supported:
-  * More input paths can be delimited by comma.
-  * The input paths are searched for the supported files recurrently.
-  * Temporary path for HTable files is used to store temporary HBase table files and the files are moved to their final HBase locations during the last stage of the Bulk Load process.
-  * Optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify YARN queue to be used by the application.
-  * Optional property `-Dhalyard.parser.skipinvalid=true` can be used to continue the Bulk Load process even in case of RDF parsing exceptions for particular files.
-  * Optional property `-Dhalyard.table.splitbits=<split_bits>` can specify number of pre-computed HBase table region splits when the table does not exist yet and it is created during the Bulk Load. Number of table pre-splits is calculated as 3 * 2^\<split_bits>. Default number of split_bits is 0, so each new HBase table is pre-split into 3 regions by default. Use this option wisely as a large number of table pre-splits can overload HBase as well as significantly affect Bulk Load performance.
-  * Optional property `-Dhalyard.parser.context.default=<default graph context>` can specify default graph context for the ingested RDF triples
-  * Optional property `-Dhalyard.parser.context.override=true` can override graph context of the loaded RDF quads with the default graph context
-5. Executed process will inform you about the tracking URL of the MapReduce application and about the bulk load progress.
 
 ### Halyard PreSplit
 
-Halyard PreSplit is a MapReduce application designed to estimate optimal HBase region splits for big datasets before the Bulk Load. Halyard PreSplit creates an empty HBase table based on calculations from the dataset sources sampling. For very large datasets it is wise to calculate the pre-splits before the HBase table is created to allow more efficient following Bulk Load process of the data. Optional definition or override of the graph context should be specified exactly the same as for the following Bulk Load process so the region presplits estimations are precise.
-
-Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.
-
 ```
 $ ./presplit
-Usage: presplit [-Dmapreduce.job.queuename=proofofconcepts] \
-                [-Dhalyard.parser.skipinvalid=true] \
-                [-Dhalyard.table.splitbits=8] \
-                [-Dhalyard.parser.context.default=http://new_context] \
-                [-Dhalyard.parser.context.override=true] \
-                <input path(s)> <table name>
+usage: presplit [-d <decimation_factor>] [-g <graph_context>] [-h] [-i] [-l <size>] [-o] -s
+       <source_paths> -t <dataset_table> [-v]
+Halyard PreSplit is a MapReduce application designed to estimate optimal HBase region splits for big
+datasets before the Bulk Load.Halyard PreSplit creates an empty HBase table based on calculations
+from the dataset sources sampling. For very large datasets it is wise to calculate the pre-splits
+before the HBase table is created to allow more efficient following Bulk Load process of the data.
+Optional definition or override of the graph context should be specified exactly the same as for the
+following Bulk Load process so the region presplits estimations are precise.
+Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.
+ -d,--decimation-factor <decimation_factor>   Optionally overide pre-split random decimation factor
+                                              (default is 1000)
+ -g,--graph-context <graph_context>           Optionally specify default target named graph context
+ -h,--help                                    Prints this help
+ -i,--skip-invalid                            Optionally skip invalid source files and parsing
+                                              errors
+ -l,--split-limit-size <size>                 Optionally override calculated split size (default is
+                                              80000000)
+ -o,--graph-context-override                  Optionally override named graph context also for
+                                              loaded quads
+ -s,--source <source_paths>                   Source path(s) with RDF files, more paths can be
+                                              delimited by comma, the paths are searched for the
+                                              supported files recurrently
+ -t,--target <dataset_table>                  Target HBase table with Halyard RDF store
+ -v,--version                                 Prints version
+Example: presplit -s hdfs://my_RDF_files -t mydataset
 ```
-
-**PreSplit usage:**
-
-1. Open terminal on a Hadoop cluster node with configured HBase.
-2. Don't forget to `kinit` with your credentials if on a secured cluster.
-3. You may optionally execute `hdfs dfs -ls -R <path_to_RDF_files>` command to verify the location and access to your RDF files.
-4. Execute `./presplit <input_path(s)_of_the_RDF_files> <HBase_table_name>` to launch the Bulk Load application. The following features are supported:
-  * More input paths can be delimited by comma.
-  * The input paths are searched recursively for files in the supported formats.
-  * The optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify a YARN queue to be used by the application.
-  * The optional property `-Dhalyard.parser.skipinvalid=true` can be used to continue the Bulk Load process even in case of RDF parsing exceptions for particular files.
-  * The optional property `-Dhalyard.parser.context.default=<default graph context>` can specify the default graph context for the ingested RDF triples.
-  * The optional property `-Dhalyard.parser.context.override=true` can override the graph context of the loaded RDF quads with the default graph context.
-5. The executed process will inform you about the tracking URL of the MapReduce application and about the presplit progress.
 
 ### Halyard Hive Load
 
-Halyard Hive Load is a MapReduce application designed to efficiently load RDF data from an Apache Hive table into HBase in a form of a Halyard dataset. Its functionality is similar to the Halyard Bulk Load, however, instead of parsing files from HDFS it parses the content of all cells from a specified Hive table and column.
-
-Halyard Hive Load consumes RDF data files of various formats supported by RDF4J RIO, similarly to Halyard Bulk Load, however it does not support compression. The following RDF4J RIO MIME types are supported:
-
- * application/rdf+xml (application/xml, text/xml)
- * application/n-triples (text/plain)
- * text/turtle (application/x-turtle)
- * text/n3 (text/rdf+n3)
- * application/trix
- * application/trig (application/x-trig)
- * application/x-binary-rdf
- * application/n-quads (text/x-nquads, text/nquads)
- * application/ld+json
- * application/rdf+json
- * application/xhtml+xml (application/html, text/html)
-
 ```
 $ ./hiveload 
-Usage: hiveload -Dhalyard.rdf.mime.type='application/ld+json' \
-                [-Dmapreduce.job.queuename=proofofconcepts] \
-                [-Dhalyard.hive.data.column.index=3] \
-                [-Dhalyard.base.uri='http://my_base_uri/'] \
-                [-Dhalyard.table.splitbits=8] \
-                [-Dhalyard.parser.context.default=http://new_context] \
-                [-Dhalyard.parser.context.override=true] \
-                <Hive table name> <output path> <HBase table name>
+usage: hiveload [-b <bits>] -c <column_index> [-d] [-e <timestamp>] [-g <graph_context>] [-h] [-i]
+       -m <mime_type> [-o] [-r] -s <hive_table> -t <dataset_table> -u <base_uri> [-v] -w
+       <shared_folder>
+Halyard Hive Load is a MapReduce application designed to efficiently load RDF data from an Apache
+Hive table into HBase in a form of a Halyard dataset. Its functionality is similar to the Halyard
+Bulk Load, however, instead of parsing files from HDFS it parses the content of all cells from a
+specified Hive table and column.
+ -b,--pre-split-bits <bits>           Optionally specify bit depth of region pre-splits for a case
+                                      when target table does not exist (default is 3)
+ -c,--column-index <column_index>     Index of column with RDF fragments within the source Hive
+                                      table
+ -d,--verify-data-types               Optionally verify RDF data type values while parsing
+ -e,--target-timestamp <timestamp>    Optionally specify timestamp of all loaded records (defaul is
+                                      actual time of the operation)
+ -g,--graph-context <graph_context>   Optionally specify default target named graph context
+ -h,--help                            Prints this help
+ -i,--skip-invalid                    Optionally skip invalid source files and parsing errors
+ -m,--mime-type <mime_type>           MIME-Type of the RDF fragments
+ -o,--graph-context-override          Optionally override named graph context also for loaded quads
+ -r,--truncate-target                 Optionally truncate target table just before the loading the
+                                      new data
+ -s,--source <hive_table>             Source Hive table with RDF fragments
+ -t,--target <dataset_table>          Target HBase table with Halyard RDF store
+ -u,--base-uri <base_uri>             Base URI for the RDF fragments
+ -v,--version                         Prints version
+ -w,--work-dir <shared_folder>        Unique non-existent folder within shared filesystem to server
+                                      as a working directory for the temporary HBase files, the
+                                      files are moved to their final HBase locations during the last
+                                      stage of the load process
+Halyard Hive Load consumes RDF data files of various formats supported by RDF4J RIO, similarly to
+Halyard Bulk Load, however it does not support compression. The following RDF4J RIO MIME types are
+supported:
+* N-Triples (application/n-triples, text/plain)
+* RDF/XML (application/rdf+xml, application/xml, text/xml)
+* Turtle (text/turtle, application/x-turtle)
+* N3 (text/n3, text/rdf+n3)
+* RDF/JSON (application/rdf+json)
+* TriG (application/trig, application/x-trig)
+* N-Quads (application/n-quads, text/x-nquads, text/nquads)
+* BinaryRDF (application/x-binary-rdf)
+* JSON (application/json)
+* ND-JSON-LD (application/x-nd-json-ld)
+* TriX (application/trix)
+* JSON-LD (application/ld+json)
+Example: hiveload -s myHiveTable -c 3 -m 'application/ld+json' -u 'http://my_base_uri/' -w
+hdfs:///my_tmp_workdir -t mydataset
 ```
-
-**Hive Load usage:**
-
-1. Open terminal on a Hadoop cluster node with a configured HBase.
-2. Don't forget to `kinit` with your credentials if on a secured cluster.
-3. Use the Apache Hive client to verify access to your table and index of the column with RDF data.
-4. Execute `./hiveload -Dhalyard.rdf.mime.type='<RDF_MIME_Type>' -Dhalyard.hive.data.column.index=<column_index> <Hive_table_name> <temporary_path_for_HTable files> <HBase_table_name>` to launch the Hive Load application. The following features are supported:
-  * A temporary path for the HTable files is used to store temporary HBase table files. The files are moved to their final HBase locations during the last stage of the Bulk Load process.
-  * The optional property `-Dmapreduce.job.queuename=<YARN_queue_name>` can specify YARN queue to be used by the application.
-  * The optional property `-Dhalyard.parser.skipinvalid=true` can be used to continue the Bulk Load process even in case of RDF parsing exceptions for particular files.
-  * The optional property `-Dhalyard.table.splitbits=<split_bits>` can specify the number of pre-computed HBase table region splits when the table does not exist yet and it is created during the Bulk Load. The number of table pre-splits is calculated as 3 * 2<sup>split\_bits</sup>. The default number of split\_bits is 0, so that each new HBase table is pre-split into 3 regions by default. Use this option wisely as a large number of table pre-splits can overload the HBase as well as significantly affect the Bulk Load performance.
-  * The optional property `-Dhalyard.parser.context.default=<default graph context>` can specify the default graph context for the ingested RDF triples.
-  * The optional property `-Dhalyard.parser.context.override=true` can override the graph context of the loaded RDF quads with the default graph context.
-5. The executed process will inform you about the tracking URL of the MapReduce application and about the bulk load progress.
 
 ### Halyard Update
 

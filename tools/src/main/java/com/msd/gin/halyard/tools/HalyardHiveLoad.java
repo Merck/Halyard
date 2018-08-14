@@ -49,6 +49,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import java.util.logging.Level;
 import org.apache.commons.cli.CommandLine;
+import org.eclipse.rdf4j.rio.RDFParserRegistry;
 import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 
 /**
@@ -123,13 +124,39 @@ public final class HalyardHiveLoad extends AbstractHalyardTool {
         }
     }
 
+    private static String listMimeTypes() {
+        StringBuilder sb = new StringBuilder();
+        for (RDFFormat fmt : RDFParserRegistry.getInstance().getKeys()) {
+            sb.append("* ").append(fmt.getName()).append(" (");
+            boolean first = true;
+            for (String mime : fmt.getMIMETypes()) {
+                if (first) {
+                    first = false;
+                } else {
+                    sb.append(", ");
+                }
+                sb.append(mime);
+            }
+            sb.append(")\n");
+        }
+        return sb.toString();
+    }
+
     public HalyardHiveLoad() {
-        super("hiveload", "loads a bulk of RDF fragments from Hive table using MapReduce framework", "Example: hiveload -s myHiveTable -c 3 -m 'application/ld+json' -u 'http://my_base_uri/' -w hdfs:///my_tmp_workdir -t mydataset");
+        super(
+            "hiveload",
+            "Halyard Hive Load is a MapReduce application designed to efficiently load RDF data from an Apache Hive table into HBase in a form of a Halyard dataset. "
+                + "Its functionality is similar to the Halyard Bulk Load, however, instead of parsing files from HDFS it parses the content of all cells from a specified Hive table and column.",
+            "Halyard Hive Load consumes RDF data files of various formats supported by RDF4J RIO, similarly to Halyard Bulk Load, however it does not support compression. "
+                + "The following RDF4J RIO MIME types are supported:\n"
+                + listMimeTypes()
+                + "Example: hiveload -s myHiveTable -c 3 -m 'application/ld+json' -u 'http://my_base_uri/' -w hdfs:///my_tmp_workdir -t mydataset"
+        );
         addOption("s", "source", "hive_table", "Source Hive table with RDF fragments", true, true);
         addOption("c", "column-index", "column_index", "Index of column with RDF fragments within the source Hive table", true, true);
         addOption("m", "mime-type", "mime_type", "MIME-Type of the RDF fragments", true, true);
         addOption("u", "base-uri", "base_uri", "Base URI for the RDF fragments", true, true);
-        addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the job", true, true);
+        addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files, the files are moved to their final HBase locations during the last stage of the load process", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store", true, true);
         addOption("i", "skip-invalid", null, "Optionally skip invalid source files and parsing errors", false, false);
         addOption("d", "verify-data-types", null, "Optionally verify RDF data type values while parsing", false, false);
