@@ -27,7 +27,7 @@ import java.util.Optional;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -48,7 +48,6 @@ import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
@@ -56,7 +55,6 @@ import org.apache.hadoop.mapreduce.lib.input.CombineFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.CombineFileSplit;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
@@ -76,7 +74,7 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  * Apache Hadoop MapReduce Tool for bulk loading RDF into HBase
  * @author Adam Sotona (MSD)
  */
-public class HalyardBulkLoad implements Tool {
+public final class HalyardBulkLoad extends AbstractHalyardTool {
 
     /**
      * Property defining number of bits used for HBase region pre-splits calculation for new table
@@ -113,14 +111,10 @@ public class HalyardBulkLoad implements Tool {
      */
     public static final String DEFAULT_TIMESTAMP_PROPERTY = "halyard.bulk.timestamp";
 
-    private static final Logger LOG = Logger.getLogger(HalyardBulkLoad.class.getName());
-
-    private Configuration conf;
-
     /**
      * Mapper class transforming each parsed Statement into set of HBase KeyValues
      */
-    public static class RDFMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, KeyValue> {
+    public static final class RDFMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, KeyValue> {
 
         private IRI defaultRdfContext;
         private boolean overrideRdfContext;
@@ -145,47 +139,6 @@ public class HalyardBulkLoad implements Tool {
                 context.write(new ImmutableBytesWritable(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength()), keyValue);
             }
         }
-    }
-
-    @Override
-    public int run(String[] args) throws Exception {
-        if (args.length != 3) {
-            System.err.println("Usage: bulkload [-D" + MRJobConfig.QUEUE_NAME + "=proofofconcepts] [-D" + SKIP_INVALID_PROPERTY + "=true] [-D" + SPLIT_BITS_PROPERTY + "=8] [-D" + DEFAULT_CONTEXT_PROPERTY + "=http://new_context] [-D" + OVERRIDE_CONTEXT_PROPERTY + "=true] <input_path(s)> <output_path> <table_name>");
-            return -1;
-        }
-        TableMapReduceUtil.addDependencyJars(getConf(),
-                NTriplesUtil.class,
-                Rio.class,
-                AbstractRDFHandler.class,
-                RDFFormat.class,
-                RDFParser.class);
-        HBaseConfiguration.addHbaseResources(getConf());
-        getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
-        Job job = Job.getInstance(getConf(), "HalyardBulkLoad -> " + args[1] + " -> " + args[2]);
-        job.setJarByClass(HalyardBulkLoad.class);
-        job.setMapperClass(RDFMapper.class);
-        job.setMapOutputKeyClass(ImmutableBytesWritable.class);
-        job.setMapOutputValueClass(KeyValue.class);
-        job.setInputFormatClass(RioFileInputFormat.class);
-        job.setSpeculativeExecution(false);
-        job.setReduceSpeculativeExecution(false);
-        try (HTable hTable = HalyardTableUtils.getTable(getConf(), args[2], true, getConf().getInt(SPLIT_BITS_PROPERTY, 3))) {
-            HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
-            FileInputFormat.setInputDirRecursive(job, true);
-            FileInputFormat.setInputPaths(job, args[0]);
-            FileOutputFormat.setOutputPath(job, new Path(args[1]));
-            TableMapReduceUtil.addDependencyJars(job);
-            TableMapReduceUtil.initCredentials(job);
-            if (job.waitForCompletion(true)) {
-                if (getConf().getBoolean(TRUNCATE_PROPERTY, false)) {
-                    HalyardTableUtils.truncateTable(hTable).close();
-                }
-                new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(args[1]), hTable);
-                LOG.info("Bulk Load Completed..");
-                return 0;
-            }
-        }
-        return -1;
     }
 
     /**
@@ -399,14 +352,62 @@ public class HalyardBulkLoad implements Tool {
         }
     }
 
-    @Override
-    public Configuration getConf() {
-        return this.conf;
+    public HalyardBulkLoad() {
+        super("bulkload", "loads a bulk of source RDF files using MapReduce framework", "Example: bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t mydataset");
+        addOption("s", "source", "source_paths", "Source path(s) with RDF files (scanned recursivelly)", true, true);
+        addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the job", true, true);
+        addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store", true, true);
+        addOption("i", "skip-invalid", null, "Optionally skip invalid source files and parsing errors", false, false);
+        addOption("r", "truncate-target", null, "Optionally truncate target table just before the loading the new data", false, false);
+        addOption("b", "pre-split-bits", "bits", "Optionally specify bit depth of region pre-splits for a case when target table does not exist (default is 3)", false, true);
+        addOption("g", "graph-context", "graph_context", "Optionally specify default target named graph context", false, true);
+        addOption("o", "graph-context-override", null, "Optionally override named graph context also for loaded quads", false, false);
+        addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (defaul is actual time of the operation)", false, true);
     }
 
     @Override
-    public void setConf(final Configuration c) {
-        this.conf = c;
+    protected int run(CommandLine cmd) throws Exception {
+        String source = cmd.getOptionValue('s');
+        String workdir = cmd.getOptionValue('w');
+        String target = cmd.getOptionValue('t');
+        getConf().setBoolean(SKIP_INVALID_PROPERTY, cmd.hasOption('i'));
+        getConf().setBoolean(TRUNCATE_PROPERTY, cmd.hasOption('r'));
+        getConf().setInt(SPLIT_BITS_PROPERTY, Integer.parseInt(cmd.getOptionValue('b', "3")));
+        if (cmd.hasOption('g')) getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
+        getConf().setBoolean(OVERRIDE_CONTEXT_PROPERTY, cmd.hasOption('o'));
+        getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, Long.parseLong(cmd.getOptionValue('e', String.valueOf(System.currentTimeMillis()))));
+        TableMapReduceUtil.addDependencyJars(getConf(),
+                NTriplesUtil.class,
+                Rio.class,
+                AbstractRDFHandler.class,
+                RDFFormat.class,
+                RDFParser.class);
+        HBaseConfiguration.addHbaseResources(getConf());
+        Job job = Job.getInstance(getConf(), "HalyardBulkLoad -> " + workdir + " -> " + target);
+        job.setJarByClass(HalyardBulkLoad.class);
+        job.setMapperClass(RDFMapper.class);
+        job.setMapOutputKeyClass(ImmutableBytesWritable.class);
+        job.setMapOutputValueClass(KeyValue.class);
+        job.setInputFormatClass(RioFileInputFormat.class);
+        job.setSpeculativeExecution(false);
+        job.setReduceSpeculativeExecution(false);
+        try (HTable hTable = HalyardTableUtils.getTable(getConf(), target, true, getConf().getInt(SPLIT_BITS_PROPERTY, 3))) {
+            HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
+            FileInputFormat.setInputDirRecursive(job, true);
+            FileInputFormat.setInputPaths(job, source);
+            FileOutputFormat.setOutputPath(job, new Path(workdir));
+            TableMapReduceUtil.addDependencyJars(job);
+            TableMapReduceUtil.initCredentials(job);
+            if (job.waitForCompletion(true)) {
+                if (getConf().getBoolean(TRUNCATE_PROPERTY, false)) {
+                    HalyardTableUtils.truncateTable(hTable).close();
+                }
+                new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(workdir), hTable);
+                LOG.info("Bulk Load Completed..");
+                return 0;
+            }
+        }
+        return -1;
     }
 
     /**
