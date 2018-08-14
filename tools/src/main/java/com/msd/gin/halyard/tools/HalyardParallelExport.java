@@ -232,16 +232,19 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
     public HalyardParallelExport() {
         super(
             "pexport",
-            "Exports graph or table data from Halyard RDF store, using parallalel SPARQL query",
-            "Example: pexport -s my_dataset -j 10 -q '\nPREFIX halyard: <" + HALYARD.NAMESPACE + ">\nselect * where {?s ?p ?o .\nFILTER (halyard:" + PARALLEL_SPLIT_FUNCTION_NAME + " (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz"
+            "Halyard Parallel Export is a MapReduce application that executes multiple Halyard Exports in multiple Map tasks across a Hadoop cluster. "
+                + "All the exports are instructed with the same SPARQL query, the same target, and the same options. "
+                + "The parallelisation is done using a custom SPARQL filter function halyard:parallelSplitBy(?a_binding). "
+                + "The function takes one or more bindings as its arguments and these bindings are used as keys to randomly distribute the query evaluation across all mappers.",
+            "Example: pexport -s my_dataset -j 10 -q 'PREFIX halyard: <" + HALYARD.NAMESPACE + ">\nselect * where {?s ?p ?o .\nFILTER (halyard:" + PARALLEL_SPLIT_FUNCTION_NAME + " (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "sparql-query", "sparql_query", "SPARQL tuple or graph query with use of '" + PARALLEL_SPLIT_FUNCTION_URI + "' function", true, true);
         addOption("t", "target-url", "target_url", "file://<path>/<file_name>{0}.<ext> or hdfs://<path>/<file_name>{0}.<ext> or jdbc:<jdbc_connection>/<table_name>", true, true);
-        addOption("j", "jobs", "number", "number of parallel jobs (default is 1)", false, true);
-        addOption("p", "jdbc-property", "property=value", "JDBC connection property", false, false);
+        addOption("j", "jobs", "number", "number of parallel jobs to execute (default is 1)", false, true);
+        addOption("p", "jdbc-property", "property=value", "JDBC connection property, the most frequent JDBC connection properties are -p user=<jdbc_connection_username> and -p password=<jdbc_connection_password>`", false, false);
         addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
-        addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name", false, true);
+        addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name, mandatory for JDBC export", false, true);
     }
     @Override
     public int run(CommandLine cmd) throws Exception {

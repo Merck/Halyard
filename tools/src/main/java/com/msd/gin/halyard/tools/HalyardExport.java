@@ -71,7 +71,9 @@ import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
+import org.eclipse.rdf4j.rio.RDFParserRegistry;
 import org.eclipse.rdf4j.rio.RDFWriter;
+import org.eclipse.rdf4j.rio.RDFWriterRegistry;
 import org.eclipse.rdf4j.rio.Rio;
 
 /**
@@ -536,14 +538,52 @@ public final class HalyardExport extends AbstractHalyardTool {
         }
     }
 
+    private static String listRDFOut() {
+        StringBuilder sb = new StringBuilder();
+        for (RDFFormat fmt : RDFWriterRegistry.getInstance().getKeys()) {
+            sb.append("* ").append(fmt.getName()).append(" (");
+            boolean first = true;
+            for (String ext : fmt.getFileExtensions()) {
+                if (first) {
+                    first = false;
+                } else {
+                    sb.append(", ");
+                }
+                sb.append('.').append(ext);
+            }
+            sb.append(")\n");
+        }
+        return sb.toString();
+    }
+
     public HalyardExport() {
-        super("export", "Exports graph or table data from Halyard RDF store based on SPARQL query", "Example: export -s my_dataset -q 'select * where {?subjet ?predicate ?object}' -t hdfs:/my_folder/my_data.csv.gz");
+        super(
+            "export",
+            "Halyard Export is a command-line application designed to export data from HBase (a Halyard dataset) into various targets and formats.",
+            "The exported data is determined by a SPARQL query. It can be either a SELECT query that produces a set of tuples (a table) or a CONSTRUCT/DESCRIBE query that produces a set of triples (a graph). "
+                + "The supported target systems, query types, formats, and compressions are listed in the following table:\n"
+                + "+-----------+----------+-------------------------------+---------------------------------------+\n"
+                + "| Target    | Protocol | SELECT query                  | CONSTRUCT/DESCRIBE query              |\n"
+                + "+-----------+----------+-------------------------------+---------------------------------------+\n"
+                + "| Local FS  | file:    | .csv + compression            | RDF4J supported formats + compression |\n"
+                + "| Hadoop FS | hdfs:    | .csv + compression            | RDF4J supported formats + compression |\n"
+                + "| Database  | jdbc:    | direct mapping to tab.columns | not supported                         |\n"
+                + "| Dry run   | null:    | .csv + compression            | RDF4J supported formats + compression |\n"
+                + "+-----------+----------+-------------------------------+---------------------------------------+\n"
+                + "Other Hadoop standard and optional filesystems (like s3:, s3n:, file:, ftp:, webhdfs:) may work according to the actual cluster configuration, however they have not been tested.\n"
+                + "Optional compressions are:\n"
+                + "* Bzip2 (.bz2)\n"
+                + "* Gzip (.gz)\n"
+                + "The RDF4J supported RDF formats are:\n"
+                + listRDFOut()
+                + "Example: export -s my_dataset -q 'select * where {?subjet ?predicate ?object}' -t hdfs:/my_folder/my_data.csv.gz"
+        );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "query", "sparql_query", "SPARQL tuple or graph query executed to export the data", true, true);
         addOption("t", "target-url", "target_url", "file://<path>/<file_name>.<ext> or hdfs://<path>/<file_name>.<ext> or jdbc:<jdbc_connection>/<table_name>", true, true);
-        addOption("p", "jdbc-property", "property=value", "JDBC connection property", false, false);
+        addOption("p", "jdbc-property", "property=value", "JDBC connection property, the most frequent JDBC connection properties are -p user=<jdbc_connection_username> and -p password=<jdbc_connection_password>`", false, false);
         addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
-        addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name", false, true);
+        addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name, mandatory for JDBC export", false, true);
         addOption("r", "trim", null, "Trim target table before export (apply for JDBC only)", false, false);
         addOption("e", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
     }

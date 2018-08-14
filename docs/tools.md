@@ -208,6 +208,7 @@ Example: update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs
 ### Halyard Bulk Update
 
 ```
+$ ./bulkupdate
 usage: bulkupdate [-e <timestamp>] [-h] -q <sparql_queries> -s <dataset_table> [-v] -w
        <shared_folder>
 Halyard Bulk Update is a MapReduce application that executes multiple SPARQL Update operations in
@@ -230,131 +231,92 @@ Example: bulkupdate -s my_dataset -q hdfs:///myqueries/*.sparql -w hdfs:///my_tm
 
 ### Halyard Export
 
-Halyard Export is a command-line application designed to export data from HBase (a Halyard dataset) into various targets and formats.
-
-The exported data is determined by a SPARQL query. It can be either a SELECT query that produces a set of tuples (a table) or a CONSTRUCT/DESCRIBE query that produces a set of triples (a graph).
-
-The supported target systems, query types, formats, and compressions are listed in the following table:
-
-| Target            | Protocol | SELECT query                    | CONSTRUCT/DESCRIBE query                                   |
-|-------------------|----------|---------------------------------|----------------------------------------------------------- |
-| Local filesystem  | file:    | CSV with optional compressions  | RDF4J RIO supported RDF formats with optional compressions |
-| Hadoop filesystem | hdfs:    | CSV with optional compressions  | RDF4J RIO supported RDF formats with optional compressions |
-| Database          | jdbc:    | direct mapping to table columns | not supported                                              |
-{: .table }
-
-Other Hadoop standard and optional filesystems (like s3:, s3n:, file:, ftp:, webhdfs:) may work according to the actual cluster configuration, however they have not been tested.
-
-Optional compressions are:
-
-* Bzip2 (.bz2)
-* Gzip (.gz)
-
-The RDF4J RIO supported RDF formats are:
-
-* Binary RDF (.brf)
-* Json-LD (.jsonld)
-* N3 (.n3)
-* N-Quads (.nq)
-* N-Triples (.nt)
-* RDFa (.xhtml, .html)
-* RDF JSON (.rj)
-* RDF XML (.rdf, .rdfs, .owl, .xml)
-* TriG (.trig)
-* TriX (.xml, .trix)
-* Turtle (.ttl)
-
 ```
 $ ./export
-Usage: export [-c <driver_class>] \
-              [-e <elastic_index_url>] \
-              [-h] \
-              [-l <driver_classpath>] \
-              [-p <property=value>] \
-              [-q <sparql_query>] \
-              [-r] \
-              [-s <source_htable>] \
-              [-t <target_url>] \
-              [-v]
-Exports graph or table data from Halyard RDF store based on SPARQL query
- -c <driver_class>        JDBC driver class name
- -e <elastic_index_url>   Optional ElasticSearch index URL
- -h                       Prints this help
- -l <driver_classpath>    JDBC driver classpath delimited by ':'
- -p <property=value>      JDBC connection properties
- -q <sparql_query>        SPARQL tuple or graph query executed to export the data
- -r                       Trim target table before export (apply for JDBC only)
- -s <source_htable>       Source HBase table with Halyard RDF store
- -t <target_url>          file://<path>/<file_name>.<ext> or hdfs://<path>/<file_name>.<ext> or
-                          jdbc:<jdbc_connection>/<table_name>
- -v                       Prints version
-Example: export -s my_dataset \
-                -q 'SELECT * WHERE { ?subjet ?predicate ?object . }' \
-                -t hdfs:/my_folder/my_data.csv.gz
+usage: export [-c <driver_class>] [-e <elastic_index_url>] [-h] [-l <driver_classpath>] [-p
+       <property=value>] -q <sparql_query> [-r] -s <dataset_table> -t <target_url> [-v]
+Halyard Export is a command-line application designed to export data from HBase (a Halyard dataset)
+into various targets and formats.
+ -c,--jdbc-driver-class <driver_class>           JDBC driver class name, mandatory for JDBC export
+ -e,--elastic-index <elastic_index_url>          Optional ElasticSearch index URL
+ -h,--help                                       Prints this help
+ -l,--jdbc-driver-classpath <driver_classpath>   JDBC driver classpath delimited by ':'
+ -p,--jdbc-property <property=value>             JDBC connection property, the most frequent JDBC
+                                                 connection properties are -p
+                                                 user=<jdbc_connection_username> and -p
+                                                 password=<jdbc_connection_password>`
+ -q,--query <sparql_query>                       SPARQL tuple or graph query executed to export the
+                                                 data
+ -r,--trim                                       Trim target table before export (apply for JDBC
+                                                 only)
+ -s,--source-dataset <dataset_table>             Source HBase table with Halyard RDF store
+ -t,--target-url <target_url>                    file://<path>/<file_name>.<ext> or
+                                                 hdfs://<path>/<file_name>.<ext> or
+                                                 jdbc:<jdbc_connection>/<table_name>
+ -v,--version                                    Prints version
+The exported data is determined by a SPARQL query. It can be either a SELECT query that produces a
+set of tuples (a table) or a CONSTRUCT/DESCRIBE query that produces a set of triples (a graph). The
+supported target systems, query types, formats, and compressions are listed in the following table:
++-----------+----------+-------------------------------+---------------------------------------+
+| Target    | Protocol | SELECT query                  | CONSTRUCT/DESCRIBE query              |
++-----------+----------+-------------------------------+---------------------------------------+
+| Local FS  | file:    | .csv + compression            | RDF4J supported formats + compression |
+| Hadoop FS | hdfs:    | .csv + compression            | RDF4J supported formats + compression |
+| Database  | jdbc:    | direct mapping to tab.columns | not supported                         |
+| Dry run   | null:    | .csv + compression            | RDF4J supported formats + compression |
++-----------+----------+-------------------------------+---------------------------------------+
+Other Hadoop standard and optional filesystems (like s3:, s3n:, file:, ftp:, webhdfs:) may work
+according to the actual cluster configuration, however they have not been tested.
+Optional compressions are:
+* Bzip2 (.bz2)
+* Gzip (.gz)
+The RDF4J supported RDF formats are:
+* N-Triples (.nt)
+* RDF/XML (.rdf, .rdfs, .owl, .xml)
+* Turtle (.ttl)
+* N3 (.n3)
+* RDF/JSON (.rj)
+* TriG (.trig)
+* N-Quads (.nq)
+* BinaryRDF (.brf)
+* TriX (.xml, .trix)
+* JSON-LD (.jsonld)
+Example: export -s my_dataset -q 'select * where {?subjet ?predicate ?object}' -t
+hdfs:/my_folder/my_data.csv.gz
 ```
-
-**Export usage:**
-
-1. Open terminal on a Hadoop cluster node with a configured HBase.
-2. Don't forget to `kinit` with your credentials if on a secured cluster.
-3. Execute `./export -s <HBase_table_name> -q '<sparql_query>' -t <target_URL>` to launch the export. The following features are supported:
-  * Target file format and optional compression (for file: and hdfs: targets) is determined from the target file extension.
-  * Target table name (for jdbc: targets) must be added behind the additional slash at the end of the standard JDBC URL connection string.
-  * The SPARQL query type must match the target URL (and the target file type if applicable). For example, only SELECT queries can be used for the jdbc: targets.
-  * The option `-c <driver_class>` is mandatory for jdbc: targets to determine the JDBC driver class used to connect the target.
-  * The option `-l <driver_classpath>` allows to specify additional Java classpath necessary to load a particular JDBC driver for the jdbc: targets.
-  * The option `-p <property=value>` allows to pass additional properties to the JDBC connections for jdbc: targets. The most frequent JDBC connection properties are `-p user=<jdbc_connection_username>` and `-p password=<jdbc_connection_password>`.
-  * The option `-r` trims the jdbc: target table before the export.
 
 ### Halyard Parallel Export <a id="Halyard_Parallel_Export"></a>
 
-Halyard Parallel Export is a MapReduce application that executes multiple Halyard Exports in multiple Map tasks across a Hadoop cluster. All the exports are instructed with the same SPARQL query, the same target, and the same options. The parallelisation is done using a custom SPARQL filter function `halyard:parallelSplitBy(?a_binding)`. The function takes one or more bindings as its arguments and these bindings are used as keys to randomly distribute the query evaluation across all mappers.
-
 ```
 $ ./pexport
-Usage: pexport [-c <driver_class>] \
-               [-h] \
-               [-l <driver_classpath>] \
-               [-p <property=value>] \
-               [-q <sparql_query>] \
-               [-s <source_htable>] \
-               [-t <target_url>] \
-               [-v]
-Exports graph or table data from Halyard RDF store, using parallalel SPARQL query
- -c <driver_class>       JDBC driver class name
- -h                      Prints this help
- -l <driver_classpath>   JDBC driver classpath delimited by ':'
- -p <property=value>     JDBC connection properties
- -q <sparql_query>       SPARQL tuple or graph query with use of
-                         'http://merck.github.io/Halyard/ns#parallelSplitBy' function
- -s <source_htable>      Source HBase table with Halyard RDF store
- -t <target_url>         file://<path>/<file_name>{0}.<ext> or hdfs://<path>/<file_name>{0}.<ext> or
-                         jdbc:<jdbc_connection>/<table_name>
- -v                      Prints version
-
-Example: pexport [-Dmapreduce.job.maps=10] \
-                 [-Dmapreduce.job.queuename=proofofconcepts] \
-                 -s my_dataset
-                 -q 'PREFIX halyard: <http://merck.github.io/Halyard/ns#>
-                     SELECT * WHERE {
-                       ?s ?p ?o .
-                       FILTER halyard:parallelSplitBy(?s)
-                     }' \
-                -t hdfs:/my_folder/my_data{0}.csv.gz
+usage: pexport [-c <driver_class>] [-h] [-j <number>] [-l <driver_classpath>] [-p <property=value>]
+       -q <sparql_query> -s <dataset_table> -t <target_url> [-v]
+Halyard Parallel Export is a MapReduce application that executes multiple Halyard Exports in
+multiple Map tasks across a Hadoop cluster. All the exports are instructed with the same SPARQL
+query, the same target, and the same options. The parallelisation is done using a custom SPARQL
+filter function halyard:parallelSplitBy(?a_binding). The function takes one or more bindings as its
+arguments and these bindings are used as keys to randomly distribute the query evaluation across all
+mappers.
+ -c,--jdbc-driver-class <driver_class>           JDBC driver class name, mandatory for JDBC export
+ -h,--help                                       Prints this help
+ -j,--jobs <number>                              number of parallel jobs to execute (default is 1)
+ -l,--jdbc-driver-classpath <driver_classpath>   JDBC driver classpath delimited by ':'
+ -p,--jdbc-property <property=value>             JDBC connection property, the most frequent JDBC
+                                                 connection properties are -p
+                                                 user=<jdbc_connection_username> and -p
+                                                 password=<jdbc_connection_password>`
+ -q,--sparql-query <sparql_query>                SPARQL tuple or graph query with use of
+                                                 'http://merck.github.io/Halyard/ns#parallelSplitBy'
+                                                 function
+ -s,--source-dataset <dataset_table>             Source HBase table with Halyard RDF store
+ -t,--target-url <target_url>                    file://<path>/<file_name>{0}.<ext> or
+                                                 hdfs://<path>/<file_name>{0}.<ext> or
+                                                 jdbc:<jdbc_connection>/<table_name>
+ -v,--version                                    Prints version
+Example: pexport -s my_dataset -j 10 -q 'PREFIX halyard: <http://merck.github.io/Halyard/ns#>
+select * where {?s ?p ?o .
+FILTER (halyard:parallelSplitBy (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz
 ```
-
-**Parallel Export usage:**
-
-1. Open terminal on a Hadoop cluster node with a configured HBase.
-2. Don't forget to `kinit` with your credentials if on a secured cluster.
-3. Execute `./pexport -Dmapreduce.job.maps=<number_of_maps> -s <HBase_table_name> -q '<sparql_query>' -t <target_URL>` to launch the export. The following features are supported:
-  * The target file format and optional compression (for file: and hdfs: targets) is determined from the target file extension.
-  * The target table name (for the jdbc: targets) must be added behind the additional slash at the end of the standard JDBC URL connection string.
-  * The target file name (for file: and hdfs: targets) must contain a parallel index marker `{0}` anywhere within the path to avoid parallel write conflicts and corruption of the exported data.
-  * The SPARQL query type must match the target URL (and the target file type if applicable). For example, only SELECT queries can be used for the jdbc: targets.
-  * The option `-c <driver_class>` is mandatory for the jdbc: targets to determine the JDBC Driver class used to connect to the target.
-  * The option `-l <driver_classpath>` allows to specify additional Java classpath necessary to load a particular JDBC driver for the jdbc: targets.
-  * The option `-p <property=value>` allows to pass additional properties to JDBC connections for the jdbc: targets. The most frequent JDBC connection properties are `-p user=<jdbc_connection_username>` and `-p password=<jdbc_connection_password>`.
 
 ### Halyard Bulk Delete
 
