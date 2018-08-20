@@ -45,7 +45,6 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -236,7 +235,7 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
                 + "All the exports are instructed with the same SPARQL query, the same target, and the same options. "
                 + "The parallelisation is done using a custom SPARQL filter function halyard:parallelSplitBy(?a_binding). "
                 + "The function takes one or more bindings as its arguments and these bindings are used as keys to randomly distribute the query evaluation across all mappers.",
-            "Example: pexport -s my_dataset -j 10 -q 'PREFIX halyard: <" + HALYARD.NAMESPACE + ">\nselect * where {?s ?p ?o .\nFILTER (halyard:" + PARALLEL_SPLIT_FUNCTION_NAME + " (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz"
+            "Example: halyard pexport -s my_dataset -j 10 -q 'PREFIX halyard: <" + HALYARD.NAMESPACE + ">\nselect * where {?s ?p ?o .\nFILTER (halyard:" + PARALLEL_SPLIT_FUNCTION_NAME + " (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "sparql-query", "sparql_query", "SPARQL tuple or graph query with use of '" + PARALLEL_SPLIT_FUNCTION_URI + "' function", true, true);
@@ -310,14 +309,5 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
             return 0;
         }
         return -1;
-    }
-
-    /**
-     * Main of the HalyardParallelExport
-     * @param args String command line arguments
-     * @throws Exception throws Exception in case of any problem
-     */
-    public static void main(String[] args) throws Exception {
-        System.exit(ToolRunner.run(new HalyardParallelExport(), args));
     }
 }

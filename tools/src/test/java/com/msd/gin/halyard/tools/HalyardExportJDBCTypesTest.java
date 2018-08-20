@@ -26,6 +26,7 @@ import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Date;
+import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.junit.Test;
@@ -66,7 +67,6 @@ public class HalyardExportJDBCTypesTest {
         }
         sail.commit();
         sail.shutDown();
-        AbstractHalyardTool.CONF = HBaseServerTestInstance.getInstanceConfig();
     }
 
 
@@ -77,7 +77,7 @@ public class HalyardExportJDBCTypesTest {
             c.createStatement().executeUpdate("create table " + name.getMethodName() + " (subj varchar(100), date date, time time, timestamp timestamp, string varchar(100), bool boolean, byte smallint, doubl double, floa float, itg integer, long bigint, short smallint)");
         }
         try {
-            HalyardExport.main(new String[] {"-s", TABLE, "-q", "PREFIX : <http://whatever/> select * where {?subj :date ?date; :time ?time; :timestamp ?timestamp; :string ?string; :boolean ?bool; :byte ?byte; :double ?doubl; :float ?floa; :int ?itg; :long ?long; :short ?short.}", "-t", "jdbc:derby:memory:halyard-export-types-test/" + name.getMethodName(), "-c", "org.apache.derby.jdbc.EmbeddedDriver", "-r"});
+            ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardExport(), new String[] {"-s", TABLE, "-q", "PREFIX : <http://whatever/> select * where {?subj :date ?date; :time ?time; :timestamp ?timestamp; :string ?string; :boolean ?bool; :byte ?byte; :double ?doubl; :float ?floa; :int ?itg; :long ?long; :short ?short.}", "-t", "jdbc:derby:memory:halyard-export-types-test/" + name.getMethodName(), "-c", "org.apache.derby.jdbc.EmbeddedDriver", "-r"});
             try (Connection c = DriverManager.getConnection("jdbc:derby:memory:halyard-export-types-test")) {
                 try (ResultSet rs = c.createStatement().executeQuery("select * from " + name.getMethodName())) {
                     ResultSetMetaData m = rs.getMetaData();

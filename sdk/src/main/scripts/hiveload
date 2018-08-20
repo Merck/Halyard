@@ -1,5 +1,0 @@
-#!/bin/sh
-halyard_home="$(dirname "${0}")"
-libjars="$(echo "$halyard_home"/lib/*.jar | tr ' ' ',')"
-export HADOOP_CLASSPATH="$halyard_home/lib/*:`hadoop classpath`:`hbase classpath`"
-hadoop com.msd.gin.halyard.tools.HalyardHiveLoad -conf /etc/hbase/conf/hbase-site.xml -conf $halyard_home/halyard-defaults.xml -libjars $libjars "$@"

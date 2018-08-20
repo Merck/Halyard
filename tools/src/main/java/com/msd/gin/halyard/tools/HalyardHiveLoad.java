@@ -34,7 +34,6 @@ import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.ToolRunner;
 import org.apache.hive.hcatalog.data.HCatRecord;
 import org.apache.hive.hcatalog.mapreduce.HCatInputFormat;
 import org.eclipse.rdf4j.model.Resource;
@@ -150,7 +149,7 @@ public final class HalyardHiveLoad extends AbstractHalyardTool {
             "Halyard Hive Load consumes RDF data files of various formats supported by RDF4J RIO, similarly to Halyard Bulk Load, however it does not support compression. "
                 + "The following RDF4J RIO MIME types are supported:\n"
                 + listMimeTypes()
-                + "Example: hiveload -s myHiveTable -c 3 -m 'application/ld+json' -u 'http://my_base_uri/' -w hdfs:///my_tmp_workdir -t mydataset"
+                + "Example: halyard hiveload -s myHiveTable -c 3 -m 'application/ld+json' -u 'http://my_base_uri/' -w hdfs:///my_tmp_workdir -t mydataset"
         );
         addOption("s", "source", "hive_table", "Source Hive table with RDF fragments", true, true);
         addOption("c", "column-index", "column_index", "Index of column with RDF fragments within the source Hive table", true, true);
@@ -214,14 +213,5 @@ public final class HalyardHiveLoad extends AbstractHalyardTool {
             }
         }
         return -1;
-    }
-
-    /**
-     * Main of the HalyardHiveLoad
-     * @param args String command line arguments
-     * @throws Exception throws Exception in case of any problem
-     */
-    public static void main(String[] args) throws Exception {
-        System.exit(ToolRunner.run(new Configuration(), new HalyardHiveLoad(), args));
     }
 }

@@ -40,7 +40,6 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Statement;
@@ -147,8 +146,9 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
     public HalyardElasticIndexer() {
         super(
             "esindex",
-            "Indexes all literals from Halyard dataset into Elasticsearch.",
-            "Example: esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index"
+            "Halyard ElasticSearch Index is a MapReduce application that indexes all literals in the given dataset into a supplementary ElasticSearch server/cluster. "
+                + "A Halyard repository configured with such supplementary ElasticSearch index can then provide more advanced text search features over the indexed literals.",
+            "Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-index", "target_url", "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
@@ -205,14 +205,5 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             return 0;
         }
         return -1;
-    }
-
-    /**
-     * Main of the HalyardElasticIndexer
-     * @param args String command line arguments
-     * @throws Exception throws Exception in case of any problem
-     */
-    public static void main(String[] args) throws Exception {
-        System.exit(ToolRunner.run(new HalyardElasticIndexer(), args));
     }
 }

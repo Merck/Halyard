@@ -55,7 +55,6 @@ import org.apache.hadoop.mapreduce.lib.input.CombineFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.CombineFileSplit;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
@@ -381,7 +380,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                 + "* Bzip2 (.bz2)\n"
                 + "* LZO (.lzo)\n"
                 + "* Snappy (.snappy)\n"
-                + "Example: bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t mydataset"
+                + "Example: halyard bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t mydataset"
         );
         addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are searched for the supported files recurrently", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
@@ -439,14 +438,5 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
             }
         }
         return -1;
-    }
-
-    /**
-     * Main of the HalyardBulkLoad
-     * @param args String command line arguments
-     * @throws Exception throws Exception in case of any problem
-     */
-    public static void main(String[] args) throws Exception {
-        System.exit(ToolRunner.run(new Configuration(), new HalyardBulkLoad(), args));
     }
 }

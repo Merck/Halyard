@@ -39,7 +39,6 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
@@ -127,8 +126,8 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
     public HalyardBulkExport() {
         super(
             "bulkexport",
-            "Exports graph or table data from Halyard RDF store, using batch of SPARQL queries",
-            "Example: bulkexport -s my_dataset -q hdfs:///myqueries/*.sparql -t hdfs:/my_folder/{0}.csv.gz"
+            "Halyard Bulk Export is a MapReduce application that executes multiple Halyard Exports in MapReduce framework. Query file name (without extension) can be used in the target URL pattern. Order of queries execution is not guaranteed.",
+            "Example: halyard bulkexport -s my_dataset -q hdfs:///myqueries/*.sparql -t hdfs:/my_folder/{0}.csv.gz"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "queries", "sparql_queries", "folder or path pattern with SPARQL tuple or graph queries", true, true);
@@ -201,14 +200,4 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
         }
         return -1;
     }
-
-     /**
-     * Main of the HalyardBulkUpdate
-     * @param args String command line arguments
-     * @throws Exception throws Exception in case of any problem
-     */
-    public static void main(String[] args) throws Exception {
-        System.exit(ToolRunner.run(new HalyardBulkExport(), args));
-    }
-
 }

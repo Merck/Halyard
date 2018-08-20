@@ -57,7 +57,6 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
@@ -432,11 +431,14 @@ public final class HalyardStats extends AbstractHalyardTool {
     }
 
     public HalyardStats() {
-        super("stats", "Updates or exports statistics about Halyard dataset.", "Example: stats -s my_dataset [-g 'http://whatever/mystats'] [-t hdfs:/my_folder/my_stats.trig]");
+        super(
+            "stats",
+            "Halyard Stats is a MapReduce application that calculates dataset statistics and stores them in the named graph within the dataset or exports them into a file. The generated statistics are described by the VoID vocabulary, its extensions, and the SPARQL 1.1 Service Description.",
+            "Example: halyard stats -s my_dataset [-g 'http://whatever/mystats'] [-t hdfs:/my_folder/my_stats.trig]");
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-file", "target_url", "Optional target file to export the statistics (instead of update) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]", false, true);
         addOption("r", "threshold", "size", "Optional minimal size of a named graph to calculate statistics for (default is 1000)", false, true);
-        addOption("g", "target-graph", "target_graph", "Optional target graph context of the exported statistics (default is " + HALYARD.STATS_GRAPH_CONTEXT.stringValue(), false, true);
+        addOption("g", "target-graph", "target_graph", "Optional target graph context of the exported statistics (default is '" + HALYARD.STATS_GRAPH_CONTEXT.stringValue() + "')", false, true);
     }
 
     @Override
@@ -487,14 +489,5 @@ public final class HalyardStats extends AbstractHalyardTool {
             return 0;
         }
         return -1;
-    }
-
-    /**
-     * Main of the HalyardStats
-     * @param args String command line arguments
-     * @throws Exception throws Exception in case of any problem
-     */
-    public static void main(String[] args) throws Exception {
-        System.exit(ToolRunner.run(new Configuration(), new HalyardStats(), args));
     }
 }

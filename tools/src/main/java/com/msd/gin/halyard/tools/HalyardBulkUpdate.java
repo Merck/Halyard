@@ -49,7 +49,6 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -244,7 +243,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
             "Halyard Bulk Update is a MapReduce application that executes multiple SPARQL Update operations in parallel in the Mapper phase. "
                 + "The Shuffle and Reduce phase are responsible for the efficient update of the dataset in a bulk mode (similar to the Halyard Bulk Load). "
                 + "Halyard Bulk Update supports large-scale DELETE/INSERT operations that are not executed separately, but instead they are processed as a single atomic bulk operation at the end of the execution.",
-            "Example: bulkupdate -s my_dataset -q hdfs:///myqueries/*.sparql -w hdfs:///my_tmp_workdir"
+            "Example: halyard bulkupdate -s my_dataset -q hdfs:///myqueries/*.sparql -w hdfs:///my_tmp_workdir"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "queries", "sparql_queries", "folder or path pattern with SPARQL tuple or graph queries", true, true);
@@ -319,14 +318,5 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         }
         LOG.info("Bulk Update Completed..");
         return 0;
-    }
-
-     /**
-     * Main of the HalyardBulkUpdate
-     * @param args String command line arguments
-     * @throws Exception throws Exception in case of any problem
-     */
-    public static void main(String[] args) throws Exception {
-        System.exit(ToolRunner.run(new Configuration(), new HalyardBulkUpdate(), args));
     }
 }

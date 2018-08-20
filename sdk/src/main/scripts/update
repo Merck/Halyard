@@ -1,4 +1,0 @@
-#!/bin/sh
-lib="$(dirname "${0}")/lib"
-if [ -n "$JAVA_HOME" ]; then JAVA=$JAVA_HOME/bin/java; else JAVA=java; fi
-$JAVA -Xmx2G -cp "$lib/*:`hadoop classpath`:`hbase classpath`" com.msd.gin.halyard.tools.HalyardUpdate "$@"

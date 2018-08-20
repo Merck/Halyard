@@ -55,7 +55,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -71,7 +70,6 @@ import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
-import org.eclipse.rdf4j.rio.RDFParserRegistry;
 import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.RDFWriterRegistry;
 import org.eclipse.rdf4j.rio.Rio;
@@ -576,7 +574,7 @@ public final class HalyardExport extends AbstractHalyardTool {
                 + "* Gzip (.gz)\n"
                 + "The RDF4J supported RDF formats are:\n"
                 + listRDFOut()
-                + "Example: export -s my_dataset -q 'select * where {?subjet ?predicate ?object}' -t hdfs:/my_folder/my_data.csv.gz"
+                + "Example: halyard export -s my_dataset -q 'select * where {?subjet ?predicate ?object}' -t hdfs:/my_folder/my_data.csv.gz"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "query", "sparql_query", "SPARQL tuple or graph query executed to export the data", true, true);
@@ -600,14 +598,5 @@ public final class HalyardExport extends AbstractHalyardTool {
             }
         }, cmd.getOptionValue('s'), cmd.getOptionValue('q'), cmd.getOptionValue('t'), cmd.getOptionValue('c'), cmd.getOptionValue('l'), cmd.getOptionValues('p'), cmd.hasOption('r'), cmd.getOptionValue('e'));
         return 0;
-    }
-
-    /**
-     * Main of the HalyardExport
-     * @param args String command line arguments
-     * @throws Exception throws Exception in case of any problem
-     */
-    public static void main(final String args[]) throws Exception {
-        ToolRunner.run(new HalyardExport(), args);
     }
 }

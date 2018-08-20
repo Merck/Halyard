@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
 import java.util.logging.Logger;
@@ -43,13 +44,13 @@ import org.apache.hadoop.util.Tool;
  */
 public abstract class AbstractHalyardTool implements Tool {
 
-    static Configuration CONF = new Configuration();
     static final Logger LOG = Logger.getLogger(AbstractHalyardTool.class.getName());
 
-    private Configuration conf = CONF;
-    private final String name, header, footer;
+    private Configuration conf;
+    final String name, header, footer;
     private final Options options = new Options();
     private final List<String> singleOptions = new ArrayList<>();
+    private int opts = 0;
 
     protected AbstractHalyardTool(String name, String header, String footer) {
         this.name = name;
@@ -60,7 +61,15 @@ public abstract class AbstractHalyardTool implements Tool {
     }
 
     protected final void printHelp() {
-        new HelpFormatter().printHelp(100, name, header, options, footer, true);
+        HelpFormatter hf = new HelpFormatter();
+        hf.setOptionComparator(new Comparator() {
+            @Override
+            public int compare(Object o1, Object o2) {
+                if (o1 instanceof OrderedOption && o2 instanceof OrderedOption) return ((OrderedOption)o1).order - ((OrderedOption)o2).order;
+                else return 0;
+            }
+        });
+        hf.printHelp(100, "halyard " + name, header, options, footer, true);
     }
 
     @Override
@@ -74,14 +83,22 @@ public abstract class AbstractHalyardTool implements Tool {
     }
 
     protected final void addOption(String opt, String longOpt, String argName, String description, boolean required, boolean single) {
-        Option o = new Option(opt, longOpt, argName != null, description);
-        o.setArgName(argName);
-        o.setRequired(required);
+        Option o = new OrderedOption(opts++, opt, longOpt, argName, description, required);
         options.addOption(o);
         if (single) {
             singleOptions.add(opt == null ? longOpt : opt);
         }
 
+    }
+
+    private static final class OrderedOption extends Option {
+        final int order;
+        public OrderedOption(int order, String opt, String longOpt, String argName, String description, boolean required) {
+            super(opt, longOpt, argName != null, description);
+            setArgName(argName);
+            setRequired(required);
+            this.order = order;
+        }
     }
 
     protected final String addTmpFile(String file) throws IOException {
@@ -116,6 +133,14 @@ public abstract class AbstractHalyardTool implements Tool {
 
     protected abstract int run(CommandLine cmd) throws Exception;
 
+    static String getVersion() throws IOException {
+        Properties p = new Properties();
+        try (InputStream in = AbstractHalyardTool.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/halyard-tools/pom.properties")) {
+            if (in != null) p.load(in);
+        }
+        return p.getProperty("version", "unknown");
+    }
+
     @Override
     public final int run(String[] args) throws Exception {
         try {
@@ -132,11 +157,7 @@ public abstract class AbstractHalyardTool implements Tool {
                 return -1;
             }
             if (cmd.hasOption('v')) {
-                Properties p = new Properties();
-                try (InputStream in = HalyardExport.class.getResourceAsStream("/META-INF/maven/com.msd.gin.halyard/halyard-tools/pom.properties")) {
-                    if (in != null) p.load(in);
-                }
-                System.out.println(name + " version " + p.getProperty("version", "unknown"));
+                System.out.println(name + " version " + getVersion());
                 return 0;
             }
             if (!cmd.getArgList().isEmpty()) {

@@ -42,7 +42,6 @@ import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
@@ -134,8 +133,8 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
     public HalyardBulkDelete() {
         super(
             "bulkdelete",
-            "Deletes large set of triples or whole named graphs, based on specified statement pattern and/or graph context.",
-            "Example: bulkdelete -t my_data -f bulkdelete_temp1 -s <http://whatever/mysubj> -c <http://whatever/myctx1> -c <http://whatever/myctx2>"
+            "Halyard Bulk Delete is a MapReduce application that effectively deletes large set of triples or whole named graphs, based on specified statement pattern and/or graph context.",
+            "Example: halyard bulkdelete -t my_data -f bulkdelete_temp1 -s <http://whatever/mysubj> -c <http://whatever/myctx1> -c <http://whatever/myctx2>"
         );
         addOption("t", "target-dataset", "dataset_table", "HBase table with Halyard RDF store", true, true);
         addOption("f", "temp-folder", "temporary_folder", "Temporary folder for HBase files", true, true);
@@ -206,15 +205,5 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
             }
         }
         return -1;
-    }
-
-    /**
-     * Main of the HalyardStats
-     *
-     * @param args String command line arguments
-     * @throws Exception throws Exception in case of any problem
-     */
-    public static void main(String[] args) throws Exception {
-        System.exit(ToolRunner.run(new HalyardBulkDelete(), args));
     }
 }

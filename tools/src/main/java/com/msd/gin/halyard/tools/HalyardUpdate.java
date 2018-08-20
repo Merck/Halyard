@@ -17,7 +17,6 @@
 package com.msd.gin.halyard.tools;
 
 import org.apache.commons.cli.CommandLine;
-import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.Update;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
@@ -33,7 +32,7 @@ public final class HalyardUpdate extends AbstractHalyardTool {
         super(
             "update",
             "Halyard Update is a command-line application designed to run SPARQL Update operations to transform data in an HBase Halyard dataset",
-            "Example: update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs ?o}'"
+            "Example: halyard update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs ?o}'"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "query", "sparql_update_query", "SPARQL update query to be executed", true, true);
@@ -54,14 +53,5 @@ public final class HalyardUpdate extends AbstractHalyardTool {
             rep.shutDown();
         }
         return 0;
-    }
-
-        /**
-     * Main of the HalyardUpdate
-     * @param args String command line arguments
-     * @throws Exception throws Exception in case of any problem
-     */
-    public static void main(final String args[]) throws Exception {
-        ToolRunner.run(new HalyardUpdate(), args);
     }
 }
