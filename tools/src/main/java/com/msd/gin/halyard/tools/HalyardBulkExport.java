@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.logging.Level;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
@@ -33,11 +32,8 @@ import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.Literal;
@@ -67,10 +63,10 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
     /**
      * Mapper class performing SPARQL Graph query evaluation and producing Halyard KeyValue pairs for HBase BulkLoad Reducers
      */
-    public static final class BulkExportMapper extends Mapper<NullWritable, Text, NullWritable, Void> {
+    public static final class BulkExportMapper extends Mapper<NullWritable, Void, NullWritable, Void> {
 
         @Override
-        protected void setup(Context context) throws IOException, InterruptedException {
+        public void run(Context context) throws IOException, InterruptedException {
             FunctionRegistry.getInstance().add(new Function() {
                 @Override
                 public String getURI() {
@@ -87,12 +83,9 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
                     return valueFactory.createLiteral(Math.floorMod(hash, size) == index);
                 }
             });
-        }
-
-        @Override
-        protected void map(NullWritable key, Text value, final Context context) throws IOException, InterruptedException {
-            final String query = StringEscapeUtils.unescapeJava(value.toString());
-            final String name = ((FileSplit)context.getInputSplit()).getPath().getName();
+            final QueryInputFormat.QueryInputSplit qis = (QueryInputFormat.QueryInputSplit)context.getInputSplit();
+            final String query = qis.getQuery();
+            final String name = qis.getQueryName();
             int dot = name.indexOf('.');
             final String bName = dot > 0 ? name.substring(0, dot) : name;
             context.setStatus("Execution of: " + name);
@@ -189,9 +182,8 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
         job.setMapOutputKeyClass(NullWritable.class);
         job.setMapOutputValueClass(Void.class);
         job.setNumReduceTasks(0);
-        job.setInputFormatClass(WholeFileTextInputFormat.class);
-        FileInputFormat.setInputDirRecursive(job, true);
-        FileInputFormat.setInputPaths(job, queryFiles);
+        job.setInputFormatClass(QueryInputFormat.class);
+        QueryInputFormat.setQueriesFromDirRecursive(job.getConfiguration(), queryFiles);
         job.setOutputFormatClass(NullOutputFormat.class);
         TableMapReduceUtil.initCredentials(job);
         if (job.waitForCompletion(true)) {

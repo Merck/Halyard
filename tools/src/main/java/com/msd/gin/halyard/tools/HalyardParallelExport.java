@@ -19,14 +19,10 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.tools.HalyardExport.ExportException;
 import com.yammer.metrics.core.Gauge;
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
@@ -35,15 +31,8 @@ import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.mapreduce.InputFormat;
-import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.RecordReader;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.Value;
@@ -73,68 +62,17 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
      */
     public static final String PARALLEL_SPLIT_FUNCTION_URI = HALYARD.NAMESPACE + PARALLEL_SPLIT_FUNCTION_NAME;
     private static final String SOURCE = "halyard.parallelexport.source";
-    private static final String QUERY = "halyard.parallelexport.query";
     private static final String TARGET = "halyard.parallelexport.target";
     private static final String JDBC_DRIVER = "halyard.parallelexport.jdbc.driver";
     private static final String JDBC_CLASSPATH = "halyard.parallelexport.jdbc.classpath";
     private static final String JDBC_PROPERTIES = "halyard.parallelexport.jdbc.properties";
 
-    static final class IndexedInputSplit extends InputSplit implements Writable {
-
-        public static IndexedInputSplit read(DataInput in) throws IOException {
-            IndexedInputSplit iis = new IndexedInputSplit();
-            iis.readFields(in);
-            return iis;
-        }
-
-        public int index, size;
-
-        public IndexedInputSplit() {
-        }
-
-        public IndexedInputSplit(int index, int size) {
-            this.index = index;
-            this.size = size;
-        }
-
-        public int getIndex() {
-            return index;
-        }
-
-        public int getSize() {
-            return size;
-        }
-
-        @Override
-        public long getLength() throws IOException, InterruptedException {
-            return 0l;
-        }
-
-        @Override
-        public String[] getLocations() throws IOException, InterruptedException {
-            return new String[0];
-        }
-
-        @Override
-        public void write(DataOutput out) throws IOException {
-            out.writeInt(index);
-            out.writeInt(size);
-        }
-
-        @Override
-        public void readFields(DataInput in) throws IOException {
-            index = in.readInt();
-            size = in.readInt();
-        }
-
-    }
-
     static final class ParallelExportMapper extends Mapper<NullWritable, Void, NullWritable, Void> {
 
         @Override
         public void run(final Context context) throws IOException, InterruptedException {
-            final IndexedInputSplit iis = (IndexedInputSplit)context.getInputSplit();
-            if (iis.size == 0) throw new IllegalArgumentException("Invalid IndexedInputSplit instance.");
+            final QueryInputFormat.QueryInputSplit qis = (QueryInputFormat.QueryInputSplit)context.getInputSplit();
+            if (qis.getRepeatCount() == 0) throw new IllegalArgumentException("Invalid IndexedInputSplit instance.");
             FunctionRegistry.getInstance().add(new Function() {
                 @Override
                 public String getURI() {
@@ -151,7 +89,7 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
                             throw new ValueExprEvaluationException("paralelSplitBy function does not allow null values");
                         }
                     }
-                    return valueFactory.createLiteral(Math.floorMod(Arrays.hashCode(args), iis.size) == iis.index);
+                    return valueFactory.createLiteral(Math.floorMod(Arrays.hashCode(args), qis.getRepeatCount()) == qis.getRepeatIndex());
                 }
             });
             try {
@@ -173,59 +111,12 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
                         props[i] = new String(Base64.decodeBase64(props[i]), StandardCharsets.UTF_8);
                     }
                 }
-                HalyardExport.export(cfg, log, cfg.get(SOURCE), cfg.get(QUERY), MessageFormat.format(cfg.get(TARGET), iis.index), cfg.get(JDBC_DRIVER), drCp, props, false, cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL));
+                HalyardExport.export(cfg, log, cfg.get(SOURCE), qis.getQuery(), MessageFormat.format(cfg.get(TARGET), qis.getRepeatIndex()), cfg.get(JDBC_DRIVER), drCp, props, false, cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL));
             } catch (Exception e) {
                 throw new IOException(e);
             }
 
         }
-    }
-
-    static final class IndexedInputFormat extends InputFormat<NullWritable, Void> {
-
-        @Override
-        public List<InputSplit> getSplits(JobContext context) throws IOException, InterruptedException {
-            int maps = context.getConfiguration().getInt(MRJobConfig.NUM_MAPS, 1);
-            ArrayList<InputSplit> splits = new ArrayList<>(maps);
-            for (int i = 0; i < maps; i++) {
-                splits.add(new IndexedInputSplit(i, maps));
-            }
-            return splits;
-        }
-
-        @Override
-        public RecordReader<NullWritable, Void> createRecordReader(InputSplit split, TaskAttemptContext context) throws IOException, InterruptedException {
-            return new RecordReader<NullWritable, Void>() {
-                @Override
-                public void initialize(InputSplit split, TaskAttemptContext context) throws IOException, InterruptedException {
-                }
-
-                @Override
-                public boolean nextKeyValue() throws IOException, InterruptedException {
-                    return false;
-                }
-
-                @Override
-                public NullWritable getCurrentKey() throws IOException, InterruptedException {
-                    return null;
-                }
-
-                @Override
-                public Void getCurrentValue() throws IOException, InterruptedException {
-                    return null;
-                }
-
-                @Override
-                public float getProgress() throws IOException, InterruptedException {
-                    return 0;
-                }
-
-                @Override
-                public void close() throws IOException {
-                }
-            };
-        }
-
     }
 
     public HalyardParallelExport() {
@@ -257,9 +148,7 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
             throw new ExportException("Parallel export file target must contain '{0}' counter in the file path or name.");
         }
         getConf().set(SOURCE, source);
-        getConf().set(QUERY, query);
         getConf().set(TARGET, target);
-        getConf().setInt(MRJobConfig.NUM_MAPS, Integer.parseInt(cmd.getOptionValue('j', "1")));
         String driver = cmd.getOptionValue('c');
         if (driver != null) {
             getConf().set(JDBC_DRIVER, driver);
@@ -301,7 +190,8 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
         job.setMapOutputKeyClass(NullWritable.class);
         job.setMapOutputValueClass(Void.class);
         job.setNumReduceTasks(0);
-        job.setInputFormatClass(IndexedInputFormat.class);
+        job.setInputFormatClass(QueryInputFormat.class);
+        QueryInputFormat.addQuery(job.getConfiguration(), "default", query, Integer.parseInt(cmd.getOptionValue('j', "1")));
         job.setOutputFormatClass(NullOutputFormat.class);
         TableMapReduceUtil.initCredentials(job);
         if (job.waitForCompletion(true)) {

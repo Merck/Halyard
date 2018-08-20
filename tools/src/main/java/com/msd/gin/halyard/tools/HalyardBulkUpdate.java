@@ -23,14 +23,11 @@ import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPER
 import com.msd.gin.halyard.tools.TimeAwareHBaseSail.TimestampCallbackBinding;
 import com.yammer.metrics.core.Gauge;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
@@ -41,13 +38,10 @@ import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
 import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -111,7 +105,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
     /**
      * Mapper class performing SPARQL Graph query evaluation and producing Halyard KeyValue pairs for HBase BulkLoad Reducers
      */
-    public static final class SPARQLUpdateMapper extends Mapper<NullWritable, Text, ImmutableBytesWritable, KeyValue> {
+    public static final class SPARQLUpdateMapper extends Mapper<NullWritable, Void, ImmutableBytesWritable, KeyValue> {
 
         private String tableName;
         private String elasticIndexURL;
@@ -119,7 +113,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         private int stage;
 
         @Override
-        protected void setup(Context context) throws IOException, InterruptedException {
+        public void run(Context context) throws IOException, InterruptedException {
             FunctionRegistry.getInstance().add(new Function() {
                 @Override
                 public String getURI() {
@@ -141,12 +135,9 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
             elasticIndexURL = conf.get(ELASTIC_INDEX_URL);
             defaultTimestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
             stage = conf.getInt(STAGE_PROPERTY, 0);
-        }
-
-        @Override
-        protected void map(NullWritable key, Text value, final Context context) throws IOException, InterruptedException {
-            String query = value.toString();
-            String name = ((FileSplit)context.getInputSplit()).getPath().getName();
+            final QueryInputFormat.QueryInputSplit qis = (QueryInputFormat.QueryInputSplit)context.getInputSplit();
+            final String query = qis.getQuery();
+            final String name = qis.getQueryName();
             ParsedUpdate parsedUpdate = QueryParserUtil.parseUpdate(QueryLanguage.SPARQL, query, null);
             if (parsedUpdate.getUpdateExprs().size() <= stage) {
                 context.setStatus("Nothing to execute in: " + name + " for stage #" + stage);
@@ -280,31 +271,24 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
             job.setMapperClass(SPARQLUpdateMapper.class);
             job.setMapOutputKeyClass(ImmutableBytesWritable.class);
             job.setMapOutputValueClass(KeyValue.class);
-            job.setInputFormatClass(WholeFileTextInputFormat.class);
+            job.setInputFormatClass(QueryInputFormat.class);
             job.setSpeculativeExecution(false);
             job.setReduceSpeculativeExecution(false);
             try (HTable hTable = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
                 HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
-                FileInputFormat.setInputDirRecursive(job, true);
-                FileInputFormat.setInputPaths(job, queryFiles);
+                QueryInputFormat.setQueriesFromDirRecursive(job.getConfiguration(), queryFiles);
                 Path outPath = new Path(workdir, "stage"+stage);
                 FileOutputFormat.setOutputPath(job, outPath);
                 TableMapReduceUtil.addDependencyJars(job);
                 TableMapReduceUtil.initCredentials(job);
                 if (stage == 0) { //count real number of stages
-                    WholeFileTextInputFormat inf = new WholeFileTextInputFormat();
-                    for (FileStatus file : inf.listStatus(job)) {
-                        byte[] contents = new byte[(int) file.getLen()];
-                        try (FSDataInputStream in = file.getPath().getFileSystem(getConf()).open(file.getPath())) {
-                            IOUtils.readFully(in, contents, 0, contents.length);
-                            int updates = QueryParserUtil.parseUpdate(QueryLanguage.SPARQL, new String(contents, StandardCharsets.UTF_8), null).getUpdateExprs().size();
-                            if (updates > stages) {
-                                stages = updates;
-                            }
-                            LOG.log(Level.INFO, "{0} contains {1} stages of the update sequence.", new Object[]{file.getPath(), updates});
-                        } catch (MalformedQueryException mqe) {
-                            throw new IOException("Exception while parsing " + file.getPath(), mqe);
+                    for (InputSplit is : new QueryInputFormat().getSplits(job)) {
+                        QueryInputFormat.QueryInputSplit qis = (QueryInputFormat.QueryInputSplit)is;
+                        int updates = QueryParserUtil.parseUpdate(QueryLanguage.SPARQL, qis.getQuery(), null).getUpdateExprs().size();
+                        if (updates > stages) {
+                            stages = updates;
                         }
+                        LOG.log(Level.INFO, "{0} contains {1} stages of the update sequence.", new Object[]{qis.getQueryName(), updates});
                     }
                     LOG.log(Level.INFO, "Bulk Update will process {0} MapReduce stages.", stages);
                 }
