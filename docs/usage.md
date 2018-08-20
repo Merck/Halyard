@@ -68,7 +68,7 @@ A newly created repository is connected automatically in the RDF4J Workbench.
 ### With Halyard Bulk Load
 
 ```
-> ./bulkload /my_hdfs_path/my_triples.owl /my_hdfs_temp_path testRepo
+> ./halyard bulkload -s /my_hdfs_path/my_triples.owl -w /my_hdfs_temp_path -t testRepo
 impl.YarnClientImpl: Submitted application application_1458475483810_40875
 mapreduce.Job: The url to track the job: http://my_app_master/proxy/application_1458475483810_40875/
 mapreduce.Job:  map 0% reduce 0%
@@ -83,7 +83,7 @@ Note: Before Bulk Load of very large datasets into a new HBase table it is recom
 ### With Halyard Hive Load
 
 ```
-> ./hiveload -Dhalyard.rdf.mime.type='application/n-triples' -Dhalyard.hive.data.column.index=3 my_hive_table /my_hdfs_temp_path testRepo
+> ./halyard hiveload -m 'application/n-triples' -c 3 -s my_hive_table -w /my_hdfs_temp_path -t testRepo -u 'http://my.base/'
 impl.YarnClientImpl: Submitted application application_1514793734614_41673
 mapreduce.Job: The url to track the job: http://my_app_master/proxy/application_1514793734614_41673/
 mapreduce.Job:  map 0% reduce 0%
@@ -145,13 +145,13 @@ This query can be used by any of the above-described ways or tools (Console, Wor
 ### With Halyard Update
 
 ```
-./update -s testRepo -q 'INSERT { ?s ?p ?o . } WHERE { ?s ?p ?o . }'
+./halyard update -s testRepo -q 'INSERT { ?s ?p ?o . } WHERE { ?s ?p ?o . }'
 ```
 
 ### With Halyard Bulk Update
 
 ```
-> ./bulkupdate /my_hdfs_path/my_update_queries.sparql /my_hdfs_temp_path testRepo
+> ./halyard bulkupdate -q /my_hdfs_path/my_update_queries.sparql -w /my_hdfs_temp_path -s testRepo
 impl.YarnClientImpl: Submitted application application_1458476924873_30975
 mapreduce.Job: The url to track the job: http://my_app_master/proxy/application_1458476924873_30975/
 mapreduce.Job:  map 0% reduce 0%
@@ -190,7 +190,7 @@ update=INSERT%20{?s%20?p%20?o}%20WHERE%20{?s%20?p%20?o}
 ### With Halyard Export
 
 ```
-> ./export -s testRepo -q 'select * where {?s ?p ?o}' -t file:///my_path/my_export.csv
+> ./halyard export -s testRepo -q 'select * where {?s ?p ?o}' -t file:///my_path/my_export.csv
 INFO: Query execution started
 INFO: Export finished
 ```
@@ -200,7 +200,7 @@ Note: additional debugging information may appear in the output of the Halyard E
 ### With Halyard Parallel Export
 
 ```
-> ./pexport -Dmapreduce.job.maps=10 -s testRepo -q 'PREFIX halyard: <http://merck.github.io/Halyard/ns#> select * where {?s ?p ?o . FILTER (halyard:parallelSplitBy (?s))}' -t hdfs:///my_path/my_export{0}.csv
+> ./halyard pexport -j 10 -s testRepo -q 'PREFIX halyard: <http://merck.github.io/Halyard/ns#> select * where {?s ?p ?o . FILTER (halyard:parallelSplitBy (?s))}' -t hdfs:///my_path/my_export{0}.csv
 impl.YarnClientImpl: Submitted application application_1572718538572_94727
 mapreduce.Job: The url to track the job: http://my_app_master/proxy/application_1572718538572_94727/
 mapreduce.Job:  map 0% reduce 0%
@@ -250,10 +250,10 @@ Accept: application/sparql-results+xml, */*;q=0.5
 
 ## Delete statements
 
-### With RDF4J Update
+### With Halyard Update
 
 ```
-./update -s testRepo -q 'DELETE { ?s ?p ?o . } WHERE { ?s ?p ?o . }'
+./halyard update -s testRepo -q 'DELETE { ?s ?p ?o . } WHERE { ?s ?p ?o . }'
 ```
 
 ### With RDF4J Workbench
