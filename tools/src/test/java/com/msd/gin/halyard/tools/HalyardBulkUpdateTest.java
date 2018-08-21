@@ -70,7 +70,6 @@ public class HalyardBulkUpdateTest {
                 + "delete {?s <http://whatever/pred> ?o}\n"
                 + "insert {?o <http://whatever/reverse> ?s}\n"
                 + "where {?s <http://whatever/pred> ?o . FILTER (halyard:forkAndFilterBy(2, ?s, ?o))};"
-                + "PREFIX halyard: <http://merck.github.io/Halyard/ns#>\n"
                 + "insert {?s <http://whatever/another> ?o}\n"
                 + "where {?s <http://whatever/reverse> ?o . FILTER (halyard:forkAndFilterBy(3, ?s, ?o))}");
         }
