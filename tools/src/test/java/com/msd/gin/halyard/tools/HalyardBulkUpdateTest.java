@@ -37,7 +37,6 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Assert;
 import static org.junit.Assert.*;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -64,27 +63,23 @@ public class HalyardBulkUpdateTest {
         File queries = File.createTempFile("test_update_queries", "");
         queries.delete();
         queries.mkdir();
-        for (int i=0; i<3; i++) {
-            File q = new File(queries, "test_update_query"+ i + ".sparql");
-            q.deleteOnExit();
-            try (PrintStream qs = new PrintStream(q)) {
-                qs.println("PREFIX halyard: <http://merck.github.io/Halyard/ns#>\n"
-                    + "delete {?s <http://whatever/pred> ?o}\n"
-                    + "insert {?o <http://whatever/reverse> ?s}\n"
-                    + "where {?s <http://whatever/pred> ?o . FILTER (halyard:decimateBy(" + i + ", 3, ?s, ?o))};"
-                    + "PREFIX halyard: <http://merck.github.io/Halyard/ns#>\n"
-                    + "insert {?s <http://whatever/another> ?o}\n"
-                    + "where {?s <http://whatever/reverse> ?o . FILTER (halyard:decimateBy(" + i + ", 3, ?s, ?o))}");
-            }
+        File q = new File(queries, "test_update_query.sparql");
+        q.deleteOnExit();
+        try (PrintStream qs = new PrintStream(q)) {
+            qs.println("PREFIX halyard: <http://merck.github.io/Halyard/ns#>\n"
+                + "delete {?s <http://whatever/pred> ?o}\n"
+                + "insert {?o <http://whatever/reverse> ?s}\n"
+                + "where {?s <http://whatever/pred> ?o . FILTER (halyard:forkAndFilterBy(2, ?s, ?o))};"
+                + "PREFIX halyard: <http://merck.github.io/Halyard/ns#>\n"
+                + "insert {?s <http://whatever/another> ?o}\n"
+                + "where {?s <http://whatever/reverse> ?o . FILTER (halyard:forkAndFilterBy(3, ?s, ?o))}");
         }
         File htableDir = File.createTempFile("test_htable", "");
         htableDir.delete();
 
         assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", TABLE}));
 
-        for (int i=0; i<3; i++) {
-            new File(queries, "test_update_query"+ i + ".sparql").delete();
-        }
+        q.delete();
         queries.delete();
 
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
@@ -179,40 +174,38 @@ public class HalyardBulkUpdateTest {
         File queries = File.createTempFile("test_time_update_queries", "");
         queries.delete();
         queries.mkdir();
-        for (i=0; i<3; i++) {
-            File q = new File(queries, "test_time_update_query" + i + ".sparql");
-            q.deleteOnExit();
-            try (PrintStream qs = new PrintStream(q)) {
-                qs.println( "PREFIX : <http://whatever/> " +
-                            "PREFIX halyard: <http://merck.github.io/Halyard/ns#> " +
-                            "DELETE {" +
-                            "  GRAPH ?targetGraph {" +
-                            "    ?deleteSubj ?deletePred ?deleteObj ." +
-                            "  }" +
-                            "}" +
-                            "INSERT {" +
-                            "  GRAPH ?targetGraph {" +
-                            "    ?insertSubj ?insertPred ?insertObj ." +
-                            "  }" +
-                            "}" +
-                            "WHERE {" +
-                            "  ?change :context   ?targetGraph ;" +
-                            "          :timestamp ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE ." +
-                            "  FILTER (halyard:decimateBy(" + i + ", 3, ?change))" +
-                            "  OPTIONAL {" +
-                            "    ?change :deleteGraph ?delGr ." +
-                            "    GRAPH ?delGr {" +
-                            "      ?deleteSubj ?deletePred ?deleteObj ." +
-                            "    }" +
-                            "  }" +
-                            "  OPTIONAL {" +
-                            "    ?change :insertGraph ?insGr ." +
-                            "    GRAPH ?insGr {" +
-                            "      ?insertSubj ?insertPred ?insertObj ." +
-                            "    }" +
-                            "  }" +
-                            "}");
-            }
+        File q = new File(queries, "test_time_update_query.sparql");
+        q.deleteOnExit();
+        try (PrintStream qs = new PrintStream(q)) {
+            qs.println( "PREFIX : <http://whatever/> " +
+                        "PREFIX halyard: <http://merck.github.io/Halyard/ns#> " +
+                        "DELETE {" +
+                        "  GRAPH ?targetGraph {" +
+                        "    ?deleteSubj ?deletePred ?deleteObj ." +
+                        "  }" +
+                        "}" +
+                        "INSERT {" +
+                        "  GRAPH ?targetGraph {" +
+                        "    ?insertSubj ?insertPred ?insertObj ." +
+                        "  }" +
+                        "}" +
+                        "WHERE {" +
+                        "  ?change :context   ?targetGraph ;" +
+                        "          :timestamp ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE ." +
+                        "  FILTER (halyard:forkAndFilterBy(3, ?change))" +
+                        "  OPTIONAL {" +
+                        "    ?change :deleteGraph ?delGr ." +
+                        "    GRAPH ?delGr {" +
+                        "      ?deleteSubj ?deletePred ?deleteObj ." +
+                        "    }" +
+                        "  }" +
+                        "  OPTIONAL {" +
+                        "    ?change :insertGraph ?insGr ." +
+                        "    GRAPH ?insGr {" +
+                        "      ?insertSubj ?insertPred ?insertObj ." +
+                        "    }" +
+                        "  }" +
+                        "}");
         }
         File htableDir = File.createTempFile("test_htable", "");
         htableDir.delete();
@@ -220,9 +213,7 @@ public class HalyardBulkUpdateTest {
         //execute BulkUpdate
         assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", "timebulkupdatetesttable"}));
 
-        for (i=0; i<3; i++) {
-            new File(queries, "test_update_query"+ i + ".sparql").delete();
-        }
+        q.delete();
         queries.delete();
 
         //read transformed data into model

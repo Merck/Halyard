@@ -16,12 +16,10 @@
  */
 package com.msd.gin.halyard.tools;
 
-import static com.msd.gin.halyard.tools.HalyardBulkUpdate.DECIMATE_FUNCTION_URI;
 import com.yammer.metrics.core.Gauge;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
-import java.util.Arrays;
 import java.util.logging.Level;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Base64;
@@ -36,10 +34,6 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.htrace.Trace;
-import org.eclipse.rdf4j.model.Literal;
-import org.eclipse.rdf4j.model.Value;
-import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.rio.RDFFormat;
@@ -67,22 +61,6 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
 
         @Override
         public void run(Context context) throws IOException, InterruptedException {
-            FunctionRegistry.getInstance().add(new Function() {
-                @Override
-                public String getURI() {
-                        return DECIMATE_FUNCTION_URI;
-                }
-
-                @Override
-                public Value evaluate(ValueFactory valueFactory, Value... args) throws ValueExprEvaluationException {
-                    if (args.length < 3) throw new ValueExprEvaluationException("Minimal number of arguments for " + DECIMATE_FUNCTION_URI + " function is 3");
-                    if (!(args[0] instanceof Literal) || !(args[1] instanceof Literal)) throw new ValueExprEvaluationException("First two two arguments of " + DECIMATE_FUNCTION_URI + " function must be literals");
-                    int index = ((Literal)args[0]).intValue();
-                    int size = ((Literal)args[1]).intValue();
-                    int hash = Arrays.hashCode(Arrays.copyOfRange(args, 2, args.length));
-                    return valueFactory.createLiteral(Math.floorMod(hash, size) == index);
-                }
-            });
             final QueryInputFormat.QueryInputSplit qis = (QueryInputFormat.QueryInputSplit)context.getInputSplit();
             final String query = qis.getQuery();
             final String name = qis.getQueryName();
@@ -90,6 +68,8 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
             final String bName = dot > 0 ? name.substring(0, dot) : name;
             context.setStatus("Execution of: " + name);
             LOG.log(Level.INFO, "Execution of {0}:\n{1}", new Object[]{name, query});
+            Function fn = new ParallelSplitFunction(qis.getRepeatIndex());
+            FunctionRegistry.getInstance().add(fn);
             try {
                 HalyardExport.StatusLog log = new HalyardExport.StatusLog() {
                     @Override
@@ -108,23 +88,27 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
                         props[i] = new String(Base64.decodeBase64(props[i]), StandardCharsets.UTF_8);
                     }
                 }
-                HalyardExport.export(cfg, log, cfg.get(SOURCE), query, MessageFormat.format(cfg.get(TARGET), bName), cfg.get(JDBC_DRIVER), cfg.get(JDBC_CLASSPATH), props, false, cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL));
+                HalyardExport.export(cfg, log, cfg.get(SOURCE), query, MessageFormat.format(cfg.get(TARGET), bName, qis.getRepeatIndex()), cfg.get(JDBC_DRIVER), cfg.get(JDBC_CLASSPATH), props, false, cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL));
             } catch (Exception e) {
                 throw new IOException(e);
+            } finally {
+                FunctionRegistry.getInstance().remove(fn);
             }
-
         }
     }
 
     public HalyardBulkExport() {
         super(
             "bulkexport",
-            "Halyard Bulk Export is a MapReduce application that executes multiple Halyard Exports in MapReduce framework. Query file name (without extension) can be used in the target URL pattern. Order of queries execution is not guaranteed.",
-            "Example: halyard bulkexport -s my_dataset -q hdfs:///myqueries/*.sparql -t hdfs:/my_folder/{0}.csv.gz"
+            "Halyard Bulk Export is a MapReduce application that executes multiple Halyard Exports in MapReduce framework. "
+                + "Query file name (without extension) can be used in the target URL pattern. Order of queries execution is not guaranteed. "
+                + "Another internal level of parallelisation is done using a custom SPARQL function halyard:" + ParallelSplitFunction.PARALLEL_SPLIT_FUNCTION_NAME + "(<constant_number_of_forks>, ?a_binding, ...). "
+                + "The function takes one or more bindings as its arguments and these bindings are used as keys to randomly distribute the query evaluation across the executed parallel forks of the same query.",
+            "Example: halyard bulkexport -s my_dataset -q hdfs:///myqueries/*.sparql -t hdfs:/my_folder/{0}-{1}.csv.gz"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "queries", "sparql_queries", "folder or path pattern with SPARQL tuple or graph queries", true, true);
-        addOption("t", "target-url", "target_url", "file://<path>/{0}.<ext> or hdfs://<path>/{0}.<ext> or jdbc:<jdbc_connection>/{0}", true, true);
+        addOption("t", "target-url", "target_url", "file://<path>/{0}-{1}.<ext> or hdfs://<path>/{0}-{1}.<ext> or jdbc:<jdbc_connection>/{0}, where {0} is replaced query filename (without extension) and {1} is replaced with parallel fork index (when " + ParallelSplitFunction.PARALLEL_SPLIT_FUNCTION_URI + " function is used in the particular query)", true, true);
         addOption("p", "jdbc-property", "property=value", "JDBC connection property", false, false);
         addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
         addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name", false, true);
@@ -183,7 +167,7 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
         job.setMapOutputValueClass(Void.class);
         job.setNumReduceTasks(0);
         job.setInputFormatClass(QueryInputFormat.class);
-        QueryInputFormat.setQueriesFromDirRecursive(job.getConfiguration(), queryFiles);
+        QueryInputFormat.setQueriesFromDirRecursive(job.getConfiguration(), queryFiles, false, 0);
         job.setOutputFormatClass(NullOutputFormat.class);
         TableMapReduceUtil.initCredentials(job);
         if (job.waitForCompletion(true)) {

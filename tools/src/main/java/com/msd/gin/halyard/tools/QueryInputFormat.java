@@ -58,32 +58,31 @@ final class QueryInputFormat extends InputFormat<NullWritable, Void> {
         conf.setStrings(QUERIES, qNames.toArray(new String[qNames.size()]));
     }
 
-    public static void addQuery(Configuration conf, FileStatus fileStatus) throws IOException {
+    public static void addQuery(Configuration conf, FileStatus fileStatus, boolean sparqlUpdate, int stage) throws IOException {
         Path path = fileStatus.getPath();
         try (FSDataInputStream in = path.getFileSystem(conf).open(path)) {
             byte buffer[] = new byte[(int)fileStatus.getLen()];
             IOUtils.readFully(in, buffer);
             String name = path.getName();
-//            int i = name.lastIndexOf('.');
-//            if (i > 0) name = name.substring(0, i);
-            addQuery(conf, name, new String(buffer, StandardCharsets.UTF_8), 1);
+            String query = new String(buffer, StandardCharsets.UTF_8);
+            addQuery(conf, name, query, Math.max(1, ParallelSplitFunction.getNumberOfForksFromFunctionArgument(query, sparqlUpdate, stage)));
         }
     }
 
-    public static void addQueryRecursively(Configuration conf, Path path)
+    public static void addQueryRecursively(Configuration conf, Path path, boolean sparqlUpdate, int stage)
         throws IOException {
         RemoteIterator<LocatedFileStatus> iter = path.getFileSystem(conf).listLocatedStatus(path);
         while (iter.hasNext()) {
             LocatedFileStatus stat = iter.next();
             if (stat.isDirectory()) {
-                addQueryRecursively(conf, stat.getPath());
+                addQueryRecursively(conf, stat.getPath(), sparqlUpdate, stage);
             } else {
-                addQuery(conf, stat);
+                addQuery(conf, stat, sparqlUpdate, stage);
             }
         }
     }
 
-    public static void setQueriesFromDirRecursive(Configuration conf, String dirs) throws IOException {
+    public static void setQueriesFromDirRecursive(Configuration conf, String dirs, boolean sparqlUpdate, int stage) throws IOException {
         for (String dir : StringUtils.split(dirs)) {
             Path p = new Path(StringUtils.unEscapeString(dir));
             FileStatus[] matches = p.getFileSystem(conf).globStatus(p);
@@ -94,9 +93,9 @@ final class QueryInputFormat extends InputFormat<NullWritable, Void> {
             } else {
                 for (FileStatus globStat : matches) {
                     if (globStat.isDirectory()) {
-                        addQueryRecursively(conf, p);
+                        addQueryRecursively(conf, p, sparqlUpdate, stage);
                     } else {
-                        addQuery(conf, globStat);
+                        addQuery(conf, globStat, sparqlUpdate, stage);
                     }
                 }
             }
@@ -111,7 +110,7 @@ final class QueryInputFormat extends InputFormat<NullWritable, Void> {
             int repeatCount = conf.getInt(PREFIX + qName + REPEAT_SUFFIX, 1);
             String query = conf.get(PREFIX + qName + QUERY_SUFFIX);
             for (int i=0; i<repeatCount; i++) {
-                splits.add(new QueryInputSplit(qName, query , i, repeatCount));
+                splits.add(new QueryInputSplit(qName, query , i));
             }
         }
         return splits;
@@ -159,16 +158,15 @@ final class QueryInputFormat extends InputFormat<NullWritable, Void> {
         }
 
         private String queryName, query;
-        private int repeatIndex, repeatCount;
+        private int repeatIndex;
 
         public QueryInputSplit() {
         }
 
-        public QueryInputSplit(String queryName, String query, int repeatIndex, int repeatCount) {
+        public QueryInputSplit(String queryName, String query, int repeatIndex) {
             this.queryName = queryName;
             this.query = query;
             this.repeatIndex = repeatIndex;
-            this.repeatCount = repeatCount;
         }
 
         public String getQueryName() {
@@ -181,10 +179,6 @@ final class QueryInputFormat extends InputFormat<NullWritable, Void> {
 
         public int getRepeatIndex() {
             return repeatIndex;
-        }
-
-        public int getRepeatCount() {
-            return repeatCount;
         }
 
         @Override
@@ -202,7 +196,6 @@ final class QueryInputFormat extends InputFormat<NullWritable, Void> {
             out.writeUTF(queryName);
             out.writeUTF(query);
             out.writeInt(repeatIndex);
-            out.writeInt(repeatCount);
         }
 
         @Override
@@ -210,8 +203,6 @@ final class QueryInputFormat extends InputFormat<NullWritable, Void> {
             queryName = in.readUTF();
             query = in.readUTF();
             repeatIndex = in.readInt();
-            repeatCount = in.readInt();
         }
-
     }
 }

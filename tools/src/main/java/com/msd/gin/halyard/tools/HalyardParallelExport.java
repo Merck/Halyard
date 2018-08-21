@@ -18,11 +18,12 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.tools.HalyardExport.ExportException;
+import static com.msd.gin.halyard.tools.ParallelSplitFunction.PARALLEL_SPLIT_FUNCTION_NAME;
+import static com.msd.gin.halyard.tools.ParallelSplitFunction.PARALLEL_SPLIT_FUNCTION_URI;
 import com.yammer.metrics.core.Gauge;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
-import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
@@ -35,9 +36,6 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.htrace.Trace;
-import org.eclipse.rdf4j.model.Value;
-import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.rio.RDFFormat;
@@ -52,16 +50,7 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  */
 public final class HalyardParallelExport extends AbstractHalyardTool {
 
-    /**
-     * String name of the custom SPARQL parallel split filter function
-     */
-    public static final String PARALLEL_SPLIT_FUNCTION_NAME = "parallelSplitBy";
-
-    /**
-     * String full URI of the custom SPARQL parallel split filter function
-     */
-    public static final String PARALLEL_SPLIT_FUNCTION_URI = HALYARD.NAMESPACE + PARALLEL_SPLIT_FUNCTION_NAME;
-    private static final String SOURCE = "halyard.parallelexport.source";
+   private static final String SOURCE = "halyard.parallelexport.source";
     private static final String TARGET = "halyard.parallelexport.target";
     private static final String JDBC_DRIVER = "halyard.parallelexport.jdbc.driver";
     private static final String JDBC_CLASSPATH = "halyard.parallelexport.jdbc.classpath";
@@ -72,26 +61,8 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
         @Override
         public void run(final Context context) throws IOException, InterruptedException {
             final QueryInputFormat.QueryInputSplit qis = (QueryInputFormat.QueryInputSplit)context.getInputSplit();
-            if (qis.getRepeatCount() == 0) throw new IllegalArgumentException("Invalid IndexedInputSplit instance.");
-            FunctionRegistry.getInstance().add(new Function() {
-                @Override
-                public String getURI() {
-                    return PARALLEL_SPLIT_FUNCTION_URI;
-                }
-
-                @Override
-                public Value evaluate(ValueFactory valueFactory, Value... args) throws ValueExprEvaluationException {
-                    if (args == null || args.length == 0) {
-                        throw new ValueExprEvaluationException("paralelSplitBy function has at least one mandatory argument");
-                    }
-                    for (Value v : args) {
-                        if (v == null) {
-                            throw new ValueExprEvaluationException("paralelSplitBy function does not allow null values");
-                        }
-                    }
-                    return valueFactory.createLiteral(Math.floorMod(Arrays.hashCode(args), qis.getRepeatCount()) == qis.getRepeatIndex());
-                }
-            });
+            Function f = new ParallelSplitFunction(qis.getRepeatIndex());
+            FunctionRegistry.getInstance().add(f);
             try {
                 HalyardExport.StatusLog log = new HalyardExport.StatusLog() {
                     @Override
@@ -114,8 +85,9 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
                 HalyardExport.export(cfg, log, cfg.get(SOURCE), qis.getQuery(), MessageFormat.format(cfg.get(TARGET), qis.getRepeatIndex()), cfg.get(JDBC_DRIVER), drCp, props, false, cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL));
             } catch (Exception e) {
                 throw new IOException(e);
+            } finally {
+                FunctionRegistry.getInstance().remove(f);
             }
-
         }
     }
 
@@ -131,7 +103,6 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "sparql-query", "sparql_query", "SPARQL tuple or graph query with use of '" + PARALLEL_SPLIT_FUNCTION_URI + "' function", true, true);
         addOption("t", "target-url", "target_url", "file://<path>/<file_name>{0}.<ext> or hdfs://<path>/<file_name>{0}.<ext> or jdbc:<jdbc_connection>/<table_name>", true, true);
-        addOption("j", "jobs", "number", "number of parallel jobs to execute (default is 1)", false, true);
         addOption("p", "jdbc-property", "property=value", "JDBC connection property, the most frequent JDBC connection properties are -p user=<jdbc_connection_username> and -p password=<jdbc_connection_password>`", false, false);
         addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
         addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name, mandatory for JDBC export", false, true);
@@ -140,7 +111,8 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
     public int run(CommandLine cmd) throws Exception {
         String source = cmd.getOptionValue('s');
         String query = cmd.getOptionValue('q');
-        if (!query.contains(PARALLEL_SPLIT_FUNCTION_NAME)) {
+        int forks = ParallelSplitFunction.getNumberOfForksFromFunctionArgument(query, false, 0);
+        if (forks == 0) {
             throw new ExportException("Parallel export SPARQL query must contain '" + PARALLEL_SPLIT_FUNCTION_URI + "' function.");
         }
         String target = cmd.getOptionValue('t');
@@ -191,7 +163,7 @@ public final class HalyardParallelExport extends AbstractHalyardTool {
         job.setMapOutputValueClass(Void.class);
         job.setNumReduceTasks(0);
         job.setInputFormatClass(QueryInputFormat.class);
-        QueryInputFormat.addQuery(job.getConfiguration(), "default", query, Integer.parseInt(cmd.getOptionValue('j', "1")));
+        QueryInputFormat.addQuery(job.getConfiguration(), "default", query, forks);
         job.setOutputFormatClass(NullOutputFormat.class);
         TableMapReduceUtil.initCredentials(job);
         if (job.waitForCompletion(true)) {

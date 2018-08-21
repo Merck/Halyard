@@ -114,22 +114,6 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 
         @Override
         public void run(Context context) throws IOException, InterruptedException {
-            FunctionRegistry.getInstance().add(new Function() {
-                @Override
-                public String getURI() {
-                        return DECIMATE_FUNCTION_URI;
-                }
-
-                @Override
-                public Value evaluate(ValueFactory valueFactory, Value... args) throws ValueExprEvaluationException {
-                    if (args.length < 3) throw new ValueExprEvaluationException("Minimal number of arguments for " + DECIMATE_FUNCTION_URI + " function is 3");
-                    if (!(args[0] instanceof Literal) || !(args[1] instanceof Literal)) throw new ValueExprEvaluationException("First two two arguments of " + DECIMATE_FUNCTION_URI + " function must be literals");
-                    int index = ((Literal)args[0]).intValue();
-                    int size = ((Literal)args[1]).intValue();
-                    int hash = Arrays.hashCode(Arrays.copyOfRange(args, 2, args.length));
-                    return valueFactory.createLiteral(Math.floorMod(hash, size) == index);
-                }
-            });
             Configuration conf = context.getConfiguration();
             tableName = conf.get(TABLE_NAME_PROPERTY);
             elasticIndexURL = conf.get(ELASTIC_INDEX_URL);
@@ -153,6 +137,8 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                 context.setStatus("Execution of: " + name + " stage #" + stage);
                 final AtomicLong added = new AtomicLong();
                 final AtomicLong removed = new AtomicLong();
+                Function fn = new ParallelSplitFunction(qis.getRepeatIndex());
+                FunctionRegistry.getInstance().add(fn);
                 try {
                     final HBaseSail sail = new TimeAwareHBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL, new HBaseSail.Ticker() {
                         @Override
@@ -224,6 +210,8 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                 } catch (RepositoryException | MalformedQueryException | QueryEvaluationException | RDFHandlerException ex) {
                     LOG.log(Level.SEVERE, null, ex);
                     throw new IOException(ex);
+                } finally {
+                    FunctionRegistry.getInstance().remove(fn);
                 }
             }
         }
@@ -276,7 +264,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
             job.setReduceSpeculativeExecution(false);
             try (HTable hTable = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
                 HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
-                QueryInputFormat.setQueriesFromDirRecursive(job.getConfiguration(), queryFiles);
+                QueryInputFormat.setQueriesFromDirRecursive(job.getConfiguration(), queryFiles, true, stage);
                 Path outPath = new Path(workdir, "stage"+stage);
                 FileOutputFormat.setOutputPath(job, outPath);
                 TableMapReduceUtil.addDependencyJars(job);

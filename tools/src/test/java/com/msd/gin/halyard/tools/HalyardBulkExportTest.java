@@ -68,6 +68,42 @@ public class HalyardBulkExportTest {
     }
 
     @Test
+    public void testParallelBulkExport() throws Exception {
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkExportTable2", true, 0, true, 0, null, null);
+        sail.initialize();
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        for (int i = 0; i < 1000; i++) {
+            sail.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i),  vf.createLiteral("whatever NT value " + i));
+        }
+        sail.commit();
+        sail.close();
+
+        File root = File.createTempFile("test_parallelBulkExport", "");
+        root.delete();
+        root.mkdirs();
+
+        File q = new File(root, "test_parallelBulkExport.sparql");
+        q.deleteOnExit();
+        try (PrintStream qs = new PrintStream(q)) {
+            qs.println("select * where {?s ?p ?o. FILTER (<http://merck.github.io/Halyard/ns#forkAndFilterBy> (2, ?p))}");
+        }
+
+        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkExport(),
+                new String[]{"-s", "bulkExportTable2", "-q", q.toURI().toURL().toString(), "-t", root.toURI().toURL().toString() + "{0}-{1}.csv"}));
+
+        File f1 = new File(root, "test_parallelBulkExport-0.csv");
+        assertTrue(f1.isFile());
+        File f2 = new File(root, "test_parallelBulkExport-1.csv");
+        assertTrue(f2.isFile());
+        assertEquals(1002, HalyardExportTest.getLinesCount(f1.toURI().toURL().toString(), null) + HalyardExportTest.getLinesCount(f2.toURI().toURL().toString(), null));
+
+        q.delete();
+        f1.delete();
+        f2.delete();
+        root.delete();
+    }
+
+    @Test
     public void testHelp() throws Exception {
         assertEquals(-1, new HalyardBulkExport().run(new String[]{"-h"}));
     }
