@@ -25,11 +25,15 @@ Property used by Halyard to persist namespaces inside the datasets.
 
 ## Custom SPARQL filter functions
 
-### <a id="parallelSplitBy" href="http://merck.github.io/Halyard/ns#parallelSplitBy">`halyard:parallelSplitBy`</a>
+### <a id="forkAndFilterBy" href="http://merck.github.io/Halyard/ns#forkAndFilterBy">`halyard:forkAndFilterBy(<num_of_forks>, ?var1 [,?varN...])`</a>
 
-Custom SPARQL function used in [Halyard Parallel Export](tools#Halyard_Parallel_Export).
+Custom SPARQL function used in [Halyard Bulk Update](tools#Halyard_Bulk_Update) and [Halyard Bulk Export](tools#Halyard_Bulk_Export).
 
-### <a id="decimateBy" href="http://merck.github.io/Halyard/ns#decimateBy">`halyard:decimateBy`</a>
+### ~~<a id="parallelSplitBy" href="http://merck.github.io/Halyard/ns#parallelSplitBy">`halyard:parallelSplitBy`</a>~~
+
+~~Custom SPARQL function used in [Halyard Parallel Export](tools#Halyard_Parallel_Export).~~
+
+### ~~<a id="decimateBy" href="http://merck.github.io/Halyard/ns#decimateBy">`halyard:decimateBy`</a>~~
 
 ## Custom data types
 

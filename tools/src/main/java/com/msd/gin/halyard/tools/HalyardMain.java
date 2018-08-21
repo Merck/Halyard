@@ -42,7 +42,6 @@ public final class HalyardMain {
                 new HalyardUpdate(),
                 new HalyardBulkUpdate(),
                 new HalyardExport(),
-                new HalyardParallelExport(),
                 new HalyardBulkExport(),
                 new HalyardBulkDelete()
             };

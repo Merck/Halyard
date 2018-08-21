@@ -95,15 +95,13 @@ bulkupdate Halyard Bulk Update is a MapReduce application that executes multiple
            the end of the execution.
 export     Halyard Export is a command-line application designed to export data from HBase (a
            Halyard dataset) into various targets and formats.
-pexport    Halyard Parallel Export is a MapReduce application that executes multiple Halyard Exports
-           in multiple Map tasks across a Hadoop cluster. All the exports are instructed with the
-           same SPARQL query, the same target, and the same options. The parallelisation is done
-           using a custom SPARQL filter function halyard:parallelSplitBy(?a_binding). The function
-           takes one or more bindings as its arguments and these bindings are used as keys to
-           randomly distribute the query evaluation across all mappers.
 bulkexport Halyard Bulk Export is a MapReduce application that executes multiple Halyard Exports in
            MapReduce framework. Query file name (without extension) can be used in the target URL
-           pattern. Order of queries execution is not guaranteed.
+           pattern. Order of queries execution is not guaranteed. Another internal level of
+           parallelisation is done using a custom SPARQL function
+           halyard:forkAndFilterBy(<constant_number_of_forks>, ?a_binding, ...). The function takes
+           one or more bindings as its arguments and these bindings are used as keys to randomly
+           distribute the query evaluation across the executed parallel forks of the same query.
 bulkdelete Halyard Bulk Delete is a MapReduce application that effectively deletes large set of
            triples or whole named graphs, based on specified statement pattern and/or graph context.
 ```
@@ -404,7 +402,7 @@ data in an HBase Halyard dataset
 Example: halyard update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs ?o}'
 ```
 
-### Halyard Bulk Update
+### Halyard Bulk Update <a id="Halyard_Bulk_Update"></a>
 ```
 $ ./halyard bulkupdate -h
 usage: halyard bulkupdate [-h] [-v] -s <dataset_table> -q <sparql_queries> -w <shared_folder> [-e
@@ -483,57 +481,36 @@ hdfs:/my_folder/my_data.csv.gz
 ```
 
 ### Halyard Parallel Export <a id="Halyard_Parallel_Export"></a>
-```
-$ ./halyard pexport -h
-usage: halyard pexport [-h] [-v] -s <dataset_table> -q <sparql_query> -t <target_url> [-j <number>]
-       [-p <property=value>] [-l <driver_classpath>] [-c <driver_class>]
-Halyard Parallel Export is a MapReduce application that executes multiple Halyard Exports in
-multiple Map tasks across a Hadoop cluster. All the exports are instructed with the same SPARQL
-query, the same target, and the same options. The parallelisation is done using a custom SPARQL
-filter function halyard:parallelSplitBy(?a_binding). The function takes one or more bindings as its
-arguments and these bindings are used as keys to randomly distribute the query evaluation across all
-mappers.
- -h,--help                                       Prints this help
- -v,--version                                    Prints version
- -s,--source-dataset <dataset_table>             Source HBase table with Halyard RDF store
- -q,--sparql-query <sparql_query>                SPARQL tuple or graph query with use of
-                                                 'http://merck.github.io/Halyard/ns#parallelSplitBy'
-                                                 function
- -t,--target-url <target_url>                    file://<path>/<file_name>{0}.<ext> or
-                                                 hdfs://<path>/<file_name>{0}.<ext> or
-                                                 jdbc:<jdbc_connection>/<table_name>
- -j,--jobs <number>                              number of parallel jobs to execute (default is 1)
- -p,--jdbc-property <property=value>             JDBC connection property, the most frequent JDBC
-                                                 connection properties are -p
-                                                 user=<jdbc_connection_username> and -p
-                                                 password=<jdbc_connection_password>`
- -l,--jdbc-driver-classpath <driver_classpath>   JDBC driver classpath delimited by ':'
- -c,--jdbc-driver-class <driver_class>           JDBC driver class name, mandatory for JDBC export
-Example: halyard pexport -s my_dataset -j 10 -q 'PREFIX halyard:
-<http://merck.github.io/Halyard/ns#>
-select * where {?s ?p ?o .
-FILTER (halyard:parallelSplitBy (?s))}' -t hdfs:/my_folder/my_data{0}.csv.gz
-```
-### Halyard Bulk Export
+Halyard Parallel Export tool become obsolete and all its functionality has been included in Halyard Bulk Export.
+
+### Halyard Bulk Export <a id="Halyard_Bulk_Export"></a>
 ```
 $ ./halyard bulkexport -h
 usage: halyard bulkexport [-h] [-v] -s <dataset_table> -q <sparql_queries> -t <target_url> [-p
        <property=value>] [-l <driver_classpath>] [-c <driver_class>]
 Halyard Bulk Export is a MapReduce application that executes multiple Halyard Exports in MapReduce
 framework. Query file name (without extension) can be used in the target URL pattern. Order of
-queries execution is not guaranteed.
+queries execution is not guaranteed. Another internal level of parallelisation is done using a
+custom SPARQL function halyard:forkAndFilterBy(<constant_number_of_forks>, ?a_binding, ...). The
+function takes one or more bindings as its arguments and these bindings are used as keys to randomly
+distribute the query evaluation across the executed parallel forks of the same query.
  -h,--help                                       Prints this help
  -v,--version                                    Prints version
  -s,--source-dataset <dataset_table>             Source HBase table with Halyard RDF store
  -q,--queries <sparql_queries>                   folder or path pattern with SPARQL tuple or graph
                                                  queries
- -t,--target-url <target_url>                    file://<path>/{0}.<ext> or hdfs://<path>/{0}.<ext>
-                                                 or jdbc:<jdbc_connection>/{0}
+ -t,--target-url <target_url>                    file://<path>/{0}-{1}.<ext> or
+                                                 hdfs://<path>/{0}-{1}.<ext> or
+                                                 jdbc:<jdbc_connection>/{0}, where {0} is replaced
+                                                 query filename (without extension) and {1} is
+                                                 replaced with parallel fork index (when
+                                                 http://merck.github.io/Halyard/ns#forkAndFilterBy
+                                                 function is used in the particular query)
  -p,--jdbc-property <property=value>             JDBC connection property
  -l,--jdbc-driver-classpath <driver_classpath>   JDBC driver classpath delimited by ':'
  -c,--jdbc-driver-class <driver_class>           JDBC driver class name
 Example: halyard bulkexport -s my_dataset -q hdfs:///myqueries/*.sparql -t
-hdfs:/my_folder/{0}.csv.gz
+hdfs:/my_folder/{0}-{1}.csv.gz
 ```
 
 ### Halyard Bulk Delete
