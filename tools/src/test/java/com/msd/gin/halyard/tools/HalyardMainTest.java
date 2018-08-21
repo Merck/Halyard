@@ -97,11 +97,6 @@ public class HalyardMainTest {
     }
 
     @Test(expected = MissingOptionException.class)
-    public void testPexport() throws Exception {
-        HalyardMain.main(new String[]{"pexport"});
-    }
-
-    @Test(expected = MissingOptionException.class)
     public void testBulkexport() throws Exception {
         HalyardMain.main(new String[]{"bulkexport"});
     }
