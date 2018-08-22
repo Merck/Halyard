@@ -60,8 +60,9 @@ exit, quit  Exit the console
 ### Halyard
 ```
 $ ./halyard -h
-usage: halyard [<command> [-h] ... | -h | -v ]
-commands:
+usage: halyard [<genericHadoopOptions>] [ -h | -v | <command> [-h] ...]
+
+commands are:
 ----------------------------------------------------------------------------------------------------
 presplit   Halyard Presplit is a MapReduce application designed to estimate optimal HBase region
            splits for big datasets before the Bulk Load.Halyard PreSplit creates an empty HBase
@@ -104,6 +105,17 @@ bulkexport Halyard Bulk Export is a MapReduce application that executes multiple
            distribute the query evaluation across the executed parallel forks of the same query.
 bulkdelete Halyard Bulk Delete is a MapReduce application that effectively deletes large set of
            triples or whole named graphs, based on specified statement pattern and/or graph context.
+
+genericHadoopOptions are:
+----------------------------------------------------------------------------------------------------
+-conf <configuration file>                   specify an application configuration file
+-D <property=value>                          use value for given property
+-fs <local|namenode:port>                    specify a namenode
+-jt <local|jobtracker:port>                  specify a job tracker
+-files <comma separated list of files>       specify comma separated files to be copied to the map
+                                             reduce cluster
+-archives <comma separated list of archives> specify comma separated archives to be unarchived on
+                                             the compute machines.
 ```
 
 ### Halyard PreSplit

@@ -59,10 +59,18 @@ public final class HalyardMain {
             } finally {
                 PrintWriter pw = new PrintWriter(System.out);
                 HelpFormatter hf = new HelpFormatter();
-                hf.printWrapped(pw, 100, "usage: halyard [<command> [-h] ... | -h | -v ]\ncommands:\n----------------------------------------------------------------------------------------------------");
+                hf.printWrapped(pw, 100, "usage: halyard [<genericHadoopOptions>] [ -h | -v | <command> [-h] ...]");
+                hf.printWrapped(pw, 100, "\ncommands are:\n----------------------------------------------------------------------------------------------------");
                 for (AbstractHalyardTool tool : tools) {
                     hf.printWrapped(pw, 100, 11, tool.name + "           ".substring(tool.name.length()) + tool.header);
                 }
+                hf.printWrapped(pw, 100, 0, "\ngenericHadoopOptions are:\n----------------------------------------------------------------------------------------------------");
+                hf.printWrapped(pw, 100, 45, "-conf <configuration file>                   specify an application configuration file");
+                hf.printWrapped(pw, 100, 45, "-D <property=value>                          use value for given property");
+                hf.printWrapped(pw, 100, 45, "-fs <local|namenode:port>                    specify a namenode");
+                hf.printWrapped(pw, 100, 45, "-jt <local|jobtracker:port>                  specify a job tracker");
+                hf.printWrapped(pw, 100, 45, "-files <comma separated list of files>       specify comma separated files to be copied to the map reduce cluster");
+                hf.printWrapped(pw, 100, 45, "-archives <comma separated list of archives> specify comma separated archives to be unarchived on the compute machines.");
                 pw.flush();
             }
         }
