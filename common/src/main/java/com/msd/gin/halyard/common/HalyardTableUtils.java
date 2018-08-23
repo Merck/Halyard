@@ -102,7 +102,7 @@ public final class HalyardTableUtils {
 
     private static final int PREFIXES = 3;
     private static final byte[] START_KEY = new byte[20];
-    static final byte[] STOP_KEY = new byte[20];
+    public static final byte[] STOP_KEY = new byte[20];
     static {
         Arrays.fill(START_KEY, (byte)0);
         Arrays.fill(STOP_KEY, (byte)0xff); /* 0xff is 255 in decimal */

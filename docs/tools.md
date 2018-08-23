@@ -251,7 +251,8 @@ hdfs:///my_tmp_workdir -t mydataset
 ### Halyard Stats
 ```
 $ ./halyard stats -h
-usage: halyard stats [-h] [-v] -s <dataset_table> [-t <target_url>] [-r <size>] [-g <target_graph>]
+usage: halyard stats [-h] [-v] -s <dataset_table> [-t <target_url>] [-r <size>] [-c <graph_context>]
+       [-g <target_graph>]
 Halyard Stats is a MapReduce application that calculates dataset statistics and stores them in the
 named graph within the dataset or exports them into a file. The generated statistics are described
 by the VoID vocabulary, its extensions, and the SPARQL 1.1 Service Description.
@@ -263,6 +264,8 @@ by the VoID vocabulary, its extensions, and the SPARQL 1.1 Service Description.
                                        hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]
  -r,--threshold <size>                 Optional minimal size of a named graph to calculate
                                        statistics for (default is 1000)
+ -c,--graph-context <graph_context>    Optional restrict stats calculation to the given named graph
+                                       context only
  -g,--target-graph <target_graph>      Optional target graph context of the exported statistics
                                        (default is 'http://merck.github.io/Halyard/ns#statsContext')
 Example: halyard stats -s my_dataset [-g 'http://whatever/mystats'] [-t

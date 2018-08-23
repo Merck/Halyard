@@ -1,0 +1,16 @@
+@prefix : <http://whatever/> .
+{
+    :subjA  :predB "whatever value ABC".
+}
+
+:graph0 {
+    :subjA  :predB "whatever value ABC".
+}
+
+:graph1 {
+    :subjA  :predB "whatever value ABC".
+}
+
+:graph2 {
+    :subjA  :predB "whatever value ABC".
+}

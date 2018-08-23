@@ -1,0 +1,30 @@
+@prefix : <http://whatever/> .
+@prefix halyard: <http://merck.github.io/Halyard/ns#> .
+@prefix void: <http://rdfs.org/ns/void#> .
+@prefix void-ext: <http://ldf.fi/void-ext#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix sd: <http://www.w3.org/ns/sparql-service-description#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+halyard:statsContext {
+	halyard:statsRoot sd:namedGraph :graph0 .
+
+	:graph0 sd:name :graph0 ;
+		sd:graph :graph0 ;
+		a sd:NamedGraph , sd:Graph , void:Dataset ;
+		void:classes "450"^^xsd:long ;
+		void:triples "900"^^xsd:long ;
+		void:propertyPartition :graph0_property_v0EPmHVxqhkyM3Yh_Wfu7gMOZGU ;
+		void:properties "14"^^xsd:long ;
+		void-ext:distinctLiterals "386"^^xsd:long ;
+		void:distinctObjects "886"^^xsd:long ;
+		void:distinctSubjects "91"^^xsd:long ;
+		void-ext:distinctBlankNodeObjects "50"^^xsd:long ;
+		void-ext:distinctBlankNodeSubjects "41"^^xsd:long ;
+		void-ext:distinctIRIReferenceObjects "450"^^xsd:long ;
+		void-ext:distinctIRIReferenceSubjects "50"^^xsd:long .
+
+	:graph0_property_v0EPmHVxqhkyM3Yh_Wfu7gMOZGU a void:Dataset ;
+		void:property rdf:type ;
+		void:triples "450"^^xsd:long .
+}
