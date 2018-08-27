@@ -25,6 +25,7 @@ import java.io.PrintStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -67,6 +68,7 @@ import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
+import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
@@ -142,7 +144,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     HTable table = null;
 
     private final Map<String, Namespace> namespaces = new HashMap<>();
-    private final Map<String, RepositoryFederatedService> federatedServices = new HashMap<>();
+    private final Map<String, Map.Entry<FederatedService, HBaseSail>> federatedServices = new HashMap<>();
 
     /**
      * Construct HBaseSail object with given arguments.
@@ -213,6 +215,17 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                             return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(partitionVar.getValue()).getBytes(StandardCharsets.UTF_8)))), DEFAULT_THRESHOLD);
                         }
                     }
+
+                    @Override
+                    public void meet(Service node) {
+                        Map.Entry<FederatedService, HBaseSail> me;
+                        //try to calculate cardinality also for (Halyard-internally) federated service expressions
+                        if (node.getServiceRef().hasValue() && (me = getServiceAndSail(node.getServiceRef().getValue().stringValue())) != null) {
+				cardinality = me.getValue().statistics.getCardinality(node.getServiceExpr());
+			} else {
+                            super.meet(node);
+                        }
+                    }
                 };
             }
         };
@@ -260,16 +273,22 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
     @Override
     public FederatedService getService(String serviceUrl) throws QueryEvaluationException {
-    		//provide a service to query over Halyard graphs. Remote service queries are not supported.
+        //provide a service to query over Halyard graphs. Remote service queries are not supported.
+        return getServiceAndSail(serviceUrl).getKey();
+    }
+
+    private Map.Entry<FederatedService, HBaseSail> getServiceAndSail(String serviceUrl) throws QueryEvaluationException {
         if (serviceUrl.startsWith(HALYARD.NAMESPACE)) {
             String federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length());
-            RepositoryFederatedService s = federatedServices.get(federatedTable);
-            if (s == null) {
-                s = new RepositoryFederatedService(new SailRepository(new HBaseSail(config, federatedTable, false, 0, true, evaluationTimeout, null, ticker)));
-                federatedServices.put(federatedTable, s);
-                s.initialize();
+            Map.Entry<FederatedService, HBaseSail> me = federatedServices.get(federatedTable);
+            if (me == null) {
+                HBaseSail sail = new HBaseSail(config, federatedTable, false, 0, true, evaluationTimeout, null, ticker);
+                FederatedService fs = new RepositoryFederatedService(new SailRepository(sail));
+                me = new AbstractMap.SimpleEntry<>(fs, sail);
+                federatedServices.put(federatedTable, me);
+                fs.initialize();
             }
-            return s;
+            return me;
         } else {
             throw new QueryEvaluationException("Unsupported service URL: " + serviceUrl);
         }
@@ -283,8 +302,8 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         } catch (IOException ex) {
             throw new SailException(ex);
         }
-        for (RepositoryFederatedService s : federatedServices.values()) { //shutdown all federated services
-            s.shutdown();
+        for (Map.Entry<FederatedService, HBaseSail> s : federatedServices.values()) { //shutdown all federated services
+            s.getKey().shutdown();
         }
         federatedServices.clear(); // release the references to the services
     }
