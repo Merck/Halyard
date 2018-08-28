@@ -20,6 +20,7 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -58,6 +59,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
@@ -115,26 +117,17 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
      */
     public static final class RDFMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, KeyValue> {
 
-        private IRI defaultRdfContext;
-        private boolean overrideRdfContext;
         private long timestamp;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
-            String defCtx = conf.get(DEFAULT_CONTEXT_PROPERTY);
-            defaultRdfContext = defCtx == null ? null : SimpleValueFactory.getInstance().createIRI(defCtx);
             timestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
         @Override
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
-            Resource rdfContext;
-            if (overrideRdfContext || (rdfContext = value.getContext()) == null) {
-                rdfContext = defaultRdfContext;
-            }
-            for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), rdfContext, false, timestamp)) {
+            for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, timestamp)) {
                 context.write(new ImmutableBytesWritable(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength()), keyValue);
             }
         }
@@ -252,6 +245,8 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         private final long size;
         private final SynchronousQueue<Statement> queue = new SynchronousQueue<>();
         private final boolean skipInvalid, verifyDataTypeValues;
+        private final String defaultRdfContextPattern;
+        private final boolean overrideRdfContext;
         private Exception ex = null;
         private long finishedSize = 0;
 
@@ -263,8 +258,11 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
             this.context = context;
             this.paths = split.getPaths();
             this.size = split.getLength();
-            this.skipInvalid = context.getConfiguration().getBoolean(SKIP_INVALID_PROPERTY, false);
-            this.verifyDataTypeValues = context.getConfiguration().getBoolean(VERIFY_DATATYPE_VALUES_PROPERTY, false);
+            Configuration conf = context.getConfiguration();
+            this.skipInvalid = conf.getBoolean(SKIP_INVALID_PROPERTY, false);
+            this.verifyDataTypeValues = conf.getBoolean(VERIFY_DATATYPE_VALUES_PROPERTY, false);
+            this.overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
+            this.defaultRdfContextPattern = conf.get(DEFAULT_CONTEXT_PROPERTY);
         }
 
         public Statement getNext() throws IOException, InterruptedException {
@@ -290,7 +288,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                 for (Path file : paths) try {
                     RDFParser parser;
                     InputStream localIn;
-                    String localBaseUri;
+                    final String localBaseUri;
                     synchronized (this) {
                         if (seek != null) try {
                             finishedSize += seek.getPos();
@@ -315,6 +313,20 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                         parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
                         localIn = this.in; //synchronised parameters must be copied to a local variable for use outide of sync block
                         localBaseUri = this.baseUri;
+                        if (defaultRdfContextPattern != null || overrideRdfContext) {
+                            final IRI defaultRdfContext = defaultRdfContextPattern == null ? null : SimpleValueFactory.getInstance().createIRI(MessageFormat.format(defaultRdfContextPattern, localBaseUri, file.toUri().getPath(), file.getName()));
+                            parser.setValueFactory(new SimpleValueFactory(){
+                                @Override
+                                public Statement createStatement(Resource subject, IRI predicate, Value object) {
+                                    return defaultRdfContextPattern != null ?  super.createStatement(subject, predicate, object, defaultRdfContext) : super.createStatement(subject, predicate, object);
+                                }
+
+                                @Override
+                                public Statement createStatement(Resource subject, IRI predicate, Value object, Resource context) {
+                                    return overrideRdfContext ? createStatement(subject, predicate, object) : super.createStatement(subject, predicate, object, context);
+                                }
+                            });
+                        }
                     }
                     parser.parse(localIn, localBaseUri);
                 } catch (Exception e) {
@@ -389,7 +401,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         addOption("d", "verify-data-types", null, "Optionally verify RDF data type values while parsing", false, false);
         addOption("r", "truncate-target", null, "Optionally truncate target table just before the loading the new data", false, false);
         addOption("b", "pre-split-bits", "bits", "Optionally specify bit depth of region pre-splits for a case when target table does not exist (default is 3)", false, true);
-        addOption("g", "graph-context", "graph_context", "Optionally specify default target named graph context", false, true);
+        addOption("g", "graph-context", "uri_pattern", "Optionally specify default target named graph context. URI pattern may include {0} token to be replaced with full source file URI, token {1} with just the path of the file, and {2} with the file name", false, true);
         addOption("o", "graph-context-override", null, "Optionally override named graph context also for loaded quads", false, false);
         addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (defaul is actual time of the operation)", false, true);
     }

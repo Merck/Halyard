@@ -152,29 +152,32 @@ Example: halyard presplit -s hdfs://my_RDF_files -t mydataset
 ```
 $ ./halyard bulkload -h
 usage: halyard bulkload [-h] [-v] -s <source_paths> -w <shared_folder> -t <dataset_table> [-i] [-d]
-       [-r] [-b <bits>] [-g <graph_context>] [-o] [-e <timestamp>]
+       [-r] [-b <bits>] [-g <uri_pattern>] [-o] [-e <timestamp>]
 Halyard Bulk Load is a MapReduce application designed to efficiently load RDF data from Hadoop
 Filesystem (HDFS) into HBase in the form of a Halyard dataset.
- -h,--help                            Prints this help
- -v,--version                         Prints version
- -s,--source <source_paths>           Source path(s) with RDF files, more paths can be delimited by
-                                      comma, the paths are searched for the supported files
-                                      recurrently
- -w,--work-dir <shared_folder>        Unique non-existent folder within shared filesystem to server
-                                      as a working directory for the temporary HBase files,  the
-                                      files are moved to their final HBase locations during the last
-                                      stage of the load process
- -t,--target <dataset_table>          Target HBase table with Halyard RDF store
- -i,--skip-invalid                    Optionally skip invalid source files and parsing errors
- -d,--verify-data-types               Optionally verify RDF data type values while parsing
- -r,--truncate-target                 Optionally truncate target table just before the loading the
-                                      new data
- -b,--pre-split-bits <bits>           Optionally specify bit depth of region pre-splits for a case
-                                      when target table does not exist (default is 3)
- -g,--graph-context <graph_context>   Optionally specify default target named graph context
- -o,--graph-context-override          Optionally override named graph context also for loaded quads
- -e,--target-timestamp <timestamp>    Optionally specify timestamp of all loaded records (defaul is
-                                      actual time of the operation)
+ -h,--help                           Prints this help
+ -v,--version                        Prints version
+ -s,--source <source_paths>          Source path(s) with RDF files, more paths can be delimited by
+                                     comma, the paths are searched for the supported files
+                                     recurrently
+ -w,--work-dir <shared_folder>       Unique non-existent folder within shared filesystem to server
+                                     as a working directory for the temporary HBase files,  the
+                                     files are moved to their final HBase locations during the last
+                                     stage of the load process
+ -t,--target <dataset_table>         Target HBase table with Halyard RDF store
+ -i,--skip-invalid                   Optionally skip invalid source files and parsing errors
+ -d,--verify-data-types              Optionally verify RDF data type values while parsing
+ -r,--truncate-target                Optionally truncate target table just before the loading the
+                                     new data
+ -b,--pre-split-bits <bits>          Optionally specify bit depth of region pre-splits for a case
+                                     when target table does not exist (default is 3)
+ -g,--graph-context <uri_pattern>    Optionally specify default target named graph context. URI
+                                     pattern may include {0} token to be replaced with full source
+                                     file URI, token {1} with just the path of the file, and {2}
+                                     with the file name
+ -o,--graph-context-override         Optionally override named graph context also for loaded quads
+ -e,--target-timestamp <timestamp>   Optionally specify timestamp of all loaded records (defaul is
+                                     actual time of the operation)
 Halyard Bulk Load consumes RDF files in various formats supported by RDF4J RIO, including:
 * N-Triples (.nt)
 * RDF/XML (.rdf, .rdfs, .owl, .xml)
