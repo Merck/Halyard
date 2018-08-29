@@ -20,6 +20,7 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.UnrecognizedOptionException;
+import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.ToolRunner;
 
 /**
@@ -29,7 +30,8 @@ import org.apache.hadoop.util.ToolRunner;
 public final class HalyardMain {
 
     public static void main(String args[]) throws Exception {
-        String first = args.length > 0 ? args[0] : null;
+        String toolArgs[] = new GenericOptionsParser(args).getRemainingArgs();
+        String first = toolArgs.length > 0 ? toolArgs[0] : null;
         if ("-v".equals(first) || "--version".equals(first)) {
             System.out.println("halyard version " + AbstractHalyardTool.getVersion());
         } else {
