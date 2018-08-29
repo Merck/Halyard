@@ -20,7 +20,6 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.UnrecognizedOptionException;
-import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.ToolRunner;
 
 /**
@@ -30,8 +29,7 @@ import org.apache.hadoop.util.ToolRunner;
 public final class HalyardMain {
 
     public static void main(String args[]) throws Exception {
-        String toolArgs[] = new GenericOptionsParser(args).getRemainingArgs();
-        String first = toolArgs.length > 0 ? toolArgs[0] : null;
+        String first = args.length > 0 ? args[0] : null;
         if ("-v".equals(first) || "--version".equals(first)) {
             System.out.println("halyard version " + AbstractHalyardTool.getVersion());
         } else {
@@ -61,7 +59,7 @@ public final class HalyardMain {
             } finally {
                 PrintWriter pw = new PrintWriter(System.out);
                 HelpFormatter hf = new HelpFormatter();
-                hf.printWrapped(pw, 100, "usage: halyard [<genericHadoopOptions>] [ -h | -v | <command> [-h] ...]");
+                hf.printWrapped(pw, 100, "usage: halyard [ -h | -v | <command> [<genericHadoopOptions>] [-h] ...]");
                 hf.printWrapped(pw, 100, "\ncommands are:\n----------------------------------------------------------------------------------------------------");
                 for (AbstractHalyardTool tool : tools) {
                     hf.printWrapped(pw, 100, 11, tool.name + "           ".substring(tool.name.length()) + tool.header);

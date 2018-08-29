@@ -60,7 +60,7 @@ exit, quit  Exit the console
 ### Halyard
 ```
 $ ./halyard -h
-usage: halyard [<genericHadoopOptions>] [ -h | -v | <command> [-h] ...]
+usage: halyard [ -h | -v | <command> [<genericHadoopOptions>] [-h] ...]
 
 commands are:
 ----------------------------------------------------------------------------------------------------
