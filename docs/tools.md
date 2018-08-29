@@ -392,17 +392,36 @@ halyard:statsContext {
 ### Halyard ElasticSearch Index <a id="Halyard_ElasticSearch_Index"></a>
 ```
 $ ./halyard esindex -h
-usage: halyard esindex [-h] [-v] -s <dataset_table> -t <target_url> [-b <batch_size>]
+usage: halyard esindex [-h] [-v] -s <dataset_table> -t <target_url> [-c] [-d <document_type>] [-a
+       <attribute_name>] [-b <batch_size>]
 Halyard ElasticSearch Index is a MapReduce application that indexes all literals in the given
 dataset into a supplementary ElasticSearch server/cluster. A Halyard repository configured with such
 supplementary ElasticSearch index can then provide more advanced text search features over the
 indexed literals.
- -h,--help                             Prints this help
- -v,--version                          Prints version
- -s,--source-dataset <dataset_table>   Source HBase table with Halyard RDF store
- -t,--target-index <target_url>        Elasticsearch target index url <server>:<port>/<index_name>
- -b,--batch-size <batch_size>          Number of literals sent to Elasticsearch for indexing in one
-                                       batch (default is 100000)
+ -h,--help                              Prints this help
+ -v,--version                           Prints version
+ -s,--source-dataset <dataset_table>    Source HBase table with Halyard RDF store
+ -t,--target-index <target_url>         Elasticsearch target index url <server>:<port>/<index_name>
+ -c,--create-index                      Optionally create Elasticsearch index
+ -d,--document-type <document_type>     Optionally specify document type within the index, default
+                                        is 'l'
+ -a,--attribute-name <attribute_name>   Optionally specify attribute name to index literals within
+                                        the document, default is 'l'
+ -b,--batch-size <batch_size>           Number of literals sent to Elasticsearch for indexing in one
+                                        batch (default is 100000)
+Default index mapping is:
+ {
+     "mappings" : {
+         "l" : {
+             "properties" : {
+                 "l" : { "type" : "text" }
+             },
+             "_source" : {
+               "enabled" : false
+             }
+         }
+     }
+ }
 Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index
 ```
 

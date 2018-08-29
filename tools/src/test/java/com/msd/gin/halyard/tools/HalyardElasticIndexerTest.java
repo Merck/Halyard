@@ -24,14 +24,15 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import org.apache.avro.data.Json;
 import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -56,13 +57,21 @@ public class HalyardElasticIndexerTest {
         sail.commit();
         sail.close();
 
+        final String[] requestUri = new String[2];
+        final JSONObject[] create = new JSONObject[1];
         final ArrayList<String> response = new ArrayList<>(200);
 
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/my_index", new HttpHandler() {
             @Override
             public void handle(HttpExchange he) throws IOException {
-                if ("POST".equalsIgnoreCase(he.getRequestMethod())) {
+                if ("PUT".equalsIgnoreCase(he.getRequestMethod())) {
+                    requestUri[0] = he.getRequestURI().getPath();
+                    try (InputStream in  = he.getRequestBody()) {
+                        create[0] = new JSONObject(IOUtils.toString(in, StandardCharsets.UTF_8));
+                    }
+                } else if ("POST".equalsIgnoreCase(he.getRequestMethod())) {
+                    requestUri[1] = he.getRequestURI().getPath();
                     try (BufferedReader br = new BufferedReader(new InputStreamReader(he.getRequestBody(), StandardCharsets.UTF_8))) {
                         String line;
                         while ((line = br.readLine()) != null) {
@@ -76,15 +85,17 @@ public class HalyardElasticIndexerTest {
         server.start();
         try {
             assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardElasticIndexer(),
-                new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index"}));
+                new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c", "-d", "customDoc", "-a", "customAttr"}));
         } finally {
             server.stop(0);
         }
-
+        assertEquals("/my_index", requestUri[0]);
+        assertNotNull(create[0].toString(), create[0].getJSONObject("mappings").getJSONObject("customDoc").getJSONObject("properties").getJSONObject("customAttr"));
+        assertEquals("/my_index/customDoc/_bulk", requestUri[1]);
         assertEquals(200, response.size());
         for (int i=0; i<200; i+=2) {
             String hash = new JSONObject(response.get(i)).getJSONObject("index").getString("_id");
-            String literal = "\"" + new JSONObject(response.get(i+1)).getString("l") + "\"";
+            String literal = "\"" + new JSONObject(response.get(i+1)).getString("customAttr") + "\"";
             assertEquals("Invalid hash for literal " + literal, Hex.encodeHexString(HalyardTableUtils.hashKey(literal.getBytes(StandardCharsets.UTF_8))), hash);
         }
     }
