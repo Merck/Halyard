@@ -39,10 +39,7 @@ import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
-import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
@@ -70,8 +67,6 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
      */
     public final static class RDFDecimatingMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, LongWritable> {
 
-        private IRI defaultRdfContext;
-        private boolean overrideRdfContext;
         private final Random random = new Random(0);
         private long counter = 0, next = 0;
         private int decimationFactor;
@@ -80,9 +75,6 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
-            String defCtx = conf.get(DEFAULT_CONTEXT_PROPERTY);
-            defaultRdfContext = defCtx == null ? null : SimpleValueFactory.getInstance().createIRI(defCtx);
             decimationFactor = conf.getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
             for (byte b = 1; b < 6; b++) {
                 context.write(new ImmutableBytesWritable(new byte[] {b}), new LongWritable(1));
@@ -94,11 +86,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
             if (counter++ == next) {
                 next = counter + random.nextInt(decimationFactor);
-                Resource rdfContext;
-                if (overrideRdfContext || (rdfContext = value.getContext()) == null) {
-                    rdfContext = defaultRdfContext;
-                }
-                for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), rdfContext, false, timestamp)) {
+                for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, timestamp)) {
                     context.write(new ImmutableBytesWritable(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength()), new LongWritable(keyValue.getLength()));
                 }
             }
