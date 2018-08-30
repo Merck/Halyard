@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
@@ -49,6 +50,7 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
@@ -129,16 +131,20 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 batch = new StringBuilder();
                 http.setFixedLengthStreamingMode(b.length);
                 http.connect();
-                try (OutputStream post = http.getOutputStream()) {
-                    post.write(b);
+                try {
+                    try (OutputStream post = http.getOutputStream()) {
+                        post.write(b);
+                    }
+                    int response = http.getResponseCode();
+                    String msg = http.getResponseMessage();
+                    if (exports > 0 && response != 200) {
+                        LOG.severe(IOUtils.toString(http.getErrorStream()));
+                        throw new IOException(msg);
+                    }
+                    batches++;
+                } finally {
+                    http.disconnect();
                 }
-                int response = http.getResponseCode();
-                String msg = http.getResponseMessage();
-                http.disconnect();
-                if (exports > 0 && response != 200) {
-                    throw new IOException(msg);
-                }
-                batches++;
             }
         }
 
@@ -222,14 +228,25 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 + "}").getBytes(StandardCharsets.UTF_8);
             http.setFixedLengthStreamingMode(b.length);
             http.connect();
-            try (OutputStream post = http.getOutputStream()) {
-                post.write(b);
-            }
-            int response = http.getResponseCode();
-            String msg = http.getResponseMessage();
-            http.disconnect();
-            if (response != 200) {
-                throw new IOException(msg);
+            try {
+                try (OutputStream post = http.getOutputStream()) {
+                    post.write(b);
+                }
+                int response = http.getResponseCode();
+                String msg = http.getResponseMessage();
+                if (response != 200) {
+                    String resp = IOUtils.toString(http.getErrorStream());
+                    LOG.warning(resp);
+                    boolean alreadyExist = false;
+                    if (response == 400) try {
+                        alreadyExist = new JSONObject(resp).getJSONObject("error").getString("type").contains("exists");
+                    } catch (JSONException | NullPointerException ex) {
+                        //ignore
+                    }
+                    if (!alreadyExist) throw new IOException(msg);
+                }
+            } finally {
+                http.disconnect();
             }
         }
         job.setJarByClass(HalyardElasticIndexer.class);
