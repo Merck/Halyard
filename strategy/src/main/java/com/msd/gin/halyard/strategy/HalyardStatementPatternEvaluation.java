@@ -28,6 +28,7 @@ import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
@@ -51,6 +52,7 @@ import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 final class HalyardStatementPatternEvaluation {
 
     private static final int THREADS = 50;
+    private static final IRI SEARCH_TYPE = SimpleValueFactory.getInstance().createIRI("http://merck.github.io/Halyard/ns#search");
 
     /**
      * A holder for the BindingSetPipe and the iterator over a tree of query sub-parts
@@ -450,15 +452,18 @@ final class HalyardStatementPatternEvaluation {
             @Override
             protected BindingSet convert(Statement st) {
                 QueryBindingSet result = new QueryBindingSet(bindings);
-
                 if (subjVar != null && !subjVar.isConstant() && !result.hasBinding(subjVar.getName())) {
                     result.addBinding(subjVar.getName(), st.getSubject());
                 }
                 if (predVar != null && !predVar.isConstant() && !result.hasBinding(predVar.getName())) {
                     result.addBinding(predVar.getName(), st.getPredicate());
                 }
-                if (objVar != null && !objVar.isConstant() && !result.hasBinding(objVar.getName())) {
-                    result.addBinding(objVar.getName(), st.getObject());
+                if (objVar != null && !objVar.isConstant()) {
+                    Value val = result.getValue(objVar.getName());
+                    // override Halyard search type object literals with real object value from the statement
+                    if (!result.hasBinding(objVar.getName()) || ((val instanceof Literal) && SEARCH_TYPE.equals(((Literal)val).getDatatype()))) {
+                        result.setBinding(objVar.getName(), st.getObject());
+                    }
                 }
                 if (conVar != null && !conVar.isConstant() && !result.hasBinding(conVar.getName())
                         && st.getContext() != null) {
