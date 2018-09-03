@@ -49,6 +49,19 @@ public class HalyardPreSplitTest {
     }
 
     @Test
+    public void testPreSplitOfExisting() throws Exception {
+        File file = File.createTempFile("test_triples", ".nq");
+        try (PrintStream ps = new PrintStream(new FileOutputStream(file))) {
+            ps.println("<http://whatever/NTsubj1> <http://whatever/NTpred1> \"whatever NT value 1\" <http://whatever/ctx1> .");
+            ps.println("<http://whatever/NTsubj2> <http://whatever/NTpred2> \"whatever NT value 2\" <http://whatever/ctx2> .");
+        }
+
+        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "preSplitTable2", true, -1).close();
+
+        assertEquals(-1, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardPreSplit(), new String[]{"-d", "1", "-l",  "0", "-s", file.toURI().toURL().toString(), "-t", "preSplitTable2"}));
+    }
+
+    @Test
     public void testHelp() throws Exception {
         assertEquals(-1, new HalyardPreSplit().run(new String[]{"-h"}));
     }

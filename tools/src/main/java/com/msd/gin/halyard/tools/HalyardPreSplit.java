@@ -46,7 +46,12 @@ import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY;
+import java.util.logging.Level;
 import org.apache.commons.cli.CommandLine;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 
 /**
  * Apache Hadoop MapReduce Tool for calculating pre-splits of an HBase table before a large dataset bulk-load.
@@ -149,6 +154,14 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
     protected int run(CommandLine cmd) throws Exception {
         String source = cmd.getOptionValue('s');
         String target = cmd.getOptionValue('t');
+        try (Connection con = ConnectionFactory.createConnection(getConf())) {
+            try (Admin admin = con.getAdmin()) {
+                if (admin.tableExists(TableName.valueOf(target))) {
+                    LOG.log(Level.WARNING, "Pre-split cannot modify already existing table {0}", target);
+                    return -1;
+                }
+            }
+        }
         getConf().setBoolean(SKIP_INVALID_PROPERTY, cmd.hasOption('i'));
         if (cmd.hasOption('g')) getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
         getConf().setBoolean(OVERRIDE_CONTEXT_PROPERTY, cmd.hasOption('o'));
