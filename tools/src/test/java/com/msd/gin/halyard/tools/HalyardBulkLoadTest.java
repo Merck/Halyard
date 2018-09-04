@@ -39,7 +39,7 @@ import org.junit.Test;
  */
 public class HalyardBulkLoadTest {
 
-    @Test
+//    @Test
     public void testBulkLoad() throws Exception {
         File root = File.createTempFile("test_triples", "");
         root.delete();
@@ -149,7 +149,7 @@ public class HalyardBulkLoadTest {
     public void testDirtyBulkLoad() throws Exception {
         File file = File.createTempFile("test_triples", ".ttl.gz");
         try (PrintStream ps = new PrintStream(new GZIPOutputStream(new FileOutputStream(file)))) {
-            ps.println("<http://whatever> <http://whatever> <http://ivalid:invalid.com>, \"valid1\" .");
+            ps.println("<http://whatever> <http://whatever> <http://invalid:invalid.com>, \"valid1\" .");
             ps.println("<http://whatever> <http://whatever> <http://valid2> .");
         }
         file.deleteOnExit();

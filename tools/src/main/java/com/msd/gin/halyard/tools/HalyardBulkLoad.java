@@ -117,7 +117,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
      */
     public static final String DEFAULT_TIMESTAMP_PROPERTY = "halyard.bulk.timestamp";
 
-    private static void setParsers() {
+    static void setParsers() {
         //this is a workaround to avoid autodetection of .xml files as TriX format and hook on .trix file extension only
         RDFParserRegistry reg = RDFParserRegistry.getInstance();
         Optional<RDFParserFactory> trixPF = reg.get(RDFFormat.TRIX);
@@ -151,9 +151,9 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
             public RDFParser getParser() {
                 return new TurtleParser(){
                     @Override
-                    protected IRI resolveURI(String uriSpec) throws RDFParseException {
+                    protected IRI parseURI() throws IOException, RDFParseException {
                         try {
-                            return super.resolveURI(uriSpec);
+                            return super.parseURI();
                         } catch (RuntimeException e) {
                             if (getParserConfig().get(NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES)) {
                                 throw e;
