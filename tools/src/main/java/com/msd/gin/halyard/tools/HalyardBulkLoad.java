@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import static com.msd.gin.halyard.tools.AbstractHalyardTool.LOG;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -61,6 +62,7 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.rio.ParseErrorListener;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
@@ -73,7 +75,6 @@ import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 import org.eclipse.rdf4j.rio.helpers.NTriplesParserSettings;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.rio.turtle.TurtleParser;
-import org.eclipse.rdf4j.rio.turtle.TurtleParserFactory;
 
 /**
  * Apache Hadoop MapReduce Tool for bulk loading RDF into HBase
@@ -116,6 +117,57 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
      */
     public static final String DEFAULT_TIMESTAMP_PROPERTY = "halyard.bulk.timestamp";
 
+    static {
+        //this is a workaround to avoid autodetection of .xml files as TriX format and hook on .trix file extension only
+        RDFParserRegistry reg = RDFParserRegistry.getInstance();
+        Optional<RDFParserFactory> trixPF = reg.get(RDFFormat.TRIX);
+        if (trixPF.isPresent()) {
+            reg.remove(trixPF.get());
+            final RDFParser trixParser = trixPF.get().getParser();
+            reg.add(new RDFParserFactory() {
+                @Override
+                public RDFFormat getRDFFormat() {
+                    RDFFormat t = RDFFormat.TRIX;
+                    return new RDFFormat(t.getName(), t.getMIMETypes(), t.getCharset(), Arrays.asList("trix"), t.getStandardURI(), t.supportsNamespaces(), t.supportsNamespaces());
+                }
+
+                @Override
+                public RDFParser getParser() {
+                    return trixParser;
+                }
+            });
+        }
+        //this is a workaround to make Turtle parser more resistent to invalid URIs when in dirty mode
+        Optional<RDFParserFactory> turtlePF = reg.get(RDFFormat.TURTLE);
+        if (turtlePF.isPresent()) {
+            reg.remove(turtlePF.get());
+            reg.add(new RDFParserFactory() {
+                @Override
+                public RDFFormat getRDFFormat() {
+                    return RDFFormat.TURTLE;
+                }
+                @Override
+                public RDFParser getParser() {
+                    return new TurtleParser(){
+                        @Override
+                        protected IRI resolveURI(String uriSpec) throws RDFParseException {
+                            try {
+                                return super.resolveURI(uriSpec);
+                            } catch (RuntimeException e) {
+                                if (getParserConfig().get(NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES)) {
+                                    throw e;
+                                } else {
+                                    reportError(e, NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES);
+                                    return null;
+                                }
+                            }
+                        }
+                    };
+                }
+            });
+        }
+    }
+
     /**
      * Mapper class transforming each parsed Statement into set of HBase KeyValues
      */
@@ -141,58 +193,6 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
      * MapReduce FileInputFormat reading and parsing any RDF4J RIO supported RDF format into Statements
      */
     public static final class RioFileInputFormat extends CombineFileInputFormat<LongWritable, Statement> {
-
-        /**
-         * Default constructor of RioFileInputFormat
-         */
-        public RioFileInputFormat() {
-            //this is a workaround to avoid autodetection of .xml files as TriX format and hook on .trix file extension only
-            RDFParserRegistry reg = RDFParserRegistry.getInstance();
-            Optional<RDFParserFactory> trixPF = reg.get(RDFFormat.TRIX);
-            if (trixPF.isPresent()) {
-                reg.remove(trixPF.get());
-                final RDFParser trixParser = trixPF.get().getParser();
-                reg.add(new RDFParserFactory() {
-                    @Override
-                    public RDFFormat getRDFFormat() {
-                        RDFFormat t = RDFFormat.TRIX;
-                        return new RDFFormat(t.getName(), t.getMIMETypes(), t.getCharset(), Arrays.asList("trix"), t.getStandardURI(), t.supportsNamespaces(), t.supportsNamespaces());
-                    }
-
-                    @Override
-                    public RDFParser getParser() {
-                        return trixParser;
-                    }
-                });
-            }
-            Optional<RDFParserFactory> turtlePF = reg.get(RDFFormat.TURTLE);
-            if (turtlePF.isPresent()) {
-                reg.remove(turtlePF.get());
-                reg.add(new RDFParserFactory() {
-                    @Override
-                    public RDFFormat getRDFFormat() {
-                        return RDFFormat.TURTLE;
-                    }
-                    @Override
-                    public RDFParser getParser() {
-                        return new TurtleParser(){
-                            @Override
-                            protected IRI resolveURI(String uriSpec) throws RDFParseException {
-                                try {
-                                    return super.resolveURI(uriSpec);
-                                } catch (RuntimeException e) {
-                                    if (getParserConfig().get(NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES)) {
-                                        throw e;
-                                    } else {
-                                        return null;
-                                    }
-                                }
-                            }
-                        };
-                    }
-                });
-            }
-        }
 
         @Override
         protected boolean isSplitable(JobContext context, Path file) {
@@ -270,7 +270,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     private static final IRI NOP = SimpleValueFactory.getInstance().createIRI(":");
     private static final Statement END_STATEMENT = SimpleValueFactory.getInstance().createStatement(NOP, NOP, NOP);
 
-    private static final class ParserPump extends AbstractRDFHandler implements Closeable, Runnable {
+    private static final class ParserPump extends AbstractRDFHandler implements Closeable, Runnable, ParseErrorListener {
         private final TaskAttemptContext context;
         private final Path paths[];
         private final long size;
@@ -340,6 +340,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                         }
                         parser = Rio.createParser(Rio.getParserFormatForFileName(baseUri).get());
                         parser.setRDFHandler(this);
+                        parser.setParseErrorListener(this);
                         parser.setStopAtFirstError(!skipInvalid);
                         if (skipInvalid) {
                             parser.set(BasicParserSettings.VERIFY_URI_SYNTAX, false);
@@ -396,6 +397,21 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                 in.close();
                 in = null;
             }
+        }
+
+        @Override
+        public void warning(String msg, long lineNo, long colNo) {
+            LOG.warning(msg);
+        }
+
+        @Override
+        public void error(String msg, long lineNo, long colNo) {
+            LOG.severe(msg);
+        }
+
+        @Override
+        public void fatalError(String msg, long lineNo, long colNo) {
+            LOG.severe(msg);
         }
     }
 
