@@ -63,13 +63,17 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
+import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.RDFParserFactory;
 import org.eclipse.rdf4j.rio.RDFParserRegistry;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
+import org.eclipse.rdf4j.rio.helpers.NTriplesParserSettings;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+import org.eclipse.rdf4j.rio.turtle.TurtleParser;
+import org.eclipse.rdf4j.rio.turtle.TurtleParserFactory;
 
 /**
  * Apache Hadoop MapReduce Tool for bulk loading RDF into HBase
@@ -158,6 +162,33 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                     @Override
                     public RDFParser getParser() {
                         return trixParser;
+                    }
+                });
+            }
+            Optional<RDFParserFactory> turtlePF = reg.get(RDFFormat.TURTLE);
+            if (turtlePF.isPresent()) {
+                reg.remove(turtlePF.get());
+                reg.add(new RDFParserFactory() {
+                    @Override
+                    public RDFFormat getRDFFormat() {
+                        return RDFFormat.TURTLE;
+                    }
+                    @Override
+                    public RDFParser getParser() {
+                        return new TurtleParser(){
+                            @Override
+                            protected IRI resolveURI(String uriSpec) throws RDFParseException {
+                                try {
+                                    return super.resolveURI(uriSpec);
+                                } catch (RuntimeException e) {
+                                    if (getParserConfig().get(NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES)) {
+                                        throw e;
+                                    } else {
+                                        return null;
+                                    }
+                                }
+                            }
+                        };
                     }
                 });
             }
