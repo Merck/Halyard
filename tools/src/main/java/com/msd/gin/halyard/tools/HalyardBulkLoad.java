@@ -310,6 +310,11 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                         parser = Rio.createParser(Rio.getParserFormatForFileName(baseUri).get());
                         parser.setRDFHandler(this);
                         parser.setStopAtFirstError(!skipInvalid);
+                        if (skipInvalid) {
+                            parser.set(BasicParserSettings.VERIFY_URI_SYNTAX, false);
+                            parser.set(BasicParserSettings.VERIFY_RELATIVE_URIS, false);
+                            parser.set(BasicParserSettings.VERIFY_LANGUAGE_TAGS, false);
+                        }
                         parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
                         localIn = this.in; //synchronised parameters must be copied to a local variable for use outide of sync block
                         localBaseUri = this.baseUri;

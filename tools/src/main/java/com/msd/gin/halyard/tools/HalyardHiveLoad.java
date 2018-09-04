@@ -96,6 +96,11 @@ public final class HalyardHiveLoad extends AbstractHalyardTool {
             String text = (String)value.get(dataColumnIndex);
             RDFParser parser = Rio.createParser(rdfFormat);
             parser.setStopAtFirstError(!skipInvalid);
+            if (skipInvalid) {
+                parser.set(BasicParserSettings.VERIFY_URI_SYNTAX, false);
+                parser.set(BasicParserSettings.VERIFY_RELATIVE_URIS, false);
+                parser.set(BasicParserSettings.VERIFY_LANGUAGE_TAGS, false);
+            }
             parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
             parser.setRDFHandler(new AbstractRDFHandler() {
                 @Override
