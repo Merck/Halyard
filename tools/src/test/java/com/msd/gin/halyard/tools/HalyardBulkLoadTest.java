@@ -145,6 +145,26 @@ public class HalyardBulkLoadTest {
         htableDir.delete();
     }
 
+    @Test
+    public void testDirtyBulkLoad() throws Exception {
+        File file = File.createTempFile("test_triples", ".ttl.gz");
+        try (PrintStream ps = new PrintStream(new GZIPOutputStream(new FileOutputStream(file)))) {
+            ps.println("<http://whatever> <http://whatever> <http://ivalid:invalid.com>, \"valid1\" .");
+            ps.println("<http://whatever> <http://whatever> <http://valid2> .");
+        }
+        file.deleteOnExit();
+        File htableDir = File.createTempFile("test_htable", "");
+        htableDir.delete();
+
+        //load with override of the graph context, however with no default graph context
+        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkLoad(), new String[]{"-b", "-1", "-i", "-s", file.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable2"}));
+
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable2", false, 0, true, 30, null, null);
+        sail.initialize();
+        assertEquals(2, sail.size());
+        sail.shutDown();
+    }
+
     private void assertCount(SailRepository rep, String query, int count) {
         TupleQuery q = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL, query);
         TupleQueryResult res = q.evaluate();

@@ -117,7 +117,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
      */
     public static final String DEFAULT_TIMESTAMP_PROPERTY = "halyard.bulk.timestamp";
 
-    static {
+    private static void setParsers() {
         //this is a workaround to avoid autodetection of .xml files as TriX format and hook on .trix file extension only
         RDFParserRegistry reg = RDFParserRegistry.getInstance();
         Optional<RDFParserFactory> trixPF = reg.get(RDFFormat.TRIX);
@@ -141,31 +141,31 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         Optional<RDFParserFactory> turtlePF = reg.get(RDFFormat.TURTLE);
         if (turtlePF.isPresent()) {
             reg.remove(turtlePF.get());
-            reg.add(new RDFParserFactory() {
-                @Override
-                public RDFFormat getRDFFormat() {
-                    return RDFFormat.TURTLE;
-                }
-                @Override
-                public RDFParser getParser() {
-                    return new TurtleParser(){
-                        @Override
-                        protected IRI resolveURI(String uriSpec) throws RDFParseException {
-                            try {
-                                return super.resolveURI(uriSpec);
-                            } catch (RuntimeException e) {
-                                if (getParserConfig().get(NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES)) {
-                                    throw e;
-                                } else {
-                                    reportError(e, NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES);
-                                    return null;
-                                }
+        }
+        reg.add(new RDFParserFactory() {
+            @Override
+            public RDFFormat getRDFFormat() {
+                return RDFFormat.TURTLE;
+            }
+            @Override
+            public RDFParser getParser() {
+                return new TurtleParser(){
+                    @Override
+                    protected IRI resolveURI(String uriSpec) throws RDFParseException {
+                        try {
+                            return super.resolveURI(uriSpec);
+                        } catch (RuntimeException e) {
+                            if (getParserConfig().get(NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES)) {
+                                throw e;
+                            } else {
+                                reportError(e, NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES);
+                                return null;
                             }
                         }
-                    };
-                }
-            });
-        }
+                    }
+                };
+            }
+        });
     }
 
     /**
@@ -193,6 +193,10 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
      * MapReduce FileInputFormat reading and parsing any RDF4J RIO supported RDF format into Statements
      */
     public static final class RioFileInputFormat extends CombineFileInputFormat<LongWritable, Statement> {
+
+        public RioFileInputFormat() {
+            setParsers();
+        }
 
         @Override
         protected boolean isSplitable(JobContext context, Path file) {
@@ -314,6 +318,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
         @Override
         public void run() {
+            setParsers();
             try {
                 Configuration conf = context.getConfiguration();
                 for (Path file : paths) try {
