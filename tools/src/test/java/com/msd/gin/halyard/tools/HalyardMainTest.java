@@ -105,4 +105,9 @@ public class HalyardMainTest {
     public void testBulkdelete() throws Exception {
         HalyardMain.main(new String[]{"bulkdelete"});
     }
+
+    @Test(expected = MissingOptionException.class)
+    public void testProfile() throws Exception {
+        HalyardMain.main(new String[]{"profile"});
+    }
 }

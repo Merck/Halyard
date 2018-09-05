@@ -105,6 +105,9 @@ bulkexport Halyard Bulk Export is a MapReduce application that executes multiple
            distribute the query evaluation across the executed parallel forks of the same query.
 bulkdelete Halyard Bulk Delete is a MapReduce application that effectively deletes large set of
            triples or whole named graphs, based on specified statement pattern and/or graph context.
+profile    Halyard Profile is a command-line tool designed to profile SPARQL query performance
+           within the actual Halyard environment. Actually it is limited to the statical analysis
+           only.
 
 genericHadoopOptions are:
 ----------------------------------------------------------------------------------------------------
@@ -568,6 +571,19 @@ whole named graphs, based on specified statement pattern and/or graph context.
                                        context of triples outside of any named graph
 Example: halyard bulkdelete -t my_data -f bulkdelete_temp1 -s <http://whatever/mysubj> -c
 <http://whatever/myctx1> -c <http://whatever/myctx2>
+```
+
+### Halyard Profile
+```
+$ ./halyard profile -h
+usage: halyard profile [-h] [-v] -s <dataset_table> -q <sparql_query>
+Halyard Profile is a command-line tool designed to profile SPARQL query performance within the
+actual Halyard environment. Actually it is limited to the statical analysis only.
+ -h,--help                             Prints this help
+ -v,--version                          Prints version
+ -s,--source-dataset <dataset_table>   Source HBase table with Halyard RDF store
+ -q,--query <sparql_query>             SPARQL query to profile
+Example: halyard profile -s my_dataset -q 'select * where {?s owl:sameAs ?o}'
 ```
 
 ### RDF4J Web Applications

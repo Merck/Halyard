@@ -134,7 +134,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     final boolean create;
     final boolean pushStrategy;
     final int splitBits;
-    final EvaluationStatistics statistics;
+    protected final EvaluationStatistics statistics;
     final int evaluationTimeout;
     private boolean readOnly = false;
     private long readOnlyTimestamp = -1;
@@ -409,7 +409,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         LOG.log(Level.FINE, "Evaluated TupleExpr after optimization:\n{0}", tupleExpr);
         try {
         		//evaluate the expression against the TripleSource according to the EvaluationStrategy.
-            CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = strategy.evaluate(tupleExpr, EmptyBindingSet.getInstance());
+            CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = evaluateInternal(strategy, tupleExpr);
             return evaluationTimeout <= 0 ? iter : new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter, 1000l * evaluationTimeout) {
                 @Override
                 protected void throwInterruptedException() throws QueryEvaluationException {
@@ -419,6 +419,10 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         } catch (QueryEvaluationException ex) {
             throw new SailException(ex);
         }
+    }
+
+    protected CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluateInternal(EvaluationStrategy strategy, TupleExpr tupleExpr) {
+        return strategy.evaluate(tupleExpr, EmptyBindingSet.getInstance());
     }
 
     @Override
