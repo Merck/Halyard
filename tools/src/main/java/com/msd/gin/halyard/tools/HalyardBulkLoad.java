@@ -58,6 +58,7 @@ import org.apache.hadoop.mapreduce.lib.input.CombineFileSplit;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
@@ -160,6 +161,19 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                             } else {
                                 reportError(e, NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES);
                                 return null;
+                            }
+                        }
+                    }
+                    @Override
+                    protected Literal createLiteral(String label, String lang, IRI datatype, long lineNo, long columnNo) throws RDFParseException {
+                        try {
+                            return super.createLiteral(label, lang, datatype, lineNo, columnNo);
+                        } catch (RuntimeException e) {
+                            if (getParserConfig().get(NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES)) {
+                                throw e;
+                            } else {
+                                reportError(e, NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES);
+                                return super.createLiteral(label, null, null, lineNo, columnNo);
                             }
                         }
                     }
