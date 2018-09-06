@@ -173,9 +173,11 @@ public class HalyardBulkUpdateTest {
         File queries = File.createTempFile("test_time_update_queries", "");
         queries.delete();
         queries.mkdir();
-        File q = new File(queries, "test_time_update_query.sparql");
-        q.deleteOnExit();
-        try (PrintStream qs = new PrintStream(q)) {
+        File q1 = new File(queries, "test_time_update_query_delete.sparql");
+        File q2 = new File(queries, "test_time_update_query_insert.sparql");
+        q1.deleteOnExit();
+        q2.deleteOnExit();
+        try (PrintStream qs = new PrintStream(q1)) {
             qs.println( "PREFIX : <http://whatever/> " +
                         "PREFIX halyard: <http://merck.github.io/Halyard/ns#> " +
                         "DELETE {" +
@@ -183,6 +185,20 @@ public class HalyardBulkUpdateTest {
                         "    ?deleteSubj ?deletePred ?deleteObj ." +
                         "  }" +
                         "}" +
+                        "WHERE {" +
+                        "  ?change :context   ?targetGraph ;" +
+                        "          :timestamp ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE ." +
+                        "  OPTIONAL {" +
+                        "    ?change :deleteGraph ?delGr ." +
+                        "    GRAPH ?delGr {" +
+                        "      ?deleteSubj ?deletePred ?deleteObj ." +
+                        "    }" +
+                        "  }" +
+                        "}");
+        }
+        try (PrintStream qs = new PrintStream(q2)) {
+            qs.println( "PREFIX : <http://whatever/> " +
+                        "PREFIX halyard: <http://merck.github.io/Halyard/ns#> " +
                         "INSERT {" +
                         "  GRAPH ?targetGraph {" +
                         "    ?insertSubj ?insertPred ?insertObj ." +
@@ -191,13 +207,7 @@ public class HalyardBulkUpdateTest {
                         "WHERE {" +
                         "  ?change :context   ?targetGraph ;" +
                         "          :timestamp ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE ." +
-                        "  FILTER (halyard:forkAndFilterBy(3, ?change))" +
-                        "  OPTIONAL {" +
-                        "    ?change :deleteGraph ?delGr ." +
-                        "    GRAPH ?delGr {" +
-                        "      ?deleteSubj ?deletePred ?deleteObj ." +
-                        "    }" +
-                        "  }" +
+                        "  FILTER (halyard:forkAndFilterBy(2, ?change))" +
                         "  OPTIONAL {" +
                         "    ?change :insertGraph ?insGr ." +
                         "    GRAPH ?insGr {" +
@@ -212,7 +222,8 @@ public class HalyardBulkUpdateTest {
         //execute BulkUpdate
         assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", "timebulkupdatetesttable"}));
 
-        q.delete();
+        q1.delete();
+        q2.delete();
         queries.delete();
 
         //read transformed data into model
