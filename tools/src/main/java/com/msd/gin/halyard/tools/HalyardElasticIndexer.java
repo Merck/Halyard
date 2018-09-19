@@ -50,7 +50,6 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
@@ -240,7 +239,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                     boolean alreadyExist = false;
                     if (response == 400) try {
                         alreadyExist = new JSONObject(resp).getJSONObject("error").getString("type").contains("exists");
-                    } catch (JSONException | NullPointerException ex) {
+                    } catch (Exception ex) {
                         //ignore
                     }
                     if (!alreadyExist) throw new IOException(msg);
