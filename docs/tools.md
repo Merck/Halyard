@@ -74,10 +74,6 @@ presplit   Halyard Presplit is a MapReduce application designed to estimate opti
            Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.
 bulkload   Halyard Bulk Load is a MapReduce application designed to efficiently load RDF data from
            Hadoop Filesystem (HDFS) into HBase in the form of a Halyard dataset.
-hiveload   Halyard Hive Load is a MapReduce application designed to efficiently load RDF data from
-           an Apache Hive table into HBase in a form of a Halyard dataset. Its functionality is
-           similar to the Halyard Bulk Load, however, instead of parsing files from HDFS it parses
-           the content of all cells from a specified Hive table and column.
 stats      Halyard Stats is a MapReduce application that calculates dataset statistics and stores
            them in the named graph within the dataset or exports them into a file. The generated
            statistics are described by the VoID vocabulary, its extensions, and the SPARQL 1.1
@@ -201,57 +197,6 @@ Hadoop, including:
 * LZO (.lzo)
 * Snappy (.snappy)
 Example: halyard bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t mydataset
-```
-
-### Halyard Hive Load
-```
-$ ./halyard hiveload -h
-usage: halyard hiveload [-h] [-v] -s <hive_table> -c <column_index> -m <mime_type> -u <base_uri> -w
-       <shared_folder> -t <dataset_table> [-i] [-d] [-r] [-b <bits>] [-g <graph_context>] [-o] [-e
-       <timestamp>]
-Halyard Hive Load is a MapReduce application designed to efficiently load RDF data from an Apache
-Hive table into HBase in a form of a Halyard dataset. Its functionality is similar to the Halyard
-Bulk Load, however, instead of parsing files from HDFS it parses the content of all cells from a
-specified Hive table and column.
- -h,--help                            Prints this help
- -v,--version                         Prints version
- -s,--source <hive_table>             Source Hive table with RDF fragments
- -c,--column-index <column_index>     Index of column with RDF fragments within the source Hive
-                                      table
- -m,--mime-type <mime_type>           MIME-Type of the RDF fragments
- -u,--base-uri <base_uri>             Base URI for the RDF fragments
- -w,--work-dir <shared_folder>        Unique non-existent folder within shared filesystem to server
-                                      as a working directory for the temporary HBase files, the
-                                      files are moved to their final HBase locations during the last
-                                      stage of the load process
- -t,--target <dataset_table>          Target HBase table with Halyard RDF store
- -i,--skip-invalid                    Optionally skip invalid source files and parsing errors
- -d,--verify-data-types               Optionally verify RDF data type values while parsing
- -r,--truncate-target                 Optionally truncate target table just before the loading the
-                                      new data
- -b,--pre-split-bits <bits>           Optionally specify bit depth of region pre-splits for a case
-                                      when target table does not exist (default is 3)
- -g,--graph-context <graph_context>   Optionally specify default target named graph context
- -o,--graph-context-override          Optionally override named graph context also for loaded quads
- -e,--target-timestamp <timestamp>    Optionally specify timestamp of all loaded records (defaul is
-                                      actual time of the operation)
-Halyard Hive Load consumes RDF data files of various formats supported by RDF4J RIO, similarly to
-Halyard Bulk Load, however it does not support compression. The following RDF4J RIO MIME types are
-supported:
-* N-Triples (application/n-triples, text/plain)
-* RDF/XML (application/rdf+xml, application/xml, text/xml)
-* Turtle (text/turtle, application/x-turtle)
-* N3 (text/n3, text/rdf+n3)
-* RDF/JSON (application/rdf+json)
-* TriG (application/trig, application/x-trig)
-* N-Quads (application/n-quads, text/x-nquads, text/nquads)
-* BinaryRDF (application/x-binary-rdf)
-* JSON (application/json)
-* ND-JSON-LD (application/x-nd-json-ld)
-* TriX (application/trix)
-* JSON-LD (application/ld+json)
-Example: halyard hiveload -s myHiveTable -c 3 -m 'application/ld+json' -u 'http://my_base_uri/' -w
-hdfs:///my_tmp_workdir -t mydataset
 ```
 
 ### Halyard Stats

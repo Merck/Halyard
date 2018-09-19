@@ -67,11 +67,6 @@ public class HalyardMainTest {
     }
 
     @Test(expected = MissingOptionException.class)
-    public void testHiveload() throws Exception {
-        HalyardMain.main(new String[]{"hiveload"});
-    }
-
-    @Test(expected = MissingOptionException.class)
     public void testStats() throws Exception {
         HalyardMain.main(new String[]{"stats"});
     }

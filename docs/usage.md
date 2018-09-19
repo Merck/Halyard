@@ -80,21 +80,6 @@ INFO: Bulk Load Completed..
 
 Note: Before Bulk Load of very large datasets into a new HBase table it is recommended to use the Halyard PreSplit. Halyard PreSplit calculates the HBase table region splits and creates the HBase table optimized for the following Bulk Load process. 
 
-### With Halyard Hive Load
-
-```
-> ./halyard hiveload -m 'application/n-triples' -c 3 -s my_hive_table -w /my_hdfs_temp_path -t testRepo -u 'http://my.base/'
-impl.YarnClientImpl: Submitted application application_1514793734614_41673
-mapreduce.Job: The url to track the job: http://my_app_master/proxy/application_1514793734614_41673/
-mapreduce.Job:  map 0% reduce 0%
-mapreduce.Job:  map 100% reduce 0%
-mapreduce.Job:  map 100% reduce 100%
-mapreduce.Job: Job job_1514793734614_41673 completed successfully
-INFO: Hive Load Completed..
-```
-
-Note: the above listing skips much debugging information from the MapReduce execution.
-
 ### With RDF4J Console
 
 ```
