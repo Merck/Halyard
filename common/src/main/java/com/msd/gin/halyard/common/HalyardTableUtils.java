@@ -23,6 +23,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.TreeSet;
 import org.apache.hadoop.conf.Configuration;
@@ -64,6 +65,7 @@ public final class HalyardTableUtils {
     private static final byte[] EMPTY = new byte[0];
     private static final byte[] CF_NAME = "e".getBytes(UTF8);
     private static final String MD_ALGORITHM = "SHA1";
+    private static final Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
 
     /*
      * Triples/ quads are stored in multiple regions as different permutations.
@@ -469,6 +471,10 @@ public final class HalyardTableUtils {
 
     public static byte[] hashKey(Value v) {
         return v == null ? null : hashKey(NTriplesUtil.toNTriplesString(v).getBytes(UTF8));
+    }
+
+    public static String encode(byte b[]) {
+        return ENC.encodeToString(b);
     }
 
     private static Scan scan(byte prefix, byte[] key1) {

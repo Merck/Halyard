@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.HalyardTableUtils;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -32,6 +33,7 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SD;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.QueryLanguage;
@@ -361,17 +363,20 @@ public class HBaseSailTest {
         TupleExpr q1 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s a ?o}", "http://whatever/").getTupleExpr();
         TupleExpr q2 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {graph <http://whatevercontext> {?s a ?o}}", "http://whatever/").getTupleExpr();
         TupleExpr q3 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s <http://whatever/> ?o}", "http://whatever/").getTupleExpr();
+        TupleExpr q4 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s ?p \"whatever\"^^<" + HALYARD.SEARCH_TYPE.stringValue() + ">}", "http://whatever/").getTupleExpr();
         assertEquals(100.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q2), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);
+        assertEquals(1.0, sail.statistics.getCardinality(q4), 0.01);
         sail.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
-        sail.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_v0EPmHVxqhkyM3Yh_Wfu7gMOZGU"), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
+        sail.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(RDF.TYPE))), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
         sail.addStatement(f.createIRI("http://whatevercontext"), VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
-        sail.addStatement(f.createIRI("http://whatevercontext_property_v0EPmHVxqhkyM3Yh_Wfu7gMOZGU"), VOID.TRIPLES, f.createLiteral(20l), HALYARD.STATS_GRAPH_CONTEXT);
+        sail.addStatement(f.createIRI("http://whatevercontext_property_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(RDF.TYPE))), VOID.TRIPLES, f.createLiteral(20l), HALYARD.STATS_GRAPH_CONTEXT);
         sail.commit();
         assertEquals(5000.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(20.0, sail.statistics.getCardinality(q2), 0.01);
         assertEquals(1000.0, sail.statistics.getCardinality(q3), 0.01);
+        assertEquals(1.0, sail.statistics.getCardinality(q4), 0.01);
         sail.shutDown();
     }
 }

@@ -33,7 +33,6 @@ import java.nio.charset.Charset;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -325,8 +324,6 @@ public final class HalyardStats extends AbstractHalyardTool {
 
     static final class StatsReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
 
-        final static Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
-
         OutputStream out;
         RDFWriter writer;
         Map<String, Boolean> graphs;
@@ -412,7 +409,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                 }
                 if (partitionId.length > 0) {
                     IRI pred = SVF.createIRI(predicate);
-                    IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(partitionId)));
+                    IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(partitionId)));
                     writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);
                     writeStatement(subset, RDF.TYPE, VOID.DATASET);
                     writeStatement(subset, pred, NTriplesUtil.parseValue(new String(partitionId, UTF8), SVF));

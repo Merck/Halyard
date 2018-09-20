@@ -24,7 +24,6 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -97,7 +96,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
@@ -217,7 +215,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                         if (partitionVar == null || !partitionVar.hasValue()) {
                             return total;
                         } else {
-                            return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + ENC.encodeToString(HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(partitionVar.getValue()).getBytes(StandardCharsets.UTF_8)))), DEFAULT_THRESHOLD);
+                            return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(partitionVar.getValue()))), DEFAULT_THRESHOLD);
                         }
                     }
 
