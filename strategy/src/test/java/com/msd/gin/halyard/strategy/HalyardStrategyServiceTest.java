@@ -30,9 +30,11 @@ import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.EmptySet;
 import org.eclipse.rdf4j.query.algebra.Service;
+import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
+import org.eclipse.rdf4j.query.impl.MapBindingSet;
 import org.junit.Test;
 
 /**
@@ -73,6 +75,20 @@ public class HalyardStrategyServiceTest {
     public void testNoServiceEvaluateFail() {
         CloseableIteration<BindingSet, QueryEvaluationException> bindings = new EmptyIteration<>();
         new HalyardEvaluationStrategy(getTripleSource(), null, null, 0).evaluate(new Service(null, new EmptySet(), "", null, null, false), null, bindings);
+    }
+
+    @Test
+    public void testServiceEvaluate2() {
+        CloseableIteration<BindingSet, QueryEvaluationException> bindings = new EmptyIteration<>();
+        try (CloseableIteration<BindingSet, QueryEvaluationException> res = new HalyardEvaluationStrategy(getTripleSource(), null, getFederatedServiceResolver(bindings), 0)
+            .evaluate(new Service(new Var("service", SimpleValueFactory.getInstance().createLiteral("http://whatever")), new EmptySet(), "", null, null, true), new MapBindingSet())) {
+            assertTrue(res.hasNext());
+            BindingSet resB = res.next();
+            Value val = resB.getValue("service");
+            assertNotNull(val);
+            assertEquals("http://whatever", val.stringValue());
+            assertFalse(res.hasNext());
+        }
     }
 
     @Test
