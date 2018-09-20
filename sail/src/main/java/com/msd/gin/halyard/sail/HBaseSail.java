@@ -27,7 +27,6 @@ import java.net.URL;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -128,7 +127,6 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
     private static final Logger LOG = Logger.getLogger(HBaseSail.class.getName());
     private static final long STATUS_CACHING_TIMEOUT = 60000l;
-    private static final Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
     private static final long DEFAULT_THRESHOLD = 1000l;
     private static final int ELASTIC_RESULT_SIZE = 10000;
 
