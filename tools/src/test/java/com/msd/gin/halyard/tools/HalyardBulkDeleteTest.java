@@ -58,7 +58,25 @@ public class HalyardBulkDeleteTest {
 
         assertEquals(0, ToolRunner.run(conf, new HalyardBulkDelete(), new String[]{ "-t", TABLE, "-o", "<http://whatever/obj0>", "-c", "NONE", "-c", "<http://whatever/ctx1>", "-f", htableDir.toURI().toURL().toString()}));
 
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
+        assertCount(23);
+
+        htableDir = File.createTempFile("test_htable", "");
+        htableDir.delete();
+
+        assertEquals(0, ToolRunner.run(conf, new HalyardBulkDelete(), new String[]{ "-t", TABLE, "-s", "<http://whatever/subj2>", "-f", htableDir.toURI().toURL().toString()}));
+
+        assertCount(18);
+
+        htableDir = File.createTempFile("test_htable", "");
+        htableDir.delete();
+
+        assertEquals(0, ToolRunner.run(conf, new HalyardBulkDelete(), new String[]{ "-t", TABLE, "-p", "<http://whatever/pred>", "-f", htableDir.toURI().toURL().toString()}));
+
+        assertCount(0);
+    }
+
+    private static void assertCount(int expected) throws Exception {
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
         sail.initialize();
         try {
             int count;
@@ -69,7 +87,7 @@ public class HalyardBulkDeleteTest {
                     count++;
                 }
             }
-            Assert.assertEquals(23, count);
+            Assert.assertEquals(expected, count);
         } finally {
             sail.shutDown();
         }
