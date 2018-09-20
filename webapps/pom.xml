@@ -74,8 +74,15 @@
                                     <zipfileset dir="../sdk/target" includes="rdf4j-repository-api-${rdf4j.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="${project.build.directory}" includes="json-20140107.jar" prefix="WEB-INF/lib"/>
                                 </zip>
+                                <unzip src="${project.build.directory}/rdf4j-workbench.war" dest="target/rdf4j-workbench-patch" overwrite="true">
+                                    <patternset>
+                                        <include name="transformations/create.xsl"/>
+                                    </patternset>
+                                </unzip>
+                                <replace file="target/rdf4j-workbench-patch/transformations/create.xsl" token="&lt;select id=&quot;type&quot; name=&quot;type&quot;&gt;" value="&lt;select id=&quot;type&quot; name=&quot;type&quot;&gt;&lt;option value=&quot;hbase&quot;&gt;Halyard HBase Store&lt;/option&gt;"/>
                                 <zip destfile="${project.build.directory}/rdf4j-workbench.war" update="true">
                                     <fileset dir="src/main/patches/rdf4j-workbench"/>
+                                    <fileset dir="target/rdf4j-workbench-patch"/>
                                     <zipfileset dir="../common/target" includes="halyard-common-${project.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="../strategy/target" includes="halyard-strategy-${project.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="../sail/target" includes="halyard-sail-${project.version}.jar" prefix="WEB-INF/lib"/>
