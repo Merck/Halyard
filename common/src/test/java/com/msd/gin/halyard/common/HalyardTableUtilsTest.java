@@ -50,12 +50,18 @@ public class HalyardTableUtilsTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, 0);
+        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, -1);
     }
 
     @AfterClass
     public static void teardown() throws Exception {
         table.close();
+    }
+
+    @Test
+    public void testGetTheSameTableAgain() throws Exception {
+        table.close();
+        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, 1);
     }
 
     @Test
@@ -148,5 +154,20 @@ public class HalyardTableUtilsTest {
     @Test(expected = IllegalArgumentException.class)
     public void testTooBigSplitBits() {
         HalyardTableUtils.calculateSplits(17);
+    }
+
+    @Test
+    public void testToKeyValuesDelete() throws Exception {
+        IRI res = SimpleValueFactory.getInstance().createIRI("http://testiri");
+        KeyValue kvs[] = HalyardTableUtils.toKeyValues(res, res, res, res, true, 0);
+        assertEquals(6, kvs.length);
+        for (KeyValue kv : kvs) {
+            assertEquals(KeyValue.Type.DeleteColumn, KeyValue.Type.codeToType(kv.getTypeByte()));
+        }
+    }
+
+    @Test
+    public void testEncode() {
+        assertEquals("AQIDBAU", HalyardTableUtils.encode(new byte[]{1, 2, 3, 4, 5}));
     }
 }
