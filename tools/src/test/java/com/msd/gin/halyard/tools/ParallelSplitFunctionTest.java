@@ -43,7 +43,7 @@ public class ParallelSplitFunctionTest {
 
     @Test(expected = ValueExprEvaluationException.class)
     public void testEvaluateNullArgs() {
-        new ParallelSplitFunction(1).evaluate(SVF, null);
+        new ParallelSplitFunction(1).evaluate(SVF, SVF.createLiteral(10), null);
     }
 
     @Test(expected = ValueExprEvaluationException.class)
@@ -109,6 +109,11 @@ public class ParallelSplitFunctionTest {
     @Test(expected = IllegalArgumentException.class)
     public void testGetNumberOfForksDoubleFunction() {
         ParallelSplitFunction.getNumberOfForksFromFunctionArgument("select * where {?s ?p ?o. filter <" + ParallelSplitFunction.PARALLEL_SPLIT_FUNCTION_URI + ">(5, ?s) filter <" + ParallelSplitFunction.PARALLEL_SPLIT_FUNCTION_URI + ">(3, ?s)}", false, 0);
+    }
+
+    @Test
+    public void testGetNumberOfForksDoubleMatchingFunction() {
+        assertEquals(5, ParallelSplitFunction.getNumberOfForksFromFunctionArgument("select * where {?s ?p ?o. filter <" + ParallelSplitFunction.PARALLEL_SPLIT_FUNCTION_URI + ">(5, ?s) filter <" + ParallelSplitFunction.PARALLEL_SPLIT_FUNCTION_URI + ">(5, ?s) filter <http://whatever/function>()}", false, 0));
     }
 
     @Test
