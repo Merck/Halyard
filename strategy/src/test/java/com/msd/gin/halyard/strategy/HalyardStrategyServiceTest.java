@@ -69,6 +69,18 @@ public class HalyardStrategyServiceTest {
         assertSame(bindings, new HalyardEvaluationStrategy(getTripleSource(), null, getFederatedServiceResolver(null), 0).evaluate(new Service(null, new EmptySet(), "", null, null, true), null, bindings));
     }
 
+    @Test (expected = QueryEvaluationException.class)
+    public void testNoServiceEvaluateFail() {
+        CloseableIteration<BindingSet, QueryEvaluationException> bindings = new EmptyIteration<>();
+        new HalyardEvaluationStrategy(getTripleSource(), null, null, 0).evaluate(new Service(null, new EmptySet(), "", null, null, false), null, bindings);
+    }
+
+    @Test
+    public void testNoServiceEvaluateFailSilent() {
+        CloseableIteration<BindingSet, QueryEvaluationException> bindings = new EmptyIteration<>();
+        assertSame(bindings, new HalyardEvaluationStrategy(getTripleSource(), null, null, 0).evaluate(new Service(null, new EmptySet(), "", null, null, true), null, bindings));
+    }
+
     private TripleSource getTripleSource() {
         return new TripleSource() {
             @Override
