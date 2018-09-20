@@ -78,6 +78,18 @@ public class HalyardProfileTest {
         runProfile("-s", "profile", "-q", "select * where {{?s <http://whatever/pred> ?o, ?o2} union {?s ?p ?o3. optional {?s ?p2 ?o4 }}}");
     }
 
+    @Test
+    public void testProfileGraph() throws Exception {
+        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "profile", true, -1);
+        runProfile("-s", "profile", "-q", "construct {?s ?o ?o2} where {{?s <http://whatever/pred> ?o, ?o2} union {?s ?p ?o3. optional {?s ?p2 ?o4 }}}");
+    }
+
+    @Test
+    public void testProfileBoolean() throws Exception {
+        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "profile", true, -1);
+        runProfile("-s", "profile", "-q", "ask where {{?s <http://whatever/pred> ?o, ?o2} union {?s ?p ?o3. optional {?s ?p2 ?o4 }}}");
+    }
+
     private static int runProfile(String ... args) throws Exception {
         return ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardProfile(), args);
     }
