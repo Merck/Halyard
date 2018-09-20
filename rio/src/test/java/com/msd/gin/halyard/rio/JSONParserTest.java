@@ -92,7 +92,10 @@ public class JSONParserTest {
 
     @Test
     public void testParse() throws Exception {
-        new JSONParser().parse(new StringReader("{}"), "http://test/");
+        JSONParser p = new JSONParser();
+        p.set(JSONParser.GENERATE_DATA, false);
+        p.set(JSONParser.GENERATE_ONTOLOGY, false);
+        p.parse(new StringReader("{}"), "http://test/");
     }
 
     @Test (expected = RuntimeException.class)
