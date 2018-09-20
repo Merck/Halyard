@@ -24,6 +24,7 @@ import org.eclipse.rdf4j.repository.config.RepositoryConfigSchema;
 import org.eclipse.rdf4j.repository.sail.config.SailRepositorySchema;
 import org.eclipse.rdf4j.sail.config.AbstractSailImplConfig;
 import org.eclipse.rdf4j.sail.config.SailConfigException;
+import org.eclipse.rdf4j.sail.config.SailConfigSchema;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -118,8 +119,6 @@ public class HBaseSailConfigTest {
     @Test
     public void testParseEmpty() throws Exception {
         TreeModel g = new TreeModel();
-        new AbstractSailImplConfig() {
-        }.export(g);
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.parse(g, null);
         assertNull(cfg.getTablespace());
@@ -130,16 +129,48 @@ public class HBaseSailConfigTest {
     }
 
     @Test
+    public void testEmptyTableSpace() throws Exception {
+        TreeModel g = new TreeModel();
+        IRI node = SimpleValueFactory.getInstance().createIRI("http://node");
+        g.add(node, HALYARD.TABLE_NAME_PROPERTY, SimpleValueFactory.getInstance().createLiteral(""));
+        HBaseSailConfig cfg = new HBaseSailConfig();
+        cfg.parse(g, null);
+        assertNull(cfg.getTablespace());
+    }
+
+    @Test
     public void testDefaultTableSpaceFromRepositoryId() throws Exception {
         TreeModel g = new TreeModel();
         IRI node = SimpleValueFactory.getInstance().createIRI("http://node");
         Literal id =  SimpleValueFactory.getInstance().createLiteral("testId");
         g.add(node, SailRepositorySchema.SAILIMPL, node);
+        g.add(node, SailConfigSchema.DELEGATE, node);
         g.add(node, RepositoryConfigSchema.REPOSITORYIMPL, node);
         g.add(node, RepositoryConfigSchema.REPOSITORYID, id);
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.parse(g, null);
         assertEquals(id.stringValue(), cfg.getTablespace());
+    }
+
+    @Test
+    public void testDefaultTableSpaceFromMissingRepositoryId() throws Exception {
+        TreeModel g = new TreeModel();
+        IRI node = SimpleValueFactory.getInstance().createIRI("http://node");
+        g.add(node, SailRepositorySchema.SAILIMPL, node);
+        g.add(node, RepositoryConfigSchema.REPOSITORYIMPL, node);
+        HBaseSailConfig cfg = new HBaseSailConfig();
+        cfg.parse(g, null);
+        assertNull(cfg.getTablespace());
+    }
+
+    @Test
+    public void testDefaultTableSpaceFromMissingRepoImpl() throws Exception {
+        TreeModel g = new TreeModel();
+        IRI node = SimpleValueFactory.getInstance().createIRI("http://node");
+        g.add(node, SailRepositorySchema.SAILIMPL, node);
+        HBaseSailConfig cfg = new HBaseSailConfig();
+        cfg.parse(g, null);
+        assertNull(cfg.getTablespace());
     }
 
     @Test(expected = SailConfigException.class)
