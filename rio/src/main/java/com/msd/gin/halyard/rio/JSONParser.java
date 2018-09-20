@@ -94,8 +94,12 @@ public final class JSONParser implements RDFParser {
     private IRI baseURI;
 
     public JSONParser() {
+        this(MD_ALGORITHM);
+    }
+
+    JSONParser(String mdAlgorithm) {
         try {
-            md = MessageDigest.getInstance(MD_ALGORITHM);
+            md = MessageDigest.getInstance(mdAlgorithm);
         } catch (NoSuchAlgorithmException ex) {
             throw new RuntimeException(ex);
         }

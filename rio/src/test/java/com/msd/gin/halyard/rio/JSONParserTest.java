@@ -63,7 +63,6 @@ public class JSONParserTest {
         p.setDatatypeHandling(RDFParser.DatatypeHandling.NORMALIZE);
         p.setParseErrorListener(null);
         p.setParseLocationListener(null);
-
     }
 
     @Test
@@ -91,4 +90,13 @@ public class JSONParserTest {
         parser.parse(new StringReader("{}{}"), "http://test/");
     }
 
+    @Test
+    public void testParse() throws Exception {
+        new JSONParser().parse(new StringReader("{}"), "http://test/");
+    }
+
+    @Test (expected = RuntimeException.class)
+    public void testInvalidMDAlgorithm() {
+        new JSONParser("invalid");
+    }
 }
