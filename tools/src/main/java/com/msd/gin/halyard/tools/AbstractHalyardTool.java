@@ -101,36 +101,6 @@ public abstract class AbstractHalyardTool implements Tool {
         }
     }
 
-    protected final String addTmpFile(String file) throws IOException {
-        String tmpFiles = conf.get("tmpfiles");
-        Path path = resolveFile(file);
-        conf.set("tmpfiles", tmpFiles == null ? path.toString() : tmpFiles + "," + path.toString());
-        return path.getName();
-    }
-
-    protected final Path resolveFile(String file) throws IOException {
-        URI pathURI;
-        try {
-            pathURI = new URI(file);
-        } catch (URISyntaxException e) {
-            throw new IllegalArgumentException(e);
-        }
-        Path path = new Path(pathURI);
-        FileSystem localFs = FileSystem.getLocal(conf);
-        if (pathURI.getScheme() == null) {
-            if (!localFs.exists(path)) {
-                throw new FileNotFoundException("File " + file + " does not exist.");
-            }
-            return path.makeQualified(localFs.getUri(), localFs.getWorkingDirectory());
-        } else {
-            FileSystem fs = path.getFileSystem(conf);
-            if (!fs.exists(path)) {
-                throw new FileNotFoundException("File " + file + " does not exist.");
-            }
-            return path.makeQualified(fs.getUri(), fs.getWorkingDirectory());
-        }
-    }
-
     protected abstract int run(CommandLine cmd) throws Exception;
 
     static String getVersion() throws IOException {

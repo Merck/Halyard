@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.yammer.metrics.core.Gauge;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
@@ -24,6 +25,8 @@ import java.util.logging.Level;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
 
@@ -175,5 +178,12 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
             return 0;
         }
         return -1;
+    }
+
+    private String addTmpFile(String file) throws IOException {
+        String tmpFiles = getConf().get("tmpfiles");
+        Path path = new Path(new File(file).toURI());
+        getConf().set("tmpfiles", tmpFiles == null ? path.toString() : tmpFiles + "," + path.toString());
+        return path.getName();
     }
 }

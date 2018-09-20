@@ -78,6 +78,6 @@ public class HBaseServerTestInstance {
             LocalHBaseCluster cluster = new LocalHBaseCluster(conf);
             cluster.startup();
         }
-        return conf;
+        return new Configuration(conf);
     }
 }

@@ -55,8 +55,11 @@ public class HalyardBulkExportTest {
             qs.println("select * where {?s ?p ?o}");
         }
 
+        File extraLib = File.createTempFile("testBulkExportLib", ".txt");
+        extraLib.deleteOnExit();
+
         assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkExport(),
-                new String[]{"-s", "bulkExportTable", "-q", q.toURI().toURL().toString(), "-t", root.toURI().toURL().toString() + "{0}.csv"}));
+                new String[]{"-s", "bulkExportTable", "-q", q.toURI().toURL().toString(), "-t", root.toURI().toURL().toString() + "{0}.csv", "-l" ,extraLib.getAbsolutePath()}));
 
         File f = new File(root, "test_bulkExport.csv");
         assertTrue(f.isFile());
@@ -65,6 +68,7 @@ public class HalyardBulkExportTest {
         q.delete();
         f.delete();
         root.delete();
+        extraLib.delete();
     }
 
     @Test
