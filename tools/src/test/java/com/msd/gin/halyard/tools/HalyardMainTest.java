@@ -105,4 +105,13 @@ public class HalyardMainTest {
     public void testProfile() throws Exception {
         HalyardMain.main(new String[]{"profile"});
     }
+
+    public void testConstructor() {
+        new HalyardMain();
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void testExit() throws Exception {
+        HalyardMain.main(new String[]{"bulkload", "-h"});
+    }
 }

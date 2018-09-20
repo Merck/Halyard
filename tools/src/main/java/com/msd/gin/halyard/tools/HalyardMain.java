@@ -28,6 +28,9 @@ import org.apache.hadoop.util.ToolRunner;
  */
 public final class HalyardMain {
 
+    HalyardMain() {
+    }
+
     public static void main(String args[]) throws Exception {
         String first = args.length > 0 ? args[0] : null;
         if ("-v".equals(first) || "--version".equals(first)) {
@@ -47,7 +50,9 @@ public final class HalyardMain {
             };
             for (AbstractHalyardTool tool : tools) {
                 if (tool.name.equalsIgnoreCase(first)) {
-                    System.exit(ToolRunner.run(tool, Arrays.copyOfRange(args, 1, args.length)));
+                    int ret = ToolRunner.run(tool, Arrays.copyOfRange(args, 1, args.length));
+                    if (ret != 0) throw new RuntimeException("Tool " + tool.name + " exits with code: " + ret);
+                    return;
                 }
             }
             try {
