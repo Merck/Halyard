@@ -95,7 +95,7 @@ public class JSONParserTest {
         JSONParser p = new JSONParser();
         p.set(JSONParser.GENERATE_DATA, false);
         p.set(JSONParser.GENERATE_ONTOLOGY, false);
-        p.parse(new StringReader("{}"), "http://test/");
+        p.parse(new StringReader("{\"a\": [\"b\", \"c\", \"d\"],\"e\": [{\"f\": \"g\"}, {\"h\": \"i\"}]}"), "http://test/");
     }
 
     @Test (expected = RuntimeException.class)
