@@ -289,7 +289,6 @@ public class HBaseSailTest {
         Resource subj = vf.createIRI("http://whatever/subj/");
         IRI pred = vf.createIRI("http://whatever/pred/");
         Value obj = vf.createLiteral("whatever");
-        CloseableIteration<? extends Statement, SailException> iter;
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverservice", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
         rep.initialize();
