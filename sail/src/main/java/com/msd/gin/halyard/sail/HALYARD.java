@@ -23,7 +23,9 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
  * IRI constants used by Halyard.
  * @author Adam Sotona (MSD)
  */
-public class HALYARD {
+public final class HALYARD {
+
+    HALYARD() {}
 
     private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 

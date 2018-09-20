@@ -97,6 +97,24 @@ public class HBaseSailConfigTest {
     }
 
     @Test
+    public void testExportAndParse2() throws Exception {
+        HBaseSailConfig cfg = new HBaseSailConfig();
+        cfg.setTablespace("");
+        cfg.setSplitBits(5);
+        cfg.setCreate(true);
+        cfg.setPush(true);
+        TreeModel g = new TreeModel();
+        cfg.export(g);
+        cfg = new HBaseSailConfig();
+        cfg.parse(g, null);
+        assertNull(cfg.getTablespace());
+        assertEquals(5, cfg.getSplitBits());
+        assertTrue(cfg.isCreate());
+        assertTrue(cfg.isPush());
+        assertEquals("", cfg.getElasticIndexURL());
+    }
+
+    @Test
     public void testDefaultTableSpaceFromRepositoryId() throws Exception {
         TreeModel g = new TreeModel();
         IRI node = SimpleValueFactory.getInstance().createIRI("http://node");
@@ -139,5 +157,11 @@ public class HBaseSailConfigTest {
         g.add(SimpleValueFactory.getInstance().createIRI("http://node"), HALYARD.EVALUATION_TIMEOUT_PROPERTY, SimpleValueFactory.getInstance().createLiteral("not a number"));
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.parse(g, null);
+    }
+
+    @Test
+    public void testInstantiateConstants() {
+        new HALYARD();
+        new VOID_EXT();
     }
 }

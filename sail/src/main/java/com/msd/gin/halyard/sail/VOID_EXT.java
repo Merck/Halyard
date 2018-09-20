@@ -1,7 +1,7 @@
 /*
  * Copyright © 2014 Merck Sharp & Dohme Corp., a subsidiary of Merck & Co., Inc.
  * All rights reserved.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -23,7 +23,9 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
  * Prefix, namespace and IRIs for the parts of the VIOD ontology used in Halyard
  * @author Adam Sotona (MSD)
  */
-public class VOID_EXT {
+public final class VOID_EXT {
+
+    VOID_EXT(){}
 
     public static final String PREFIX = "void-ext";
 
