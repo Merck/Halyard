@@ -39,7 +39,7 @@ import org.junit.Test;
  */
 public class HalyardBulkLoadTest {
 
-//    @Test
+    @Test
     public void testBulkLoad() throws Exception {
         File root = File.createTempFile("test_triples", "");
         root.delete();
@@ -86,7 +86,7 @@ public class HalyardBulkLoadTest {
         htableDir.delete();
 
         //load with override of the graph context, however with no default graph context
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkLoad(), new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o"}));
+        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkLoad(), new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o", "-m", "1000"}));
 
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);

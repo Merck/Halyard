@@ -218,6 +218,30 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         }
 
         @Override
+        public List<InputSplit> getSplits(JobContext job) throws IOException {
+            List<InputSplit> splits = super.getSplits(job);
+            long maxSize = job.getConfiguration().getLong("mapreduce.input.fileinputformat.split.maxsize", 0);
+            if (maxSize > 0) {
+                List<InputSplit> newSplits = new ArrayList<>();
+                for (InputSplit spl : splits) {
+                    CombineFileSplit cfs = (CombineFileSplit)spl;
+                    for (int i=0; i<cfs.getNumPaths(); i++) {
+                        long length = cfs.getLength();
+                        if (length > maxSize) {
+                            int replicas = (int)Math.ceil((double)length / (double)maxSize);
+                            Path path = cfs.getPath(i);
+                            for (int r=1; r<replicas; r++) {
+                                newSplits.add(new CombineFileSplit(new Path[]{path}, new long[]{r}, new long[]{length}, cfs.getLocations()));
+                            }
+                        }
+                    }
+                }
+                splits.addAll(newSplits);
+            }
+            return splits;
+        }
+
+        @Override
         protected List<FileStatus> listStatus(JobContext job) throws IOException {
             List<FileStatus> filteredList = new ArrayList<>();
             for (FileStatus fs : super.listStatus(job)) {
@@ -291,13 +315,16 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     private static final class ParserPump extends AbstractRDFHandler implements Closeable, Runnable, ParseErrorListener {
         private final TaskAttemptContext context;
         private final Path paths[];
+        private final long[] sizes, offsets;
         private final long size;
         private final SynchronousQueue<Statement> queue = new SynchronousQueue<>();
         private final boolean skipInvalid, verifyDataTypeValues;
         private final String defaultRdfContextPattern;
         private final boolean overrideRdfContext;
+        private final long maxSize;
         private Exception ex = null;
         private long finishedSize = 0;
+        private int offset, count;
 
         private String baseUri = "";
         private Seekable seek;
@@ -306,12 +333,15 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         public ParserPump(CombineFileSplit split, TaskAttemptContext context) {
             this.context = context;
             this.paths = split.getPaths();
+            this.sizes = split.getLengths();
+            this.offsets = split.getStartOffsets();
             this.size = split.getLength();
             Configuration conf = context.getConfiguration();
             this.skipInvalid = conf.getBoolean(SKIP_INVALID_PROPERTY, false);
             this.verifyDataTypeValues = conf.getBoolean(VERIFY_DATATYPE_VALUES_PROPERTY, false);
             this.overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
             this.defaultRdfContextPattern = conf.get(DEFAULT_CONTEXT_PROPERTY);
+            this.maxSize = conf.getLong("mapreduce.input.fileinputformat.split.maxsize", Long.MAX_VALUE);
         }
 
         public Statement getNext() throws IOException, InterruptedException {
@@ -335,7 +365,8 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
             setParsers();
             try {
                 Configuration conf = context.getConfiguration();
-                for (Path file : paths) try {
+                for (int i=0; i<paths.length; i++) try {
+                    Path file = paths[i];
                     RDFParser parser;
                     InputStream localIn;
                     final String localBaseUri;
@@ -347,6 +378,8 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                         }
                         close();
                         this.baseUri = file.toString();
+                        this.offset = (int)offsets[i];
+                        this.count = sizes[i] > maxSize ? (int)Math.ceil((double)sizes[i] / (double)maxSize) : 1;
                         context.setStatus("Parsing " + baseUri);
                         FileSystem fs = file.getFileSystem(conf);
                         FSDataInputStream fileIn = fs.open(file);
@@ -403,7 +436,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
         @Override
         public void handleStatement(Statement st) throws RDFHandlerException {
-            try {
+            if (count == 1 || Math.floorMod(st.hashCode(), count) == offset) try {
                 queue.put(st);
             } catch (InterruptedException e) {
                 throw new RDFHandlerException(e);
@@ -475,6 +508,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         addOption("g", "graph-context", "uri_pattern", "Optionally specify default target named graph context. URI pattern may include {0} token to be replaced with full source file URI, token {1} with just the path of the file, and {2} with the file name", false, true);
         addOption("o", "graph-context-override", null, "Optionally override named graph context also for loaded quads", false, false);
         addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (defaul is actual time of the operation)", false, true);
+        addOption("m", "max-split-size", "size_in_bytes", "Optionally limit maximum file split size, where larger files will be processed in parallel", false, true);
     }
 
     @Override
@@ -489,6 +523,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         if (cmd.hasOption('g')) getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
         getConf().setBoolean(OVERRIDE_CONTEXT_PROPERTY, cmd.hasOption('o'));
         getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, Long.parseLong(cmd.getOptionValue('e', String.valueOf(System.currentTimeMillis()))));
+        if (cmd.hasOption('m')) getConf().setLong("mapreduce.input.fileinputformat.split.maxsize", Long.parseLong(cmd.getOptionValue('m')));
         TableMapReduceUtil.addDependencyJars(getConf(),
                 NTriplesUtil.class,
                 Rio.class,
