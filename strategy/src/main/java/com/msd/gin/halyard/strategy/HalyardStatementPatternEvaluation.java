@@ -38,6 +38,7 @@ import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.Filter;
+import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.Var;
@@ -211,6 +212,13 @@ final class HalyardStatementPatternEvaluation {
                     node.getCondition().visit(this);
                 }
 
+                @Override
+                public void meet(LeftJoin node) throws RuntimeException {
+                    if (node.hasCondition()) {
+                        meetNode(node.getCondition());
+                    }
+                    super.meet(node);
+                }
             }.meetOther(root);
             return ret.get();
         }
