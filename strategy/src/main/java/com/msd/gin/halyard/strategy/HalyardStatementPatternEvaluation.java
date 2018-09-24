@@ -214,10 +214,10 @@ final class HalyardStatementPatternEvaluation {
 
                 @Override
                 public void meet(LeftJoin node) throws RuntimeException {
+                    super.meet(node);
                     if (node.hasCondition()) {
                         meetNode(node.getCondition());
                     }
-                    super.meet(node);
                 }
             }.meetOther(root);
             return ret.get();
