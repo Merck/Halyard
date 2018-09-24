@@ -175,7 +175,7 @@ Filesystem (HDFS) into HBase in the form of a Halyard dataset.
                                        file URI, token {1} with just the path of the file, and {2}
                                        with the file name
  -o,--graph-context-override           Optionally override named graph context also for loaded quads
- -e,--target-timestamp <timestamp>     Optionally specify timestamp of all loaded records (defaul is
+ -e,--target-timestamp <timestamp>     Optionally specify timestamp of all loaded records (default is
                                        actual time of the operation)
  -m,--max-split-size <size_in_bytes>   Optionally limit maximum file split size, where larger files
                                        will be processed in parallel
@@ -407,7 +407,7 @@ processed as a single atomic bulk operation at the end of the execution.
                                        as a working directory for the temporary HBase files,  the
                                        files are moved to their final HBase locations during the
                                        last stage of the load process
- -e,--target-timestamp <timestamp>     Optionally specify timestamp of all loaded records (defaul is
+ -e,--target-timestamp <timestamp>     Optionally specify timestamp of all loaded records (default is
                                        actual time of the operation)
 Example: halyard bulkupdate -s my_dataset -q hdfs:///myqueries/*.sparql -w hdfs:///my_tmp_workdir
 ```

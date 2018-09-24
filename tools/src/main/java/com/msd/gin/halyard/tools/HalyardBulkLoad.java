@@ -507,7 +507,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         addOption("b", "pre-split-bits", "bits", "Optionally specify bit depth of region pre-splits for a case when target table does not exist (default is 3)", false, true);
         addOption("g", "graph-context", "uri_pattern", "Optionally specify default target named graph context. URI pattern may include {0} token to be replaced with full source file URI, token {1} with just the path of the file, and {2} with the file name", false, true);
         addOption("o", "graph-context-override", null, "Optionally override named graph context also for loaded quads", false, false);
-        addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (defaul is actual time of the operation)", false, true);
+        addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (default is actual time of the operation)", false, true);
         addOption("m", "max-split-size", "size_in_bytes", "Optionally limit maximum file split size, where larger files will be processed in parallel", false, true);
     }
 

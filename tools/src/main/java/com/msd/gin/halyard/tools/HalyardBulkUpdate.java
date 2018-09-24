@@ -227,7 +227,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "queries", "sparql_queries", "folder or path pattern with SPARQL tuple or graph queries", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
-        addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (defaul is actual time of the operation)", false, true);
+        addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (default is actual time of the operation)", false, true);
     }
 
 
