@@ -175,10 +175,11 @@ Filesystem (HDFS) into HBase in the form of a Halyard dataset.
                                        file URI, token {1} with just the path of the file, and {2}
                                        with the file name
  -o,--graph-context-override           Optionally override named graph context also for loaded quads
- -e,--target-timestamp <timestamp>     Optionally specify timestamp of all loaded records (default is
-                                       actual time of the operation)
- -m,--max-split-size <size_in_bytes>   Optionally limit maximum file split size, where larger files
-                                       will be processed in parallel
+ -e,--target-timestamp <timestamp>     Optionally specify timestamp of all loaded records (default
+                                       is actual time of the operation)
+ -m,--max-split-size <size_in_bytes>   Optionally override maximum input split size, where also
+                                       significantly larger single files will be processed in
+                                       parallel (0 means no limit, default is 200000000)
 Halyard Bulk Load consumes RDF files in various formats supported by RDF4J RIO, including:
 * N-Triples (.nt)
 * RDF/XML (.rdf, .rdfs, .owl, .xml)

@@ -118,6 +118,11 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
      */
     public static final String DEFAULT_TIMESTAMP_PROPERTY = "halyard.bulk.timestamp";
 
+    /**
+     * Multiplier limiting maximum single file size in relation to the maximum split size, before it is processed in parallel (10x maximum split size)
+     */
+    private static final long MAX_SINGLE_FILE_MULTIPLIER = 10;
+
     static void setParsers() {
         //this is a workaround to avoid autodetection of .xml files as TriX format and hook on .trix file extension only
         RDFParserRegistry reg = RDFParserRegistry.getInstance();
@@ -220,7 +225,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         @Override
         public List<InputSplit> getSplits(JobContext job) throws IOException {
             List<InputSplit> splits = super.getSplits(job);
-            long maxSize = job.getConfiguration().getLong("mapreduce.input.fileinputformat.split.maxsize", 0);
+            long maxSize = MAX_SINGLE_FILE_MULTIPLIER * job.getConfiguration().getLong("mapreduce.input.fileinputformat.split.maxsize", 0);
             if (maxSize > 0) {
                 List<InputSplit> newSplits = new ArrayList<>();
                 for (InputSplit spl : splits) {
@@ -341,7 +346,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
             this.verifyDataTypeValues = conf.getBoolean(VERIFY_DATATYPE_VALUES_PROPERTY, false);
             this.overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
             this.defaultRdfContextPattern = conf.get(DEFAULT_CONTEXT_PROPERTY);
-            this.maxSize = conf.getLong("mapreduce.input.fileinputformat.split.maxsize", Long.MAX_VALUE);
+            this.maxSize = MAX_SINGLE_FILE_MULTIPLIER * conf.getLong("mapreduce.input.fileinputformat.split.maxsize", 0);
         }
 
         public Statement getNext() throws IOException, InterruptedException {
@@ -379,7 +384,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                         close();
                         this.baseUri = file.toString();
                         this.offset = (int)offsets[i];
-                        this.count = sizes[i] > maxSize ? (int)Math.ceil((double)sizes[i] / (double)maxSize) : 1;
+                        this.count = maxSize > 0 && sizes[i] > maxSize ? (int)Math.ceil((double)sizes[i] / (double)maxSize) : 1;
                         context.setStatus("Parsing " + baseUri);
                         FileSystem fs = file.getFileSystem(conf);
                         FSDataInputStream fileIn = fs.open(file);
@@ -508,7 +513,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         addOption("g", "graph-context", "uri_pattern", "Optionally specify default target named graph context. URI pattern may include {0} token to be replaced with full source file URI, token {1} with just the path of the file, and {2} with the file name", false, true);
         addOption("o", "graph-context-override", null, "Optionally override named graph context also for loaded quads", false, false);
         addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (default is actual time of the operation)", false, true);
-        addOption("m", "max-split-size", "size_in_bytes", "Optionally limit maximum file split size, where larger files will be processed in parallel", false, true);
+        addOption("m", "max-split-size", "size_in_bytes", "Optionally override maximum input split size, where also significantly larger single files will be processed in parallel (0 means no limit, default is 200000000)", false, true);
     }
 
     @Override
