@@ -379,38 +379,42 @@ Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index
 ### Halyard Update
 ```
 $ ./halyard update -h
-usage: halyard update [-h] [-v] -s <dataset_table> -q <sparql_update_query> [-e <elastic_index_url>]
+usage: halyard update [-h] [-v] -s <dataset_table> -q <sparql_update_operation> [-e
+       <elastic_index_url>]
 Halyard Update is a command-line application designed to run SPARQL Update operations to transform
 data in an HBase Halyard dataset
- -h,--help                                Prints this help
- -v,--version                             Prints version
- -s,--source-dataset <dataset_table>      Source HBase table with Halyard RDF store
- -q,--query <sparql_update_query>         SPARQL update query to be executed
- -e,--elastic-index <elastic_index_url>   Optional ElasticSearch index URL
+ -h,--help                                         Prints this help
+ -v,--version                                      Prints version
+ -s,--source-dataset <dataset_table>               Source HBase table with Halyard RDF store
+ -q,--update-operation <sparql_update_operation>   SPARQL update operation to be executed
+ -e,--elastic-index <elastic_index_url>            Optional ElasticSearch index URL
 Example: halyard update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs ?o}'
 ```
 
 ### Halyard Bulk Update <a id="Halyard_Bulk_Update"></a>
 ```
 $ ./halyard bulkupdate -h
-usage: halyard bulkupdate [-h] [-v] -s <dataset_table> -q <sparql_queries> -w <shared_folder> [-e
-       <timestamp>]
+usage: halyard bulkupdate [-h] [-v] -s <dataset_table> -q <sparql_update_operations> -w
+       <shared_folder> [-e <timestamp>]
 Halyard Bulk Update is a MapReduce application that executes multiple SPARQL Update operations in
 parallel in the Mapper phase. The Shuffle and Reduce phase are responsible for the efficient update
 of the dataset in a bulk mode (similar to the Halyard Bulk Load). Halyard Bulk Update supports
 large-scale DELETE/INSERT operations that are not executed separately, but instead they are
 processed as a single atomic bulk operation at the end of the execution.
- -h,--help                             Prints this help
- -v,--version                          Prints version
- -s,--source-dataset <dataset_table>   Source HBase table with Halyard RDF store
- -q,--queries <sparql_queries>         folder or path pattern with SPARQL tuple or graph queries
- -w,--work-dir <shared_folder>         Unique non-existent folder within shared filesystem to server
-                                       as a working directory for the temporary HBase files,  the
-                                       files are moved to their final HBase locations during the
-                                       last stage of the load process
- -e,--target-timestamp <timestamp>     Optionally specify timestamp of all loaded records (default is
-                                       actual time of the operation)
-Example: halyard bulkupdate -s my_dataset -q hdfs:///myqueries/*.sparql -w hdfs:///my_tmp_workdir
+ -h,--help                                           Prints this help
+ -v,--version                                        Prints version
+ -s,--source-dataset <dataset_table>                 Source HBase table with Halyard RDF store
+ -q,--update-operations <sparql_update_operations>   folder or path pattern with SPARQL update
+                                                     operations
+ -w,--work-dir <shared_folder>                       Unique non-existent folder within shared
+                                                     filesystem to server as a working directory for
+                                                     the temporary HBase files,  the files are moved
+                                                     to their final HBase locations during the last
+                                                     stage of the load process
+ -e,--target-timestamp <timestamp>                   Optionally specify timestamp of all loaded
+                                                     records (default is actual time of the
+                                                     operation)
+Example: halyard bulkupdate -s my_dataset -q hdfs:///myupdates/*.sparql -w hdfs:///my_tmp_workdir
 ```
 
 ### Halyard Export

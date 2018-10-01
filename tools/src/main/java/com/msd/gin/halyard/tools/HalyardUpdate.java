@@ -35,7 +35,7 @@ public final class HalyardUpdate extends AbstractHalyardTool {
             "Example: halyard update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs ?o}'"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
-        addOption("q", "query", "sparql_update_query", "SPARQL update query to be executed", true, true);
+        addOption("q", "update-operation", "sparql_update_operation", "SPARQL update operation to be executed", true, true);
         addOption("e", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
     }
 
