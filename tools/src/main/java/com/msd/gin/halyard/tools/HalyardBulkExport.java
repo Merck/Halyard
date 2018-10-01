@@ -25,7 +25,6 @@ import java.util.logging.Level;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
@@ -44,6 +43,7 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+import static com.msd.gin.halyard.sail.HALYARD.PARALLEL_SPLIT_FUNCTION;
 
 /**
  * Apache Hadoop MapReduce tool for batch exporting of SPARQL queries.
@@ -101,17 +101,16 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
     }
 
     public HalyardBulkExport() {
-        super(
-            "bulkexport",
+        super("bulkexport",
             "Halyard Bulk Export is a MapReduce application that executes multiple Halyard Exports in MapReduce framework. "
                 + "Query file name (without extension) can be used in the target URL pattern. Order of queries execution is not guaranteed. "
-                + "Another internal level of parallelisation is done using a custom SPARQL function halyard:" + ParallelSplitFunction.PARALLEL_SPLIT_FUNCTION_NAME + "(<constant_number_of_forks>, ?a_binding, ...). "
+                + "Another internal level of parallelisation is done using a custom SPARQL function halyard:" + PARALLEL_SPLIT_FUNCTION.toString() + "(<constant_number_of_forks>, ?a_binding, ...). "
                 + "The function takes one or more bindings as its arguments and these bindings are used as keys to randomly distribute the query evaluation across the executed parallel forks of the same query.",
             "Example: halyard bulkexport -s my_dataset -q hdfs:///myqueries/*.sparql -t hdfs:/my_folder/{0}-{1}.csv.gz"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "queries", "sparql_queries", "folder or path pattern with SPARQL tuple or graph queries", true, true);
-        addOption("t", "target-url", "target_url", "file://<path>/{0}-{1}.<ext> or hdfs://<path>/{0}-{1}.<ext> or jdbc:<jdbc_connection>/{0}, where {0} is replaced query filename (without extension) and {1} is replaced with parallel fork index (when " + ParallelSplitFunction.PARALLEL_SPLIT_FUNCTION_URI + " function is used in the particular query)", true, true);
+        addOption("t", "target-url", "target_url", "file://<path>/{0}-{1}.<ext> or hdfs://<path>/{0}-{1}.<ext> or jdbc:<jdbc_connection>/{0}, where {0} is replaced query filename (without extension) and {1} is replaced with parallel fork index (when " + PARALLEL_SPLIT_FUNCTION.toString() + " function is used in the particular query)", true, true);
         addOption("p", "jdbc-property", "property=value", "JDBC connection property", false, false);
         addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
         addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name", false, true);

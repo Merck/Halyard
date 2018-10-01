@@ -54,4 +54,7 @@ public final class HALYARD {
     public final static IRI ELASTIC_INDEX_URL_PROPERTY = SVF.createIRI(NAMESPACE, "elasticIndexURL");
 
     public final static IRI SEARCH_TYPE = SVF.createIRI(NAMESPACE, "search");
+
+    public final static IRI PARALLEL_SPLIT_FUNCTION = SVF.createIRI(NAMESPACE, "forkAndFilterBy");
+
 }
