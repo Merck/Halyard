@@ -65,11 +65,11 @@ usage: halyard [ -h | -v | <command> [<genericHadoopOptions>] [-h] ...]
 commands are:
 ----------------------------------------------------------------------------------------------------
 presplit   Halyard Presplit is a MapReduce application designed to estimate optimal HBase region
-           splits for big datasets before the Bulk Load.Halyard PreSplit creates an empty HBase
+           splits for big datasets before the Bulk Load. Halyard PreSplit creates an empty HBase
            table based on calculations from the dataset sources sampling. For very large datasets it
            is wise to calculate the pre-splits before the HBase table is created to allow more
            efficient following Bulk Load process of the data. Optional definition or override of the
-           graph context should be specified exactly the same as for the following Bulk Load process
+           named graph should be specified exactly the same as for the following Bulk Load process
            so the region presplits estimations are precise.
            Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.
 bulkload   Halyard Bulk Load is a MapReduce application designed to efficiently load RDF data from
@@ -100,7 +100,8 @@ bulkexport Halyard Bulk Export is a MapReduce application that executes multiple
            one or more bindings as its arguments and these bindings are used as keys to randomly
            distribute the query evaluation across the executed parallel forks of the same query.
 bulkdelete Halyard Bulk Delete is a MapReduce application that effectively deletes large set of
-           triples or whole named graphs, based on specified statement pattern and/or graph context.
+           triples or whole named graphs, based on specified statement pattern and/or named
+           graph(s).
 profile    Halyard Profile is a command-line tool designed to profile SPARQL query performance
            within the actual Halyard environment. Actually it is limited to the statical analysis
            only.
@@ -120,13 +121,13 @@ genericHadoopOptions are:
 ### Halyard PreSplit
 ```
 $ ./halyard presplit -h
-usage: halyard presplit [-h] [-v] -s <source_paths> -t <dataset_table> [-i] [-g <graph_context>]
-       [-o] [-d <decimation_factor>] [-l <size>]
+usage: halyard presplit [-h] [-v] -s <source_paths> -t <dataset_table> [-i] [-g <named_graph>] [-o]
+       [-d <decimation_factor>] [-l <size>]
 Halyard Presplit is a MapReduce application designed to estimate optimal HBase region splits for big
-datasets before the Bulk Load.Halyard PreSplit creates an empty HBase table based on calculations
+datasets before the Bulk Load. Halyard PreSplit creates an empty HBase table based on calculations
 from the dataset sources sampling. For very large datasets it is wise to calculate the pre-splits
 before the HBase table is created to allow more efficient following Bulk Load process of the data.
-Optional definition or override of the graph context should be specified exactly the same as for the
+Optional definition or override of the named graph should be specified exactly the same as for the
 following Bulk Load process so the region presplits estimations are precise.
 Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.
  -h,--help                                    Prints this help
@@ -137,9 +138,10 @@ Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.
  -t,--target <dataset_table>                  Target HBase table with Halyard RDF store
  -i,--skip-invalid                            Optionally skip invalid source files and parsing
                                               errors
- -g,--graph-context <graph_context>           Optionally specify default target named graph context
- -o,--graph-context-override                  Optionally override named graph context also for
-                                              loaded quads
+ -g,--default-named-graph <named_graph>       Optionally specify default target named graph
+ -o,--named-graph-override                    Optionally override named graph also for quads, named
+                                              graph is stripped from quads if --default-named-graph
+                                              option is not specified
  -d,--decimation-factor <decimation_factor>   Optionally overide pre-split random decimation factor
                                               (default is 1000)
  -l,--split-limit-size <size>                 Optionally override calculated split size (default is
@@ -151,35 +153,34 @@ Example: halyard presplit -s hdfs://my_RDF_files -t mydataset
 ```
 $ ./halyard bulkload -h
 usage: halyard bulkload [-h] [-v] -s <source_paths> -w <shared_folder> -t <dataset_table> [-i] [-d]
-       [-r] [-b <bits>] [-g <uri_pattern>] [-o] [-e <timestamp>] [-m <size_in_bytes>]
+       [-r] [-b <bits>] [-g <named_graph>] [-o] [-e <timestamp>] [-m <size_in_bytes>]
 Halyard Bulk Load is a MapReduce application designed to efficiently load RDF data from Hadoop
 Filesystem (HDFS) into HBase in the form of a Halyard dataset.
- -h,--help                             Prints this help
- -v,--version                          Prints version
- -s,--source <source_paths>            Source path(s) with RDF files, more paths can be delimited by
-                                       comma, the paths are searched for the supported files
-                                       recurrently
- -w,--work-dir <shared_folder>         Unique non-existent folder within shared filesystem to server
-                                       as a working directory for the temporary HBase files,  the
-                                       files are moved to their final HBase locations during the
-                                       last stage of the load process
- -t,--target <dataset_table>           Target HBase table with Halyard RDF store
- -i,--skip-invalid                     Optionally skip invalid source files and parsing errors
- -d,--verify-data-types                Optionally verify RDF data type values while parsing
- -r,--truncate-target                  Optionally truncate target table just before the loading the
-                                       new data
- -b,--pre-split-bits <bits>            Optionally specify bit depth of region pre-splits for a case
-                                       when target table does not exist (default is 3)
- -g,--graph-context <uri_pattern>      Optionally specify default target named graph context. URI
-                                       pattern may include {0} token to be replaced with full source
-                                       file URI, token {1} with just the path of the file, and {2}
-                                       with the file name
- -o,--graph-context-override           Optionally override named graph context also for loaded quads
- -e,--target-timestamp <timestamp>     Optionally specify timestamp of all loaded records (default
-                                       is actual time of the operation)
- -m,--max-split-size <size_in_bytes>   Optionally override maximum input split size, where also
-                                       significantly larger single files will be processed in
-                                       parallel (0 means no limit, default is 200000000)
+ -h,--help                                Prints this help
+ -v,--version                             Prints version
+ -s,--source <source_paths>               Source path(s) with RDF files, more paths can be delimited
+                                          by comma, the paths are searched for the supported files
+                                          recurrently
+ -w,--work-dir <shared_folder>            Unique non-existent folder within shared filesystem to
+                                          server as a working directory for the temporary HBase
+                                          files,  the files are moved to their final HBase locations
+                                          during the last stage of the load process
+ -t,--target <dataset_table>              Target HBase table with Halyard RDF store
+ -i,--skip-invalid                        Optionally skip invalid source files and parsing errors
+ -d,--verify-data-types                   Optionally verify RDF data type values while parsing
+ -r,--truncate-target                     Optionally truncate target table just before the loading
+                                          the new data
+ -b,--pre-split-bits <bits>               Optionally specify bit depth of region pre-splits for a
+                                          case when target table does not exist (default is 3)
+ -g,--default-named-graph <named_graph>   Optionally specify default target named graph
+ -o,--named-graph-override                Optionally override named graph also for quads, named
+                                          graph is stripped from quads if --default-named-graph
+                                          option is not specified
+ -e,--target-timestamp <timestamp>        Optionally specify timestamp of all loaded records
+                                          (default is actual time of the operation)
+ -m,--max-split-size <size_in_bytes>      Optionally override maximum input split size, where also
+                                          significantly larger single files will be processed in
+                                          parallel (0 means no limit, default is 200000000)
 Halyard Bulk Load consumes RDF files in various formats supported by RDF4J RIO, including:
 * N-Triples (.nt)
 * RDF/XML (.rdf, .rdfs, .owl, .xml)
@@ -205,23 +206,24 @@ Example: halyard bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t my
 ### Halyard Stats
 ```
 $ ./halyard stats -h
-usage: halyard stats [-h] [-v] -s <dataset_table> [-t <target_url>] [-r <size>] [-c <graph_context>]
+usage: halyard stats [-h] [-v] -s <dataset_table> [-t <target_url>] [-r <size>] [-c <named_graph>]
        [-g <target_graph>]
 Halyard Stats is a MapReduce application that calculates dataset statistics and stores them in the
 named graph within the dataset or exports them into a file. The generated statistics are described
 by the VoID vocabulary, its extensions, and the SPARQL 1.1 Service Description.
- -h,--help                             Prints this help
- -v,--version                          Prints version
- -s,--source-dataset <dataset_table>   Source HBase table with Halyard RDF store
- -t,--target-file <target_url>         Optional target file to export the statistics (instead of
-                                       update)
-                                       hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]
- -r,--threshold <size>                 Optional minimal size of a named graph to calculate
-                                       statistics for (default is 1000)
- -c,--graph-context <graph_context>    Optional restrict stats calculation to the given named graph
-                                       context only
- -g,--target-graph <target_graph>      Optional target graph context of the exported statistics
-                                       (default is 'http://merck.github.io/Halyard/ns#statsContext')
+ -h,--help                               Prints this help
+ -v,--version                            Prints version
+ -s,--source-dataset <dataset_table>     Source HBase table with Halyard RDF store
+ -t,--target-file <target_url>           Optional target file to export the statistics (instead of
+                                         update)
+                                         hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]
+ -r,--threshold <size>                   Optional minimal size of a named graph to calculate
+                                         statistics for (default is 1000)
+ -c,--named-graph <named_graph>          Optional restrict stats calculation to the given named
+                                         graph only
+ -g,--stats-named-graph <target_graph>   Optional target named graph of the exported statistics
+                                         (default is
+                                         'http://merck.github.io/Halyard/ns#statsContext')
 Example: halyard stats -s my_dataset [-g 'http://whatever/mystats'] [-t
 hdfs:/my_folder/my_stats.trig]
 ```
@@ -509,9 +511,9 @@ hdfs:/my_folder/{0}-{1}.csv.gz
 ```
 $ ./halyard bulkdelete -h
 usage: halyard bulkdelete [-h] [-v] -t <dataset_table> -f <temporary_folder> [-s <subject>] [-p
-       <predicate>] [-o <object>] [-c <context>]
+       <predicate>] [-o <object>] [-g <named_graph>]
 Halyard Bulk Delete is a MapReduce application that effectively deletes large set of triples or
-whole named graphs, based on specified statement pattern and/or graph context.
+whole named graphs, based on specified statement pattern and/or named graph(s).
  -h,--help                             Prints this help
  -v,--version                          Prints version
  -t,--target-dataset <dataset_table>   HBase table with Halyard RDF store
@@ -519,10 +521,10 @@ whole named graphs, based on specified statement pattern and/or graph context.
  -s,--subject <subject>                Optional subject to delete
  -p,--predicate <predicate>            Optional predicate to delete
  -o,--object <object>                  Optional object to delete
- -c,--graph-context <context>          Optional named graph context(s) to delete, NONE represents
-                                       context of triples outside of any named graph
-Example: halyard bulkdelete -t my_data -f bulkdelete_temp1 -s <http://whatever/mysubj> -c
-<http://whatever/myctx1> -c <http://whatever/myctx2>
+ -g,--named-graph <named_graph>        Optional named graph(s) to delete, NONE represents triples
+                                       outside of any named graph
+Example: halyard bulkdelete -t my_data -f bulkdelete_temp1 -s <http://whatever/mysubj> -g
+<http://whatever/mygraph1> -g <http://whatever/mygraph2>
 ```
 
 ### Halyard Profile

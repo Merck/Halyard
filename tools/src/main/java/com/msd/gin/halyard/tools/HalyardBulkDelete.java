@@ -133,15 +133,15 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
     public HalyardBulkDelete() {
         super(
             "bulkdelete",
-            "Halyard Bulk Delete is a MapReduce application that effectively deletes large set of triples or whole named graphs, based on specified statement pattern and/or graph context.",
-            "Example: halyard bulkdelete -t my_data -f bulkdelete_temp1 -s <http://whatever/mysubj> -c <http://whatever/myctx1> -c <http://whatever/myctx2>"
+            "Halyard Bulk Delete is a MapReduce application that effectively deletes large set of triples or whole named graphs, based on specified statement pattern and/or named graph(s).",
+            "Example: halyard bulkdelete -t my_data -f bulkdelete_temp1 -s <http://whatever/mysubj> -g <http://whatever/mygraph1> -g <http://whatever/mygraph2>"
         );
         addOption("t", "target-dataset", "dataset_table", "HBase table with Halyard RDF store", true, true);
         addOption("f", "temp-folder", "temporary_folder", "Temporary folder for HBase files", true, true);
         addOption("s", "subject", "subject", "Optional subject to delete", false, true);
         addOption("p", "predicate", "predicate", "Optional predicate to delete", false, true);
         addOption("o", "object", "object", "Optional object to delete", false, true);
-        addOption("c", "graph-context", "context", "Optional named graph context(s) to delete, NONE represents context of triples outside of any named graph", false, false);
+        addOption("g", "named-graph", "named_graph", "Optional named graph(s) to delete, NONE represents triples outside of any named graph", false, false);
     }
 
     @Override

@@ -56,7 +56,7 @@ public class HalyardBulkDeleteTest {
         File htableDir = File.createTempFile("test_htable", "");
         htableDir.delete();
 
-        assertEquals(0, ToolRunner.run(conf, new HalyardBulkDelete(), new String[]{ "-t", TABLE, "-o", "<http://whatever/obj0>", "-c", "NONE", "-c", "<http://whatever/ctx1>", "-f", htableDir.toURI().toURL().toString()}));
+        assertEquals(0, ToolRunner.run(conf, new HalyardBulkDelete(), new String[]{ "-t", TABLE, "-o", "<http://whatever/obj0>", "-g", "NONE", "-g", "<http://whatever/ctx1>", "-f", htableDir.toURI().toURL().toString()}));
 
         assertCount(23);
 

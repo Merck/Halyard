@@ -510,8 +510,8 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         addOption("d", "verify-data-types", null, "Optionally verify RDF data type values while parsing", false, false);
         addOption("r", "truncate-target", null, "Optionally truncate target table just before the loading the new data", false, false);
         addOption("b", "pre-split-bits", "bits", "Optionally specify bit depth of region pre-splits for a case when target table does not exist (default is 3)", false, true);
-        addOption("g", "graph-context", "uri_pattern", "Optionally specify default target named graph context. URI pattern may include {0} token to be replaced with full source file URI, token {1} with just the path of the file, and {2} with the file name", false, true);
-        addOption("o", "graph-context-override", null, "Optionally override named graph context also for loaded quads", false, false);
+        addOption("g", "default-named-graph", "named_graph", "Optionally specify default target named graph", false, true);
+        addOption("o", "named-graph-override", null, "Optionally override named graph also for quads, named graph is stripped from quads if --default-named-graph option is not specified", false, false);
         addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (default is actual time of the operation)", false, true);
         addOption("m", "max-split-size", "size_in_bytes", "Optionally override maximum input split size, where also significantly larger single files will be processed in parallel (0 means no limit, default is 200000000)", false, true);
     }
