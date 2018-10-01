@@ -170,8 +170,8 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         if (cmd.hasOption('o')) {
             job.getConfiguration().set(OBJECT, cmd.getOptionValue('o'));
         }
-        if (cmd.hasOption('c')) {
-            job.getConfiguration().setStrings(CONTEXTS, cmd.getOptionValues('c'));
+        if (cmd.hasOption('g')) {
+            job.getConfiguration().setStrings(CONTEXTS, cmd.getOptionValues('g'));
         }
         job.setJarByClass(HalyardBulkDelete.class);
         TableMapReduceUtil.initCredentials(job);
