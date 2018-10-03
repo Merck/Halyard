@@ -208,7 +208,7 @@ final class HalyardStatementPatternEvaluation {
 
                 @Override
                 public void meet(Filter node) throws RuntimeException {
-                    node.visitChildren(this);
+                    super.meet(node);
                     node.getCondition().visit(this);
                 }
 
