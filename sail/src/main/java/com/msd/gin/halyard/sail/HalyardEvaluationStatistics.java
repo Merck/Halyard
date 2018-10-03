@@ -88,30 +88,31 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
                     boolean sv = hasValue(sp.getSubjectVar());
                     boolean pv = hasValue(sp.getPredicateVar());
                     boolean ov = hasValue(sp.getObjectVar());
+                    long defaultCardinality = Math.round(Math.pow(triples, 2.0/3.0));
                     if (sv) {
                         if (pv) {
                             if (ov) {
                                 card = 1.0;
                             } else {
-                                card = (double)subsetTriplesPart(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar()) * subsetTriplesPart(graphNode, VOID.PROPERTY, sp.getPredicateVar()) / triples;
+                                card = (double)subsetTriplesPart(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar(), defaultCardinality) * subsetTriplesPart(graphNode, VOID.PROPERTY, sp.getPredicateVar(), defaultCardinality) / triples;
                             }
                         } else {
                             if (ov) {
-                                card = (double)subsetTriplesPart(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar()) * subsetTriplesPart(graphNode, VOID_EXT.OBJECT, sp.getObjectVar()) / triples;
+                                card = (double)subsetTriplesPart(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar(), defaultCardinality) * subsetTriplesPart(graphNode, VOID_EXT.OBJECT, sp.getObjectVar(), defaultCardinality) / triples;
                             } else {
-                                card = subsetTriplesPart(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar());
+                                card = subsetTriplesPart(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar(), defaultCardinality);
                             }
                         }
                     } else {
                         if (pv) {
                             if (ov) {
-                                card = (double)subsetTriplesPart(graphNode, VOID.PROPERTY, sp.getPredicateVar()) * subsetTriplesPart(graphNode, VOID_EXT.OBJECT, sp.getObjectVar()) / triples;
+                                card = (double)subsetTriplesPart(graphNode, VOID.PROPERTY, sp.getPredicateVar(), defaultCardinality) * subsetTriplesPart(graphNode, VOID_EXT.OBJECT, sp.getObjectVar(), defaultCardinality) / triples;
                             } else {
-                                card = subsetTriplesPart(graphNode, VOID.PROPERTY, sp.getPredicateVar());
+                                card = subsetTriplesPart(graphNode, VOID.PROPERTY, sp.getPredicateVar(), defaultCardinality);
                             }
                         } else {
                             if (ov) {
-                                card = subsetTriplesPart(graphNode, VOID_EXT.OBJECT, sp.getObjectVar());
+                                card = subsetTriplesPart(graphNode, VOID_EXT.OBJECT, sp.getObjectVar(), defaultCardinality);
                             } else {
                                 card = triples;
                             }
@@ -151,7 +152,8 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
             }
 
             //calculate a multiplier for the triple count for this sub-part of the graph
-            private long subsetTriplesPart(IRI graph, IRI partitionType, Var partitionVar) {
+            private long subsetTriplesPart(IRI graph, IRI partitionType, Var partitionVar, long defaultCardinality) {
+                if (partitionVar == null || !partitionVar.hasValue()) return defaultCardinality;
                 return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(partitionVar.getValue()))), 100l);
             }
 
