@@ -88,7 +88,7 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
                     boolean sv = hasValue(sp.getSubjectVar());
                     boolean pv = hasValue(sp.getPredicateVar());
                     boolean ov = hasValue(sp.getObjectVar());
-                    long defaultCardinality = Math.round(Math.pow(triples, 2.0/3.0));
+                    long defaultCardinality = Math.round(Math.sqrt(triples));
                     if (sv) {
                         if (pv) {
                             if (ov) {
