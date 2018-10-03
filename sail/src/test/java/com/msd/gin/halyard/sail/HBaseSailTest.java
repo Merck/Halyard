@@ -374,7 +374,7 @@ public class HBaseSailTest {
         sail.commit();
         assertEquals(5000.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(20.0, sail.statistics.getCardinality(q2), 0.01);
-        assertEquals(1000.0, sail.statistics.getCardinality(q3), 0.01);
+        assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);
         assertEquals(1.0, sail.statistics.getCardinality(q4), 0.01);
         sail.shutDown();
     }

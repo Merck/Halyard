@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -70,8 +71,6 @@ import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
 import org.eclipse.rdf4j.query.algebra.FunctionCall;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
-import org.eclipse.rdf4j.query.algebra.Service;
-import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.Var;
@@ -85,7 +84,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.CompareOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConstantOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.FilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.OrderLimitOptimizer;
@@ -128,7 +126,6 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
     private static final Logger LOG = Logger.getLogger(HBaseSail.class.getName());
     private static final long STATUS_CACHING_TIMEOUT = 60000l;
-    private static final long DEFAULT_THRESHOLD = 1000l;
     private static final int ELASTIC_RESULT_SIZE = 10000;
 
     private final Configuration config; //the configuration of the HBase database
@@ -136,7 +133,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     final boolean create;
     final boolean pushStrategy;
     final int splitBits;
-    protected final EvaluationStatistics statistics;
+    protected final HalyardEvaluationStatistics statistics;
     final int evaluationTimeout;
     private boolean readOnly = false;
     private long readOnlyTimestamp = -1;
@@ -165,72 +162,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         this.create = create;
         this.splitBits = splitBits;
         this.pushStrategy = pushStrategy;
-        this.statistics = new EvaluationStatistics() { //Calculates values for query optimizations
-            @Override
-            protected EvaluationStatistics.CardinalityCalculator createCardinalityCalculator() {
-                return new CardinalityCalculator() {
-                    @Override
-                    protected double getCardinality(StatementPattern sp) { //get the cardinality of the Statement form VOID statistics
-                        Var objectVar = sp.getObjectVar();
-                        //always return cardinality 1.0 for HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
-                        if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal)objectVar.getValue()).getDatatype())) {
-                            return 1.0;
-                        }
-                        Var contextVar = sp.getContextVar();
-                        IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI)contextVar.getValue();
-                        long triples = getTriplesCount(graphNode, -1l);
-                        if (triples > 0) {
-                            double card = Math.min(subsetTriplesPart(graphNode, VOID_EXT.SUBJECT, sp.getSubjectVar(), triples),
-                                          Math.min(subsetTriplesPart(graphNode, VOID.PROPERTY, sp.getPredicateVar(), triples),
-                                                   subsetTriplesPart(graphNode, VOID_EXT.OBJECT, sp.getObjectVar(), triples)));
-                            LOG.log(Level.FINE, "cardinality of {0} = {1}", new Object[]{sp.toString(), card});
-                            return card;
-                        } else {
-                            double card = super.getCardinality(sp);
-                            LOG.log(Level.FINE, "default cardinality of {0} = {1}", new Object[]{sp.toString(), card});
-                            return card;
-                        }
-                    }
-
-                    //get the Triples count for a giving subject from VOID statistics or return the default value
-                    private long getTriplesCount(IRI subjectNode, long defaultValue) {
-                        try (CloseableIteration<? extends Statement, SailException> ci = getStatements(subjectNode, VOID.TRIPLES, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
-                            if (ci.hasNext()) {
-                                Value v = ci.next().getObject();
-                                if (v instanceof Literal) try {
-                                    long l = ((Literal)v).longValue();
-                                    LOG.log(Level.FINER, "triple stats for {0} = {1}", new Object[]{subjectNode, l});
-                                    return l;
-                                } catch (NumberFormatException ignore) {}
-                                LOG.log(Level.WARNING, "Invalid statistics for:{0}", subjectNode);
-                            }
-                        }
-                        LOG.log(Level.FINER, "triple stats for {0} are not available, using default {1}", new Object[]{subjectNode, defaultValue});
-                        return defaultValue;
-                    }
-
-                    //calculate a multiplier for the triple count for this sub-part of the graph
-                    private double subsetTriplesPart(IRI graph, IRI partitionType, Var partitionVar, double total) {
-                        if (partitionVar == null || !partitionVar.hasValue()) {
-                            return total;
-                        } else {
-                            return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(partitionVar.getValue()))), DEFAULT_THRESHOLD);
-                        }
-                    }
-
-                    @Override
-                    public void meet(Service node) {
-                        Map.Entry<FederatedService, HBaseSail> me;
-                        //try to calculate cardinality also for (Halyard-internally) federated service expressions
-                        if (node.getServiceRef().hasValue() && (me = getServiceAndSail(node.getServiceRef().getValue().stringValue())) != null) {
-				cardinality = me.getValue().statistics.getCardinality(node.getServiceExpr());
-			} else {
-                            super.meet(node);
-                        }
-                    }
-                };
-            }
-        };
+        this.statistics = new HalyardEvaluationStatistics(this);
         this.evaluationTimeout = evaluationTimeout;
         this.elasticIndexURL = elasticIndexURL;
         this.ticker = ticker;
@@ -279,7 +211,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         return getServiceAndSail(serviceUrl).getKey();
     }
 
-    private Map.Entry<FederatedService, HBaseSail> getServiceAndSail(String serviceUrl) throws QueryEvaluationException {
+    Map.Entry<FederatedService, HBaseSail> getServiceAndSail(String serviceUrl) throws QueryEvaluationException {
         if (serviceUrl.startsWith(HALYARD.NAMESPACE)) {
             String federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length());
             Map.Entry<FederatedService, HBaseSail> me = federatedServices.get(federatedTable);
@@ -440,7 +372,18 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                     super.meet(node);
                 }
             });
-            new QueryJoinOptimizer(statistics).optimize(tupleExpr, dataset, bindings);
+            new QueryJoinOptimizer(statistics) {
+                @Override
+                public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
+                    tupleExpr.visit(new QueryJoinOptimizer.JoinVisitor(){
+                        @Override
+                        protected double getTupleExprCardinality(TupleExpr tupleExpr, Map<TupleExpr, Double> cardinalityMap, Map<TupleExpr, List<Var>> varsMap, Map<Var, Integer> varFreqMap, Set<String> boundVars) {
+                            ((HalyardEvaluationStatistics)statistics).updateCardinalityMap(tupleExpr, boundVars, cardinalityMap);
+                            return super.getTupleExprCardinality(tupleExpr, cardinalityMap, varsMap, varFreqMap, boundVars); //To change body of generated methods, choose Tools | Templates.
+                        }
+                    });
+                }
+            }.optimize(tupleExpr, dataset, bindings);
         } catch (IncompatibleOperationException ex) {
             //skip QueryJoinOptimizer when HALYARD.SEARCH_TYPE or HALYARD.PARALLEL_SPLIT_FUNCTION is present in the query to avoid re-shuffling of the joins
         }
