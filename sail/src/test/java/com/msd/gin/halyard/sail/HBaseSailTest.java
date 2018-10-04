@@ -287,23 +287,48 @@ public class HBaseSailTest {
     @Test
     public void testEvaluateService() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        Resource subj = vf.createIRI("http://whatever/subj/");
-        IRI pred = vf.createIRI("http://whatever/pred/");
-        Value obj = vf.createLiteral("whatever");
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverservice", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
         rep.initialize();
-        sail.addStatement(subj, pred, obj);
+        Random r = new Random(333);
+        IRI pred = vf.createIRI("http://whatever/pred");
+        IRI meta = vf.createIRI("http://whatever/meta");
+        for (int i = 0; i < 10; i++) {
+            IRI subj = vf.createIRI("http://whatever/subj#" + r.nextLong());
+            IRI graph = vf.createIRI("http://whatever/grp#" + r.nextLong());
+            sail.addStatement(subj, pred, graph, meta);
+            for (int j = 0; j < 10; j++) {
+                IRI s = vf.createIRI("http://whatever/s#" + r.nextLong());
+                IRI p = vf.createIRI("http://whatever/p#" + r.nextLong());
+                IRI o = vf.createIRI("http://whatever/o#" + r.nextLong());
+                sail.addStatement(s, p, o, graph);
+            }
+        }
         sail.commit();
         rep.shutDown();
 
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverparent", true, 0, true, 0, null, null);
         rep = new SailRepository(sail);
         rep.initialize();
-        TupleQuery q = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "select * {SERVICE <" + HALYARD.NAMESPACE +"whateverservice> {?s ?p ?o}}");
+        TupleQuery q = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL,
+            "select * where {"
+            + "  SERVICE <" + HALYARD.NAMESPACE + "whateverservice> {"
+            + "    graph <http://whatever/meta> {"
+            + "      ?subj <http://whatever/pred> ?graph"
+            + "    }"
+            + "    graph ?graph {"
+            + "      ?s ?p ?o"
+            + "    }"
+            + "  }"
+            + "}");
         TupleQueryResult res = q.evaluate();
-        assertTrue(res.hasNext());
+        int count = 0;
+        while (res.hasNext()) {
+            count++;
+            res.next();
+        }
         rep.shutDown();
+        assertEquals(100, count);
     }
 
     @Test(expected = UnsupportedOperationException.class)
@@ -378,54 +403,5 @@ public class HBaseSailTest {
         assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);
         assertEquals(1.0, sail.statistics.getCardinality(q4), 0.01);
         sail.shutDown();
-    }
-
-    @Test
-    public void testEvaluateServices() throws Exception {
-        ValueFactory vf = SimpleValueFactory.getInstance();
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverservice2", true, 0, true, 0, null, null);
-        SailRepository rep = new SailRepository(sail);
-        rep.initialize();
-        Random r = new Random(333);
-        IRI pred = vf.createIRI("http://whatever/pred");
-        IRI meta = vf.createIRI("http://whatever/meta");
-        for (int i = 0; i < 1000; i++) {
-            IRI subj = vf.createIRI("http://whatever/subj#" + r.nextLong());
-            IRI graph = vf.createIRI("http://whatever/grp#" + r.nextLong());
-            sail.addStatement(subj, pred, graph, meta);
-            for (int j = 0; j < 10; j++) {
-                IRI s = vf.createIRI("http://whatever/s#" + r.nextLong());
-                IRI p = vf.createIRI("http://whatever/p#" + r.nextLong());
-                IRI o = vf.createIRI("http://whatever/o#" + r.nextLong());
-                sail.addStatement(s, p, o, graph);
-            }
-        }
-        sail.commit();
-        rep.shutDown();
-
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverparent2", true, 0, true, 0, null, null);
-        rep = new SailRepository(sail);
-        rep.initialize();
-        TupleQuery q = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL,
-            "select * where {"
-            + "  SERVICE <" + HALYARD.NAMESPACE + "whateverservice2> {"
-            + "    graph <http://whatever/meta> {"
-            + "      ?subj <http://whatever/pred> ?graph"
-            + "    }"
-            + "  }"
-            + "  SERVICE <" + HALYARD.NAMESPACE + "whateverservice2> {"
-            + "    graph ?graph {"
-            + "      ?s ?p ?o"
-            + "    }"
-            + "  }"
-            + "}");
-        TupleQueryResult res = q.evaluate();
-        int count = 0;
-        while (res.hasNext()) {
-            count++;
-            res.next();
-        }
-        rep.shutDown();
-        assertEquals(10000, count);
     }
 }
