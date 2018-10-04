@@ -16,25 +16,18 @@
  */
 package com.msd.gin.halyard.strategy;
 
-import java.util.Set;
 import static junit.framework.TestCase.*;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
-import org.eclipse.rdf4j.common.iteration.EmptyIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.algebra.EmptySet;
-import org.eclipse.rdf4j.query.algebra.Service;
-import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
-import org.eclipse.rdf4j.query.impl.MapBindingSet;
 import org.junit.Test;
 
 /**
@@ -52,49 +45,9 @@ public class HalyardStrategyServiceTest {
         }, 0).getService(null));
     }
 
-    @Test
-    public void testServiceEvaluate() {
-        CloseableIteration<BindingSet, QueryEvaluationException> bindings1 = new EmptyIteration<>();
-        CloseableIteration<BindingSet, QueryEvaluationException> bindings2 = new EmptyIteration<>();
-        assertSame(bindings1, new HalyardEvaluationStrategy(getTripleSource(), null, getFederatedServiceResolver(bindings1), 0).evaluate(new Service(null, new EmptySet(), "", null, null, false), null, bindings2));
-    }
-
-    @Test (expected = QueryEvaluationException.class)
+    @Test(expected = UnsupportedOperationException.class)
     public void testServiceEvaluateFail() {
-        CloseableIteration<BindingSet, QueryEvaluationException> bindings = new EmptyIteration<>();
-        new HalyardEvaluationStrategy(getTripleSource(), null, getFederatedServiceResolver(null), 0).evaluate(new Service(null, new EmptySet(), "", null, null, false), null, bindings);
-    }
-
-    @Test
-    public void testServiceEvaluateFailSilent() {
-        CloseableIteration<BindingSet, QueryEvaluationException> bindings = new EmptyIteration<>();
-        assertSame(bindings, new HalyardEvaluationStrategy(getTripleSource(), null, getFederatedServiceResolver(null), 0).evaluate(new Service(null, new EmptySet(), "", null, null, true), null, bindings));
-    }
-
-    @Test (expected = QueryEvaluationException.class)
-    public void testNoServiceEvaluateFail() {
-        CloseableIteration<BindingSet, QueryEvaluationException> bindings = new EmptyIteration<>();
-        new HalyardEvaluationStrategy(getTripleSource(), null, null, 0).evaluate(new Service(null, new EmptySet(), "", null, null, false), null, bindings);
-    }
-
-    @Test
-    public void testServiceEvaluate2() {
-        CloseableIteration<BindingSet, QueryEvaluationException> bindings = new EmptyIteration<>();
-        try (CloseableIteration<BindingSet, QueryEvaluationException> res = new HalyardEvaluationStrategy(getTripleSource(), null, getFederatedServiceResolver(bindings), 0)
-            .evaluate(new Service(new Var("service", SimpleValueFactory.getInstance().createLiteral("http://whatever")), new EmptySet(), "", null, null, true), new MapBindingSet())) {
-            assertTrue(res.hasNext());
-            BindingSet resB = res.next();
-            Value val = resB.getValue("service");
-            assertNotNull(val);
-            assertEquals("http://whatever", val.stringValue());
-            assertFalse(res.hasNext());
-        }
-    }
-
-    @Test
-    public void testNoServiceEvaluateFailSilent() {
-        CloseableIteration<BindingSet, QueryEvaluationException> bindings = new EmptyIteration<>();
-        assertSame(bindings, new HalyardEvaluationStrategy(getTripleSource(), null, null, 0).evaluate(new Service(null, new EmptySet(), "", null, null, true), null, bindings));
+        new HalyardEvaluationStrategy(getTripleSource(), null, null, 0).evaluate(null, null, null);
     }
 
     private TripleSource getTripleSource() {
@@ -107,41 +60,6 @@ public class HalyardStrategyServiceTest {
             @Override
             public ValueFactory getValueFactory() {
                 return SimpleValueFactory.getInstance();
-            }
-        };
-    }
-
-    private FederatedServiceResolver getFederatedServiceResolver(final CloseableIteration<BindingSet, QueryEvaluationException> defaultBindings) {
-        return new FederatedServiceResolver() {
-            @Override
-            public FederatedService getService(String serviceUrl) throws QueryEvaluationException {
-                return new FederatedService() {
-                    @Override
-                    public boolean ask(Service service, BindingSet bindings, String baseUri) throws QueryEvaluationException {
-                        throw new QueryEvaluationException();
-                    }
-                    @Override
-                    public CloseableIteration<BindingSet, QueryEvaluationException> select(Service service, Set<String> projectionVars, BindingSet bindings, String baseUri) throws QueryEvaluationException {
-                        throw new QueryEvaluationException();
-                    }
-                    @Override
-                    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Service service, CloseableIteration<BindingSet, QueryEvaluationException> bindings, String baseUri) throws QueryEvaluationException {
-                        if (defaultBindings != null) return defaultBindings;
-                        else throw new QueryEvaluationException();
-                    }
-                    @Override
-                    public boolean isInitialized() {
-                        return false;
-                    }
-                    @Override
-                    public void initialize() throws QueryEvaluationException {
-                        throw new QueryEvaluationException();
-                    }
-                    @Override
-                    public void shutdown() throws QueryEvaluationException {
-                        throw new QueryEvaluationException();
-                    }
-                };
             }
         };
     }
