@@ -325,7 +325,7 @@ public class HBaseSailTest {
         int count = 0;
         while (res.hasNext()) {
             count++;
-            res.next();
+            System.out.println(res.next());
         }
         rep.shutDown();
         assertEquals(10000, count);
