@@ -106,10 +106,10 @@ public class TimeAwareHBaseSail extends HBaseSail {
     }
 
     @Override
-    public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred) throws SailException {
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred) throws SailException {
         Binding b = bindings.getBinding(TIMESTAMP_CALLBACK_BINDING_NAME);
         final TimestampCallbackBinding timestampBinding = (b instanceof TimestampCallbackBinding) ? (TimestampCallbackBinding) b : null;
-        CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = super.evaluate(tupleExpr, dataset, bindings, includeInferred);
+        CloseableIteration<BindingSet, QueryEvaluationException> iter = super.evaluate(tupleExpr, dataset, bindings, includeInferred);
         //push back the actual timestamp binding to the callback binding if requested
         if (timestampBinding != null) {
             iter = new FilterIteration<BindingSet, QueryEvaluationException>(iter) {

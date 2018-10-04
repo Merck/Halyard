@@ -33,7 +33,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
 
 /**
  * Provides an efficient asynchronous parallel push {@code EvaluationStrategy} implementation for query evaluation in Halyard. This is the default strategy
- * in Halyard. An alternative strategy is the {@code StrictEvaluationStrategy} from RDF4J. 
+ * in Halyard. An alternative strategy is the {@code StrictEvaluationStrategy} from RDF4J.
  * @author Adam Sotona (MSD)
  */
 public final class HalyardEvaluationStrategy implements EvaluationStrategy {
@@ -46,7 +46,7 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
      * Evaluates TupleExpressions and all implementations of that interface
      */
     private final HalyardTupleExprEvaluation tupleEval;
-    
+
     /**
      * Evaluates ValueExpr expressions and all implementations of that interface
      */
@@ -87,21 +87,7 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
      */
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Service service, String serviceUri, CloseableIteration<BindingSet, QueryEvaluationException> bindings) throws QueryEvaluationException {
-        if (serviceResolver == null) {
-            if (service.isSilent()) {
-                return bindings;
-            } else {
-                throw new QueryEvaluationException("No Service Resolver set.");
-            }
-        } else try {
-            return serviceResolver.getService(serviceUri).evaluate(service, bindings, service.getBaseURI());
-        } catch (QueryEvaluationException e) {
-            if (service.isSilent()) {
-                return bindings;
-            } else {
-                throw new QueryEvaluationException(e);
-            }
-        }
+        throw new UnsupportedOperationException();
     }
 
     /**

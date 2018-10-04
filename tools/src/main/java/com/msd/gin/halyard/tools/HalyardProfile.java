@@ -60,12 +60,12 @@ public final class HalyardProfile extends AbstractHalyardTool {
     public int run(CommandLine cmd) throws Exception {
         SailRepository repo = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('e'), null) {
             @Override
-            public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred) throws SailException {
+            public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred) throws SailException {
                 print("Original query:", tupleExpr);
                 return super.evaluate(tupleExpr, dataset, bindings, includeInferred); //To change body of generated methods, choose Tools | Templates.
             }
             @Override
-            protected CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluateInternal(EvaluationStrategy strategy, TupleExpr tupleExpr) {
+            protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(EvaluationStrategy strategy, TupleExpr tupleExpr) {
                 print("Optimized query:", tupleExpr);
                 return new EmptyIteration<>();
             }

@@ -24,7 +24,6 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -71,6 +70,7 @@ import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
 import org.eclipse.rdf4j.query.algebra.FunctionCall;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
+import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.Var;
@@ -78,7 +78,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
-import org.eclipse.rdf4j.query.algebra.evaluation.federation.RepositoryFederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.BindingAssigner;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.CompareOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
@@ -93,7 +92,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
-import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
@@ -110,7 +108,7 @@ import org.json.JSONTokener;
  * only supported for queries across multiple graphs in one Halyard database.
  * @author Adam Sotona (MSD)
  */
-public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver {
+public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver, FederatedService {
 
     /**
      * Ticker is a simple service interface that is notified when some data are processed.
@@ -143,7 +141,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     HTable table = null;
 
     private final Map<String, Namespace> namespaces = new HashMap<>();
-    private final Map<String, Map.Entry<FederatedService, HBaseSail>> federatedServices = new HashMap<>();
+    private final Map<String, HBaseSail> federatedServices = new HashMap<>();
 
     /**
      * Construct HBaseSail object with given arguments.
@@ -208,24 +206,45 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     @Override
     public FederatedService getService(String serviceUrl) throws QueryEvaluationException {
         //provide a service to query over Halyard graphs. Remote service queries are not supported.
-        return getServiceAndSail(serviceUrl).getKey();
-    }
-
-    Map.Entry<FederatedService, HBaseSail> getServiceAndSail(String serviceUrl) throws QueryEvaluationException {
         if (serviceUrl.startsWith(HALYARD.NAMESPACE)) {
             String federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length());
-            Map.Entry<FederatedService, HBaseSail> me = federatedServices.get(federatedTable);
-            if (me == null) {
-                HBaseSail sail = new HBaseSail(config, federatedTable, false, 0, true, evaluationTimeout, null, ticker);
-                FederatedService fs = new RepositoryFederatedService(new SailRepository(sail));
-                me = new AbstractMap.SimpleEntry<>(fs, sail);
-                federatedServices.put(federatedTable, me);
-                fs.initialize();
+            HBaseSail sail = federatedServices.get(federatedTable);
+            if (sail == null) {
+                sail = new HBaseSail(config, federatedTable, false, 0, true, evaluationTimeout, null, ticker);
+                federatedServices.put(federatedTable, sail);
+                sail.initialize();
             }
-            return me;
+            return sail;
         } else {
             throw new QueryEvaluationException("Unsupported service URL: " + serviceUrl);
         }
+    }
+
+    @Override
+    public boolean ask(Service service, BindingSet bindings, String baseUri) throws QueryEvaluationException {
+        try (CloseableIteration<BindingSet, QueryEvaluationException> res = evaluate(service.getArg(), null, bindings, true)) {
+            return res.hasNext();
+        }
+    }
+
+    @Override
+    public CloseableIteration<BindingSet, QueryEvaluationException> select(Service service, Set<String> projectionVars, BindingSet bindings, String baseUri) throws QueryEvaluationException {
+        return evaluate(service.getArg(), null, bindings, true);
+    }
+
+    @Override
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Service service, CloseableIteration<BindingSet, QueryEvaluationException> bindings, String baseUri) throws QueryEvaluationException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean isInitialized() {
+        return table != null;
+    }
+
+    @Override
+    public void shutdown() throws QueryEvaluationException {
+        shutDown();
     }
 
     @Override
@@ -236,8 +255,8 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         } catch (IOException ex) {
             throw new SailException(ex);
         }
-        for (Map.Entry<FederatedService, HBaseSail> s : federatedServices.values()) { //shutdown all federated services
-            s.getKey().shutdown();
+        for (HBaseSail s : federatedServices.values()) { //shutdown all federated services
+            s.shutdown();
         }
         federatedServices.clear(); // release the references to the services
     }
@@ -293,7 +312,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
     //evaluate queries/ subqueries
     @Override
-    public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred) throws SailException {
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred) throws SailException {
         LOG.log(Level.FINE, "Evaluated TupleExpr before optimizers:\n{0}", tupleExpr);
         tupleExpr = tupleExpr.clone();
         if (!(tupleExpr instanceof QueryRoot)) {
@@ -394,7 +413,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         LOG.log(Level.FINE, "Evaluated TupleExpr after optimization:\n{0}", tupleExpr);
         try {
         		//evaluate the expression against the TripleSource according to the EvaluationStrategy.
-            CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = evaluateInternal(strategy, tupleExpr);
+            CloseableIteration<BindingSet, QueryEvaluationException> iter = evaluateInternal(strategy, tupleExpr);
             return evaluationTimeout <= 0 ? iter : new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter, 1000l * evaluationTimeout) {
                 @Override
                 protected void throwInterruptedException() throws QueryEvaluationException {
@@ -406,7 +425,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         }
     }
 
-    protected CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluateInternal(EvaluationStrategy strategy, TupleExpr tupleExpr) {
+    protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(EvaluationStrategy strategy, TupleExpr tupleExpr) {
         return strategy.evaluate(tupleExpr, EmptyBindingSet.getInstance());
     }
 

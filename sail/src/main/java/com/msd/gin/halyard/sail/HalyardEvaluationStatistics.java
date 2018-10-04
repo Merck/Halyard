@@ -194,10 +194,10 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
 
             @Override
             public void meet(Service node) {
-                Map.Entry<FederatedService, HBaseSail> me;
+                FederatedService servSail;
                 //try to calculate cardinality also for (Halyard-internally) federated service expressions
-                if (node.getServiceRef().hasValue() && (me = sail.getServiceAndSail(node.getServiceRef().getValue().stringValue())) != null) {
-                    cardinality = me.getValue().statistics.getCardinality(node.getServiceExpr());
+                if (node.getServiceRef().hasValue() && (servSail = sail.getService(node.getServiceRef().getValue().stringValue())) != null) {
+                    cardinality = ((HBaseSail)servSail).statistics.getCardinality(node.getServiceExpr());
                     updateMap(node);
                 } else {
                     super.meet(node);
