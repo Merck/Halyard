@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -40,6 +41,7 @@ import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
+import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
@@ -192,10 +194,10 @@ final class HalyardStatementPatternEvaluation {
         if (p != null) {
             return p;
         } else {
-            final AtomicInteger counter = new AtomicInteger();
-            final AtomicInteger ret = new AtomicInteger();
             QueryModelNode root = node;
             while (root.getParentNode() != null) root = root.getParentNode(); //traverse to the root of the query model
+            final AtomicInteger counter = new AtomicInteger(root instanceof ServiceRoot ? getPriorityForNode(((ServiceRoot)root).originalServiceArgs) : 0); //starting priority for ServiceRoot must be evaluated from the original service args node
+            final AtomicInteger ret = new AtomicInteger();
 
             new AbstractQueryModelVisitor<RuntimeException>() {
                 @Override
@@ -210,6 +212,13 @@ final class HalyardStatementPatternEvaluation {
                 public void meet(Filter node) throws RuntimeException {
                     super.meet(node);
                     node.getCondition().visit(this);
+                }
+
+                @Override
+                public void meet(Service node) throws RuntimeException {
+                    final int checkpoint = counter.get();
+                    super.meet(node);
+                    counter.getAndUpdate((int count) -> 2 * count - checkpoint + 1); //at least double the distance to have a space for service optimizations
                 }
 
                 @Override

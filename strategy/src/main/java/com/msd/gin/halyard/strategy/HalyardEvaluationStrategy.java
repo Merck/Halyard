@@ -21,6 +21,7 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
+import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
@@ -37,6 +38,17 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardEvaluationStrategy implements EvaluationStrategy {
+
+    public static final class ServiceRoot extends QueryRoot {
+        private static final long serialVersionUID = 7052207623408379003L;
+
+        public final TupleExpr originalServiceArgs;
+
+        public ServiceRoot(TupleExpr serviceArgs) {
+            super(serviceArgs.clone());
+            this.originalServiceArgs = serviceArgs;
+        }
+    }
 
 	/**
 	 * Used to allow queries across more than one Halyard datasets

@@ -293,7 +293,7 @@ public class HBaseSailTest {
         Random r = new Random(333);
         IRI pred = vf.createIRI("http://whatever/pred");
         IRI meta = vf.createIRI("http://whatever/meta");
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 1000; i++) {
             IRI subj = vf.createIRI("http://whatever/subj#" + r.nextLong());
             IRI graph = vf.createIRI("http://whatever/grp#" + r.nextLong());
             sail.addStatement(subj, pred, graph, meta);
@@ -328,7 +328,7 @@ public class HBaseSailTest {
             res.next();
         }
         rep.shutDown();
-        assertEquals(100, count);
+        assertEquals(10000, count);
     }
 
     @Test(expected = UnsupportedOperationException.class)

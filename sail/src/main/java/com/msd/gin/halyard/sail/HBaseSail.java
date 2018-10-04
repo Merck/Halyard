@@ -18,6 +18,7 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
+import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -222,14 +223,14 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
     @Override
     public boolean ask(Service service, BindingSet bindings, String baseUri) throws QueryEvaluationException {
-        try (CloseableIteration<BindingSet, QueryEvaluationException> res = evaluate(service.getArg(), null, bindings, true)) {
+        try (CloseableIteration<BindingSet, QueryEvaluationException> res = evaluate(new ServiceRoot(service.getArg()), null, bindings, true)) {
             return res.hasNext();
         }
     }
 
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> select(Service service, Set<String> projectionVars, BindingSet bindings, String baseUri) throws QueryEvaluationException {
-        return evaluate(service.getArg(), null, bindings, true);
+        return evaluate(new ServiceRoot(service.getArg()), null, bindings, true);
     }
 
     @Override
