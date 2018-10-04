@@ -47,6 +47,7 @@ import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.junit.Test;
 import static org.junit.Assert.*;
+import org.junit.Ignore;
 
 /**
  *
@@ -284,6 +285,7 @@ public class HBaseSailTest {
         rep.shutDown();
     }
 
+    @Ignore
     @Test
     public void testEvaluateService() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
