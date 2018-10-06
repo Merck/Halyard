@@ -215,9 +215,12 @@ final class HalyardStatementPatternEvaluation {
                 }
 
                 @Override
-                public void meet(Service node) throws RuntimeException {
+                public void meet(Service n) throws RuntimeException {
                     final int checkpoint = counter.get();
-                    super.meet(node);
+                    n.visitChildren(this);
+                    int pp = counter.getAndIncrement();
+                    PRIORITY_MAP_CACHE.put(new IdentityWrapper<>(n), pp);
+                    if (n == node) ret.set(pp);
                     counter.getAndUpdate((int count) -> 2 * count - checkpoint + 1); //at least double the distance to have a space for service optimizations
                 }
 

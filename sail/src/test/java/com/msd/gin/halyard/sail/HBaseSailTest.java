@@ -285,7 +285,6 @@ public class HBaseSailTest {
         rep.shutDown();
     }
 
-    @Ignore
     @Test
     public void testEvaluateService() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
