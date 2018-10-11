@@ -412,12 +412,12 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                             parser.setValueFactory(new SimpleValueFactory(){
                                 @Override
                                 public Statement createStatement(Resource subject, IRI predicate, Value object) {
-                                    return defaultRdfContextPattern != null ?  super.createStatement(subject, predicate, object, defaultRdfContext) : super.createStatement(subject, predicate, object);
+                                    return super.createStatement(subject, predicate, object, defaultRdfContext);
                                 }
 
                                 @Override
                                 public Statement createStatement(Resource subject, IRI predicate, Value object, Resource context) {
-                                    return overrideRdfContext ? createStatement(subject, predicate, object) : super.createStatement(subject, predicate, object, context);
+                                    return super.createStatement(subject, predicate, object, overrideRdfContext || context == null ? defaultRdfContext : context);
                                 }
                             });
                         }
