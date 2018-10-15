@@ -30,15 +30,24 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
+import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
+import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
+import org.eclipse.rdf4j.query.algebra.EmptySet;
+import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
+import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.Service;
+import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
+import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Var;
+import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
 import org.eclipse.rdf4j.sail.SailException;
 
 /**
@@ -56,11 +65,13 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
 
     CardinalityCalculator lastBoundCC = null;
     Set<String> lastBoundVars = null;
+    Map<TupleExpr, Double> lastMap = null;
 
     public synchronized void updateCardinalityMap(TupleExpr expr, Set<String> boundVars, Map<TupleExpr, Double> mapToUpdate) {
-            if (this.lastBoundVars != boundVars || lastBoundCC == null) {
+            if (this.lastBoundVars != boundVars || this.lastMap != mapToUpdate || lastBoundCC == null) {
                     lastBoundCC = createCardinalityCalculator(boundVars, mapToUpdate);
                     lastBoundVars = boundVars;
+                    lastMap = mapToUpdate;
             }
             expr.visit(lastBoundCC);
     }
@@ -193,15 +204,82 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
             }
 
             @Override
+            public void meet(Filter node) throws RuntimeException {
+                super.meetUnaryTupleOperator(node);
+                double subCost = cardinality;
+                cardinality = 1;
+                node.getCondition().visit(this);
+                cardinality *= subCost;
+                updateMap(node);
+            }
+
+            @Override
+            protected void meetUnaryTupleOperator(UnaryTupleOperator node) {
+                super.meetUnaryTupleOperator(node);
+                updateMap(node);
+            }
+
+            @Override
+            public void meet(StatementPattern sp) {
+                super.meet(sp);
+                updateMap(sp);
+            }
+
+            @Override
+            public void meet(ArbitraryLengthPath node) {
+                super.meet(node);
+                updateMap(node);
+            }
+
+            @Override
+            public void meet(ZeroLengthPath node) {
+                super.meet(node);
+                updateMap(node);
+            }
+
+
+            @Override
+            public void meet(BindingSetAssignment node) {
+                super.meet(node);
+                updateMap(node);
+            }
+
+            @Override
+            public void meet(EmptySet node) {
+                super.meet(node);
+                updateMap(node);
+            }
+
+            @Override
+            public void meet(SingletonSet node) {
+                super.meet(node);
+                updateMap(node);
+            }
+
+            @Override
+            protected void meetNode(QueryModelNode node) {
+                if (node instanceof ExternalSet) {
+                        meetExternalSet((ExternalSet)node);
+                } else {
+                    node.visitChildren(this);
+                }
+            }
+
+            @Override
             public void meet(Service node) {
                 FederatedService servSail;
                 //try to calculate cardinality also for (Halyard-internally) federated service expressions
                 if (node.getServiceRef().hasValue() && (servSail = sail.getService(node.getServiceRef().getValue().stringValue())) != null) {
-                    cardinality = ((HBaseSail)servSail).statistics.getCardinality(node.getServiceExpr());
-                    updateMap(node);
+                    Double servCard = null;
+                    if (mapToUpdate != null) {
+                        ((HBaseSail)servSail).statistics.updateCardinalityMap(node.getServiceExpr(), boundVars, mapToUpdate);
+                        servCard = mapToUpdate.get(node.getServiceExpr());
+                    }
+                    cardinality = servCard != null ? servCard : ((HBaseSail)servSail).statistics.getCardinality(node.getServiceExpr());
                 } else {
                     super.meet(node);
                 }
+                updateMap(node);
             }
 
             private void updateMap(TupleExpr node) {
