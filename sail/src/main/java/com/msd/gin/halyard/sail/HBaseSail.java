@@ -69,6 +69,7 @@ import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.IncompatibleOperationException;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
+import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.FunctionCall;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.Service;
@@ -92,6 +93,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
+import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
@@ -409,7 +411,23 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         }
         // new SubSelectJoinOptimizer().optimize(tupleExpr, dataset, bindings);
         new IterativeEvaluationOptimizer().optimize(tupleExpr, dataset, bindings);
-        new FilterOptimizer().optimize(tupleExpr, dataset, bindings);
+        new FilterOptimizer(){
+            @Override
+            public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
+                tupleExpr.visit(new FilterFinder(tupleExpr){
+		@Override
+		public void meet(Filter filter) {
+			super.meet(filter);
+			filter.visit(new FilterRelocator(filter){
+                            {
+                                filterVars.retainAll(VarNameCollector.process(filter.getArg()));
+                            }
+                        });
+		}
+                });
+            }
+
+        }.optimize(tupleExpr, dataset, bindings);
         new OrderLimitOptimizer().optimize(tupleExpr, dataset, bindings);
         LOG.log(Level.FINE, "Evaluated TupleExpr after optimization:\n{0}", tupleExpr);
         try {
