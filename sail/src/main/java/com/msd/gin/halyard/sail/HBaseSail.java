@@ -702,7 +702,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         namespaces.clear();
     }
 
-    Map <String, List<byte[]>> searchCache = Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map <String, List<byte[]>> SEARCH_CACHE = new WeakHashMap<>();
 
     //Scans the Halyard table for statements that match the specified pattern
     private class LiteralSearchStatementScanner extends StatementScanner {
@@ -723,37 +723,39 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
             while (true) {
                 if (objHash == null) {
                     if (objectHashes == null) { //perform ES query and parse results
-                        List<byte[]> objectHashesList = searchCache.get(literalSearchQuery);
-                        if (objectHashesList == null) {
-                            objectHashesList = new ArrayList<>();
-                            HttpURLConnection http = (HttpURLConnection)(new URL(elasticIndexURL + "/_search").openConnection());
-                            try {
-                                http.setRequestMethod("POST");
-                                http.setDoOutput(true);
-                                http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                                http.connect();
-                                try (PrintStream out = new PrintStream(http.getOutputStream(), true, "UTF-8")) {
-                                    out.print("{\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"_source\":false,\"stored_fields\":\"_id\",\"size\":" + ELASTIC_RESULT_SIZE + "}");
-                                }
-                                int response = http.getResponseCode();
-                                String msg = http.getResponseMessage();
-                                if (response != 200) {
-                                    throw new IOException(msg);
-                                }
-                                try (InputStreamReader isr = new InputStreamReader(http.getInputStream(), "UTF-8")) {
-                                    JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
-                                    for (int i=0; i<hits.length(); i++) {
-                                        objectHashesList.add(Hex.decodeHex(hits.getJSONObject(i).getString("_id").toCharArray()));
+                        synchronized (SEARCH_CACHE) {
+                            List<byte[]> objectHashesList = SEARCH_CACHE.get(literalSearchQuery);
+                            if (objectHashesList == null) {
+                                objectHashesList = new ArrayList<>();
+                                HttpURLConnection http = (HttpURLConnection)(new URL(elasticIndexURL + "/_search").openConnection());
+                                try {
+                                    http.setRequestMethod("POST");
+                                    http.setDoOutput(true);
+                                    http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                                    http.connect();
+                                    try (PrintStream out = new PrintStream(http.getOutputStream(), true, "UTF-8")) {
+                                        out.print("{\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"_source\":false,\"stored_fields\":\"_id\",\"size\":" + ELASTIC_RESULT_SIZE + "}");
                                     }
+                                    int response = http.getResponseCode();
+                                    String msg = http.getResponseMessage();
+                                    if (response != 200) {
+                                        throw new IOException(msg);
+                                    }
+                                    try (InputStreamReader isr = new InputStreamReader(http.getInputStream(), "UTF-8")) {
+                                        JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
+                                        for (int i=0; i<hits.length(); i++) {
+                                            objectHashesList.add(Hex.decodeHex(hits.getJSONObject(i).getString("_id").toCharArray()));
+                                        }
+                                    }
+                                } catch (JSONException | DecoderException ex) {
+                                    throw new IOException(ex);
+                                } finally {
+                                    http.disconnect();
                                 }
-                            } catch (JSONException | DecoderException ex) {
-                                throw new IOException(ex);
-                            } finally {
-                                http.disconnect();
+                                SEARCH_CACHE.put(new String(literalSearchQuery), objectHashesList);
                             }
-                            searchCache.put(new String(literalSearchQuery), objectHashesList);
+                            objectHashes = objectHashesList.iterator();
                         }
-                        objectHashes = objectHashesList.iterator();
                     }
                     if (objectHashes.hasNext()) {
                         objHash = objectHashes.next();
