@@ -739,20 +739,21 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                                     int response = http.getResponseCode();
                                     String msg = http.getResponseMessage();
                                     if (response != 200) {
-                                        throw new IOException(msg);
-                                    }
-                                    try (InputStreamReader isr = new InputStreamReader(http.getInputStream(), "UTF-8")) {
-                                        JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
-                                        for (int i=0; i<hits.length(); i++) {
-                                            objectHashesList.add(Hex.decodeHex(hits.getJSONObject(i).getString("_id").toCharArray()));
+                                        LOG.info("ElasticSearch error response: " + msg + " on query: " + literalSearchQuery);
+                                    } else {
+                                        try (InputStreamReader isr = new InputStreamReader(http.getInputStream(), "UTF-8")) {
+                                            JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
+                                            for (int i=0; i<hits.length(); i++) {
+                                                objectHashesList.add(Hex.decodeHex(hits.getJSONObject(i).getString("_id").toCharArray()));
+                                            }
                                         }
+                                        SEARCH_CACHE.put(new String(literalSearchQuery), objectHashesList);
                                     }
                                 } catch (JSONException | DecoderException ex) {
                                     throw new IOException(ex);
                                 } finally {
                                     http.disconnect();
                                 }
-                                SEARCH_CACHE.put(new String(literalSearchQuery), objectHashesList);
                             }
                             objectHashes = objectHashesList.iterator();
                         }
