@@ -393,7 +393,7 @@ public class HBaseSailTest {
         assertEquals(100.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q2), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);
-        assertEquals(1.0, sail.statistics.getCardinality(q4), 0.01);
+        assertEquals(0.000001, sail.statistics.getCardinality(q4), 0.01);
         sail.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
         sail.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(RDF.TYPE))), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
         sail.addStatement(f.createIRI("http://whatevercontext"), VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
@@ -402,7 +402,7 @@ public class HBaseSailTest {
         assertEquals(5000.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(20.0, sail.statistics.getCardinality(q2), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);
-        assertEquals(1.0, sail.statistics.getCardinality(q4), 0.01);
+        assertEquals(0.000001, sail.statistics.getCardinality(q4), 0.01);
         sail.shutDown();
     }
 }
