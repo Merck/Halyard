@@ -35,6 +35,7 @@ import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
 import org.eclipse.rdf4j.query.algebra.EmptySet;
 import org.eclipse.rdf4j.query.algebra.Filter;
+import org.eclipse.rdf4j.query.algebra.FunctionCall;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
@@ -87,9 +88,9 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
             @Override
             protected double getCardinality(StatementPattern sp) { //get the cardinality of the Statement form VOID statistics
                 Var objectVar = sp.getObjectVar();
-                //always return cardinality 1.0 for HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
+                //always return very low cardinality for HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
                 if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal) objectVar.getValue()).getDatatype())) {
-                    return 1.0;
+                    return 0.000001;
                 }
                 final Var contextVar = sp.getContextVar();
                 final IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI) contextVar.getValue();
@@ -211,6 +212,15 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
                 node.getCondition().visit(this);
                 cardinality *= subCost;
                 updateMap(node);
+            }
+
+            @Override
+            public void meet(FunctionCall node) throws RuntimeException {
+                if (HALYARD.PARALLEL_SPLIT_FUNCTION.toString().equals(node.getURI())) {
+                    cardinality = 0.000001;
+                } else {
+                    super.meet(node);
+                }
             }
 
             @Override

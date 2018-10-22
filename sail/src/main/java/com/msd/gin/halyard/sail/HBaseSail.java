@@ -63,18 +63,13 @@ import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.SD;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
-import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
-import org.eclipse.rdf4j.query.IncompatibleOperationException;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
 import org.eclipse.rdf4j.query.algebra.Filter;
-import org.eclipse.rdf4j.query.algebra.FunctionCall;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
-import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
@@ -92,7 +87,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.sail.Sail;
@@ -357,68 +351,14 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         new DisjunctiveConstraintOptimizer().optimize(tupleExpr, dataset, bindings);
         new SameTermFilterOptimizer().optimize(tupleExpr, dataset, bindings);
         new QueryModelNormalizer().optimize(tupleExpr, dataset, bindings);
-        try {
-            //seach for presence of HALYARD.SEARCH_TYPE or HALYARD.PARALLEL_SPLIT_FUNCTION within the query
-            tupleExpr.visit(new AbstractQueryModelVisitor<IncompatibleOperationException>(){
-                private void checkForSearchType(Value val) {
-                    if ((val instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal)val).getDatatype())) {
-                        throw new IncompatibleOperationException();
-                    }
-                }
-                @Override
-                public void meet(ValueConstant node) throws RuntimeException {
-                    checkForSearchType(node.getValue());
-                    super.meet(node);
-                }
-                @Override
-                public void meet(Var node) throws RuntimeException {
-                    if (node.hasValue()) {
-                        checkForSearchType(node.getValue());
-                    }
-                    super.meet(node);
-                }
-                @Override
-                public void meet(FunctionCall node) throws IncompatibleOperationException {
-                    if (HALYARD.PARALLEL_SPLIT_FUNCTION.toString().equals(node.getURI())) {
-                        throw new IncompatibleOperationException();
-                    }
-                    super.meet(node);
-                }
-                @Override
-                public void meet(BindingSetAssignment node) throws RuntimeException {
-                    for (BindingSet bs : node.getBindingSets()) {
-                        for (Binding b : bs) {
-                            checkForSearchType(b.getValue());
-                        }
-                    }
-                    super.meet(node);
-                }
-            });
-            new QueryJoinOptimizer(statistics) {
-                @Override
-                public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-                    tupleExpr.visit(new QueryJoinOptimizer.JoinVisitor(){
-                        @Override
-                        protected double getTupleExprCardinality(TupleExpr tupleExpr, Map<TupleExpr, Double> cardinalityMap, Map<TupleExpr, List<Var>> varsMap, Map<Var, Integer> varFreqMap, Set<String> boundVars) {
-                            ((HalyardEvaluationStatistics)statistics).updateCardinalityMap(tupleExpr, boundVars, cardinalityMap);
-                            return super.getTupleExprCardinality(tupleExpr, cardinalityMap, varsMap, varFreqMap, boundVars); //To change body of generated methods, choose Tools | Templates.
-                        }
-                    });
-                }
-            }.optimize(tupleExpr, dataset, bindings);
-        } catch (IncompatibleOperationException ex) {
-            //skip QueryJoinOptimizer when HALYARD.SEARCH_TYPE or HALYARD.PARALLEL_SPLIT_FUNCTION is present in the query to avoid re-shuffling of the joins
-        }
-        // new SubSelectJoinOptimizer().optimize(tupleExpr, dataset, bindings);
-        new IterativeEvaluationOptimizer().optimize(tupleExpr, dataset, bindings);
-        new FilterOptimizer(){
+        FilterOptimizer filterOptimizer = new FilterOptimizer(){
             @Override
             public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-                tupleExpr.visit(new FilterFinder(tupleExpr){
+                tupleExpr.visit(new FilterOptimizer.FilterFinder(tupleExpr){
 		@Override
 		public void meet(Filter filter) {
 			super.meet(filter);
-			filter.visit(new FilterRelocator(filter){
+			filter.visit(new FilterOptimizer.FilterRelocator(filter){
                             {
                                 filterVars.retainAll(VarNameCollector.process(filter.getArg()));
                             }
@@ -427,7 +367,23 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                 });
             }
 
+        };
+        filterOptimizer.optimize(tupleExpr, dataset, bindings);
+        new QueryJoinOptimizer(statistics) {
+            @Override
+            public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
+                tupleExpr.visit(new QueryJoinOptimizer.JoinVisitor(){
+                    @Override
+                    protected double getTupleExprCardinality(TupleExpr tupleExpr, Map<TupleExpr, Double> cardinalityMap, Map<TupleExpr, List<Var>> varsMap, Map<Var, Integer> varFreqMap, Set<String> boundVars) {
+                        ((HalyardEvaluationStatistics)statistics).updateCardinalityMap(tupleExpr, boundVars, cardinalityMap);
+                        return super.getTupleExprCardinality(tupleExpr, cardinalityMap, varsMap, varFreqMap, boundVars); //To change body of generated methods, choose Tools | Templates.
+                    }
+                });
+            }
         }.optimize(tupleExpr, dataset, bindings);
+        // new SubSelectJoinOptimizer().optimize(tupleExpr, dataset, bindings);
+        new IterativeEvaluationOptimizer().optimize(tupleExpr, dataset, bindings);
+        filterOptimizer.optimize(tupleExpr, dataset, bindings); //apply filter optimizer twice (before and after Joins and Unions shaking)
         new OrderLimitOptimizer().optimize(tupleExpr, dataset, bindings);
         LOG.log(Level.FINE, "Evaluated TupleExpr after optimization:\n{0}", tupleExpr);
         try {
