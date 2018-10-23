@@ -583,7 +583,7 @@ public final class HalyardExport extends AbstractHalyardTool {
         addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
         addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name, mandatory for JDBC export", false, true);
         addOption("r", "trim", null, "Trim target table before export (apply for JDBC only)", false, false);
-        addOption("e", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
     }
 
     @Override
@@ -596,7 +596,7 @@ public final class HalyardExport extends AbstractHalyardTool {
             public void logStatus(String status) {
                 LOG.info(status);
             }
-        }, cmd.getOptionValue('s'), cmd.getOptionValue('q'), cmd.getOptionValue('t'), cmd.getOptionValue('c'), cmd.getOptionValue('l'), cmd.getOptionValues('p'), cmd.hasOption('r'), cmd.getOptionValue('e'));
+        }, cmd.getOptionValue('s'), cmd.getOptionValue('q'), cmd.getOptionValue('t'), cmd.getOptionValue('c'), cmd.getOptionValue('l'), cmd.getOptionValues('p'), cmd.hasOption('r'), cmd.getOptionValue('i'));
         return 0;
     }
 }

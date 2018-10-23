@@ -36,12 +36,12 @@ public final class HalyardUpdate extends AbstractHalyardTool {
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "update-operation", "sparql_update_operation", "SPARQL update operation to be executed", true, true);
-        addOption("e", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
     }
 
 
     public int run(CommandLine cmd) throws Exception {
-        SailRepository rep = new SailRepository(new TimeAwareHBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('e'), null));
+        SailRepository rep = new SailRepository(new TimeAwareHBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('i'), null));
         rep.initialize();
         try {
             Update u = rep.getConnection().prepareUpdate(QueryLanguage.SPARQL, cmd.getOptionValue('q'));

@@ -381,7 +381,7 @@ Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index
 ### Halyard Update
 ```
 $ ./halyard update -h
-usage: halyard update [-h] [-v] -s <dataset_table> -q <sparql_update_operation> [-e
+usage: halyard update [-h] [-v] -s <dataset_table> -q <sparql_update_operation> [-i
        <elastic_index_url>]
 Halyard Update is a command-line application designed to run SPARQL Update operations to transform
 data in an HBase Halyard dataset
@@ -389,7 +389,7 @@ data in an HBase Halyard dataset
  -v,--version                                      Prints version
  -s,--source-dataset <dataset_table>               Source HBase table with Halyard RDF store
  -q,--update-operation <sparql_update_operation>   SPARQL update operation to be executed
- -e,--elastic-index <elastic_index_url>            Optional ElasticSearch index URL
+ -i,--elastic-index <elastic_index_url>            Optional ElasticSearch index URL
 Example: halyard update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs ?o}'
 ```
 
@@ -397,7 +397,7 @@ Example: halyard update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s ow
 ```
 $ ./halyard bulkupdate -h
 usage: halyard bulkupdate [-h] [-v] -s <dataset_table> -q <sparql_update_operations> -w
-       <shared_folder> [-e <timestamp>]
+       <shared_folder> [-e <timestamp>] [-i <elastic_index_url>]
 Halyard Bulk Update is a MapReduce application that executes multiple SPARQL Update operations in
 parallel in the Mapper phase. The Shuffle and Reduce phase are responsible for the efficient update
 of the dataset in a bulk mode (similar to the Halyard Bulk Load). Halyard Bulk Update supports
@@ -416,6 +416,7 @@ processed as a single atomic bulk operation at the end of the execution.
  -e,--target-timestamp <timestamp>                   Optionally specify timestamp of all loaded
                                                      records (default is actual time of the
                                                      operation)
+ -i,--elastic-index <elastic_index_url>              Optional ElasticSearch index URL
 Example: halyard bulkupdate -s my_dataset -q hdfs:///myupdates/*.sparql -w hdfs:///my_tmp_workdir
 ```
 
@@ -423,7 +424,7 @@ Example: halyard bulkupdate -s my_dataset -q hdfs:///myupdates/*.sparql -w hdfs:
 ```
 $ ./halyard export -h
 usage: halyard export [-h] [-v] -s <dataset_table> -q <sparql_query> -t <target_url> [-p
-       <property=value>] [-l <driver_classpath>] [-c <driver_class>] [-r] [-e <elastic_index_url>]
+       <property=value>] [-l <driver_classpath>] [-c <driver_class>] [-r] [-i <elastic_index_url>]
 Halyard Export is a command-line application designed to export data from HBase (a Halyard dataset)
 into various targets and formats.
  -h,--help                                       Prints this help
@@ -442,7 +443,7 @@ into various targets and formats.
  -c,--jdbc-driver-class <driver_class>           JDBC driver class name, mandatory for JDBC export
  -r,--trim                                       Trim target table before export (apply for JDBC
                                                  only)
- -e,--elastic-index <elastic_index_url>          Optional ElasticSearch index URL
+ -i,--elastic-index <elastic_index_url>          Optional ElasticSearch index URL
 The exported data is determined by a SPARQL query. It can be either a SELECT query that produces a
 set of tuples (a table) or a CONSTRUCT/DESCRIBE query that produces a set of triples (a graph). The
 supported target systems, query types, formats, and compressions are listed in the following table:
@@ -481,13 +482,14 @@ Halyard Parallel Export tool become obsolete and all its functionality has been 
 ```
 $ ./halyard bulkexport -h
 usage: halyard bulkexport [-h] [-v] -s <dataset_table> -q <sparql_queries> -t <target_url> [-p
-       <property=value>] [-l <driver_classpath>] [-c <driver_class>]
+       <property=value>] [-l <driver_classpath>] [-c <driver_class>] [-i <elastic_index_url>]
 Halyard Bulk Export is a MapReduce application that executes multiple Halyard Exports in MapReduce
 framework. Query file name (without extension) can be used in the target URL pattern. Order of
 queries execution is not guaranteed. Another internal level of parallelisation is done using a
-custom SPARQL function halyard:forkAndFilterBy(<constant_number_of_forks>, ?a_binding, ...). The
-function takes one or more bindings as its arguments and these bindings are used as keys to randomly
-distribute the query evaluation across the executed parallel forks of the same query.
+custom SPARQL function
+halyard:http://merck.github.io/Halyard/ns#forkAndFilterBy(<constant_number_of_forks>, ?a_binding,
+...). The function takes one or more bindings as its arguments and these bindings are used as keys
+to randomly distribute the query evaluation across the executed parallel forks of the same query.
  -h,--help                                       Prints this help
  -v,--version                                    Prints version
  -s,--source-dataset <dataset_table>             Source HBase table with Halyard RDF store
@@ -503,6 +505,7 @@ distribute the query evaluation across the executed parallel forks of the same q
  -p,--jdbc-property <property=value>             JDBC connection property
  -l,--jdbc-driver-classpath <driver_classpath>   JDBC driver classpath delimited by ':'
  -c,--jdbc-driver-class <driver_class>           JDBC driver class name
+ -i,--elastic-index <elastic_index_url>          Optional ElasticSearch index URL
 Example: halyard bulkexport -s my_dataset -q hdfs:///myqueries/*.sparql -t
 hdfs:/my_folder/{0}-{1}.csv.gz
 ```

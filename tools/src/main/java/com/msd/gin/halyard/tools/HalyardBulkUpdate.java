@@ -228,6 +228,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         addOption("q", "update-operations", "sparql_update_operations", "folder or path pattern with SPARQL update operations", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
         addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (default is actual time of the operation)", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
     }
 
 
@@ -236,6 +237,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         String queryFiles = cmd.getOptionValue('q');
         String workdir = cmd.getOptionValue('w');
         getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, Long.parseLong(cmd.getOptionValue('e', String.valueOf(System.currentTimeMillis()))));
+        if (cmd.hasOption('i')) getConf().set(ELASTIC_INDEX_URL, cmd.getOptionValue('i'));
         TableMapReduceUtil.addDependencyJars(getConf(),
                HalyardExport.class,
                NTriplesUtil.class,

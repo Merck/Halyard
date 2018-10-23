@@ -114,6 +114,7 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
         addOption("p", "jdbc-property", "property=value", "JDBC connection property", false, false);
         addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
         addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
     }
 
     @Override
@@ -138,6 +139,7 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
             }
             getConf().setStrings(JDBC_PROPERTIES, props);
         }
+        if (cmd.hasOption('i')) getConf().set(HalyardBulkUpdate.ELASTIC_INDEX_URL, cmd.getOptionValue('i'));
         TableMapReduceUtil.addDependencyJars(getConf(),
                HalyardExport.class,
                NTriplesUtil.class,
