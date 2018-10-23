@@ -188,7 +188,7 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
                 boundVars.addAll(node.getLeftArg().getBindingNames());
                 node.getRightArg().visit(this);
                 updateMap(node.getRightArg());
-                cardinality *= leftArgCost;
+                cardinality *= leftArgCost * leftArgCost;
                 boundVars = origBoundVars;
                 updateMap(node);
             }
