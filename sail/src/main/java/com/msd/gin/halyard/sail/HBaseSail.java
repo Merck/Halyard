@@ -17,6 +17,9 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
+import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 import java.io.File;
@@ -66,11 +69,9 @@ import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
-import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
@@ -80,14 +81,11 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.CompareOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConstantOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.FilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.OrderLimitOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
-import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
@@ -157,7 +155,10 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         this.create = create;
         this.splitBits = splitBits;
         this.pushStrategy = pushStrategy;
-        this.statistics = new HalyardEvaluationStatistics(this);
+        this.statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(this), (String service) -> {
+            FederatedService servSail = getService(service);
+            return servSail != null ? ((HBaseSail)servSail).statistics : null;
+        });
         this.evaluationTimeout = evaluationTimeout;
         this.elasticIndexURL = elasticIndexURL;
         this.ticker = ticker;
@@ -351,36 +352,9 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         new DisjunctiveConstraintOptimizer().optimize(tupleExpr, dataset, bindings);
         new SameTermFilterOptimizer().optimize(tupleExpr, dataset, bindings);
         new QueryModelNormalizer().optimize(tupleExpr, dataset, bindings);
-        FilterOptimizer filterOptimizer = new FilterOptimizer(){
-            @Override
-            public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-                tupleExpr.visit(new FilterOptimizer.FilterFinder(tupleExpr){
-		@Override
-		public void meet(Filter filter) {
-			super.meet(filter);
-			filter.visit(new FilterOptimizer.FilterRelocator(filter){
-                            {
-                                filterVars.retainAll(VarNameCollector.process(filter.getArg()));
-                            }
-                        });
-		}
-                });
-            }
-
-        };
+        HalyardFilterOptimizer filterOptimizer = new HalyardFilterOptimizer();
         filterOptimizer.optimize(tupleExpr, dataset, bindings);
-        new QueryJoinOptimizer(statistics) {
-            @Override
-            public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-                tupleExpr.visit(new QueryJoinOptimizer.JoinVisitor(){
-                    @Override
-                    protected double getTupleExprCardinality(TupleExpr tupleExpr, Map<TupleExpr, Double> cardinalityMap, Map<TupleExpr, List<Var>> varsMap, Map<Var, Integer> varFreqMap, Set<String> boundVars) {
-                        ((HalyardEvaluationStatistics)statistics).updateCardinalityMap(tupleExpr, boundVars, cardinalityMap);
-                        return super.getTupleExprCardinality(tupleExpr, cardinalityMap, varsMap, varFreqMap, boundVars); //To change body of generated methods, choose Tools | Templates.
-                    }
-                });
-            }
-        }.optimize(tupleExpr, dataset, bindings);
+        new HalyardQueryJoinOptimizer(statistics).optimize(tupleExpr, dataset, bindings);
         // new SubSelectJoinOptimizer().optimize(tupleExpr, dataset, bindings);
         new IterativeEvaluationOptimizer().optimize(tupleExpr, dataset, bindings);
         filterOptimizer.optimize(tupleExpr, dataset, bindings); //apply filter optimizer twice (before and after Joins and Unions shaking)
