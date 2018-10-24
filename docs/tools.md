@@ -342,7 +342,7 @@ halyard:statsContext {
         void:triples "400"^^xsd:long .
 }
 ```
-### Halyard ElasticSearch Index <a id="Halyard_ElasticSearch_Index"></a>
+### Halyard ElasticSearch Index<a id="Halyard_ElasticSearch_Index"></a>
 ```
 $ ./halyard esindex -h
 usage: halyard esindex [-h] [-v] -s <dataset_table> -t <target_url> [-c] [-d <document_type>] [-a
@@ -393,7 +393,7 @@ data in an HBase Halyard dataset
 Example: halyard update -s my_dataset -q 'insert {?o owl:sameAs ?s} where {?s owl:sameAs ?o}'
 ```
 
-### Halyard Bulk Update <a id="Halyard_Bulk_Update"></a>
+### Halyard Bulk Update<a id="Halyard_Bulk_Update"></a>
 ```
 $ ./halyard bulkupdate -h
 usage: halyard bulkupdate [-h] [-v] -s <dataset_table> -q <sparql_update_operations> -w
@@ -475,10 +475,10 @@ Example: halyard export -s my_dataset -q 'select * where {?subjet ?predicate ?ob
 hdfs:/my_folder/my_data.csv.gz
 ```
 
-### Halyard Parallel Export <a id="Halyard_Parallel_Export"></a>
+### Halyard Parallel Export<a id="Halyard_Parallel_Export"></a>
 Halyard Parallel Export tool become obsolete and all its functionality has been included in Halyard Bulk Export.
 
-### Halyard Bulk Export <a id="Halyard_Bulk_Export"></a>
+### Halyard Bulk Export<a id="Halyard_Bulk_Export"></a>
 ```
 $ ./halyard bulkexport -h
 usage: halyard bulkexport [-h] [-v] -s <dataset_table> -q <sparql_queries> -t <target_url> [-p
