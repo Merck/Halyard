@@ -34,6 +34,7 @@ import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
+import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
@@ -45,10 +46,12 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
 public final class HalyardEvaluationStatistics extends EvaluationStatistics {
 
     public static interface StatementPatternCardinalityCalculator {
-        public double getCardinality(StatementPattern sp, Collection<String> boundVars);
+
+        public Double getCardinality(StatementPattern sp, Collection<String> boundVars);
     }
 
     public static interface ServiceStatsProvider {
+
         public HalyardEvaluationStatistics getStatsForService(String service);
     }
 
@@ -65,146 +68,167 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
     Map<TupleExpr, Double> lastMap = null;
 
     public synchronized void updateCardinalityMap(TupleExpr expr, Set<String> boundVars, Map<TupleExpr, Double> mapToUpdate) {
-            if (this.lastBoundVars != boundVars || this.lastMap != mapToUpdate || lastBoundCC == null) {
-                    lastBoundCC = createCardinalityCalculator(boundVars, mapToUpdate);
-                    lastBoundVars = boundVars;
-                    lastMap = mapToUpdate;
-            }
-            expr.visit(lastBoundCC);
+        if (this.lastBoundVars != boundVars || this.lastMap != mapToUpdate || lastBoundCC == null) {
+            lastBoundCC = new HalyardCardinalityCalcualtor(boundVars, mapToUpdate);
+            lastBoundVars = boundVars;
+            lastMap = mapToUpdate;
+        }
+        expr.visit(lastBoundCC);
+    }
+
+    public synchronized double getCardinality(TupleExpr expr, final Set<String> boundVariables) {
+        if (cc == null) {
+            cc = new HalyardCardinalityCalcualtor(boundVariables, null);
+        }
+        expr.visit(cc);
+        return cc.getCardinality();
     }
 
     @Override
     protected CardinalityCalculator createCardinalityCalculator() {
-        return createCardinalityCalculator(Collections.emptySet(), null);
+        return new HalyardCardinalityCalcualtor(Collections.emptySet(), null);
     }
 
-    private CardinalityCalculator createCardinalityCalculator(final Set<String> boundVariables, final Map<TupleExpr, Double> mapToUpdate) {
-        return new CardinalityCalculator() {
-            Set<String> boundVars = boundVariables;
-            @Override
-            protected double getCardinality(StatementPattern sp) {
-                return spcalc == null ? super.getCardinality(sp) : spcalc.getCardinality(sp, boundVars);
+    private class HalyardCardinalityCalcualtor extends CardinalityCalculator {
+
+        private Set<String> boundVars;
+        private final Map<TupleExpr, Double> mapToUpdate;
+
+        public HalyardCardinalityCalcualtor(Set<String> boundVariables, Map<TupleExpr, Double> mapToUpdate) {
+            this.boundVars = boundVariables;
+            this.mapToUpdate = mapToUpdate;
+        }
+
+        @Override
+        protected double getCardinality(StatementPattern sp) {
+            Double card = spcalc == null ? null : spcalc.getCardinality(sp, boundVars);
+            if (card == null) { //fallback to default cardinality calculation
+                card = (hasValue(sp.getSubjectVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getPredicateVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getObjectVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getContextVar(), boundVars) ? 1.0 : 10.0);
             }
+            return card;
+        }
 
-            @Override
-            public void meet(Join node) {
-                meetJoin(node);
+        private boolean hasValue(Var partitionVar, Collection<String> boundVars) {
+            return partitionVar == null || partitionVar.hasValue() || boundVars.contains(partitionVar.getName());
+        }
+
+        @Override
+        public void meet(Join node) {
+            meetJoin(node);
+        }
+
+        @Override
+        public void meet(LeftJoin node) {
+            meetJoin(node);
+        }
+
+        private void meetJoin(BinaryTupleOperator node) {
+            node.getLeftArg().visit(this);
+            updateMap(node.getLeftArg());
+            double leftArgCost = this.cardinality;
+            Set<String> origBoundVars = boundVars;
+            boundVars = new HashSet<>(boundVars);
+            boundVars.addAll(node.getLeftArg().getBindingNames());
+            node.getRightArg().visit(this);
+            updateMap(node.getRightArg());
+            cardinality *= leftArgCost * leftArgCost;
+            boundVars = origBoundVars;
+            updateMap(node);
+        }
+
+        @Override
+        protected void meetBinaryTupleOperator(BinaryTupleOperator node) {
+            node.getLeftArg().visit(this);
+            updateMap(node.getLeftArg());
+            double leftArgCost = this.cardinality;
+            node.getRightArg().visit(this);
+            updateMap(node.getRightArg());
+            cardinality += leftArgCost;
+            updateMap(node);
+        }
+
+        @Override
+        public void meet(Filter node) throws RuntimeException {
+            super.meetUnaryTupleOperator(node);
+            double subCost = cardinality;
+            cardinality = 1;
+            node.getCondition().visit(this);
+            cardinality *= subCost;
+            updateMap(node);
+        }
+
+        @Override
+        protected void meetUnaryTupleOperator(UnaryTupleOperator node) {
+            super.meetUnaryTupleOperator(node);
+            updateMap(node);
+        }
+
+        @Override
+        public void meet(StatementPattern sp) {
+            super.meet(sp);
+            updateMap(sp);
+        }
+
+        @Override
+        public void meet(ArbitraryLengthPath node) {
+            super.meet(node);
+            updateMap(node);
+        }
+
+        @Override
+        public void meet(ZeroLengthPath node) {
+            super.meet(node);
+            updateMap(node);
+        }
+
+        @Override
+        public void meet(BindingSetAssignment node) {
+            super.meet(node);
+            updateMap(node);
+        }
+
+        @Override
+        public void meet(EmptySet node) {
+            super.meet(node);
+            updateMap(node);
+        }
+
+        @Override
+        public void meet(SingletonSet node) {
+            super.meet(node);
+            updateMap(node);
+        }
+
+        @Override
+        protected void meetNode(QueryModelNode node) {
+            if (node instanceof ExternalSet) {
+                meetExternalSet((ExternalSet) node);
+            } else {
+                node.visitChildren(this);
             }
+        }
 
-            @Override
-            public void meet(LeftJoin node) {
-                meetJoin(node);
-            }
-
-            private void meetJoin(BinaryTupleOperator node) {
-                node.getLeftArg().visit(this);
-                updateMap(node.getLeftArg());
-                double leftArgCost = this.cardinality;
-                Set<String> origBoundVars = boundVars;
-                boundVars = new HashSet<>(boundVars);
-                boundVars.addAll(node.getLeftArg().getBindingNames());
-                node.getRightArg().visit(this);
-                updateMap(node.getRightArg());
-                cardinality *= leftArgCost * leftArgCost;
-                boundVars = origBoundVars;
-                updateMap(node);
-            }
-
-            @Override
-            protected void meetBinaryTupleOperator(BinaryTupleOperator node) {
-                node.getLeftArg().visit(this);
-                updateMap(node.getLeftArg());
-                double leftArgCost = this.cardinality;
-                node.getRightArg().visit(this);
-                updateMap(node.getRightArg());
-                cardinality += leftArgCost;
-                updateMap(node);
-            }
-
-            @Override
-            public void meet(Filter node) throws RuntimeException {
-                super.meetUnaryTupleOperator(node);
-                double subCost = cardinality;
-                cardinality = 1;
-                node.getCondition().visit(this);
-                cardinality *= subCost;
-                updateMap(node);
-            }
-
-            @Override
-            protected void meetUnaryTupleOperator(UnaryTupleOperator node) {
-                super.meetUnaryTupleOperator(node);
-                updateMap(node);
-            }
-
-            @Override
-            public void meet(StatementPattern sp) {
-                super.meet(sp);
-                updateMap(sp);
-            }
-
-            @Override
-            public void meet(ArbitraryLengthPath node) {
-                super.meet(node);
-                updateMap(node);
-            }
-
-            @Override
-            public void meet(ZeroLengthPath node) {
-                super.meet(node);
-                updateMap(node);
-            }
-
-
-            @Override
-            public void meet(BindingSetAssignment node) {
-                super.meet(node);
-                updateMap(node);
-            }
-
-            @Override
-            public void meet(EmptySet node) {
-                super.meet(node);
-                updateMap(node);
-            }
-
-            @Override
-            public void meet(SingletonSet node) {
-                super.meet(node);
-                updateMap(node);
-            }
-
-            @Override
-            protected void meetNode(QueryModelNode node) {
-                if (node instanceof ExternalSet) {
-                        meetExternalSet((ExternalSet)node);
-                } else {
-                    node.visitChildren(this);
-                }
-            }
-
-            @Override
-            public void meet(Service node) {
-                HalyardEvaluationStatistics srvStats = srvProvider != null && node.getServiceRef().hasValue() ? srvProvider.getStatsForService(node.getServiceRef().getValue().stringValue()) : null;
-                //try to calculate cardinality also for (Halyard-internally) federated service expressions
-                if (srvStats != null) {
-                    Double servCard = null;
-                    if (mapToUpdate != null) {
-                        srvStats.updateCardinalityMap(node.getServiceExpr(), boundVars, mapToUpdate);
-                        servCard = mapToUpdate.get(node.getServiceExpr());
-                    }
-                    cardinality = servCard != null ? servCard : srvStats.getCardinality(node.getServiceExpr());
-                } else {
-                    super.meet(node);
-                }
-                updateMap(node);
-            }
-
-            private void updateMap(TupleExpr node) {
+        @Override
+        public void meet(Service node) {
+            HalyardEvaluationStatistics srvStats = srvProvider != null && node.getServiceRef().hasValue() ? srvProvider.getStatsForService(node.getServiceRef().getValue().stringValue()) : null;
+            //try to calculate cardinality also for (Halyard-internally) federated service expressions
+            if (srvStats != null) {
+                Double servCard = null;
                 if (mapToUpdate != null) {
-                    mapToUpdate.put(node, cardinality);
+                    srvStats.updateCardinalityMap(node.getServiceExpr(), boundVars, mapToUpdate);
+                    servCard = mapToUpdate.get(node.getServiceExpr());
                 }
+                cardinality = servCard != null ? servCard : srvStats.getCardinality(node.getServiceExpr());
+            } else {
+                super.meet(node);
             }
-        };
+            updateMap(node);
+        }
+
+        private void updateMap(TupleExpr node) {
+            if (mapToUpdate != null) {
+                mapToUpdate.put(node, cardinality);
+            }
+        }
     }
 }

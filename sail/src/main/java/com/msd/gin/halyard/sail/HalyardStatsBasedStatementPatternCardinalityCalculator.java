@@ -47,7 +47,7 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
     }
 
     @Override
-    public double getCardinality(StatementPattern sp, Collection<String> boundVars) { //get the cardinality of the Statement form VOID statistics
+    public Double getCardinality(StatementPattern sp, Collection<String> boundVars) { //get the cardinality of the Statement form VOID statistics
         Var objectVar = sp.getObjectVar();
         //always return very low cardinality for HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
         if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal) objectVar.getValue()).getDatatype())) {
@@ -88,9 +88,7 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
             LOG.log(Level.FINE, "cardinality of {0} = {1}", new Object[]{sp.toString(), card});
             return card;
         } else { // stats are not present
-            double card = (hasValue(sp.getSubjectVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getPredicateVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getObjectVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getContextVar(), boundVars) ? 1.0 : 10.0);
-            LOG.log(Level.FINE, "default cardinality of {0} = {1}", new Object[]{sp.toString(), card});
-            return card;
+            return null;
         }
     }
 
