@@ -49,9 +49,9 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
     @Override
     public Double getCardinality(StatementPattern sp, Collection<String> boundVars) { //get the cardinality of the Statement form VOID statistics
         Var objectVar = sp.getObjectVar();
-        //always return very low cardinality for HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
+        //always return 1.0 for HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
         if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal) objectVar.getValue()).getDatatype())) {
-            return 0.000001;
+            return 1.0;
         }
         final Var contextVar = sp.getContextVar();
         final IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI) contextVar.getValue();
