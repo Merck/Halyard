@@ -124,6 +124,6 @@ public class HalyardBulkExportTest {
 
     @Test(expected = UnrecognizedOptionException.class)
     public void testRunInvalid() throws Exception {
-        new HalyardBulkExport().run(new String[]{"-invalid"});
+        new HalyardBulkExport().run(new String[]{"--invalid"});
     }
 }
