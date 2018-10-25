@@ -346,7 +346,7 @@ halyard:statsContext {
 ```
 $ ./halyard esindex -h
 usage: halyard esindex [-h] [-v] -s <dataset_table> -t <target_url> [-c] [-d <document_type>] [-a
-       <attribute_name>] [-b <batch_size>]
+       <attribute_name>] [-b <batch_size>] [-g <named_graph>]
 Halyard ElasticSearch Index is a MapReduce application that indexes all literals in the given
 dataset into a supplementary ElasticSearch server/cluster. A Halyard repository configured with such
 supplementary ElasticSearch index can then provide more advanced text search features over the
@@ -362,6 +362,7 @@ indexed literals.
                                         the document, default is 'l'
  -b,--batch-size <batch_size>           Number of literals sent to Elasticsearch for indexing in one
                                         batch (default is 100000)
+ -g,--named-graph <named_graph>         Optional restrict indexing to the given named graph only
 Default index mapping is:
  {
      "mappings" : {

@@ -52,11 +52,15 @@ public class HalyardElasticIndexerTest {
         sail.initialize();
         ValueFactory vf = SimpleValueFactory.getInstance();
         for (int i = 0; i < 100; i++) {
-            sail.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i),  vf.createLiteral("whatever NT value " + i));
+            sail.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i),  vf.createLiteral("whatever NT value " + i), (i % 4 == 0) ? null : vf.createIRI("http://whatever/graph#"+(i%4)));
         }
         sail.commit();
         sail.close();
+        testElasticIndexer(false);
+        testElasticIndexer(true);
+    }
 
+    public void testElasticIndexer(boolean namedGraphOnly) throws Exception {
         final String[] requestUri = new String[2];
         final JSONObject[] create = new JSONObject[1];
         final ArrayList<String> response = new ArrayList<>(200);
@@ -85,15 +89,16 @@ public class HalyardElasticIndexerTest {
         server.start();
         try {
             assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardElasticIndexer(),
-                new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c", "-d", "customDoc", "-a", "customAttr"}));
+                namedGraphOnly ? new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c", "-d", "customDoc", "-a", "customAttr", "-g", "<http://whatever/graph#1>"}
+                               : new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c", "-d", "customDoc", "-a", "customAttr"}));
         } finally {
             server.stop(0);
         }
         assertEquals("/my_index", requestUri[0]);
         assertNotNull(create[0].toString(), create[0].getJSONObject("mappings").getJSONObject("customDoc").getJSONObject("properties").getJSONObject("customAttr"));
         assertEquals("/my_index/customDoc/_bulk", requestUri[1]);
-        assertEquals(200, response.size());
-        for (int i=0; i<200; i+=2) {
+        assertEquals((namedGraphOnly ? 50 : 200), response.size());
+        for (int i=0; i< response.size(); i+=2) {
             String hash = new JSONObject(response.get(i)).getJSONObject("index").getString("_id");
             String literal = "\"" + new JSONObject(response.get(i+1)).getString("customAttr") + "\"";
             assertEquals("Invalid hash for literal " + literal, Hex.encodeHexString(HalyardTableUtils.hashKey(literal.getBytes(StandardCharsets.UTF_8))), hash);

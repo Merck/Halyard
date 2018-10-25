@@ -92,7 +92,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 output.setStatus(MessageFormat.format("{0} st:{1} exp:{2} batch:{3} ", counter, statements, exports, batches));
             }
             hash = new byte[20];
-            System.arraycopy(key.get(), key.getOffset() + 1, hash, 0, 20);
+            System.arraycopy(key.get(), key.getOffset() + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 1 : 21), hash, 0, 20);
             if (!Arrays.equals(hash, lastHash)) {
                 export(false);
                 lastHash = hash;
@@ -179,6 +179,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         addOption("d", "document-type", "document_type", "Optionally specify document type within the index, default is 'l'", false, true);
         addOption("a", "attribute-name", "attribute_name", "Optionally specify attribute name to index literals within the document, default is 'l'", false, true);
         addOption("b", "batch-size", "batch_size", "Number of literals sent to Elasticsearch for indexing in one batch (default is 100000)", false, true);
+        addOption("g", "named-graph", "named_graph", "Optional restrict indexing to the given named graph only", false, true);
     }
 
     @Override
@@ -256,9 +257,16 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         scan.setMaxVersions(1);
         scan.setBatch(10);
         scan.setAllowPartialResults(true);
-        scan.setStartRow(new byte[]{HalyardTableUtils.OSP_PREFIX});
-        scan.setStopRow(new byte[]{HalyardTableUtils.OSP_PREFIX+1});
-
+        if (cmd.hasOption('g')) {
+            //scan only given named graph from COSP region(s)
+            byte[] graphHash = HalyardTableUtils.hashKey(NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance()));
+            scan.setStartRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash));
+            scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, true, graphHash, HalyardTableUtils.STOP_KEY, HalyardTableUtils.STOP_KEY, HalyardTableUtils.STOP_KEY));
+        } else {
+            //scan all OSP region(s)
+            scan.setStartRow(new byte[]{HalyardTableUtils.OSP_PREFIX});
+            scan.setStopRow(new byte[]{HalyardTableUtils.OSP_PREFIX+1});
+        }
         TableMapReduceUtil.initTableMapperJob(
                 source,
                 scan,
