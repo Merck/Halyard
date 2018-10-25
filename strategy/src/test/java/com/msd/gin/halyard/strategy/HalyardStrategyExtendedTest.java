@@ -25,6 +25,7 @@ import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQueryResult;
+import org.eclipse.rdf4j.query.parser.sparql.SPARQLParser;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
@@ -123,6 +124,21 @@ public class HalyardStrategyExtendedTest {
     public void testServiceSilent() throws Exception {
         String sparql = "SELECT * WHERE {SERVICE SILENT <http://whatever/> { ?s ?p ?o . }}";
         con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
+    }
+
+    @Test
+    public void testReduced() throws Exception {
+        String sparql = "SELECT REDUCED ?a WHERE {VALUES ?a {0 0 1 1 0 0 1 1}}";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
+        assertTrue(res.hasNext());
+        assertEquals(0, ((Literal) res.next().getValue("a")).intValue());
+        assertTrue(res.hasNext());
+        assertEquals(1, ((Literal) res.next().getValue("a")).intValue());
+        assertTrue(res.hasNext());
+        assertEquals(0, ((Literal) res.next().getValue("a")).intValue());
+        assertTrue(res.hasNext());
+        assertEquals(1, ((Literal) res.next().getValue("a")).intValue());
+        assertFalse(res.hasNext());
     }
 
     @Test

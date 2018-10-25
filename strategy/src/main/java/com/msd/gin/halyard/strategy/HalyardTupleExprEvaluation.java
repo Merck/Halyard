@@ -508,9 +508,9 @@ final class HalyardTupleExprEvaluation {
             public boolean push(BindingSet bs) throws InterruptedException {
                 synchronized (this) {
                     if (bs != null && bs.equals(previous)) {
-                        previous = bs;
                         return true;
                     }
+                    previous = bs;
                 }
                 return parent.push(bs);
             }
