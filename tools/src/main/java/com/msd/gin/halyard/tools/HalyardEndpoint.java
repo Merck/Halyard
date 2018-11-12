@@ -27,13 +27,15 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
         addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
         addOption("t", "timeout", "evaluation_timeout", "Timeout in seconds for each query evaluation (default is " +
                 "unlimited timeout)", false, true);
+        addOption("v", "verbose", "verbose", "Logging mode that records all logging information (by default only " +
+                "important informative and error messages are printed)", false, true);
     }
 
     @Override
     protected int run(CommandLine cmd) throws Exception {
         int timeout;
         String timeoutString = cmd.getOptionValue('t');
-        if(timeoutString == null) {
+        if (timeoutString == null) {
             timeout = 0; // Default unlimited timeout
         } else {
             try {

@@ -30,8 +30,6 @@ import java.util.logging.Logger;
  * @author sykorjan
  */
 public class HttpSparqlHandler implements HttpHandler {
-    private static final Logger LOGGER = Logger.getLogger(HttpSparqlHandler.class.getName());
-
     private static final String AND_DELIMITER = "&";
     private static final String SEMICOLON_DELIMITER = ";";
     private final String CHARSET = "UTF-8";
@@ -57,9 +55,28 @@ public class HttpSparqlHandler implements HttpHandler {
 
     // Connection to the Sail repository
     private final SailRepositoryConnection connection;
+    // Logger
+    private static final Logger LOGGER = Logger.getLogger(HttpSparqlHandler.class.getName());
 
+    /**
+     * Default HttpSparqlHandler (verbose mode disabled by default)
+     *
+     * @param connection connection to Sail repository
+     */
     public HttpSparqlHandler(SailRepositoryConnection connection) {
+        this(connection, false);
+    }
+
+    /**
+     * @param connection connection to Sail repository
+     * @param verbose    true when verbose mode enabled, otherwise false
+     */
+    public HttpSparqlHandler(SailRepositoryConnection connection, boolean verbose) {
         this.connection = connection;
+        if(!verbose) {
+            // Verbose mode disabled --> messages with level lower than WARNING will be discarded
+            LOGGER.setLevel(Level.WARNING);
+        }
     }
 
     /**

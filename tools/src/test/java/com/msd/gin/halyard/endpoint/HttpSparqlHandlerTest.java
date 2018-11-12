@@ -311,7 +311,7 @@ public class HttpSparqlHandlerTest {
     /**
      * Invoke correct query operation with a protocol-specified default graph via POST
      */
-    @Test
+    @Ignore("Not ready yet") @Test
     public void testQueryDatasetDefaultGraph() throws IOException {
         URL url = new URL(SERVER_URL + "?default-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1.rdf");
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
@@ -332,7 +332,7 @@ public class HttpSparqlHandlerTest {
     /**
      * Invoke correct query operation with multiple protocol-specified default graphs via GET
      */
-    @Test
+    @Ignore("Not ready yet") @Test
     public void testQueryDatasetDefaultGraphsGet() throws IOException {
         String GET_URL = SERVER_URL + "?query=ASK%20%7B%20%3Chttp%3A%2F%2Fkasei" +
                 ".us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1.rdf%3E%20a%20%3Ftype%20.%20%3Chttp%3A%2F%2Fkasei" +
@@ -353,7 +353,7 @@ public class HttpSparqlHandlerTest {
     /**
      * Invoke correct query operation with multiple protocol-specified default graphs via POST
      */
-    @Test
+    @Ignore("Not ready yet") @Test
     public void testQueryDatasetDefaultGraphsPost() throws IOException {
         URL url = new URL(SERVER_URL +
                 "?default-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1.rdf" +
@@ -377,7 +377,7 @@ public class HttpSparqlHandlerTest {
     /**
      * Invoke correct query operation with multiple protocol-specified named graphs via GET
      */
-    @Test
+    @Ignore("Not ready yet") @Test
     public void testQueryDatasetNamedGraphsGet() throws IOException {
         String GET_URL = SERVER_URL + "?query=ASK%20%7B%20GRAPH%20%3Fg1%20%7B%20%3Chttp%3A%2F%2Fkasei" +
                 ".us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1" +
@@ -399,7 +399,7 @@ public class HttpSparqlHandlerTest {
     /**
      * Invoke correct query operation with multiple protocol-specified named graphs via POST
      */
-    @Test
+    @Ignore("Not ready yet") @Test
     public void testQueryDatasetNamedGraphsPost() throws IOException {
         URL url = new URL(SERVER_URL +
                 "?named-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1.rdf" +
@@ -422,7 +422,7 @@ public class HttpSparqlHandlerTest {
     /**
      * Invoke correct query operation with protocol-specified dataset (both named and default graphs)
      */
-    @Test
+    @Ignore("Not ready yet") @Test
     public void testQueryDatasetFull() throws IOException {
         URL url = new URL(SERVER_URL +
                 "?default-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata3.rdf" +
@@ -447,7 +447,7 @@ public class HttpSparqlHandlerTest {
      * Invoke query specifying dataset in both query string and protocol; test for use of protocol-specified dataset
      * (test relies on the endpoint allowing client-specified RDF datasets; returns 400 otherwise)
      */
-    @Test
+    @Ignore("Not ready yet") @Test
     public void testQueryMultipleDataset() throws IOException {
         URL url = new URL(SERVER_URL +
                 "?default-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata2.rdf");

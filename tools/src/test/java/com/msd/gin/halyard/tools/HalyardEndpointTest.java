@@ -18,6 +18,9 @@ import java.io.File;
 import java.io.StringReader;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermissions;
 
 public class HalyardEndpointTest {
     private static final String PORT = "8080";
@@ -48,6 +51,8 @@ public class HalyardEndpointTest {
     public void testOneScript() throws Exception {
         URL url = this.getClass().getResource("testScript.sh");
         File file = new File(url.toURI());
+        // Grant permission to the script to be executable
+        Files.setPosixFilePermissions(Paths.get(url.getPath()), PosixFilePermissions.fromString("rwxr--r--"));
         runEndpoint("-p", PORT, "-s", TABLE, "-x", file.getPath());
     }
 
