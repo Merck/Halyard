@@ -2,20 +2,22 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
-import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.PosixFilePermissions;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  *
@@ -23,6 +25,10 @@ import java.nio.file.attribute.PosixFilePermissions;
 public class HalyardEndpointTest {
     private static final String PORT = "0";
     private static final String TABLE = "exporttesttable";
+    private static String ROOT;
+
+    @Rule
+    public TestName name = new TestName();
 
     /**
      * Create temporary testing folder for testing files, create Sail repository and add testing data
@@ -31,6 +37,13 @@ public class HalyardEndpointTest {
      */
     @BeforeClass
     public static void setup() throws Exception {
+        File rf = File.createTempFile("HalyardEndpointTest", "");
+        rf.delete();
+        rf.mkdirs();
+        ROOT = rf.getPath();
+        if (!ROOT.endsWith("/")) {
+            ROOT = ROOT + "/";
+        }
         ValueFactory vf = SimpleValueFactory.getInstance();
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, true, 0, true, 0, null, null);
         sail.initialize();
@@ -49,21 +62,64 @@ public class HalyardEndpointTest {
         sail.shutDown();
     }
 
-    @Test
-    public void testOneScript() throws Exception {
-        URL url = this.getClass().getResource("endpoint/testScript.sh");
-        File file = new File(url.toURI());
-        // Grant permission to the script to be executable
-        Files.setPosixFilePermissions(Paths.get(url.getPath()), PosixFilePermissions.fromString("rwxrwxrwx"));
-
-//        System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream("output.txt"))));
-
-        runEndpoint("-p", PORT, "-s", TABLE, "-x", file.getPath(), "--verbose");
+    @AfterClass
+    public static void teardown() throws Exception {
+        FileUtils.deleteDirectory(new File(ROOT));
     }
 
-    private static int runEndpoint(String... args) throws Exception {
-        HalyardEndpoint endpoint = new HalyardEndpoint();
+    @Test(expected = HalyardEndpoint.EndpointException.class)
+    public void testScriptNotFound() throws Exception {
+        File tmp = File.createTempFile("tmp", "");
+        tmp.delete();
+        runEndpoint("-s", TABLE, "-x", tmp.getPath());
+    }
 
-        return ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), endpoint, args);
+    @Test(expected = HalyardEndpoint.EndpointException.class)
+    public void testScriptNotExecutable() throws Exception {
+        File notExecutable = File.createTempFile("notExecutable", "");
+        notExecutable.setExecutable(false);
+        runEndpoint("-s", TABLE, "-x", notExecutable.getPath());
+    }
+
+    @Test(expected = HalyardEndpoint.EndpointException.class)
+    public void testNotWritableOutputDirectory() throws Exception {
+        File outputDirectory = new File(ROOT + "outputDirectory");
+        outputDirectory.mkdir();
+        outputDirectory.setWritable(false);
+        String directoryPath = outputDirectory.getPath();
+        if (!directoryPath.endsWith("/")) {
+            directoryPath = directoryPath + "/";
+        }
+        File script = File.createTempFile("script", "");
+        script.setExecutable(true);
+        runEndpoint("-s", TABLE, "-x", script.getPath(), "-o", directoryPath + "output.txt");
+    }
+
+    @Test(expected = HalyardEndpoint.EndpointException.class)
+    public void testNotExistingOutputDirectory() throws Exception {
+        File outputDirectory = new File(ROOT + "outputDirectory");
+        outputDirectory.mkdir();
+        String directoryPath = outputDirectory.getPath();
+        if (!directoryPath.endsWith("/")) {
+            directoryPath = directoryPath + "/";
+        }
+        outputDirectory.delete();
+        File script = File.createTempFile("script", "");
+        script.setExecutable(true);
+        runEndpoint("-s", TABLE, "-x", script.getPath(), "-o", directoryPath + "output.txt");
+    }
+
+    @Test
+    public void testCorrectScript() throws Exception {
+        File script = new File(this.getClass().getResource("testScript.sh").getPath());
+        script.setExecutable(true);
+        runEndpoint("-p", PORT, "-s", TABLE, "-x", script.getPath(), "-o", ROOT + name.getMethodName(), "--verbose");
+        Path path = Paths.get(ROOT + name.getMethodName());
+        assertTrue(Files.exists(path));
+        assertTrue(Files.lines(path).count() >= 10);
+    }
+
+    private int runEndpoint(String... args) throws Exception {
+        return ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardEndpoint(), args);
     }
 }
