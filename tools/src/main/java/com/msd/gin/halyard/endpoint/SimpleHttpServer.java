@@ -3,8 +3,11 @@ package com.msd.gin.halyard.endpoint;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -34,8 +37,8 @@ public class SimpleHttpServer {
         httpServer = HttpServer.create(new InetSocketAddress(port), backlog);
         // Create HTTP context with a given handler
         httpServer.createContext(context, handler);
-        // Create a default executor
-        httpServer.setExecutor(null);
+        // Create an executor
+        httpServer.setExecutor(Executors.newFixedThreadPool(4 * Runtime.getRuntime().availableProcessors()));
     }
 
     /**
@@ -51,6 +54,7 @@ public class SimpleHttpServer {
      */
     public void stop() {
         // stop immediately
+        ((ExecutorService) httpServer.getExecutor()).shutdown();
         httpServer.stop(0);
         LOGGER.log(Level.INFO, "Server stopped");
     }

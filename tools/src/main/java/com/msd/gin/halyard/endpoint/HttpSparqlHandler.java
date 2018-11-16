@@ -258,7 +258,7 @@ public class HttpSparqlHandler implements HttpHandler {
             QueryResultFormat format = getFormat(TupleQueryResultWriterRegistry.getInstance(), acceptedMimeTypes,
                     TupleQueryResultFormat.SPARQL, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
-            try (OutputStream response = exchange.getResponseBody()) {
+            try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
                 ((TupleQuery) query).evaluate(TupleQueryResultWriterRegistry.getInstance().get(format).get()
                         .getWriter(response));
             }
@@ -267,7 +267,7 @@ public class HttpSparqlHandler implements HttpHandler {
             RDFFormat format = getFormat(RDFWriterRegistry.getInstance(), acceptedMimeTypes, RDFFormat.RDFXML,
                     exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
-            try (OutputStream response = exchange.getResponseBody()) {
+            try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
                 ((GraphQuery) query).evaluate(RDFWriterRegistry.getInstance().get(format).get().getWriter(response));
             }
         } else if (query instanceof BooleanQuery) {
@@ -275,7 +275,7 @@ public class HttpSparqlHandler implements HttpHandler {
             QueryResultFormat format = getFormat(BooleanQueryResultWriterRegistry.getInstance(),
                     acceptedMimeTypes, BooleanQueryResultFormat.SPARQL, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
-            try (OutputStream response = exchange.getResponseBody()) {
+            try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
                 BooleanQueryResultWriterRegistry.getInstance().get(format).get().getWriter(response)
                         .write(((BooleanQuery) query).evaluate());
             }

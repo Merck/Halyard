@@ -1,32 +1,34 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.endpoint.HttpSparqlHandler;
-import com.msd.gin.halyard.endpoint.SimpleHttpServer;
 import com.msd.gin.halyard.sail.HBaseSail;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.eclipse.rdf4j.repository.sail.SailRepository;
-import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
-import org.eclipse.rdf4j.rio.RDFFormat;
-import org.eclipse.rdf4j.sail.memory.MemoryStore;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.StringReader;
-import java.net.URISyntaxException;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermissions;
 
+/**
+ *
+ */
 public class HalyardEndpointTest {
-    private static final String PORT = "8080";
+    private static final String PORT = "0";
     private static final String TABLE = "exporttesttable";
-    private static final String TRIPLE = "<http://a> <http://b> <http://c> .";
 
+    /**
+     * Create temporary testing folder for testing files, create Sail repository and add testing data
+     *
+     * @throws Exception
+     */
     @BeforeClass
     public static void setup() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
@@ -49,43 +51,19 @@ public class HalyardEndpointTest {
 
     @Test
     public void testOneScript() throws Exception {
-        URL url = this.getClass().getResource("testScript.sh");
+        URL url = this.getClass().getResource("endpoint/testScript.sh");
         File file = new File(url.toURI());
         // Grant permission to the script to be executable
-        Files.setPosixFilePermissions(Paths.get(url.getPath()), PosixFilePermissions.fromString("rwxr--r--"));
-        runEndpoint("-p", PORT, "-s", TABLE, "-x", file.getPath());
+        Files.setPosixFilePermissions(Paths.get(url.getPath()), PosixFilePermissions.fromString("rwxrwxrwx"));
+
+//        System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream("output.txt"))));
+
+        runEndpoint("-p", PORT, "-s", TABLE, "-x", file.getPath(), "--verbose");
     }
 
-//    @Test
-//    public void testFoo() {
-//        try {
-//            URL url = this.getClass().getResource("testScript.sh");
-//            File file = new File(url.toURI());
-//            SailRepository rep = new SailRepository(new MemoryStore());
-//            rep.initialize();
-//            SailRepositoryConnection connection = rep.getConnection();
-//            connection.begin();
-//            connection.add(new StringReader(TRIPLE), "http://whatever/", RDFFormat.NTRIPLES);
-//            HttpSparqlHandler handler = new HttpSparqlHandler(connection);
-//
-//            Integer port = Integer.parseInt(PORT);
-//            if (port == null) {
-//                port = 0; // system will automatically assign a new, free port
-//            }
-//
-//            SimpleHttpServer server = new SimpleHttpServer(port, "/", handler);
-//            server.start();
-//
-//            ProcessBuilder pb = new ProcessBuilder(file.getPath()).inheritIO();
-//            pb.environment().put("ENDPOINT", "http://localhost" + ":" + server.getAddress().getPort() + "/");
-//            System.exit(pb.start().waitFor());
-//            server.stop();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
-
     private static int runEndpoint(String... args) throws Exception {
-        return ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardEndpoint(), args);
+        HalyardEndpoint endpoint = new HalyardEndpoint();
+
+        return ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), endpoint, args);
     }
 }
