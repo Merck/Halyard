@@ -8,8 +8,12 @@ import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 
 import java.io.*;
-import java.util.Scanner;
+import java.util.Arrays;
+import java.util.List;
 
+/**
+ * @author sykorjan
+ */
 public final class HalyardEndpoint extends AbstractHalyardTool {
     private static final String CONTEXT = "/";
     private static final String HOSTNAME = "http://localhost";
@@ -28,30 +32,36 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
     public HalyardEndpoint() {
         super(
                 "endpoint",
-                "Halyard Endpoint is a command-line application designed to launch a simple SPARQL " +
-                        "Endpoint to serve SPARQL Queries. If no port is specified, system will automatically " +
-                        "select a new port number",
-                "Example: halyard endpoint -p 8000 -s TABLE -x /tmp/script.sh --verbose -o /tmp/output.xml"
+                "Halyard Endpoint is a command-line application designed to launch a simple SPARQL Endpoint to serve " +
+                        "SPARQL Queries. Any custom commands that are to be run as a new subprocess internally by " +
+                        "this tool have to be passed at the end of this tool.\n" +
+                        "Endpoint URI is accessible via the system environment variable ENDPOINT.\n" +
+                        "Warning: All options following a first unrecognized option are ignored and are considered" +
+                        " as part of the custom command.",
+                "Example: halyard endpoint -p 8000 -s TABLE --verbose customScript.sh customArg1 customArg2"
         );
+        // allow passing unspecified additional parameters for the executable script
+        cmdMoreArgs = true;
         addOption(
-                "p", "port", "http_server_port", "HTTP server port number", false, true);
+                "p", "port", "http_server_port", "HTTP server port number. If no port number is specified, system " +
+                        "will automatically select a new port number", false, true);
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
-        addOption("x", "executable-script", "executable_script", "Executable script to be run on the server", true,
-                true);
         addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
         addOption("t", "timeout", "evaluation_timeout", "Timeout in seconds for each query evaluation (default is " +
                 "unlimited timeout)", false, true);
         // cannot use short option 'v' due to conflict with the super "--version" option
         addOption(null, "verbose", null, "Logging mode that records all logging information (by default only " +
                 "important informative and error messages are printed)", false, false);
-        addOption("o", "output", "script_output", "Redirect output of the executed script to a specified file " +
-                "(default output is same as the output of the java process)", false, true);
     }
 
     /**
-     * @param cmd
-     * @return
-     * @throws EndpointException
+     * Parse options and user's custom command, create SPARQL endpoint connected to a specified Sail repository and run
+     * user's custom command as a new subprocess.
+     *
+     * @param cmd list of halyard endpoint tool arguments
+     * @return exit value of the created subprocess
+     * @throws EndpointException if any error occurs during parsing, setting up server/endpoint or running the
+     *                           subprocess
      */
     @Override
     protected int run(CommandLine cmd) throws EndpointException {
@@ -61,33 +71,14 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
             String table = cmd.getOptionValue('s');
             String elasticIndexURL = cmd.getOptionValue('i');
 
-            String script = cmd.getOptionValue('x');
-            File scriptFile = new File(script);
-            if (!scriptFile.exists()) {
-                throw new EndpointException("Script " + script + " does not exist");
-            } else if (!scriptFile.canRead()) {
-                throw new EndpointException("Cannot read script: " + script);
-            } else if (!scriptFile.canExecute()) {
-                throw new EndpointException("Cannot execute script: " + script);
-            }
-
-            boolean redirectOutput = false;
-            String output = cmd.getOptionValue('o');
-            if(output != null) {
-                redirectOutput = true;
-                File outputFile = new File(cmd.getOptionValue('o'));
-                if(!outputFile.getParentFile().exists()) {
-                    throw new EndpointException("Directory of the output file" + outputFile.getParent() + " does not " +
-                            "exist");
-                } else if(!outputFile.getParentFile().canWrite()) {
-                    throw new EndpointException("Cannot write into the output file directory: " + outputFile.getParent());
-                }
-            }
-
             boolean verbose = false;
             if (cmd.hasOption("verbose")) {
                 verbose = true;
             }
+
+            // Any left-over non-recognized options and arguments are considered as part of user's custom commands
+            // that are to be run by this tool
+            List<String> cmdArgs = Arrays.asList(cmd.getArgs());
 
             SailRepository rep = new SailRepository(
                     new HBaseSail(getConf(), table, false, 0, true, timeout, elasticIndexURL, null));
@@ -99,12 +90,7 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                 SimpleHttpServer server = new SimpleHttpServer(port, CONTEXT, handler);
                 server.start();
                 try {
-                    ProcessBuilder pb = new ProcessBuilder(script).inheritIO();
-                    if (redirectOutput) {
-                        pb.redirectOutput(new File(cmd.getOptionValue('o')));
-                    } else {
-                        pb.inheritIO();
-                    }
+                    ProcessBuilder pb = new ProcessBuilder(cmdArgs).inheritIO();
                     pb.environment().put("ENDPOINT", HOSTNAME + ":" + server.getAddress().getPort() + "/");
                     return pb.start().waitFor();
                 } finally {
@@ -118,6 +104,13 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
         }
     }
 
+    /**
+     * Parse timeout number
+     *
+     * @param cmd
+     * @return
+     * @throws EndpointException Provided timeout value is not a number
+     */
     private int parseTimeout(CommandLine cmd) throws EndpointException {
         String timeoutString = cmd.getOptionValue('t');
         if (timeoutString == null) {
@@ -131,6 +124,13 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
         }
     }
 
+    /**
+     * Parse port number
+     *
+     * @param cmd
+     * @return
+     * @throws EndpointException Provided port value is not a number
+     */
     private int parsePort(CommandLine cmd) throws EndpointException {
         String portString = cmd.getOptionValue('p');
         if (portString == null) {

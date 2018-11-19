@@ -51,6 +51,11 @@ public abstract class AbstractHalyardTool implements Tool {
     private final Options options = new Options();
     private final List<String> singleOptions = new ArrayList<>();
     private int opts = 0;
+    /**
+     * Allow to pass additional unspecified arguments via command line. By default this functionality is disabled.
+     * This functionality is used by HalyardEndpoint tool to pass additional arguments for an inner process.
+     */
+    protected boolean cmdMoreArgs = false;
 
     protected AbstractHalyardTool(String name, String header, String footer) {
         this.name = name;
@@ -121,7 +126,7 @@ public abstract class AbstractHalyardTool implements Tool {
                         super.checkRequiredOptions();
                     }
                 }
-            }.parse(options, args);
+            }.parse(options, args, cmdMoreArgs);
             if (args.length == 0 || cmd.hasOption('h')) {
                 printHelp();
                 return -1;
@@ -130,7 +135,7 @@ public abstract class AbstractHalyardTool implements Tool {
                 System.out.println(name + " version " + getVersion());
                 return 0;
             }
-            if (!cmd.getArgList().isEmpty()) {
+            if (!cmdMoreArgs && !cmd.getArgList().isEmpty()) {
                 throw new ParseException("Unknown arguments: " + cmd.getArgList().toString());
             }
             for (String opt : singleOptions) {

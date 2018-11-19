@@ -31,9 +31,7 @@ import java.util.logging.Logger;
  */
 public class HttpSparqlHandler implements HttpHandler {
     private static final String AND_DELIMITER = "&";
-    private static final String SEMICOLON_DELIMITER = ";";
     private final String CHARSET = "UTF-8";
-    private final String CHARSET_PREFIX = "charset=";
 
     // Query parameter prefixes
     private static final String QUERY_PREFIX = "query=";
@@ -73,8 +71,8 @@ public class HttpSparqlHandler implements HttpHandler {
      */
     public HttpSparqlHandler(SailRepositoryConnection connection, boolean verbose) {
         this.connection = connection;
-        if(!verbose) {
-            // Verbose mode disabled --> messages with level lower than WARNING will be discarded
+        if (!verbose) {
+            // Verbose mode disabled --> logs with level lower than WARNING will be discarded
             LOGGER.setLevel(Level.WARNING);
         }
     }
@@ -224,8 +222,6 @@ public class HttpSparqlHandler implements HttpHandler {
             } catch (MimeTypeParseException e) {
                 throw new IllegalArgumentException("Illegal Content-Type header content");
             }
-
-
         } else {
             throw new IllegalArgumentException("Request method has to be only either GET or POST");
         }
@@ -298,6 +294,20 @@ public class HttpSparqlHandler implements HttpHandler {
         os.close();
     }
 
+    /**
+     * Get file format of the response and set its MIME type as a response content-type header value.
+     * <p>
+     * If no accepted MIME types are specified, a default file format for the default MIME type is chosen.
+     *
+     * @param reg           requested result writer registry
+     * @param mimeTypes     requested/accepted response MIME types (e.g. application/sparql-results+xml,
+     *                      application/xml)
+     * @param defaultFormat default file format (e.g. SPARQL/XML)
+     * @param h             response headers for setting response content-type value
+     * @param <FF>          file format
+     * @param <S>
+     * @return
+     */
     private <FF extends FileFormat, S extends Object> FF getFormat(FileFormatServiceRegistry<FF, S> reg,
                                                                    List<String> mimeTypes, FF defaultFormat,
                                                                    Headers h) {
