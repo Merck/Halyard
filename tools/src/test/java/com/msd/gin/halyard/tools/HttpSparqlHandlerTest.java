@@ -1,5 +1,7 @@
-package com.msd.gin.halyard.endpoint;
+package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.tools.HttpSparqlHandler;
+import com.msd.gin.halyard.tools.SimpleHttpServer;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.rio.RDFFormat;

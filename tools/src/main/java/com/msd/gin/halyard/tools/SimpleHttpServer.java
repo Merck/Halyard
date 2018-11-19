@@ -1,4 +1,4 @@
-package com.msd.gin.halyard.endpoint;
+package com.msd.gin.halyard.tools;
 
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;

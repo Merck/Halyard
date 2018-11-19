@@ -1,7 +1,5 @@
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.endpoint.HttpSparqlHandler;
-import com.msd.gin.halyard.endpoint.SimpleHttpServer;
 import com.msd.gin.halyard.sail.HBaseSail;
 import org.apache.commons.cli.CommandLine;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
