@@ -1,3 +1,19 @@
+/*
+ * Copyright 2018 Merck Sharp & Dohme Corp. a subsidiary of Merck & Co.,
+ * Inc., Kenilworth, NJ, USA.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.msd.gin.halyard.tools;
 
 import com.sun.net.httpserver.Headers;
@@ -6,9 +22,13 @@ import com.sun.net.httpserver.HttpHandler;
 import org.eclipse.rdf4j.RDF4JException;
 import org.eclipse.rdf4j.common.lang.FileFormat;
 import org.eclipse.rdf4j.common.lang.service.FileFormatServiceRegistry;
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.*;
+import org.eclipse.rdf4j.query.impl.SimpleDataset;
 import org.eclipse.rdf4j.query.resultio.*;
-import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
+import org.eclipse.rdf4j.repository.sail.*;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFWriterRegistry;
 
@@ -48,7 +68,7 @@ public class HttpSparqlHandler implements HttpHandler {
     // Client does not provide a correct request, including incorrect request parameter content (e.g. illegal request
     // parameters or illegal sequence of query characters defined by the SPARQL query grammar)
     private static final int HTTP_BAD_REQUEST = 400;
-    // Client provides a correct request but service fails to process it (e.g. service failed to execute the query)
+    // Client provides a correct request but service fails to process it (e.g. server failed to send the response)
     private static final int HTTP_INTERNAL_SERVER_ERROR = 500;
 
     // Connection to the Sail repository
@@ -83,7 +103,7 @@ public class HttpSparqlHandler implements HttpHandler {
      * <p>First, SPARQL query is retrieved from the HTTP request. Then the query is evaluated towards a
      * specified Sail repository. Finally, the query result is sent back as an HTTP response.</p>
      *
-     * @param exchange HTTP request
+     * @param exchange HTTP exchange
      * @throws IOException If an error occurs during sending the error response
      */
     @Override
@@ -120,6 +140,8 @@ public class HttpSparqlHandler implements HttpHandler {
         SparqlQuery sparqlQuery = new SparqlQuery();
         // Help variable for checking for multiple query parameters
         int queryCount = 0;
+        // Factory for IRI creation
+        ValueFactory factory = SimpleValueFactory.getInstance();
 
         if ("GET".equalsIgnoreCase(requestMethod)) {
             // Retrieve from the request URI parameter query and optional parameters defaultGraphs and namedGraphs
@@ -132,11 +154,11 @@ public class HttpSparqlHandler implements HttpHandler {
                         queryCount++;
                         sparqlQuery.setQuery(URLDecoder.decode(param.substring(QUERY_PREFIX.length()), CHARSET));
                     } else if (param.startsWith(DEFAULT_GRAPH_PREFIX)) {
-                        sparqlQuery.addDefaultGraph(URLDecoder.decode(param.substring(DEFAULT_GRAPH_PREFIX.length()),
-                                CHARSET));
+                        sparqlQuery.addDefaultGraph(factory.createIRI(URLDecoder.decode(param.substring(
+                                DEFAULT_GRAPH_PREFIX.length()), CHARSET)));
                     } else if (param.startsWith(NAMED_GRAPH_PREFIX)) {
-                        sparqlQuery.addNamedGraph(URLDecoder.decode(param.substring(NAMED_GRAPH_PREFIX.length()),
-                                CHARSET));
+                        sparqlQuery.addNamedGraph(factory.createIRI(URLDecoder.decode(param.substring(
+                                NAMED_GRAPH_PREFIX.length()), CHARSET)));
                     } else {
                         throw new IllegalArgumentException("Unspecified request parameter: " + param);
                     }
@@ -182,11 +204,11 @@ public class HttpSparqlHandler implements HttpHandler {
                                 sparqlQuery.setQuery(URLDecoder.decode(parameter.substring(QUERY_PREFIX.length()),
                                         CHARSET));
                             } else if (parameter.startsWith(DEFAULT_GRAPH_PREFIX)) {
-                                sparqlQuery.addDefaultGraph(URLDecoder.decode(
-                                        parameter.substring(DEFAULT_GRAPH_PREFIX.length()), CHARSET));
+                                sparqlQuery.addDefaultGraph(factory.createIRI(URLDecoder.decode(
+                                        parameter.substring(DEFAULT_GRAPH_PREFIX.length()), CHARSET)));
                             } else if (parameter.startsWith(NAMED_GRAPH_PREFIX)) {
-                                sparqlQuery.addNamedGraph(URLDecoder.decode(
-                                        parameter.substring(NAMED_GRAPH_PREFIX.length()), CHARSET));
+                                sparqlQuery.addNamedGraph(factory.createIRI(URLDecoder.decode(
+                                        parameter.substring(NAMED_GRAPH_PREFIX.length()), CHARSET)));
                             } else {
                                 throw new IllegalArgumentException("Unspecified request parameter: " + parameter);
                             }
@@ -200,11 +222,11 @@ public class HttpSparqlHandler implements HttpHandler {
                         while (stk.hasMoreTokens()) {
                             String param = stk.nextToken();
                             if (param.startsWith(DEFAULT_GRAPH_PREFIX)) {
-                                sparqlQuery.addDefaultGraph(
-                                        URLDecoder.decode(param.substring(DEFAULT_GRAPH_PREFIX.length()), CHARSET));
+                                sparqlQuery.addDefaultGraph(factory.createIRI(
+                                        URLDecoder.decode(param.substring(DEFAULT_GRAPH_PREFIX.length()), CHARSET)));
                             } else if (param.startsWith(NAMED_GRAPH_PREFIX)) {
-                                sparqlQuery.addNamedGraph(URLDecoder.decode(param.substring(NAMED_GRAPH_PREFIX.length()),
-                                        CHARSET));
+                                sparqlQuery.addNamedGraph(factory.createIRI(
+                                        URLDecoder.decode(param.substring(NAMED_GRAPH_PREFIX.length()), CHARSET)));
                             } else {
                                 throw new IllegalArgumentException("Unspecified request parameter: " + param);
                             }
@@ -246,10 +268,15 @@ public class HttpSparqlHandler implements HttpHandler {
      * @throws RDF4JException If an error occurs due to illegal SPARQL query (e.g. incorrect syntax)
      */
     private void evaluateQuery(SparqlQuery sparqlQuery, HttpExchange exchange) throws IOException, RDF4JException {
-        // TODO include optional parameters defaultGraphs and namedGraphs and
-        Query query = connection.prepareQuery(sparqlQuery.getQuery());
+        SailQuery query = connection.prepareQuery(QueryLanguage.SPARQL, sparqlQuery.getQuery(), null);
+        Dataset dataset = sparqlQuery.getDataset();
+        if(!dataset.getDefaultGraphs().isEmpty() || !dataset.getNamedGraphs().isEmpty()) {
+            // This will include default graphs and named graphs from  the request parameters but default graphs and
+            // named graphs contained in the string query will be ignored
+            query.getParsedQuery().setDataset(dataset);
+        }
         List<String> acceptedMimeTypes = exchange.getRequestHeaders().get("Accept");
-        if (query instanceof TupleQuery) {
+        if (query instanceof SailTupleQuery) {
             LOGGER.log(Level.INFO, "Evaluating tuple query: " + sparqlQuery.getQuery());
             QueryResultFormat format = getFormat(TupleQueryResultWriterRegistry.getInstance(), acceptedMimeTypes,
                     TupleQueryResultFormat.SPARQL, exchange.getResponseHeaders());
@@ -258,7 +285,7 @@ public class HttpSparqlHandler implements HttpHandler {
                 ((TupleQuery) query).evaluate(TupleQueryResultWriterRegistry.getInstance().get(format).get()
                         .getWriter(response));
             }
-        } else if (query instanceof GraphQuery) {
+        } else if (query instanceof SailGraphQuery) {
             LOGGER.log(Level.INFO, "Evaluating graph query: " + sparqlQuery.getQuery());
             RDFFormat format = getFormat(RDFWriterRegistry.getInstance(), acceptedMimeTypes, RDFFormat.RDFXML,
                     exchange.getResponseHeaders());
@@ -266,7 +293,7 @@ public class HttpSparqlHandler implements HttpHandler {
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
                 ((GraphQuery) query).evaluate(RDFWriterRegistry.getInstance().get(format).get().getWriter(response));
             }
-        } else if (query instanceof BooleanQuery) {
+        } else if (query instanceof SailBooleanQuery) {
             LOGGER.log(Level.INFO, "Evaluating boolean query: " + sparqlQuery.getQuery());
             QueryResultFormat format = getFormat(BooleanQueryResultWriterRegistry.getInstance(),
                     acceptedMimeTypes, BooleanQueryResultFormat.SPARQL, exchange.getResponseHeaders());
@@ -331,39 +358,32 @@ public class HttpSparqlHandler implements HttpHandler {
     private class SparqlQuery {
         // SPARQL query string, has to be exactly one
         private String query;
-        // List of specified default graph URIs, can be zero or more
-        private List<String> defaultGraphs;
-        // List of specified named graph URIs, can be zero or more
-        private List<String> namedGraphs;
+        // Dataset containing default graphs and named graphs
+        private SimpleDataset dataset;
 
         public SparqlQuery() {
             query = null;
-            defaultGraphs = new ArrayList<>();
-            namedGraphs = new ArrayList<>();
+            dataset = new SimpleDataset();
         }
 
         public String getQuery() {
             return query;
         }
 
-        public List<String> getDefaultGraphs() {
-            return defaultGraphs;
-        }
-
-        public List<String> getNamedGraphs() {
-            return namedGraphs;
-        }
-
         public void setQuery(String query) {
             this.query = query;
         }
 
-        public void addDefaultGraph(String defaultGraphUri) {
-            defaultGraphs.add(defaultGraphUri);
+        public void addDefaultGraph(IRI defaultGraph) {
+            dataset.addDefaultGraph(defaultGraph);
         }
 
-        public void addNamedGraph(String namedGraphUri) {
-            namedGraphs.add(namedGraphUri);
+        public void addNamedGraph(IRI namedGraph) {
+            dataset.addNamedGraph(namedGraph);
+        }
+
+        public Dataset getDataset() {
+            return dataset;
         }
 
     }

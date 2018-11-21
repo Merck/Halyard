@@ -1,10 +1,29 @@
+/*
+ * Copyright 2018 Merck Sharp & Dohme Corp. a subsidiary of Merck & Co.,
+ * Inc., Kenilworth, NJ, USA.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.tools.HttpSparqlHandler;
-import com.msd.gin.halyard.tools.SimpleHttpServer;
+import com.sun.net.httpserver.HttpExchange;
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
-import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
 import org.junit.*;
 import org.w3c.dom.Document;
@@ -17,6 +36,7 @@ import javax.xml.xpath.*;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.List;
 
@@ -35,9 +55,9 @@ import static org.junit.Assert.assertTrue;
  */
 public class HttpSparqlHandlerTest {
 
-    private static final String CONTEXT = "/";
-    private static final int PORT = 8000;
-    private static final String SERVER_URL = "http://localhost:" + PORT;
+    private static final String SERVER_CONTEXT = "/";
+    private static final int PORT = 0;
+    private static final String CHARSET = "UTF-8";
 
     // Request content type (only for POST requests)
     private static final String ENCODED_CONTENT = "application/x-www-form-urlencoded";
@@ -49,11 +69,29 @@ public class HttpSparqlHandlerTest {
     private static final String TSV_CONTENT = "text/tab-separated-values";
     private static final String CSV_CONTENT = "text/csv";
 
-    private static final String TRIPLE = "<http://a> <http://b> <http://c> .";
+    // test data
+    private static final ValueFactory factory = SimpleValueFactory.getInstance();
+    private static final Resource SUBJ = factory.createIRI("http://ginger/subject/");
+    private static final IRI PRED = factory.createIRI("http://ginger/pred/");
+    private static final Value OBJ = factory.createLiteral("ginger literal");
+    private static final Resource CONTEXT = factory.createIRI("http://ginger/");
 
+    private static final Resource SUBJ2 = factory.createIRI("http://carrot/subject2/");
+    private static final IRI PRED2 = factory.createIRI("http://carrot/pred2/");
+    private static final Value OBJ2 = factory.createLiteral("carrot literal 2");
+    private static final Resource CONTEXT2 = factory.createIRI("http://carrot/");
+
+    private static final Resource SUBJ3 = factory.createIRI("http://potato/subject2/");
+    private static final IRI PRED3 = factory.createIRI("http://potato/pred2/");
+    private static final Value OBJ3 = factory.createLiteral("potato literal 2");
+    private static final Resource CONTEXT3 = factory.createIRI("http://potato/");
+
+    private static final Resource NON_EXISTING_CONTEXT = factory.createIRI("http://broccoli/");
 
     private static SimpleHttpServer server;
     private static SailRepositoryConnection repositoryConnection;
+    // SimpleHttpServer URL
+    private static String SERVER_URL;
 
     /**
      * Create HTTP server, handler and repositoryConnection to Sail repository first
@@ -71,16 +109,18 @@ public class HttpSparqlHandlerTest {
         repositoryConnection.begin();
 
         // Add some test data
-        repositoryConnection.add(new StringReader(TRIPLE), "http://whatever/", RDFFormat.NTRIPLES);
+        repositoryConnection.add(factory.createStatement(SUBJ, PRED, OBJ, CONTEXT));
+        repositoryConnection.add(factory.createStatement(SUBJ2, PRED2, OBJ2, CONTEXT2));
+        repositoryConnection.add(factory.createStatement(SUBJ3, PRED3, OBJ3, CONTEXT3));
+        repositoryConnection.commit();
 
         // Create handler with the repositoryConnection to the sail repository
-        HttpSparqlHandler handler = new HttpSparqlHandler(repositoryConnection);
+        HttpSparqlHandler handler = new HttpSparqlHandler(repositoryConnection, true);
 
         // Create and start http server
-        server = new SimpleHttpServer(PORT, CONTEXT, handler);
+        server = new SimpleHttpServer(PORT, SERVER_CONTEXT, handler);
         server.start();
-
-
+        SERVER_URL = "http://localhost:" + server.getAddress().getPort();
     }
 
     /**
@@ -250,7 +290,7 @@ public class HttpSparqlHandlerTest {
         List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
         assertTrue(validResponseContent.contains(urlConnection.getContentType()));
         if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, true);
+            checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
         }
     }
 
@@ -271,7 +311,7 @@ public class HttpSparqlHandlerTest {
         List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
         assertTrue(validResponseContent.contains(urlConnection.getContentType()));
         if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, true);
+            checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
         }
     }
 
@@ -292,174 +332,7 @@ public class HttpSparqlHandlerTest {
         List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
         assertTrue(validResponseContent.contains(urlConnection.getContentType()));
         if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, true);
-        }
-    }
-
-
-    /**
-     * Invoke correct query operation with a protocol-specified default graph via POST
-     */
-    @Ignore("Not ready yet")
-    @Test
-    public void testQueryDatasetDefaultGraph() throws IOException {
-        URL url = new URL(SERVER_URL +
-                "?default-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1.rdf");
-        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-        urlConnection.setDoOutput(true);
-        urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
-        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
-        out.write("ASK { <http://kasei.us/2009/09/sparql/data/data1.rdf> ?p ?o }");
-        out.close();
-        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, true);
-        }
-    }
-
-    /**
-     * Invoke correct query operation with multiple protocol-specified default graphs via GET
-     */
-    @Ignore("Not ready yet")
-    @Test
-    public void testQueryDatasetDefaultGraphsGet() throws IOException {
-        String GET_URL = SERVER_URL + "?query=ASK%20%7B%20%3Chttp%3A%2F%2Fkasei" +
-                ".us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1.rdf%3E%20a%20%3Ftype%20.%20%3Chttp%3A%2F%2Fkasei" +
-                ".us%2F2009%2F09%2Fsparql%2Fdata%2Fdata2.rdf%3E%20a%20%3Ftype%20.%20%7D" +
-                "&default-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1.rdf" +
-                "&default-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata2.rdf";
-        URL url = new URL(GET_URL);
-        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-        urlConnection.setRequestMethod("GET");
-        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, true);
-        }
-    }
-
-    /**
-     * Invoke correct query operation with multiple protocol-specified default graphs via POST
-     */
-    @Ignore("Not ready yet")
-    @Test
-    public void testQueryDatasetDefaultGraphsPost() throws IOException {
-        URL url = new URL(SERVER_URL +
-                "?default-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1.rdf" +
-                "&default-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata2.rdf");
-        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-        urlConnection.setDoOutput(true);
-        urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
-        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
-        out.write("ASK { <http://kasei.us/2009/09/sparql/data/data1.rdf> ?p ?o . " +
-                "<http://kasei.us/2009/09/sparql/data/data2.rdf> ?p ?o }");
-        out.close();
-        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, true);
-        }
-    }
-
-    /**
-     * Invoke correct query operation with multiple protocol-specified named graphs via GET
-     */
-    @Ignore("Not ready yet")
-    @Test
-    public void testQueryDatasetNamedGraphsGet() throws IOException {
-        String GET_URL = SERVER_URL + "?query=ASK%20%7B%20GRAPH%20%3Fg1%20%7B%20%3Chttp%3A%2F%2Fkasei" +
-                ".us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1" +
-                ".rdf%3E%20a%20%3Ftype%20%7D%20GRAPH%20%3Fg2%20%7B%20%3Chttp%3A%2F%2Fkasei" +
-                ".us%2F2009%2F09%2Fsparql%2Fdata%2Fdata2.rdf%3E%20a%20%3Ftype%20%7D%20%7D" +
-                "&named-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1.rdf" +
-                "&named-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata2.rdf";
-        URL url = new URL(GET_URL);
-        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-        urlConnection.setRequestMethod("GET");
-        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, true);
-        }
-    }
-
-    /**
-     * Invoke correct query operation with multiple protocol-specified named graphs via POST
-     */
-    @Ignore("Not ready yet")
-    @Test
-    public void testQueryDatasetNamedGraphsPost() throws IOException {
-        URL url = new URL(SERVER_URL +
-                "?named-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1.rdf" +
-                "&named-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata2.rdf");
-        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-        urlConnection.setDoOutput(true);
-        urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
-        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
-        out.write("ASK { GRAPH ?g { ?s ?p ?o } }");
-        out.close();
-        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, true);
-        }
-    }
-
-    /**
-     * Invoke correct query operation with protocol-specified dataset (both named and default graphs)
-     */
-    @Ignore("Not ready yet")
-    @Test
-    public void testQueryDatasetFull() throws IOException {
-        URL url = new URL(SERVER_URL +
-                "?default-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata3.rdf" +
-                "&named-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata1.rdf" +
-                "&named-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata2.rdf");
-        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-        urlConnection.setDoOutput(true);
-        urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
-        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
-        out.write("ASK { GRAPH ?g { ?s ?p ?o } }");
-        out.close();
-        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, true);
-        }
-    }
-
-    /**
-     * Invoke query specifying dataset in both query string and protocol; test for use of protocol-specified dataset
-     * (test relies on the endpoint allowing client-specified RDF datasets; returns 400 otherwise)
-     */
-    @Ignore("Not ready yet")
-    @Test
-    public void testQueryMultipleDataset() throws IOException {
-        URL url = new URL(SERVER_URL +
-                "?default-graph-uri=http%3A%2F%2Fkasei.us%2F2009%2F09%2Fsparql%2Fdata%2Fdata2.rdf");
-        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-        urlConnection.setDoOutput(true);
-        urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
-        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
-        out.write("ASK FROM <http://kasei.us/2009/09/sparql/data/data1.rdf> { <data1.rdf> ?p ?o }");
-        out.close();
-        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, true);
+            checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
         }
     }
 
@@ -482,20 +355,133 @@ public class HttpSparqlHandlerTest {
     }
 
     /**
+     * Invoke query operation with empty query parameter
+     */
+    @Test
+    public void testEmptyQueryParameter() throws IOException {
+        URL url = new URL(SERVER_URL + "?query=");
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("GET");
+        assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, urlConnection.getResponseCode());
+    }
+
+    /**
+     * Invoke query operation with an unspecified parameter
+     *
+     * @throws IOException
+     */
+    @Test
+    public void testUnspecifiedParameterViaGet() throws IOException {
+        URL url = new URL(SERVER_URL + "?unspecifiedParameter=");
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("GET");
+        assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, urlConnection.getResponseCode());
+    }
+
+    /**
+     * Invoke graph query
+     */
+    @Test
+    public void testGraphQuery() throws IOException {
+        URL url = new URL(SERVER_URL +
+                "?query=" + URLEncoder.encode("DESCRIBE ?x WHERE { ?x  ?y ?z }", CHARSET));
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("GET");
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+    }
+
+    /**
+     * Invoke correct query operation with multiple named and default graphs via POST headers
+     */
+    @Test
+    public void testDefaultAndNamedGraphsViaPostHeaders() throws IOException {
+        URL url = new URL(SERVER_URL
+                + "?default-graph-uri=" + URLEncoder.encode(CONTEXT.toString(), CHARSET)
+                + "&named-graph-uri=" + URLEncoder.encode(CONTEXT2.toString(), CHARSET)
+                + "&named-graph-uri=" + URLEncoder.encode(CONTEXT3.toString(), CHARSET)
+        );
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setDoOutput(true);
+        urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
+        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
+        out.write(
+                "SELECT (COUNT(*) AS ?count) " +
+                        "WHERE { ?x ?y ?z  GRAPH ?g { ?s ?p ?o } }");
+        out.close();
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
+        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
+        if (urlConnection.getContentType().equals(XML_CONTENT)) {
+            checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
+        }
+    }
+
+    /**
+     * Invoke correct query operation with multiple named and default graphs via POST message body
+     */
+    @Test
+    public void testDefaultAndNamedGraphsViaPostMessageBody() throws IOException {
+        URL url = new URL(SERVER_URL);
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setDoOutput(true);
+        urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Content-Type", ENCODED_CONTENT);
+        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
+        out.write(
+                "query=" + URLEncoder.encode("SELECT (COUNT(*) AS ?count) WHERE { ?x ?y ?z  GRAPH ?g { ?s ?p ?o } }",
+                        CHARSET)
+                        + "&default-graph-uri=" + URLEncoder.encode(CONTEXT.toString(), CHARSET)
+                        + "&named-graph-uri=" + URLEncoder.encode(CONTEXT2.toString(), CHARSET)
+                        + "&named-graph-uri=" + URLEncoder.encode(CONTEXT3.toString(), CHARSET)
+
+        );
+        out.close();
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
+        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
+        if (urlConnection.getContentType().equals(XML_CONTENT)) {
+            checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
+        }
+    }
+
+    /**
+     * Invoke correct query operation with multiple named and default graphs via GET
+     */
+    @Test
+    public void testDefaultAndNamedGraphsViaGet() throws IOException {
+        URL url = new URL(SERVER_URL + "?query="
+                + URLEncoder.encode("SELECT (COUNT(*) AS ?count) WHERE { ?x ?y ?z GRAPH ?g { ?s ?p ?o } }", CHARSET)
+                + "&default-graph-uri=" + URLEncoder.encode(CONTEXT.toString(), CHARSET)
+                + "&named-graph-uri=" + URLEncoder.encode(CONTEXT2.toString(), CHARSET)
+                + "&named-graph-uri=" + URLEncoder.encode(CONTEXT3.toString(), CHARSET)
+        );
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("GET");
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
+        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
+        if (urlConnection.getContentType().equals(XML_CONTENT)) {
+            checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
+        }
+    }
+
+    /**
      * Help method for checking response content, only boolean value is expected (result of ASK query)
      *
      * @param urlConnection
      * @param expected
+     * @param xpathExpr     XPath expression for searching the result in the XML document
      */
-    private void checkXMLResponseContent(HttpURLConnection urlConnection, Boolean expected) {
+    private void checkXMLResponseContent(HttpURLConnection urlConnection, String expected, String xpathExpr) {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             DocumentBuilder builder = factory.newDocumentBuilder();
             Document doc = builder.parse(urlConnection.getInputStream());
             XPathFactory xPathfactory = XPathFactory.newInstance();
             XPath xpath = xPathfactory.newXPath();
-            XPathExpression expr = xpath.compile("/sparql/boolean");
-            Boolean result = Boolean.valueOf(expr.evaluate(doc));
+            XPathExpression expr = xpath.compile(xpathExpr);
+            String result = expr.evaluate(doc);
             assertEquals(expected, result);
         } catch (IOException | ParserConfigurationException | SAXException | XPathExpressionException e) {
             e.printStackTrace();
