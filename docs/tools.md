@@ -96,15 +96,22 @@ bulkexport Halyard Bulk Export is a MapReduce application that executes multiple
            MapReduce framework. Query file name (without extension) can be used in the target URL
            pattern. Order of queries execution is not guaranteed. Another internal level of
            parallelisation is done using a custom SPARQL function
-           halyard:forkAndFilterBy(<constant_number_of_forks>, ?a_binding, ...). The function takes
-           one or more bindings as its arguments and these bindings are used as keys to randomly
-           distribute the query evaluation across the executed parallel forks of the same query.
+           halyard:http://merck.github.io/Halyard/ns#forkAndFilterBy(<constant_number_of_forks>,
+           ?a_binding, ...). The function takes one or more bindings as its arguments and these
+           bindings are used as keys to randomly distribute the query evaluation across the executed
+           parallel forks of the same query.
 bulkdelete Halyard Bulk Delete is a MapReduce application that effectively deletes large set of
            triples or whole named graphs, based on specified statement pattern and/or named
            graph(s).
 profile    Halyard Profile is a command-line tool designed to profile SPARQL query performance
            within the actual Halyard environment. Actually it is limited to the statical analysis
            only.
+endpoint   Halyard Endpoint is a command-line application designed to launch a simple SPARQL
+           Endpoint to serve SPARQL Queries. Any custom commands that are to be run as a new
+           subprocess internally by this tool have to be passed at the end of this tool.
+           Endpoint URI is accessible via the system environment variable ENDPOINT.
+           Warning: All options following a first unrecognized option are ignored and are considered
+           as part of the custom command.
 
 genericHadoopOptions are:
 ----------------------------------------------------------------------------------------------------
@@ -542,6 +549,31 @@ actual Halyard environment. Actually it is limited to the statical analysis only
  -s,--source-dataset <dataset_table>   Source HBase table with Halyard RDF store
  -q,--query <sparql_query>             SPARQL query to profile
 Example: halyard profile -s my_dataset -q 'select * where {?s owl:sameAs ?o}'
+```
+
+### Halyard Endpoint
+```
+$ ./halyard endpoint -h
+usage: halyard endpoint [-h] [-v] [-p <http_server_port>] -s <dataset_table> [-i
+       <elastic_index_url>] [-t <evaluation_timeout>] [--verbose]
+Halyard Endpoint is a command-line application designed to launch a simple SPARQL Endpoint to serve
+SPARQL Queries. Any custom commands that are to be run as a new subprocess internally by this tool
+have to be passed at the end of this tool.
+Endpoint URI is accessible via the system environment variable ENDPOINT.
+Warning: All options following a first unrecognized option are ignored and are considered as part of
+the custom command.
+ -h,--help                                Prints this help
+ -v,--version                             Prints version
+ -p,--port <http_server_port>             HTTP server port number. If no port number is specified,
+                                          system will automatically select a new port number
+ -s,--source-dataset <dataset_table>      Source HBase table with Halyard RDF store
+ -i,--elastic-index <elastic_index_url>   Optional ElasticSearch index URL
+ -t,--timeout <evaluation_timeout>        Timeout in seconds for each query evaluation (default is
+                                          unlimited timeout)
+    --verbose                             Logging mode that records all logging information (by
+                                          default only important informative and error messages are
+                                          printed)
+Example: halyard endpoint -p 8000 -s TABLE --verbose customScript.sh customArg1 customArg2
 ```
 
 ### RDF4J Web Applications
