@@ -161,7 +161,7 @@ public class HalyardBulkLoadTest {
 
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable2", false, 0, true, 30, null, null);
         sail.initialize();
-        assertEquals(2, sail.size());
+        assertEquals(3, sail.size());
         sail.shutDown();
     }
 
