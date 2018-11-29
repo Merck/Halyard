@@ -47,7 +47,8 @@ public final class HalyardMain {
                 new HalyardBulkExport(),
                 new HalyardBulkDelete(),
                 new HalyardProfile(),
-                new HalyardEndpoint()
+                new HalyardEndpoint(),
+                new HalyardSummary()
             };
             for (AbstractHalyardTool tool : tools) {
                 if (tool.name.equalsIgnoreCase(first)) {
