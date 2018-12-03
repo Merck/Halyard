@@ -82,6 +82,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
     private static final String FILTER_NAMESPACE_PREFIX = "http://merck.github.io/Halyard/";
     private static final String SOURCE = "halyard.summary.source";
     private static final String TARGET = "halyard.summary.target";
+    private static final String TARGET_GRAPH = "halyard.summary.target.graph";
 
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -274,11 +275,15 @@ public final class HalyardSummary extends AbstractHalyardTool {
         OutputStream out;
         RDFWriter writer;
         HBaseSail sail;
+        IRI namedGraph;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             String targetUrl = conf.get(TARGET);
+            String ng = conf.get(TARGET_GRAPH);
+            namedGraph = ng ==null ? null : SVF.createIRI(ng);
+
             sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
             sail.initialize();
             targetUrl = MessageFormat.format(targetUrl, context.getTaskAttemptID().getTaskID().getId());
@@ -319,7 +324,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         }
 
         private void write(Resource subj, String halyardPredicate, Value value) {
-            writer.handleStatement(SVF.createStatement(subj, SVF.createIRI(NAMESPACE, halyardPredicate), value));
+            writer.handleStatement(SVF.createStatement(subj, SVF.createIRI(NAMESPACE, halyardPredicate), value, namedGraph));
         }
 
         private void copyDescription(Resource subject) {
@@ -406,10 +411,11 @@ public final class HalyardSummary extends AbstractHalyardTool {
         super(
             "summary",
             "Halyard Summary is a MapReduce application that calculates dataset summary and exports it into a file.",
-            "Example: halyard summary -s my_dataset -n 10 -t hdfs:/my_folder/my_dataset_summary.ttl");
+            "Example: halyard summary -s my_dataset -n 10 -g http://my_dataset_summary -t hdfs:/my_folder/my_dataset_summary{0}.nq.gz");
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-file", "target_url", "Target file to export the statistics (instead of update) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]", true, true);
         addOption("n", "reducers-number", "n", "Optional set number of reducers to run (default is 1)", false, true);
+        addOption("g", "summary-named-graph", "target_graph", "Optional target named graph of the exported graph summary", false, true);
     }
 
     @Override
@@ -432,6 +438,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         Job job = Job.getInstance(getConf(), "HalyardSummary " + source + (target == null ? " update" : " -> " + target));
         job.getConfiguration().set(SOURCE, source);
         if (target != null) job.getConfiguration().set(TARGET, target);
+        if (cmd.hasOption('g')) job.getConfiguration().set(TARGET_GRAPH, cmd.getOptionValue('g'));
         job.setJarByClass(HalyardSummary.class);
         TableMapReduceUtil.initCredentials(job);
 
