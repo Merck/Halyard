@@ -450,7 +450,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         Scan scan = new Scan(new byte[]{HalyardTableUtils.POS_PREFIX}, new byte[]{HalyardTableUtils.POS_PREFIX + 1});
         scan.addFamily("e".getBytes(UTF8));
         scan.setMaxVersions(1);
-        scan.setBatch(10);
+        scan.setBatch(100);
         scan.setAllowPartialResults(true);
         TableMapReduceUtil.initTableMapperJob(source,
                 scan,
