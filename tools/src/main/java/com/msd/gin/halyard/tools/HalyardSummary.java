@@ -229,9 +229,14 @@ public final class HalyardSummary extends AbstractHalyardTool {
             oldStatement = newStatement;
         }
 
+        long counter = 0;
+
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             statementChange(HalyardTableUtils.parseStatement(value.rawCells()[0]));
+            if (++counter % 1000 == 0) {
+                output.setStatus(Long.toString(counter));
+            }
         }
 
         @Override
