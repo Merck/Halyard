@@ -132,36 +132,46 @@ public final class HalyardSummary extends AbstractHalyardTool {
         Set<Resource> rangeClasses = Collections.emptySet();
         Context mapContext = null;
 
+        long counter = 0, ccCounter = 0, pcCounter = 0, pdCounter = 0, prCounter = 0, pdrCounter = 0, prltCounter = 0, pdrltCounter = 0, coCounter = 0;
+
         private void reportClassCardinality(Resource clazz, long cardinality) throws IOException, InterruptedException {
             report(ReportType.ClassCardinality, clazz, cardinality);
+            ccCounter++;
         }
 
         private void reportPredicateCardinality(IRI predicate, long cardinality) throws IOException, InterruptedException {
             report(ReportType.PCardinality, predicate, cardinality);
+            pcCounter++;
         }
 
         private void reportPredicateDomain(IRI predicate, Resource domainClass) throws IOException, InterruptedException {
             report(ReportType.PDomain, predicate, 1l, domainClass);
+            pdCounter++;
         }
 
         private void reportPredicateRange(IRI predicate, Resource rangeClass) throws IOException, InterruptedException {
             report(ReportType.PRange, predicate, 1l, rangeClass);
+            prCounter++;
         }
 
         private void reportPredicateDomainAndRange(IRI predicate, Resource domainClass, Resource rangeClass) throws IOException, InterruptedException {
             report(ReportType.PDomainAndRange, predicate, 1l, domainClass, rangeClass);
+            pdrCounter++;
         }
 
         private void reportPredicateRangeLiteralType(IRI predicate, IRI rangeLiteralDataType) throws IOException, InterruptedException {
             report(ReportType.PRangeLiteralType, predicate, 1l, rangeLiteralDataType == null ? XMLSchema.STRING : rangeLiteralDataType);
+            prltCounter++;
         }
 
         private void reportPredicateDomainAndRangeLiteralType(IRI predicate, Resource domainClass, IRI rangeLiteralDataType) throws IOException, InterruptedException {
             report(ReportType.PDomainAndRangeLiteralType, predicate, 1l, domainClass, rangeLiteralDataType == null ? XMLSchema.STRING : rangeLiteralDataType);
+            pdrltCounter++;
         }
 
         private void reportClassesOverlap(Resource class1, Resource class2) throws IOException, InterruptedException {
             report(ReportType.ClassesOverlap, class1, 1l, class2);
+            coCounter++;
         }
 
         private final ByteArrayOutputStream baos = new ByteArrayOutputStream(100000);
@@ -233,13 +243,11 @@ public final class HalyardSummary extends AbstractHalyardTool {
             oldStatement = newStatement;
         }
 
-        long counter = 0;
-
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             statementChange(HalyardTableUtils.parseStatement(value.rawCells()[0]));
             if (++counter % 1000 == 0) {
-                output.setStatus(Long.toString(counter));
+                output.setStatus(MessageFormat.format("{0} cc:{1} co:{2} pc:{3} pd:{4} pr:{5} pdr:{6} prlt:{7} pdrlt:{8}", counter, ccCounter, coCounter, pcCounter, pdCounter, prCounter, pdrCounter, prltCounter, pdrltCounter));
             }
         }
 
