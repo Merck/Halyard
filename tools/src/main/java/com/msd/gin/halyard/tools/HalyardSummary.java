@@ -31,7 +31,6 @@ import java.nio.charset.Charset;
 import java.text.MessageFormat;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.cli.CommandLine;
@@ -130,7 +129,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         Statement oldStatement = null;
         long predicateCardinality = 0;
         long classCardinality = 0;
-        Set<Resource> rangeClasses = Collections.emptyList();
+        Set<Resource> rangeClasses = Collections.emptySet();
         Context mapContext = null;
 
         private void reportClassCardinality(Resource clazz, long cardinality) throws IOException, InterruptedException {
