@@ -29,10 +29,11 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
@@ -42,7 +43,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
@@ -50,7 +53,6 @@ import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.htrace.Trace;
@@ -96,38 +98,39 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
         final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
 
-        HBaseSail sail;
+        Table table;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             this.mapContext = context;
-            if (sail == null) {
+            if (table == null) {
                 Configuration conf = context.getConfiguration();
-                sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
-                sail.initialize();
+                table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             }
         }
 
-        private List<Resource> queryForClasses(Value instance) {
+        private Set<Resource> queryForClasses(Value instance) throws IOException {
             if (instance instanceof Resource) {
-                List<Resource> res = new ArrayList<>();
-                try (CloseableIteration<? extends Statement, SailException> it = sail.getStatements((Resource)instance, RDF.TYPE, null, true)) {
-                    while (it.hasNext()) {
-                        Statement st = it.next();
-                        if (st.getObject() instanceof Resource) {
+                Set<Resource> res = new HashSet<>();
+                Scan scan = HalyardTableUtils.scan((Resource)instance, RDF.TYPE, null, null);
+                scan.setSmall(true);
+                try (ResultScanner scanner = table.getScanner(scan)) {
+                    for (Result r : scanner) {
+                        Statement st = HalyardTableUtils.parseStatement(r.rawCells()[0]);
+                        if (st.getSubject().equals(instance) && st.getPredicate().equals(RDF.TYPE) && (st.getObject() instanceof Resource)) {
                             res.add((Resource)st.getObject());
                         }
                     }
                 }
                 return res;
             }
-            return Collections.emptyList();
+            return Collections.emptySet();
         }
 
         Statement oldStatement = null;
         long predicateCardinality = 0;
         long classCardinality = 0;
-        List<Resource> rangeClasses = Collections.emptyList();
+        Set<Resource> rangeClasses = Collections.emptyList();
         Context mapContext = null;
 
         private void reportClassCardinality(Resource clazz, long cardinality) throws IOException, InterruptedException {
@@ -162,8 +165,9 @@ public final class HalyardSummary extends AbstractHalyardTool {
             report(ReportType.ClassesOverlap, class1, 1l, class2);
         }
 
+        private final ByteArrayOutputStream baos = new ByteArrayOutputStream(100000);
         private void report(ReportType type, Resource firstKey, long cardinality, Value ... otherKeys) throws IOException, InterruptedException {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            baos.reset();
             try (DataOutputStream dos = new DataOutputStream(baos)) {
                 dos.writeUTF(NTriplesUtil.toNTriplesString(firstKey));
                 dos.writeByte(type.ordinal());
@@ -199,7 +203,8 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 } else if (!oldStatement.getPredicate().stringValue().startsWith(FILTER_NAMESPACE_PREFIX)) {
                     if (objectChange) {
                         //init of object change
-                        for (Resource objClass : queryForClasses(oldStatement.getObject())) {
+                        rangeClasses = queryForClasses(oldStatement.getObject());
+                        for (Resource objClass : rangeClasses) {
                             reportPredicateRange(oldStatement.getPredicate(), objClass);
                         }
                         if (oldStatement.getObject() instanceof Literal) {
@@ -242,24 +247,12 @@ public final class HalyardSummary extends AbstractHalyardTool {
         @Override
         protected void cleanup(Context output) throws IOException, InterruptedException {
             statementChange(null);
-            if (sail != null) {
-                sail.commit();
-                sail.close();
-                sail = null;
+            if (table != null) {
+                table.close();;
+                table = null;
             }
         }
 
-    }
-
-    static final class SummaryPartitioner extends Partitioner<ImmutableBytesWritable, LongWritable> {
-        @Override
-        public int getPartition(ImmutableBytesWritable key, LongWritable value, int numPartitions) {
-            try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
-                return (dis.readUTF().hashCode() & Integer.MAX_VALUE) % numPartitions;
-            } catch (IOException e) {
-                throw new IllegalArgumentException(e);
-            }
-        }
     }
 
     static final class SummaryCombiner extends Reducer<ImmutableBytesWritable, LongWritable, ImmutableBytesWritable, LongWritable>  {
@@ -416,10 +409,9 @@ public final class HalyardSummary extends AbstractHalyardTool {
         super(
             "summary",
             "Halyard Summary is a MapReduce application that calculates dataset summary and exports it into a file.",
-            "Example: halyard summary -s my_dataset -n 10 -g http://my_dataset_summary -t hdfs:/my_folder/my_dataset_summary{0}.nq.gz");
+            "Example: halyard summary -s my_dataset -n 10 -g http://my_dataset_summary -t hdfs:/my_folder/my_dataset_summary.nq.gz");
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
-        addOption("t", "target-file", "target_url", "Target file to export the statistics (instead of update) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]", true, true);
-        addOption("n", "reducers-number", "n", "Optional set number of reducers to run (default is 1)", false, true);
+        addOption("t", "target-file", "target_url", "Target file to export the statistics (instead of update) hdfs://<path>/<file_name>.<RDF_ext>[.<compression>]", true, true);
         addOption("g", "summary-named-graph", "target_graph", "Optional target named graph of the exported graph summary", false, true);
     }
 
@@ -458,10 +450,9 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 ImmutableBytesWritable.class,
                 LongWritable.class,
                 job);
-        job.setPartitionerClass(SummaryPartitioner.class);
         job.setCombinerClass(SummaryCombiner.class);
         job.setReducerClass(SummaryReducer.class);
-        job.setNumReduceTasks(Integer.parseInt(cmd.getOptionValue('n', "1")));
+        job.setNumReduceTasks(1);
         job.setOutputFormatClass(NullOutputFormat.class);
         if (job.waitForCompletion(true)) {
             LOG.info("Summary Generation Completed..");
