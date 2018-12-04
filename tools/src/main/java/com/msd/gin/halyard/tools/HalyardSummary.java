@@ -136,12 +136,12 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
         private void reportClassCardinality(Resource clazz, long cardinality) throws IOException, InterruptedException {
             report(ReportType.ClassCardinality, clazz, cardinality);
-            ccCounter++;
+            ccCounter+=cardinality;
         }
 
         private void reportPredicateCardinality(IRI predicate, long cardinality) throws IOException, InterruptedException {
             report(ReportType.PCardinality, predicate, cardinality);
-            pcCounter++;
+            pcCounter+=cardinality;
         }
 
         private void reportPredicateDomain(IRI predicate, Resource domainClass) throws IOException, InterruptedException {
