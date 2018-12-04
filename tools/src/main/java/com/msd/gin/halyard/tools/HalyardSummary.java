@@ -338,9 +338,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 while (it.hasNext()) {
                     Statement st = it.next();
                     if (!st.getPredicate().stringValue().startsWith(FILTER_NAMESPACE_PREFIX)) {
-                        if (st.getContext() != null) {
-                            st = SVF.createStatement(st.getSubject(), st.getPredicate(), st.getObject());
-                        }
+                        st = SVF.createStatement(st.getSubject(), st.getPredicate(), st.getObject(), namedGraph);
                         if (!st.equals(dedup)) {
                             writer.handleStatement(st);
                         }
