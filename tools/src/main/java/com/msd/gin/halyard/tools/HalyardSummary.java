@@ -112,7 +112,6 @@ public final class HalyardSummary extends AbstractHalyardTool {
             if (instance instanceof Resource) {
                 Set<Resource> res = new HashSet<>();
                 Scan scan = HalyardTableUtils.scan((Resource)instance, RDF.TYPE, null, null);
-                scan.setSmall(true);
                 try (ResultScanner scanner = table.getScanner(scan)) {
                     for (Result r : scanner) {
                         Statement st = HalyardTableUtils.parseStatement(r.rawCells()[0]);
@@ -287,7 +286,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             String targetUrl = conf.get(TARGET);
             String ng = conf.get(TARGET_GRAPH);
-            namedGraph = ng ==null ? null : SVF.createIRI(ng);
+            namedGraph = ng == null ? null : SVF.createIRI(ng);
 
             sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
             sail.initialize();
@@ -414,7 +413,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         super(
             "summary",
             "Halyard Summary is a MapReduce application that calculates dataset summary and exports it into a file.",
-            "Example: halyard summary -s my_dataset -n 10 -g http://my_dataset_summary -t hdfs:/my_folder/my_dataset_summary.nq.gz");
+            "Example: halyard summary -s my_dataset -g http://my_dataset_summary -t hdfs:/my_folder/my_dataset_summary.nq.gz");
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-file", "target_url", "Target file to export the statistics (instead of update) hdfs://<path>/<file_name>.<RDF_ext>[.<compression>]", true, true);
         addOption("g", "summary-named-graph", "target_graph", "Optional target named graph of the exported graph summary", false, true);
