@@ -246,7 +246,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             statementChange(HalyardTableUtils.parseStatement(value.rawCells()[0]));
-            if (++counter % 1000 == 0) {
+            if (++counter % 10000 == 0) {
                 output.setStatus(MessageFormat.format("{0} cc:{1} co:{2} pc:{3} pd:{4} pr:{5} pdr:{6} prlt:{7} pdrlt:{8}", counter, ccCounter, coCounter, pcCounter, pdCounter, prCounter, pdrCounter, prltCounter, pdrltCounter));
             }
         }
