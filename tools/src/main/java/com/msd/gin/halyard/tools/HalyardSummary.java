@@ -32,6 +32,7 @@ import java.text.MessageFormat;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.compress.compressors.CompressorException;
@@ -84,6 +85,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
     private static final String SOURCE = "halyard.summary.source";
     private static final String TARGET = "halyard.summary.target";
     private static final String TARGET_GRAPH = "halyard.summary.target.graph";
+    private static final String DECIMATION_FACTOR = "halyard.summary.decimation";
 
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -95,15 +97,17 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
     static final class SummaryMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
 
-        final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
-
-        Table table;
+        private final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
+        private int decimationFactor;
+        private final Random random = new Random(0);
+        private Table table;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             this.mapContext = context;
+            Configuration conf = context.getConfiguration();
+            this.decimationFactor = conf.getInt(DECIMATION_FACTOR, 10);
             if (table == null) {
-                Configuration conf = context.getConfiguration();
                 table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             }
         }
@@ -244,7 +248,9 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
-            statementChange(HalyardTableUtils.parseStatement(value.rawCells()[0]));
+            if (random.nextInt(decimationFactor) == 0) {
+                statementChange(HalyardTableUtils.parseStatement(value.rawCells()[0]));
+            }
             if (++counter % 10000 == 0) {
                 output.setStatus(MessageFormat.format("{0} cc:{1} co:{2} pc:{3} pd:{4} pr:{5} pdr:{6} prlt:{7} pdrlt:{8}", counter, ccCounter, coCounter, pcCounter, pdCounter, prCounter, pdrCounter, prltCounter, pdrltCounter));
             }
@@ -276,18 +282,19 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
     static final class SummaryReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
 
-        OutputStream out;
-        RDFWriter writer;
-        HBaseSail sail;
-        IRI namedGraph;
+        private OutputStream out;
+        private RDFWriter writer;
+        private HBaseSail sail;
+        private IRI namedGraph;
+        private int decimationFactor;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             String targetUrl = conf.get(TARGET);
             String ng = conf.get(TARGET_GRAPH);
-            namedGraph = ng == null ? null : SVF.createIRI(ng);
-
+            this.namedGraph = ng == null ? null : SVF.createIRI(ng);
+            this.decimationFactor = conf.getInt(DECIMATION_FACTOR, 10);
             sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
             sail.initialize();
             targetUrl = MessageFormat.format(targetUrl, context.getTaskAttemptID().getTaskID().getId());
@@ -354,6 +361,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 cardinality += lw.get();
             }
             if (cardinality > 0) try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
+                cardinality *= decimationFactor;
                 Resource firstKey = NTriplesUtil.parseResource(dis.readUTF(), SVF);
                 IRI generatedRoot = SVF.createIRI(NAMESPACE, HalyardTableUtils.encode(HalyardTableUtils.hashKey(key.get())));
                 switch (ReportType.values()[dis.readByte()]) {
@@ -417,6 +425,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-file", "target_url", "Target file to export the statistics (instead of update) hdfs://<path>/<file_name>.<RDF_ext>[.<compression>]", true, true);
         addOption("g", "summary-named-graph", "target_graph", "Optional target named graph of the exported graph summary", false, true);
+        addOption("d", "decimation-factor", "decimation_factor", "Optionally overide summary random decimation factor (default is 10)", false, true);
     }
 
     @Override
@@ -440,6 +449,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         job.getConfiguration().set(SOURCE, source);
         if (target != null) job.getConfiguration().set(TARGET, target);
         if (cmd.hasOption('g')) job.getConfiguration().set(TARGET_GRAPH, cmd.getOptionValue('g'));
+        if (cmd.hasOption('d')) getConf().setInt(DECIMATION_FACTOR, Integer.parseInt(cmd.getOptionValue('d')));
         job.setJarByClass(HalyardSummary.class);
         TableMapReduceUtil.initCredentials(job);
 
