@@ -80,24 +80,33 @@ import org.eclipse.rdf4j.sail.SailException;
  */
 public final class HalyardSummary extends AbstractHalyardTool {
 
-    private static final String NAMESPACE = "http://merck.github.io/Halyard/summary#";
+
+    enum ReportType {
+        ClassCardinality, PredicateCardinality, DomainCardinality, RangeCardinality, DomainAndRangeCardinality, RangeTypeCardinality, DomainAndRangeTypeCardinality, ClassesOverlapCardinality;
+
+        final IRI IRI = SVF.createIRI(NAMESPACE, Character.toLowerCase(name().charAt(0)) + name().substring(1));
+    }
+
+    static final String NAMESPACE = "http://merck.github.io/Halyard/summary#";
+    static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
+    static final IRI PREDICATE = SVF.createIRI(NAMESPACE, "predicate");
+    static final IRI CLASS = SVF.createIRI(NAMESPACE, "class");
+    static final IRI DOMAIN = SVF.createIRI(NAMESPACE, "domain");
+    static final IRI RANGE = SVF.createIRI(NAMESPACE, "range");
+    static final IRI RANGE_TYPE = SVF.createIRI(NAMESPACE, "rangeType");
+
     private static final String FILTER_NAMESPACE_PREFIX = "http://merck.github.io/Halyard/";
     private static final String SOURCE = "halyard.summary.source";
     private static final String TARGET = "halyard.summary.target";
     private static final String TARGET_GRAPH = "halyard.summary.target.graph";
     private static final String DECIMATION_FACTOR = "halyard.summary.decimation";
+    private static final int DEFAULT_DECIMATION_FACTOR = 100;
 
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
-    static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
-
-    enum ReportType {
-        ClassCardinality, PCardinality, PDomain, PRange, PDomainAndRange, PRangeLiteralType, PDomainAndRangeLiteralType, ClassesOverlap;
-    }
 
     static final class SummaryMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
 
-        private final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
         private int decimationFactor;
         private final Random random = new Random(0);
         private Table table;
@@ -106,7 +115,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             this.mapContext = context;
             Configuration conf = context.getConfiguration();
-            this.decimationFactor = conf.getInt(DECIMATION_FACTOR, 10);
+            this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             if (table == null) {
                 table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             }
@@ -131,8 +140,9 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
         Statement oldStatement = null;
         long predicateCardinality = 0;
+        long objectCardinality = 0;
         long classCardinality = 0;
-        Set<Resource> rangeClasses = Collections.emptySet();
+        Set<Resource> rangeClasses = null;
         Context mapContext = null;
 
         long counter = 0, ccCounter = 0, pcCounter = 0, pdCounter = 0, prCounter = 0, pdrCounter = 0, prltCounter = 0, pdrltCounter = 0, coCounter = 0;
@@ -143,37 +153,37 @@ public final class HalyardSummary extends AbstractHalyardTool {
         }
 
         private void reportPredicateCardinality(IRI predicate, long cardinality) throws IOException, InterruptedException {
-            report(ReportType.PCardinality, predicate, cardinality);
+            report(ReportType.PredicateCardinality, predicate, cardinality);
             pcCounter+=cardinality;
         }
 
         private void reportPredicateDomain(IRI predicate, Resource domainClass) throws IOException, InterruptedException {
-            report(ReportType.PDomain, predicate, 1l, domainClass);
+            report(ReportType.DomainCardinality, predicate, 1l, domainClass);
             pdCounter++;
         }
 
-        private void reportPredicateRange(IRI predicate, Resource rangeClass) throws IOException, InterruptedException {
-            report(ReportType.PRange, predicate, 1l, rangeClass);
-            prCounter++;
+        private void reportPredicateRange(IRI predicate, Resource rangeClass, long cardinality) throws IOException, InterruptedException {
+            report(ReportType.RangeCardinality, predicate, cardinality, rangeClass);
+            prCounter += cardinality;
         }
 
         private void reportPredicateDomainAndRange(IRI predicate, Resource domainClass, Resource rangeClass) throws IOException, InterruptedException {
-            report(ReportType.PDomainAndRange, predicate, 1l, domainClass, rangeClass);
+            report(ReportType.DomainAndRangeCardinality, predicate, 1l, domainClass, rangeClass);
             pdrCounter++;
         }
 
-        private void reportPredicateRangeLiteralType(IRI predicate, IRI rangeLiteralDataType) throws IOException, InterruptedException {
-            report(ReportType.PRangeLiteralType, predicate, 1l, rangeLiteralDataType == null ? XMLSchema.STRING : rangeLiteralDataType);
-            prltCounter++;
+        private void reportPredicateRangeLiteralType(IRI predicate, IRI rangeLiteralDataType, long cardinality) throws IOException, InterruptedException {
+            report(ReportType.RangeTypeCardinality, predicate, cardinality, rangeLiteralDataType == null ? XMLSchema.STRING : rangeLiteralDataType);
+            prltCounter += cardinality;
         }
 
         private void reportPredicateDomainAndRangeLiteralType(IRI predicate, Resource domainClass, IRI rangeLiteralDataType) throws IOException, InterruptedException {
-            report(ReportType.PDomainAndRangeLiteralType, predicate, 1l, domainClass, rangeLiteralDataType == null ? XMLSchema.STRING : rangeLiteralDataType);
+            report(ReportType.DomainAndRangeTypeCardinality, predicate, 1l, domainClass, rangeLiteralDataType == null ? XMLSchema.STRING : rangeLiteralDataType);
             pdrltCounter++;
         }
 
         private void reportClassesOverlap(Resource class1, Resource class2) throws IOException, InterruptedException {
-            report(ReportType.ClassesOverlap, class1, 1l, class2);
+            report(ReportType.ClassesOverlapCardinality, class1, 1l, class2);
             coCounter++;
         }
 
@@ -194,9 +204,8 @@ public final class HalyardSummary extends AbstractHalyardTool {
             if (oldStatement != null && !HALYARD.STATS_GRAPH_CONTEXT.equals(oldStatement.getContext())) {
                 boolean predicateChange = newStatement == null || !oldStatement.getPredicate().equals(newStatement.getPredicate());
                 boolean objectChange = predicateChange || !oldStatement.getObject().equals(newStatement.getObject());
-                boolean subjectChange = objectChange || !oldStatement.getSubject().equals(newStatement.getSubject());
-                if (RDF.TYPE.equals(oldStatement.getPredicate())) {
-                    if (subjectChange) {
+                if (objectChange || !oldStatement.getSubject().equals(newStatement.getSubject())) {
+                    if (RDF.TYPE.equals(oldStatement.getPredicate())) {
                         //subject change
                         classCardinality++;
                         for (Resource subjClass : queryForClasses(oldStatement.getSubject())) {
@@ -204,28 +213,21 @@ public final class HalyardSummary extends AbstractHalyardTool {
                                 reportClassesOverlap(subjClass, (Resource)oldStatement.getObject());
                             }
                         }
-                    }
-                    if (objectChange) {
-                        //object change
-                        if (oldStatement.getObject() instanceof Resource) {
-                            reportClassCardinality((Resource)oldStatement.getObject(), classCardinality);
+                        if (objectChange) {
+                            //object change
+                            if (oldStatement.getObject() instanceof Resource) {
+                                reportClassCardinality((Resource)oldStatement.getObject(), classCardinality);
+                            }
+                            classCardinality = 0;
                         }
-                        classCardinality = 0;
-                    }
-                } else if (!oldStatement.getPredicate().stringValue().startsWith(FILTER_NAMESPACE_PREFIX)) {
-                    if (objectChange) {
-                        //init of object change
-                        rangeClasses = queryForClasses(oldStatement.getObject());
-                        for (Resource objClass : rangeClasses) {
-                            reportPredicateRange(oldStatement.getPredicate(), objClass);
-                        }
-                        if (oldStatement.getObject() instanceof Literal) {
-                            reportPredicateRangeLiteralType(oldStatement.getPredicate(), ((Literal)oldStatement.getObject()).getDatatype());
-                        }
-                    }
-                    if (subjectChange) {
+                    } else if (!oldStatement.getPredicate().stringValue().startsWith(FILTER_NAMESPACE_PREFIX)) {
                         //subject change
+                        objectCardinality++;
                         predicateCardinality++;
+                        if (rangeClasses == null) {
+                            //init after object change
+                            rangeClasses = queryForClasses(oldStatement.getObject());
+                        }
                         for (Resource domainClass : queryForClasses(oldStatement.getSubject())) {
                             reportPredicateDomain(oldStatement.getPredicate(), domainClass);
                             for (Resource rangeClass : rangeClasses) {
@@ -235,11 +237,22 @@ public final class HalyardSummary extends AbstractHalyardTool {
                                 reportPredicateDomainAndRangeLiteralType(oldStatement.getPredicate(), domainClass, ((Literal)oldStatement.getObject()).getDatatype());
                             }
                         }
-                    }
-                    if (predicateChange) {
-                        //predicate change
-                        reportPredicateCardinality(oldStatement.getPredicate(), predicateCardinality);
-                        predicateCardinality = 0;
+                        if (objectChange) {
+                            //object change
+                            for (Resource objClass : rangeClasses) {
+                                reportPredicateRange(oldStatement.getPredicate(), objClass, objectCardinality);
+                            }
+                            if (oldStatement.getObject() instanceof Literal) {
+                                reportPredicateRangeLiteralType(oldStatement.getPredicate(), ((Literal)oldStatement.getObject()).getDatatype(), objectCardinality);
+                            }
+                            objectCardinality = 0;
+                            rangeClasses = null;
+                        }
+                        if (predicateChange) {
+                            //predicate change
+                            reportPredicateCardinality(oldStatement.getPredicate(), predicateCardinality);
+                            predicateCardinality = 0;
+                        }
                     }
                 }
             }
@@ -294,7 +307,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             String targetUrl = conf.get(TARGET);
             String ng = conf.get(TARGET_GRAPH);
             this.namedGraph = ng == null ? null : SVF.createIRI(ng);
-            this.decimationFactor = conf.getInt(DECIMATION_FACTOR, 10);
+            this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
             sail.initialize();
             targetUrl = MessageFormat.format(targetUrl, context.getTaskAttemptID().getTaskID().getId());
@@ -326,16 +339,16 @@ public final class HalyardSummary extends AbstractHalyardTool {
         }
 
 
-        private void write(Resource subj, String halyardPredicate, String resource) {
-            write(subj, halyardPredicate, NTriplesUtil.parseResource(resource, SVF));
+        private void write(Resource subj, IRI predicate, String resource) {
+            write(subj, predicate, NTriplesUtil.parseResource(resource, SVF));
         }
 
-        private void write(Resource subj, String halyardPredicate, long value) {
-            write(subj, halyardPredicate, SVF.createLiteral(value));
+        private void write(Resource subj, ReportType reportType, long cardinality) {
+            write(subj, reportType.IRI, SVF.createLiteral(cardinality));
         }
 
-        private void write(Resource subj, String halyardPredicate, Value value) {
-            writer.handleStatement(SVF.createStatement(subj, SVF.createIRI(NAMESPACE, halyardPredicate), value, namedGraph));
+        private void write(Resource subj, IRI predicate, Value value) {
+            writer.handleStatement(SVF.createStatement(subj, predicate, value, namedGraph));
         }
 
         private void copyDescription(Resource subject) {
@@ -364,46 +377,47 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 cardinality *= decimationFactor;
                 Resource firstKey = NTriplesUtil.parseResource(dis.readUTF(), SVF);
                 IRI generatedRoot = SVF.createIRI(NAMESPACE, HalyardTableUtils.encode(HalyardTableUtils.hashKey(key.get())));
-                switch (ReportType.values()[dis.readByte()]) {
+                ReportType reportType = ReportType.values()[dis.readByte()];
+                switch (reportType) {
                     case ClassCardinality:
-                        write(firstKey, "classCardinality", cardinality);
+                        write(firstKey, reportType, cardinality);
                         copyDescription(firstKey);
                         break;
-                    case PCardinality:
-                        write(firstKey, "predicateCardinality", cardinality);
+                    case PredicateCardinality:
+                        write(firstKey, reportType, cardinality);
                         copyDescription(firstKey);
                         break;
-                    case PDomain:
-                        write(generatedRoot, "predicate", firstKey);
-                        write(generatedRoot, "domainCardinality", cardinality);
-                        write(generatedRoot, "domain", dis.readUTF());
+                    case DomainCardinality:
+                        write(generatedRoot, PREDICATE, firstKey);
+                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, DOMAIN, dis.readUTF());
                         break;
-                    case PRange:
-                        write(generatedRoot, "predicate", firstKey);
-                        write(generatedRoot, "rangeCardinality", cardinality);
-                        write(generatedRoot, "range", dis.readUTF());
+                    case RangeCardinality:
+                        write(generatedRoot, PREDICATE, firstKey);
+                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, RANGE, dis.readUTF());
                         break;
-                    case PDomainAndRange:
-                        write(generatedRoot, "predicate", firstKey);
-                        write(generatedRoot, "domainAndRangeCardinality", cardinality);
-                        write(generatedRoot, "domain", dis.readUTF());
-                        write(generatedRoot, "range", dis.readUTF());
+                    case DomainAndRangeCardinality:
+                        write(generatedRoot, PREDICATE, firstKey);
+                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, DOMAIN, dis.readUTF());
+                        write(generatedRoot, RANGE, dis.readUTF());
                         break;
-                    case PRangeLiteralType:
-                        write(generatedRoot, "predicate", firstKey);
-                        write(generatedRoot, "rangeTypeCardinality", cardinality);
-                        write(generatedRoot, "rangeType", dis.readUTF());
+                    case RangeTypeCardinality:
+                        write(generatedRoot, PREDICATE, firstKey);
+                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, RANGE_TYPE, dis.readUTF());
                         break;
-                    case PDomainAndRangeLiteralType:
-                        write(generatedRoot, "predicate", firstKey);
-                        write(generatedRoot, "domainAndRangeTypeCardinality", cardinality);
-                        write(generatedRoot, "domain", dis.readUTF());
-                        write(generatedRoot, "rangeType", dis.readUTF());
+                    case DomainAndRangeTypeCardinality:
+                        write(generatedRoot, PREDICATE, firstKey);
+                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, DOMAIN, dis.readUTF());
+                        write(generatedRoot, RANGE_TYPE, dis.readUTF());
                         break;
-                    case ClassesOverlap:
-                        write(generatedRoot, "class", firstKey);
-                        write(generatedRoot, "classesOverlapCardinality", cardinality);
-                        write(generatedRoot, "class", dis.readUTF());
+                    case ClassesOverlapCardinality:
+                        write(generatedRoot, CLASS, firstKey);
+                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, CLASS, dis.readUTF());
                 }
             }
 
@@ -425,7 +439,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-file", "target_url", "Target file to export the statistics (instead of update) hdfs://<path>/<file_name>.<RDF_ext>[.<compression>]", true, true);
         addOption("g", "summary-named-graph", "target_graph", "Optional target named graph of the exported graph summary", false, true);
-        addOption("d", "decimation-factor", "decimation_factor", "Optionally overide summary random decimation factor (default is 10)", false, true);
+        addOption("d", "decimation-factor", "decimation_factor", "Optionally overide summary random decimation factor (default is " + DEFAULT_DECIMATION_FACTOR + ")", false, true);
     }
 
     @Override
@@ -449,7 +463,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         job.getConfiguration().set(SOURCE, source);
         if (target != null) job.getConfiguration().set(TARGET, target);
         if (cmd.hasOption('g')) job.getConfiguration().set(TARGET_GRAPH, cmd.getOptionValue('g'));
-        if (cmd.hasOption('d')) getConf().setInt(DECIMATION_FACTOR, Integer.parseInt(cmd.getOptionValue('d')));
+        if (cmd.hasOption('d')) job.getConfiguration().setInt(DECIMATION_FACTOR, Integer.parseInt(cmd.getOptionValue('d')));
         job.setJarByClass(HalyardSummary.class);
         TableMapReduceUtil.initCredentials(job);
 
@@ -464,7 +478,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 ImmutableBytesWritable.class,
                 LongWritable.class,
                 job);
-        job.setCombinerClass(SummaryCombiner.class);
+//        job.setCombinerClass(SummaryCombiner.class);
         job.setReducerClass(SummaryReducer.class);
         job.setNumReduceTasks(1);
         job.setOutputFormatClass(NullOutputFormat.class);
