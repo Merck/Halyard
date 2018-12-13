@@ -352,7 +352,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         }
 
         private void write(Resource subj, ReportType reportType, long count) {
-            write(subj, reportType.IRI, SVF.createLiteral(63 - Long.numberOfLeadingZeros(count)));
+            write(subj, reportType.IRI, SVF.createLiteral(String.valueOf(63 - Long.numberOfLeadingZeros(count)), XMLSchema.INTEGER));
         }
 
         private void write(Resource subj, IRI predicate, Value value) {
