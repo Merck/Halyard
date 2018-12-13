@@ -351,8 +351,8 @@ public final class HalyardSummary extends AbstractHalyardTool {
             write(subj, predicate, NTriplesUtil.parseResource(resource, SVF));
         }
 
-        private void write(Resource subj, ReportType reportType, long cardinality) {
-            write(subj, reportType.IRI, SVF.createLiteral((int)Long.highestOneBit(cardinality)));
+        private void write(Resource subj, ReportType reportType, long count) {
+            write(subj, reportType.IRI, SVF.createLiteral(63 - Long.numberOfLeadingZeros(count)));
         }
 
         private void write(Resource subj, IRI predicate, Value value) {
@@ -377,54 +377,54 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
         @Override
 	public void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
-            long cardinality = 0;
+            long count = 0;
             for (LongWritable lw : values) {
-                cardinality += lw.get();
+                count += lw.get();
             }
-            if (cardinality > 0) try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
-                cardinality *= decimationFactor;
+            if (count > 0) try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
+                count *= decimationFactor;
                 ReportType reportType = ReportType.values()[dis.readByte()];
                 Resource firstKey = NTriplesUtil.parseResource(dis.readUTF(), SVF);
                 IRI generatedRoot = SVF.createIRI(NAMESPACE, HalyardTableUtils.encode(HalyardTableUtils.hashKey(key.get())));
                 switch (reportType) {
                     case ClassCardinality:
-                        write(firstKey, reportType, cardinality);
+                        write(firstKey, reportType, count);
                         copyDescription(firstKey);
                         break;
                     case PredicateCardinality:
-                        write(firstKey, reportType, cardinality);
+                        write(firstKey, reportType, count);
                         copyDescription(firstKey);
                         break;
                     case DomainCardinality:
                         write(generatedRoot, PREDICATE, firstKey);
-                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, reportType, count);
                         write(generatedRoot, DOMAIN, dis.readUTF());
                         break;
                     case RangeCardinality:
                         write(generatedRoot, PREDICATE, firstKey);
-                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, reportType, count);
                         write(generatedRoot, RANGE, dis.readUTF());
                         break;
                     case DomainAndRangeCardinality:
                         write(generatedRoot, PREDICATE, firstKey);
-                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, reportType, count);
                         write(generatedRoot, DOMAIN, dis.readUTF());
                         write(generatedRoot, RANGE, dis.readUTF());
                         break;
                     case RangeTypeCardinality:
                         write(generatedRoot, PREDICATE, firstKey);
-                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, reportType, count);
                         write(generatedRoot, RANGE_TYPE, dis.readUTF());
                         break;
                     case DomainAndRangeTypeCardinality:
                         write(generatedRoot, PREDICATE, firstKey);
-                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, reportType, count);
                         write(generatedRoot, DOMAIN, dis.readUTF());
                         write(generatedRoot, RANGE_TYPE, dis.readUTF());
                         break;
                     case ClassesOverlapCardinality:
                         write(generatedRoot, CLASS, firstKey);
-                        write(generatedRoot, reportType, cardinality);
+                        write(generatedRoot, reportType, count);
                         write(generatedRoot, CLASS, dis.readUTF());
                 }
             }

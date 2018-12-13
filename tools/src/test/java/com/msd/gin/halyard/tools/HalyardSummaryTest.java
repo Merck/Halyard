@@ -185,7 +185,7 @@ public class HalyardSummaryTest {
     }
 
     private void assertCardinality(IRI subject, IRI cardinalityPredicate, long count, Model model, IRI ... contains)  {
-        int cardinality = (int)Long.highestOneBit(count);
+        int cardinality = 63 - Long.numberOfLeadingZeros(count);
         for (Statement st : model.filter(subject, cardinalityPredicate, null)) {
             boolean cont = true;
             for (int i=0; i<contains.length; i+=2) {
