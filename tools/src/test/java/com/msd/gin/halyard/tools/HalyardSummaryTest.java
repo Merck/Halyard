@@ -184,14 +184,15 @@ public class HalyardSummaryTest {
         }
     }
 
-    private void assertCardinality(IRI subject, IRI cardinalityPredicate, long cardinality, Model model, IRI ... contains)  {
+    private void assertCardinality(IRI subject, IRI cardinalityPredicate, long count, Model model, IRI ... contains)  {
+        int cardinality = (int)Long.highestOneBit(count);
         for (Statement st : model.filter(subject, cardinalityPredicate, null)) {
             boolean cont = true;
             for (int i=0; i<contains.length; i+=2) {
                 cont &= model.contains(st.getSubject(), contains[i], contains[i+1]);
             }
             if (cont) {
-                assertEquals("Cardinality mismatch in: " + String.valueOf(subject) + " " + cardinalityPredicate.getLocalName() + " " + Arrays.asList(contains), cardinality, ((Literal)st.getObject()).longValue());
+                assertEquals("Cardinality mismatch in: " + String.valueOf(subject) + " " + cardinalityPredicate.getLocalName() + " " + Arrays.asList(contains), cardinality, ((Literal)st.getObject()).intValue());
                 return;
             }
         }

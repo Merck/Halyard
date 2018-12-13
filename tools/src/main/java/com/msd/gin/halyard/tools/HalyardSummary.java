@@ -53,6 +53,7 @@ import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.htrace.Trace;
@@ -191,8 +192,8 @@ public final class HalyardSummary extends AbstractHalyardTool {
         private void report(ReportType type, Resource firstKey, long cardinality, Value ... otherKeys) throws IOException, InterruptedException {
             baos.reset();
             try (DataOutputStream dos = new DataOutputStream(baos)) {
-                dos.writeUTF(NTriplesUtil.toNTriplesString(firstKey));
                 dos.writeByte(type.ordinal());
+                dos.writeUTF(NTriplesUtil.toNTriplesString(firstKey));
                 for (Value key : otherKeys) {
                     dos.writeUTF(NTriplesUtil.toNTriplesString(key));
                 }
@@ -280,6 +281,13 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
     }
 
+    static final class SummaryPartitioner extends Partitioner<ImmutableBytesWritable, LongWritable> {
+        @Override
+        public int getPartition(ImmutableBytesWritable key, LongWritable value, int numPartitions) {
+            return key.get()[key.getOffset()] % numPartitions;
+        }
+    }
+
     static final class SummaryCombiner extends Reducer<ImmutableBytesWritable, LongWritable, ImmutableBytesWritable, LongWritable>  {
         @Override
         protected void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
@@ -310,7 +318,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
             sail.initialize();
-            targetUrl = MessageFormat.format(targetUrl, context.getTaskAttemptID().getTaskID().getId());
+            targetUrl = MessageFormat.format(targetUrl, ReportType.values()[context.getTaskAttemptID().getTaskID().getId() % ReportType.values().length].name());
             out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
             try {
                 if (targetUrl.endsWith(".bz2")) {
@@ -344,7 +352,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         }
 
         private void write(Resource subj, ReportType reportType, long cardinality) {
-            write(subj, reportType.IRI, SVF.createLiteral(cardinality));
+            write(subj, reportType.IRI, SVF.createLiteral((int)Long.highestOneBit(cardinality)));
         }
 
         private void write(Resource subj, IRI predicate, Value value) {
@@ -375,9 +383,9 @@ public final class HalyardSummary extends AbstractHalyardTool {
             }
             if (cardinality > 0) try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
                 cardinality *= decimationFactor;
+                ReportType reportType = ReportType.values()[dis.readByte()];
                 Resource firstKey = NTriplesUtil.parseResource(dis.readUTF(), SVF);
                 IRI generatedRoot = SVF.createIRI(NAMESPACE, HalyardTableUtils.encode(HalyardTableUtils.hashKey(key.get())));
-                ReportType reportType = ReportType.values()[dis.readByte()];
                 switch (reportType) {
                     case ClassCardinality:
                         write(firstKey, reportType, cardinality);
@@ -435,9 +443,9 @@ public final class HalyardSummary extends AbstractHalyardTool {
         super(
             "summary",
             "Halyard Summary is a MapReduce application that calculates dataset summary and exports it into a file.",
-            "Example: halyard summary -s my_dataset -g http://my_dataset_summary -t hdfs:/my_folder/my_dataset_summary.nq.gz");
+            "Example: halyard summary -s my_dataset -g http://my_dataset_summary -t hdfs:/my_folder/my_dataset_summary-{0}.nq.gz");
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
-        addOption("t", "target-file", "target_url", "Target file to export the statistics (instead of update) hdfs://<path>/<file_name>.<RDF_ext>[.<compression>]", true, true);
+        addOption("t", "target-file", "target_url", "Target file to export the summary (instead of update) hdfs://<path>/<file_name>{0}.<RDF_ext>[.<compression>], usage of {0} pattern is optional and it will split target file into multiple summarization categories.", true, true);
         addOption("g", "summary-named-graph", "target_graph", "Optional target named graph of the exported graph summary", false, true);
         addOption("d", "decimation-factor", "decimation_factor", "Optionally overide summary random decimation factor (default is " + DEFAULT_DECIMATION_FACTOR + ")", false, true);
     }
@@ -478,9 +486,14 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 ImmutableBytesWritable.class,
                 LongWritable.class,
                 job);
-//        job.setCombinerClass(SummaryCombiner.class);
+        if (target.contains("{0}")) {
+            job.setPartitionerClass(SummaryPartitioner.class);
+            job.setNumReduceTasks(ReportType.values().length);
+        } else {
+            job.setNumReduceTasks(1);
+        }
+        job.setCombinerClass(SummaryCombiner.class);
         job.setReducerClass(SummaryReducer.class);
-        job.setNumReduceTasks(1);
         job.setOutputFormatClass(NullOutputFormat.class);
         if (job.waitForCompletion(true)) {
             LOG.info("Summary Generation Completed..");
