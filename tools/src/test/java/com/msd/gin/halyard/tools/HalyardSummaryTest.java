@@ -42,6 +42,7 @@ import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.Rio;
 import static org.junit.Assert.*;
+import static com.msd.gin.halyard.tools.HalyardSummary.SummaryType.*;
 import org.junit.Test;
 
 /**
@@ -158,45 +159,45 @@ public class HalyardSummaryTest {
 //            });
             model = model.filter(null, null, null, namedGraph);
             for (Map.Entry<IRI, Integer> me : classCardinalities.entrySet()) {
-                assertCardinality(me.getKey(), HalyardSummary.ReportType.ClassCardinality.IRI, me.getValue(), model);
+                assertCardinality(ClassSummary.CARDINALITY_IRI, me.getValue(), model, ClassSummary.CLASS_IRI, me.getKey());
             }
             for (Map.Entry<IRI, Integer> me : predicateCardinalities.entrySet()) {
-                assertCardinality(me.getKey(), HalyardSummary.ReportType.PredicateCardinality.IRI, me.getValue(), model);
+                assertCardinality(PredicateSummary.CARDINALITY_IRI, me.getValue(), model, PredicateSummary.PREDICATE_IRI, me.getKey());
             }
             for (Map.Entry<List<IRI>, Integer> me : domainCardinalities.entrySet()) {
-                assertCardinality(null, HalyardSummary.ReportType.DomainCardinality.IRI, me.getValue(), model, HalyardSummary.PREDICATE, me.getKey().get(0), HalyardSummary.DOMAIN, me.getKey().get(1));
+                assertCardinality(DomainSummary.CARDINALITY_IRI, me.getValue(), model, DomainSummary.PREDICATE_IRI, me.getKey().get(0), DomainSummary.DOMAIN_IRI, me.getKey().get(1));
             }
             for (Map.Entry<List<IRI>, Integer> me : rangeCardinalities.entrySet()) {
-                assertCardinality(null, HalyardSummary.ReportType.RangeCardinality.IRI, me.getValue(), model, HalyardSummary.PREDICATE, me.getKey().get(0), HalyardSummary.RANGE, me.getKey().get(1));
+                assertCardinality(RangeSummary.CARDINALITY_IRI, me.getValue(), model, RangeSummary.PREDICATE_IRI, me.getKey().get(0), RangeSummary.RANGE_IRI, me.getKey().get(1));
             }
             for (Map.Entry<List<IRI>, Integer> me : domainAndRangeCardinalities.entrySet()) {
-                assertCardinality(null, HalyardSummary.ReportType.DomainAndRangeCardinality.IRI, me.getValue(), model, HalyardSummary.PREDICATE, me.getKey().get(0), HalyardSummary.DOMAIN, me.getKey().get(1), HalyardSummary.RANGE, me.getKey().get(2));
+                assertCardinality(DomainAndRangeSummary.CARDINALITY_IRI, me.getValue(), model, DomainAndRangeSummary.PREDICATE_IRI, me.getKey().get(0), DomainAndRangeSummary.DOMAIN_IRI, me.getKey().get(1), DomainAndRangeSummary.RANGE_IRI, me.getKey().get(2));
             }
             for (Map.Entry<List<IRI>, Integer> me : rangeTypeCardinalities.entrySet()) {
-                assertCardinality(null, HalyardSummary.ReportType.RangeTypeCardinality.IRI, me.getValue(), model, HalyardSummary.PREDICATE, me.getKey().get(0), HalyardSummary.RANGE_TYPE, me.getKey().get(1));
+                assertCardinality(RangeTypeSummary.CARDINALITY_IRI, me.getValue(), model, RangeTypeSummary.PREDICATE_IRI, me.getKey().get(0), RangeTypeSummary.RANGE_TYPE_IRI, me.getKey().get(1));
             }
             for (Map.Entry<List<IRI>, Integer> me : domainAndRangeTypeCardinalities.entrySet()) {
-                assertCardinality(null, HalyardSummary.ReportType.DomainAndRangeTypeCardinality.IRI, me.getValue(), model, HalyardSummary.PREDICATE, me.getKey().get(0), HalyardSummary.DOMAIN, me.getKey().get(1), HalyardSummary.RANGE_TYPE, me.getKey().get(2));
+                assertCardinality(DomainAndRangeTypeSummary.CARDINALITY_IRI, me.getValue(), model, DomainAndRangeTypeSummary.PREDICATE_IRI, me.getKey().get(0), DomainAndRangeTypeSummary.DOMAIN_IRI, me.getKey().get(1), DomainAndRangeTypeSummary.RANGE_TYPE_IRI, me.getKey().get(2));
             }
             for (Map.Entry<List<IRI>, Integer> me : classClassCardinalities.entrySet()) {
-                assertCardinality(null, HalyardSummary.ReportType.ClassesOverlapCardinality.IRI, me.getValue(), model, HalyardSummary.CLASS, me.getKey().get(0), HalyardSummary.CLASS, me.getKey().get(1));
+                assertCardinality(ClassesOverlapSummary.CARDINALITY_IRI, me.getValue(), model, ClassesOverlapSummary.CLASS_IRI, me.getKey().get(0), ClassesOverlapSummary.CLASS_IRI, me.getKey().get(1));
             }
         }
     }
 
-    private void assertCardinality(IRI subject, IRI cardinalityPredicate, long count, Model model, IRI ... contains)  {
+    private void assertCardinality(IRI cardinalityPredicate, long count, Model model, IRI ... contains)  {
         int cardinality = 63 - Long.numberOfLeadingZeros(count);
-        for (Statement st : model.filter(subject, cardinalityPredicate, null)) {
+        for (Statement st : model.filter(null, cardinalityPredicate, null)) {
             boolean cont = true;
             for (int i=0; i<contains.length; i+=2) {
                 cont &= model.contains(st.getSubject(), contains[i], contains[i+1]);
             }
             if (cont) {
-                assertEquals("Cardinality mismatch in: " + String.valueOf(subject) + " " + cardinalityPredicate.getLocalName() + " " + Arrays.asList(contains), cardinality, ((Literal)st.getObject()).intValue());
+                assertEquals("Cardinality mismatch in: " + cardinalityPredicate.getLocalName() + " " + Arrays.asList(contains), cardinality, ((Literal)st.getObject()).intValue());
                 return;
             }
         }
-        fail("Failed to find match of: " + String.valueOf(subject) + " " + cardinalityPredicate.getLocalName() + " " + Arrays.asList(contains));
+        fail("Failed to find match of: " + cardinalityPredicate.getLocalName() + " " + Arrays.asList(contains));
     }
 
     @Test(expected = MissingOptionException.class)
