@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.sail.HALYARD;
 import static com.msd.gin.halyard.tools.AbstractHalyardTool.LOG;
 import java.io.Closeable;
 import java.io.IOException;
@@ -445,6 +446,14 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                 queue.put(st);
             } catch (InterruptedException e) {
                 throw new RDFHandlerException(e);
+            }
+        }
+
+        @Override
+        public void handleNamespace(String prefix, String uri) throws RDFHandlerException {
+            if (prefix.length() > 0) {
+                SimpleValueFactory svf = SimpleValueFactory.getInstance();
+                handleStatement(svf.createStatement(svf.createIRI(uri), HALYARD.NAMESPACE_PREFIX_PROPERTY, svf.createLiteral(prefix)));
             }
         }
 
