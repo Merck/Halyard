@@ -151,19 +151,22 @@ public class HalyardSummaryTest {
 //            });
             model = model.filter(null, null, null, namedGraph);
             for (Map.Entry<IRI, Integer> me : classCardinalities.entrySet()) {
-                assertStatement(me.getKey(), RDF.TYPE, HalyardSummary.cardinalityPredicate("Class", me.getValue()), model);
+                assertStatement(me.getKey(), RDF.TYPE, HalyardSummary.cardinalityIRI("Class", HalyardSummary.toCardinality(me.getValue())), model);
             }
             for (Map.Entry<IRI, Integer> me : predicateCardinalities.entrySet()) {
-                assertStatement(me.getKey(), RDF.TYPE, HalyardSummary.cardinalityPredicate("Property", me.getValue()), model);
+                assertStatement(me.getKey(), RDF.TYPE, HalyardSummary.cardinalityIRI("Property", HalyardSummary.toCardinality(me.getValue())), model);
             }
             for (Map.Entry<List<IRI>, Integer> me : domainCardinalities.entrySet()) {
-                assertStatement(me.getKey().get(0), HalyardSummary.cardinalityPredicate("domain", me.getValue()), me.getKey().get(1), model);
+                assertStatement(me.getKey().get(0), HalyardSummary.cardinalityIRI("domain", HalyardSummary.toCardinality(me.getValue())), me.getKey().get(1), model);
             }
             for (Map.Entry<List<IRI>, Integer> me : rangeCardinalities.entrySet()) {
-                assertStatement(me.getKey().get(0), HalyardSummary.cardinalityPredicate("range", me.getValue()), me.getKey().get(1), model);
+                assertStatement(me.getKey().get(0), HalyardSummary.cardinalityIRI("range", HalyardSummary.toCardinality(me.getValue())), me.getKey().get(1), model);
             }
             for (Map.Entry<List<IRI>, Integer> me : domainAndRangeCardinalities.entrySet()) {
-                assertJoins(RDFS.SUBPROPERTYOF, me.getKey().get(0), HalyardSummary.cardinalityPredicate("sliceDomain", me.getValue()), me.getKey().get(1), HalyardSummary.cardinalityPredicate("sliceRange", me.getValue()), me.getKey().get(2), model);
+                assertJoins(RDFS.SUBPROPERTYOF, me.getKey().get(0),
+                    HalyardSummary.cardinalityIRI("sliceDomain", HalyardSummary.toCardinality(me.getValue())),me.getKey().get(1),
+                    HalyardSummary.cardinalityIRI("sliceRange", HalyardSummary.toCardinality(me.getValue())), me.getKey().get(2),
+                    model);
             }
         }
     }
