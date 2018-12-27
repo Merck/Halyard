@@ -22,7 +22,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,14 +34,14 @@ import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Model;
-import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.Rio;
 import static org.junit.Assert.*;
-import static com.msd.gin.halyard.tools.HalyardSummary.SummaryType.*;
+import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.vocabulary.RDFS;
 import org.junit.Test;
 
 /**
@@ -72,7 +71,6 @@ public class HalyardSummaryTest {
         Map<IRI, Collection<IRI>> classMap = new HashMap<>();
         Map<IRI, Integer> classCardinalities = new HashMap<>(), predicateCardinalities = new HashMap<>();
         Map<List<IRI>, Integer> domainCardinalities = new HashMap<>(), rangeCardinalities = new HashMap<>(), domainAndRangeCardinalities = new HashMap<>();
-        Map<List<IRI>, Integer> rangeTypeCardinalities = new HashMap<>(), domainAndRangeTypeCardinalities = new HashMap<>(), classClassCardinalities = new HashMap<>();
         for (int i = 0; i < literals.length; i++) {
             literals[i] = svf.createLiteral("0", literalTypes[r.nextInt(literalTypes.length)]);
         }
@@ -83,12 +81,6 @@ public class HalyardSummaryTest {
                 for (IRI clazz : classes) {
                     if (r.nextBoolean()) {
                         sail.addStatement(instance, RDF.TYPE, clazz);
-                        for (IRI otherClass : clsC) {
-                            List<IRI> keys = new ArrayList<>(2);
-                            keys.add(clazz);
-                            keys.add(otherClass);
-                            classClassCardinalities.put(keys, classClassCardinalities.getOrDefault(keys, 0) + 1);
-                        }
                         clsC.add(clazz);
                         classCardinalities.put(clazz, classCardinalities.getOrDefault(clazz, 0) + 1);
                     }
@@ -110,12 +102,12 @@ public class HalyardSummaryTest {
                             keys.add(predicate);
                             keys.add(domainClass);
                             keys.add(l.getDatatype());
-                            domainAndRangeTypeCardinalities.put(keys, domainAndRangeTypeCardinalities.getOrDefault(keys, 0) + 1);
+                            domainAndRangeCardinalities.put(keys, domainAndRangeCardinalities.getOrDefault(keys, 0) + 1);
                         }
                         List<IRI> keys = new ArrayList<>(2);
                         keys.add(predicate);
                         keys.add(l.getDatatype());
-                        rangeTypeCardinalities.put(keys, rangeTypeCardinalities.getOrDefault(keys, 0) + 1);
+                        rangeCardinalities.put(keys, rangeCardinalities.getOrDefault(keys, 0) + 1);
                     }
                     if (r.nextBoolean()) {
                         IRI otherInstance = instances[r.nextInt(instances.length)];
@@ -159,45 +151,34 @@ public class HalyardSummaryTest {
 //            });
             model = model.filter(null, null, null, namedGraph);
             for (Map.Entry<IRI, Integer> me : classCardinalities.entrySet()) {
-                assertCardinality(ClassSummary.CARDINALITY_IRI, me.getValue(), model, ClassSummary.CLASS_IRI, me.getKey());
+                assertStatement(me.getKey(), RDF.TYPE, HalyardSummary.cardinalityPredicate("Class", me.getValue()), model);
             }
             for (Map.Entry<IRI, Integer> me : predicateCardinalities.entrySet()) {
-                assertCardinality(PredicateSummary.CARDINALITY_IRI, me.getValue(), model, PredicateSummary.PREDICATE_IRI, me.getKey());
+                assertStatement(me.getKey(), RDF.TYPE, HalyardSummary.cardinalityPredicate("Property", me.getValue()), model);
             }
             for (Map.Entry<List<IRI>, Integer> me : domainCardinalities.entrySet()) {
-                assertCardinality(DomainSummary.CARDINALITY_IRI, me.getValue(), model, DomainSummary.PREDICATE_IRI, me.getKey().get(0), DomainSummary.DOMAIN_IRI, me.getKey().get(1));
+                assertStatement(me.getKey().get(0), HalyardSummary.cardinalityPredicate("domain", me.getValue()), me.getKey().get(1), model);
             }
             for (Map.Entry<List<IRI>, Integer> me : rangeCardinalities.entrySet()) {
-                assertCardinality(RangeSummary.CARDINALITY_IRI, me.getValue(), model, RangeSummary.PREDICATE_IRI, me.getKey().get(0), RangeSummary.RANGE_IRI, me.getKey().get(1));
+                assertStatement(me.getKey().get(0), HalyardSummary.cardinalityPredicate("range", me.getValue()), me.getKey().get(1), model);
             }
             for (Map.Entry<List<IRI>, Integer> me : domainAndRangeCardinalities.entrySet()) {
-                assertCardinality(DomainAndRangeSummary.CARDINALITY_IRI, me.getValue(), model, DomainAndRangeSummary.PREDICATE_IRI, me.getKey().get(0), DomainAndRangeSummary.DOMAIN_IRI, me.getKey().get(1), DomainAndRangeSummary.RANGE_IRI, me.getKey().get(2));
-            }
-            for (Map.Entry<List<IRI>, Integer> me : rangeTypeCardinalities.entrySet()) {
-                assertCardinality(RangeTypeSummary.CARDINALITY_IRI, me.getValue(), model, RangeTypeSummary.PREDICATE_IRI, me.getKey().get(0), RangeTypeSummary.RANGE_TYPE_IRI, me.getKey().get(1));
-            }
-            for (Map.Entry<List<IRI>, Integer> me : domainAndRangeTypeCardinalities.entrySet()) {
-                assertCardinality(DomainAndRangeTypeSummary.CARDINALITY_IRI, me.getValue(), model, DomainAndRangeTypeSummary.PREDICATE_IRI, me.getKey().get(0), DomainAndRangeTypeSummary.DOMAIN_IRI, me.getKey().get(1), DomainAndRangeTypeSummary.RANGE_TYPE_IRI, me.getKey().get(2));
-            }
-            for (Map.Entry<List<IRI>, Integer> me : classClassCardinalities.entrySet()) {
-                assertCardinality(ClassesOverlapSummary.CARDINALITY_IRI, me.getValue(), model, ClassesOverlapSummary.CLASS_IRI, me.getKey().get(0), ClassesOverlapSummary.CLASS_IRI, me.getKey().get(1));
+                assertJoins(RDFS.SUBPROPERTYOF, me.getKey().get(0), HalyardSummary.cardinalityPredicate("sliceDomain", me.getValue()), me.getKey().get(1), HalyardSummary.cardinalityPredicate("sliceRange", me.getValue()), me.getKey().get(2), model);
             }
         }
     }
 
-    private void assertCardinality(IRI cardinalityPredicate, long count, Model model, IRI ... contains)  {
-        int cardinality = 63 - Long.numberOfLeadingZeros(count);
-        for (Statement st : model.filter(null, cardinalityPredicate, null)) {
-            boolean cont = true;
-            for (int i=0; i<contains.length; i+=2) {
-                cont &= model.contains(st.getSubject(), contains[i], contains[i+1]);
-            }
-            if (cont) {
-                assertEquals("Cardinality mismatch in: " + cardinalityPredicate.getLocalName() + " " + Arrays.asList(contains), cardinality, ((Literal)st.getObject()).intValue());
+    private void assertStatement(Resource subj, IRI pred, IRI obj, Model model) {
+        assertTrue("required: <" + subj + "> <" + pred + "> <" + obj + ">", model.contains(subj, pred, obj));
+    }
+
+    private void assertJoins(IRI pred1, IRI obj1, IRI pred2, IRI obj2, IRI pred3, IRI obj3, Model model) {
+        for (Resource subj : model.filter(null, pred1, obj1).subjects()) {
+            if (model.contains(subj, pred2, obj2) && model.contains(subj, pred3, obj3)) {
                 return;
             }
         }
-        fail("Failed to find match of: " + cardinalityPredicate.getLocalName() + " " + Arrays.asList(contains));
+        fail("required: [] <" + pred1 + "> <" + obj1 + ">; <" + pred2 + "> <" + obj2 + ">; <" + pred3 + "> <" + obj3 + ">");
     }
 
     @Test(expected = MissingOptionException.class)

@@ -66,13 +66,13 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.RDFS;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
-import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.sail.SailException;
 
 /**
@@ -83,19 +83,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
 
     enum SummaryType {
-        ClassSummary, PredicateSummary, DomainSummary, RangeSummary, DomainAndRangeSummary, RangeTypeSummary, DomainAndRangeTypeSummary, ClassesOverlapSummary;
-
-        final IRI SUMMARY_CLASS_IRI = SVF.createIRI(NAMESPACE, name());
-        final IRI CARDINALITY_IRI = predicateIRI("Cardinality");
-        final IRI PREDICATE_IRI = predicateIRI("Predicate");
-        final IRI DOMAIN_IRI = predicateIRI("Domain");
-        final IRI RANGE_IRI = predicateIRI("Range");
-        final IRI RANGE_TYPE_IRI = predicateIRI("RangeType");
-        final IRI CLASS_IRI = predicateIRI("Class");
-
-        private IRI predicateIRI(String localName) {
-            return SVF.createIRI(NAMESPACE, Character.toLowerCase(name().charAt(0)) + name().substring(1) + localName);
-        }
+        ClassSummary, PredicateSummary, DomainSummary, RangeSummary, DomainAndRangeSummary;
     }
 
     static final String NAMESPACE = "http://merck.github.io/Halyard/summary#";
@@ -110,6 +98,9 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
+    static IRI cardinalityPredicate(String type, long count) {
+        return SVF.createIRI(NAMESPACE, type + (63 - Long.numberOfLeadingZeros(count)));
+    }
 
     static final class SummaryMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
 
@@ -127,15 +118,15 @@ public final class HalyardSummary extends AbstractHalyardTool {
             }
         }
 
-        private Set<Resource> queryForClasses(Value instance) throws IOException {
+        private Set<IRI> queryForClasses(Value instance) throws IOException {
             if (instance instanceof Resource) {
-                Set<Resource> res = new HashSet<>();
+                Set<IRI> res = new HashSet<>();
                 Scan scan = HalyardTableUtils.scan((Resource)instance, RDF.TYPE, null, null);
                 try (ResultScanner scanner = table.getScanner(scan)) {
                     for (Result r : scanner) {
                         Statement st = HalyardTableUtils.parseStatement(r.rawCells()[0]);
-                        if (st.getSubject().equals(instance) && st.getPredicate().equals(RDF.TYPE) && (st.getObject() instanceof Resource)) {
-                            res.add((Resource)st.getObject());
+                        if (st.getSubject().equals(instance) && st.getPredicate().equals(RDF.TYPE) && (st.getObject() instanceof IRI)) {
+                            res.add((IRI)st.getObject());
                         }
                     }
                 }
@@ -148,12 +139,12 @@ public final class HalyardSummary extends AbstractHalyardTool {
         long predicateCardinality = 0;
         long objectCardinality = 0;
         long classCardinality = 0;
-        Set<Resource> rangeClasses = null;
+        Set<IRI> rangeClasses = null;
         Context mapContext = null;
 
-        long counter = 0, ccCounter = 0, pcCounter = 0, pdCounter = 0, prCounter = 0, pdrCounter = 0, prltCounter = 0, pdrltCounter = 0, coCounter = 0;
+        long counter = 0, ccCounter = 0, pcCounter = 0, pdCounter = 0, prCounter = 0, pdrCounter = 0;
 
-        private void reportClassCardinality(Resource clazz, long cardinality) throws IOException, InterruptedException {
+        private void reportClassCardinality(IRI clazz, long cardinality) throws IOException, InterruptedException {
             report(SummaryType.ClassSummary, clazz, cardinality);
             ccCounter+=cardinality;
         }
@@ -163,44 +154,29 @@ public final class HalyardSummary extends AbstractHalyardTool {
             pcCounter+=cardinality;
         }
 
-        private void reportPredicateDomain(IRI predicate, Resource domainClass) throws IOException, InterruptedException {
+        private void reportPredicateDomain(IRI predicate, IRI domainClass) throws IOException, InterruptedException {
             report(SummaryType.DomainSummary, predicate, 1l, domainClass);
             pdCounter++;
         }
 
-        private void reportPredicateRange(IRI predicate, Resource rangeClass, long cardinality) throws IOException, InterruptedException {
+        private void reportPredicateRange(IRI predicate, IRI rangeClass, long cardinality) throws IOException, InterruptedException {
             report(SummaryType.RangeSummary, predicate, cardinality, rangeClass);
             prCounter += cardinality;
         }
 
-        private void reportPredicateDomainAndRange(IRI predicate, Resource domainClass, Resource rangeClass) throws IOException, InterruptedException {
+        private void reportPredicateDomainAndRange(IRI predicate, IRI domainClass, IRI rangeClass) throws IOException, InterruptedException {
             report(SummaryType.DomainAndRangeSummary, predicate, 1l, domainClass, rangeClass);
             pdrCounter++;
         }
 
-        private void reportPredicateRangeLiteralType(IRI predicate, IRI rangeLiteralDataType, long cardinality) throws IOException, InterruptedException {
-            report(SummaryType.RangeTypeSummary, predicate, cardinality, rangeLiteralDataType == null ? XMLSchema.STRING : rangeLiteralDataType);
-            prltCounter += cardinality;
-        }
-
-        private void reportPredicateDomainAndRangeLiteralType(IRI predicate, Resource domainClass, IRI rangeLiteralDataType) throws IOException, InterruptedException {
-            report(SummaryType.DomainAndRangeTypeSummary, predicate, 1l, domainClass, rangeLiteralDataType == null ? XMLSchema.STRING : rangeLiteralDataType);
-            pdrltCounter++;
-        }
-
-        private void reportClassesOverlap(Resource class1, Resource class2) throws IOException, InterruptedException {
-            report(SummaryType.ClassesOverlapSummary, class1, 1l, class2);
-            coCounter++;
-        }
-
         private final ByteArrayOutputStream baos = new ByteArrayOutputStream(100000);
-        private void report(SummaryType type, Resource firstKey, long cardinality, Value ... otherKeys) throws IOException, InterruptedException {
+        private void report(SummaryType type, IRI firstKey, long cardinality, IRI ... otherKeys) throws IOException, InterruptedException {
             baos.reset();
             try (DataOutputStream dos = new DataOutputStream(baos)) {
                 dos.writeByte(type.ordinal());
-                dos.writeUTF(NTriplesUtil.toNTriplesString(firstKey));
+                dos.writeUTF(firstKey.stringValue());
                 for (Value key : otherKeys) {
-                    dos.writeUTF(NTriplesUtil.toNTriplesString(key));
+                    dos.writeUTF(key.stringValue());
                 }
             }
             mapContext.write(new ImmutableBytesWritable(baos.toByteArray()), new LongWritable(cardinality));
@@ -214,15 +190,10 @@ public final class HalyardSummary extends AbstractHalyardTool {
                     if (RDF.TYPE.equals(oldStatement.getPredicate())) {
                         //subject change
                         classCardinality++;
-                        for (Resource subjClass : queryForClasses(oldStatement.getSubject())) {
-                            if ((oldStatement.getObject() instanceof Resource) && subjClass.stringValue().compareTo(oldStatement.getObject().stringValue()) < 0) {
-                                reportClassesOverlap(subjClass, (Resource)oldStatement.getObject());
-                            }
-                        }
                         if (objectChange) {
                             //object change
-                            if (oldStatement.getObject() instanceof Resource) {
-                                reportClassCardinality((Resource)oldStatement.getObject(), classCardinality);
+                            if (oldStatement.getObject() instanceof IRI) {
+                                reportClassCardinality((IRI)oldStatement.getObject(), classCardinality);
                             }
                             classCardinality = 0;
                         }
@@ -234,22 +205,24 @@ public final class HalyardSummary extends AbstractHalyardTool {
                             //init after object change
                             rangeClasses = queryForClasses(oldStatement.getObject());
                         }
-                        for (Resource domainClass : queryForClasses(oldStatement.getSubject())) {
+                        for (IRI domainClass : queryForClasses(oldStatement.getSubject())) {
                             reportPredicateDomain(oldStatement.getPredicate(), domainClass);
-                            for (Resource rangeClass : rangeClasses) {
+                            for (IRI rangeClass : rangeClasses) {
                                 reportPredicateDomainAndRange(oldStatement.getPredicate(), domainClass, rangeClass);
                             }
                             if (oldStatement.getObject() instanceof Literal) {
-                                reportPredicateDomainAndRangeLiteralType(oldStatement.getPredicate(), domainClass, ((Literal)oldStatement.getObject()).getDatatype());
+                                IRI lt = ((Literal)oldStatement.getObject()).getDatatype();
+                                reportPredicateDomainAndRange(oldStatement.getPredicate(), domainClass, lt == null ? XMLSchema.STRING : lt);
                             }
                         }
                         if (objectChange) {
                             //object change
-                            for (Resource objClass : rangeClasses) {
+                            for (IRI objClass : rangeClasses) {
                                 reportPredicateRange(oldStatement.getPredicate(), objClass, objectCardinality);
                             }
                             if (oldStatement.getObject() instanceof Literal) {
-                                reportPredicateRangeLiteralType(oldStatement.getPredicate(), ((Literal)oldStatement.getObject()).getDatatype(), objectCardinality);
+                                IRI lt = ((Literal)oldStatement.getObject()).getDatatype();
+                                reportPredicateRange(oldStatement.getPredicate(), lt == null ? XMLSchema.STRING : lt, objectCardinality);
                             }
                             objectCardinality = 0;
                             rangeClasses = null;
@@ -271,7 +244,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 statementChange(HalyardTableUtils.parseStatement(value.rawCells()[0]));
             }
             if (++counter % 10000 == 0) {
-                output.setStatus(MessageFormat.format("{0} cc:{1} co:{2} pc:{3} pd:{4} pr:{5} pdr:{6} prlt:{7} pdrlt:{8}", counter, ccCounter, coCounter, pcCounter, pdCounter, prCounter, pdrCounter, prltCounter, pdrltCounter));
+                output.setStatus(MessageFormat.format("{0} cc:{1} pc:{2} pd:{3} pr:{4} pdr:{5}", counter, ccCounter, pcCounter, pdCounter, prCounter, pdrCounter));
             }
         }
 
@@ -362,15 +335,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             }
         }
 
-        private void write(Resource subj, IRI predicate, String resource) throws IOException {
-            write(subj, predicate, NTriplesUtil.parseResource(resource, SVF));
-        }
-
-        private void write(Resource subj, IRI predicate, long count) throws IOException {
-            write(subj, predicate, SVF.createLiteral(String.valueOf(63 - Long.numberOfLeadingZeros(count)), XMLSchema.INTEGER));
-        }
-
-        private void write(Resource subj, IRI predicate, Value value) throws IOException {
+        private void write(IRI subj, IRI predicate, IRI value) throws IOException {
             writer.handleStatement(SVF.createStatement(subj, predicate, value, namedGraph));
             if (splitOutput && fsOut.getPos() > outputLimit) {
                 setupOutput();
@@ -405,58 +370,27 @@ public final class HalyardSummary extends AbstractHalyardTool {
             if (count > 0) try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
                 count *= decimationFactor;
                 SummaryType reportType = SummaryType.values()[dis.readByte()];
-                Resource firstKey = NTriplesUtil.parseResource(dis.readUTF(), SVF);
-                IRI generatedRoot = SVF.createIRI(NAMESPACE, HalyardTableUtils.encode(HalyardTableUtils.hashKey(key.get())));
+                IRI firstKey = SVF.createIRI(dis.readUTF());
                 switch (reportType) {
                     case ClassSummary:
-                        write(generatedRoot, RDF.TYPE, reportType.SUMMARY_CLASS_IRI);
-                        write(generatedRoot, reportType.CARDINALITY_IRI, count);
-                        write(generatedRoot, reportType.CLASS_IRI, firstKey);
+                        write(firstKey, RDF.TYPE, cardinalityPredicate("Class", count));
                         copyDescription(firstKey);
                         break;
                     case PredicateSummary:
-                        write(generatedRoot, RDF.TYPE, reportType.SUMMARY_CLASS_IRI);
-                        write(generatedRoot, reportType.CARDINALITY_IRI, count);
-                        write(generatedRoot, reportType.PREDICATE_IRI, firstKey);
+                        write(firstKey, RDF.TYPE, cardinalityPredicate("Property", count));
                         copyDescription(firstKey);
                         break;
                     case DomainSummary:
-                        write(generatedRoot, RDF.TYPE, reportType.SUMMARY_CLASS_IRI);
-                        write(generatedRoot, reportType.PREDICATE_IRI, firstKey);
-                        write(generatedRoot, reportType.CARDINALITY_IRI, count);
-                        write(generatedRoot, reportType.DOMAIN_IRI, dis.readUTF());
+                        write(firstKey, cardinalityPredicate("domain", count), SVF.createIRI(dis.readUTF()));
                         break;
                     case RangeSummary:
-                        write(generatedRoot, RDF.TYPE, reportType.SUMMARY_CLASS_IRI);
-                        write(generatedRoot, reportType.PREDICATE_IRI, firstKey);
-                        write(generatedRoot, reportType.CARDINALITY_IRI, count);
-                        write(generatedRoot, reportType.RANGE_IRI, dis.readUTF());
+                        write(firstKey, cardinalityPredicate("range", count), SVF.createIRI(dis.readUTF()));
                         break;
                     case DomainAndRangeSummary:
-                        write(generatedRoot, RDF.TYPE, reportType.SUMMARY_CLASS_IRI);
-                        write(generatedRoot, reportType.PREDICATE_IRI, firstKey);
-                        write(generatedRoot, reportType.CARDINALITY_IRI, count);
-                        write(generatedRoot, reportType.DOMAIN_IRI, dis.readUTF());
-                        write(generatedRoot, reportType.RANGE_IRI, dis.readUTF());
-                        break;
-                    case RangeTypeSummary:
-                        write(generatedRoot, RDF.TYPE, reportType.SUMMARY_CLASS_IRI);
-                        write(generatedRoot, reportType.PREDICATE_IRI, firstKey);
-                        write(generatedRoot, reportType.CARDINALITY_IRI, count);
-                        write(generatedRoot, reportType.RANGE_TYPE_IRI, dis.readUTF());
-                        break;
-                    case DomainAndRangeTypeSummary:
-                        write(generatedRoot, RDF.TYPE, reportType.SUMMARY_CLASS_IRI);
-                        write(generatedRoot, reportType.PREDICATE_IRI, firstKey);
-                        write(generatedRoot, reportType.CARDINALITY_IRI, count);
-                        write(generatedRoot, reportType.DOMAIN_IRI, dis.readUTF());
-                        write(generatedRoot, reportType.RANGE_TYPE_IRI, dis.readUTF());
-                        break;
-                    case ClassesOverlapSummary:
-                        write(generatedRoot, RDF.TYPE, reportType.SUMMARY_CLASS_IRI);
-                        write(generatedRoot, reportType.CLASS_IRI, firstKey);
-                        write(generatedRoot, reportType.CARDINALITY_IRI, count);
-                        write(generatedRoot, reportType.CLASS_IRI, dis.readUTF());
+                        IRI generatedRoot = SVF.createIRI(NAMESPACE, HalyardTableUtils.encode(HalyardTableUtils.hashKey(key.get())));
+                        write(generatedRoot, RDFS.SUBPROPERTYOF, firstKey);
+                        write(generatedRoot, cardinalityPredicate("sliceDomain", count), SVF.createIRI(dis.readUTF()));
+                        write(generatedRoot, cardinalityPredicate("sliceRange", count), SVF.createIRI(dis.readUTF()));
                 }
             }
 
@@ -487,7 +421,6 @@ public final class HalyardSummary extends AbstractHalyardTool {
         String target = cmd.getOptionValue('t');
         TableMapReduceUtil.addDependencyJars(getConf(),
                HalyardExport.class,
-               NTriplesUtil.class,
                Rio.class,
                AbstractRDFHandler.class,
                RDFFormat.class,
