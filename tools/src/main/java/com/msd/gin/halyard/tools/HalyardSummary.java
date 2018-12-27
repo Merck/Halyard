@@ -38,6 +38,7 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -53,7 +54,6 @@ import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.htrace.Trace;
@@ -286,13 +286,6 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
     }
 
-    static final class SummaryPartitioner extends Partitioner<ImmutableBytesWritable, LongWritable> {
-        @Override
-        public int getPartition(ImmutableBytesWritable key, LongWritable value, int numPartitions) {
-            return key.get()[key.getOffset()] % numPartitions;
-        }
-    }
-
     static final class SummaryCombiner extends Reducer<ImmutableBytesWritable, LongWritable, ImmutableBytesWritable, LongWritable>  {
         @Override
         protected void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
@@ -308,63 +301,83 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
     static final class SummaryReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
 
-        private OutputStream out;
-        private RDFWriter writer;
+        private Configuration conf;
+        private OutputStream out = null;
+        private FSDataOutputStream fsOut = null;
+        private RDFWriter writer = null;
+        private boolean splitOutput;
+        private long outputLimit;
+        private int outputCounter = 0;
         private HBaseSail sail;
         private IRI namedGraph;
         private int decimationFactor;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
-            Configuration conf = context.getConfiguration();
-            String targetUrl = conf.get(TARGET);
+            this.conf = context.getConfiguration();
+            this.splitOutput = conf.get(TARGET).contains("{0}");
+            this.outputLimit = conf.getLong("mapreduce.input.fileinputformat.split.maxsize", Long.MAX_VALUE);
             String ng = conf.get(TARGET_GRAPH);
             this.namedGraph = ng == null ? null : SVF.createIRI(ng);
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
             sail.initialize();
-            targetUrl = MessageFormat.format(targetUrl, SummaryType.values()[context.getTaskAttemptID().getTaskID().getId() % SummaryType.values().length].name());
-            out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
-            try {
-                if (targetUrl.endsWith(".bz2")) {
-                    out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.BZIP2, out);
-                    targetUrl = targetUrl.substring(0, targetUrl.length() - 4);
-                } else if (targetUrl.endsWith(".gz")) {
-                    out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.GZIP, out);
-                    targetUrl = targetUrl.substring(0, targetUrl.length() - 3);
-                }
-            } catch (CompressorException ce) {
-                throw new IOException(ce);
-            }
-            Optional<RDFFormat> form = Rio.getWriterFormatForFileName(targetUrl);
-            if (!form.isPresent()) throw new IOException("Unsupported target file format extension: " + targetUrl);
-            writer = Rio.createWriter(form.get(), out);
-            writer.handleNamespace("", NAMESPACE);
-            writer.handleNamespace(XMLSchema.PREFIX, XMLSchema.NAMESPACE);
-            writer.handleNamespace(RDF.PREFIX, RDF.NAMESPACE);
-            try (CloseableIteration<? extends Namespace, SailException> iter = sail.getNamespaces()) {
-                while (iter.hasNext()) {
-                    Namespace ns = iter.next();
-                    writer.handleNamespace(ns.getPrefix(), ns.getName());
-                }
-            }
-            writer.startRDF();
+            setupOutput();
         }
 
+        private void setupOutput() throws IOException {
+            String targetUrl = conf.get(TARGET);
+            if (splitOutput || out == null) {
+                if (out != null) {
+                    writer.endRDF();
+                    out.close();
+                }
+                targetUrl = MessageFormat.format(targetUrl, outputCounter++);
+                fsOut = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
+                out = fsOut;
+                try {
+                    if (targetUrl.endsWith(".bz2")) {
+                        out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.BZIP2, out);
+                        targetUrl = targetUrl.substring(0, targetUrl.length() - 4);
+                    } else if (targetUrl.endsWith(".gz")) {
+                        out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.GZIP, out);
+                        targetUrl = targetUrl.substring(0, targetUrl.length() - 3);
+                    }
+                } catch (CompressorException ce) {
+                    throw new IOException(ce);
+                }
+                Optional<RDFFormat> form = Rio.getWriterFormatForFileName(targetUrl);
+                if (!form.isPresent()) throw new IOException("Unsupported target file format extension: " + targetUrl);
+                writer = Rio.createWriter(form.get(), out);
+                writer.handleNamespace("", NAMESPACE);
+                writer.handleNamespace(XMLSchema.PREFIX, XMLSchema.NAMESPACE);
+                writer.handleNamespace(RDF.PREFIX, RDF.NAMESPACE);
+                try (CloseableIteration<? extends Namespace, SailException> iter = sail.getNamespaces()) {
+                    while (iter.hasNext()) {
+                        Namespace ns = iter.next();
+                        writer.handleNamespace(ns.getPrefix(), ns.getName());
+                    }
+                }
+                writer.startRDF();
+            }
+        }
 
-        private void write(Resource subj, IRI predicate, String resource) {
+        private void write(Resource subj, IRI predicate, String resource) throws IOException {
             write(subj, predicate, NTriplesUtil.parseResource(resource, SVF));
         }
 
-        private void write(Resource subj, IRI predicate, long count) {
+        private void write(Resource subj, IRI predicate, long count) throws IOException {
             write(subj, predicate, SVF.createLiteral(String.valueOf(63 - Long.numberOfLeadingZeros(count)), XMLSchema.INTEGER));
         }
 
-        private void write(Resource subj, IRI predicate, Value value) {
+        private void write(Resource subj, IRI predicate, Value value) throws IOException {
             writer.handleStatement(SVF.createStatement(subj, predicate, value, namedGraph));
+            if (splitOutput && fsOut.getPos() > outputLimit) {
+                setupOutput();
+            }
         }
 
-        private void copyDescription(Resource subject) {
+        private void copyDescription(Resource subject) throws IOException {
             Statement dedup = null;
             try (CloseableIteration<? extends Statement, SailException> it = sail.getStatements(subject, null, null, true)) {
                 while (it.hasNext()) {
@@ -377,6 +390,9 @@ public final class HalyardSummary extends AbstractHalyardTool {
                         dedup = st;
                     }
                 }
+            }
+            if (splitOutput && fsOut.getPos() > outputLimit) {
+                setupOutput();
             }
         }
 
@@ -501,12 +517,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 ImmutableBytesWritable.class,
                 LongWritable.class,
                 job);
-        if (target.contains("{0}")) {
-            job.setPartitionerClass(SummaryPartitioner.class);
-            job.setNumReduceTasks(SummaryType.values().length);
-        } else {
-            job.setNumReduceTasks(1);
-        }
+        job.setNumReduceTasks(1);
         job.setCombinerClass(SummaryCombiner.class);
         job.setReducerClass(SummaryReducer.class);
         job.setOutputFormatClass(NullOutputFormat.class);
