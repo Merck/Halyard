@@ -428,10 +428,14 @@ public final class HalyardSummary extends AbstractHalyardTool {
                         write(firstKey, cardinalityIRI("range", cardinality), SVF.createIRI(dis.readUTF()));
                         break;
                     case DomainAndRangeSummary:
+                        IRI slicePPred = cardinalityIRI("sliceSubProperty", cardinality);
                         IRI sliceDPred = cardinalityIRI("sliceDomain", cardinality);
                         IRI sliceRPred = cardinalityIRI("sliceRange", cardinality);
                         if (!drcSet.get(cardinality)) {
                             drcSet.set(cardinality);
+                            write(slicePPred, RDFS.SUBPROPERTYOF, RDFS.SUBPROPERTYOF);
+                            write(slicePPred, RDFS.LABEL, SVF.createLiteral("slice rdfs:subPropertyOf with cardinality " + cardinality));
+                            write(slicePPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
                             write(sliceDPred, RDFS.SUBPROPERTYOF, RDFS.DOMAIN);
                             write(sliceDPred, RDFS.LABEL, SVF.createLiteral("slice rdfs:domain with cardinality " + cardinality));
                             write(sliceDPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
@@ -440,7 +444,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                             write(sliceRPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
                         }
                         IRI generatedRoot = SVF.createIRI(NAMESPACE, HalyardTableUtils.encode(HalyardTableUtils.hashKey(key.get())));
-                        write(generatedRoot, RDFS.SUBPROPERTYOF, firstKey);
+                        write(generatedRoot, slicePPred, firstKey);
                         write(generatedRoot, sliceDPred, SVF.createIRI(dis.readUTF()));
                         write(generatedRoot, sliceRPred, SVF.createIRI(dis.readUTF()));
                 }

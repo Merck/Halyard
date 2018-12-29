@@ -163,7 +163,7 @@ public class HalyardSummaryTest {
                 assertStatement(me.getKey().get(0), HalyardSummary.cardinalityIRI("range", HalyardSummary.toCardinality(me.getValue())), me.getKey().get(1), model);
             }
             for (Map.Entry<List<IRI>, Integer> me : domainAndRangeCardinalities.entrySet()) {
-                assertJoins(RDFS.SUBPROPERTYOF, me.getKey().get(0),
+                assertJoins(HalyardSummary.cardinalityIRI("sliceSubProperty", HalyardSummary.toCardinality(me.getValue())), me.getKey().get(0),
                     HalyardSummary.cardinalityIRI("sliceDomain", HalyardSummary.toCardinality(me.getValue())),me.getKey().get(1),
                     HalyardSummary.cardinalityIRI("sliceRange", HalyardSummary.toCardinality(me.getValue())), me.getKey().get(2),
                     model);
