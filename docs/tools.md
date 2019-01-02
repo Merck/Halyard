@@ -235,8 +235,10 @@ by the VoID vocabulary, its extensions, and the SPARQL 1.1 Service Description.
  -c,--named-graph <named_graph>          Optional restrict stats calculation to the given named
                                          graph only
  -g,--stats-named-graph <target_graph>   Optional target named graph of the exported statistics
-                                         (default is
-                                         'http://merck.github.io/Halyard/ns#statsContext')
+                                         (default value is
+                                         'http://merck.github.io/Halyard/ns#statsContext'),
+                                         modification is recomended only for external export as
+                                         internal Halyard optimizers expect the default value
 Example: halyard stats -s my_dataset [-g 'http://whatever/mystats'] [-t
 hdfs:/my_folder/my_stats.trig]
 ```

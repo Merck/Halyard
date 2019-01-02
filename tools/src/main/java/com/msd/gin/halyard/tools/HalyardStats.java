@@ -453,7 +453,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         addOption("t", "target-file", "target_url", "Optional target file to export the statistics (instead of update) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]", false, true);
         addOption("r", "threshold", "size", "Optional minimal size of a named graph to calculate statistics for (default is 1000)", false, true);
         addOption("c", "named-graph", "named_graph", "Optional restrict stats calculation to the given named graph only", false, true);
-        addOption("g", "stats-named-graph", "target_graph", "Optional target named graph of the exported statistics (default is '" + HALYARD.STATS_GRAPH_CONTEXT.stringValue() + "')", false, true);
+        addOption("g", "stats-named-graph", "target_graph", "Optional target named graph of the exported statistics (default value is '" + HALYARD.STATS_GRAPH_CONTEXT.stringValue() + "'), modification is recomended only for external export as internal Halyard optimizers expect the default value", false, true);
     }
 
     private static RowRange rowRange(byte prefix, byte[] hash) {
