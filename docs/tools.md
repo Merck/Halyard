@@ -112,6 +112,9 @@ endpoint   Halyard Endpoint is a command-line application designed to launch a s
            Endpoint URI is accessible via the system environment variable ENDPOINT.
            Warning: All options following a first unrecognized option are ignored and are considered
            as part of the custom command.
+summary    Halyard Summary is an experimental MapReduce application that calculates dataset
+           approximate summary in a form of self-described synthetic RDF schema and exports it into
+           a file.
 
 genericHadoopOptions are:
 ----------------------------------------------------------------------------------------------------
@@ -574,6 +577,28 @@ the custom command.
                                           default only important informative and error messages are
                                           printed)
 Example: halyard endpoint -p 8000 -s TABLE --verbose customScript.sh customArg1 customArg2
+```
+
+### Halyard Summary
+```
+$ ./halyard summary -h
+usage: halyard summary [-h] [-v] -s <dataset_table> -t <target_url> [-g <target_graph>] [-d
+       <decimation_factor>]
+Halyard Summary is an experimental MapReduce application that calculates dataset approximate summary
+in a form of self-described synthetic RDF schema and exports it into a file.
+ -h,--help                                    Prints this help
+ -v,--version                                 Prints version
+ -s,--source-dataset <dataset_table>          Source HBase table with Halyard RDF store
+ -t,--target-file <target_url>                Target file to export the summary (instead of update)
+                                              hdfs://<path>/<file_name>{0}.<RDF_ext>[.<compression>]
+                                              , usage of {0} pattern is optional and it will split
+                                              output into multiple files for large summaries.
+ -g,--summary-named-graph <target_graph>      Optional target named graph of the exported graph
+                                              summary
+ -d,--decimation-factor <decimation_factor>   Optionally overide summary random decimation factor
+                                              (default is 100)
+Example: halyard summary -s my_dataset -g http://my_dataset_summary -t
+hdfs:/my_folder/my_dataset_summary-{0}.nq.gz
 ```
 
 ### RDF4J Web Applications

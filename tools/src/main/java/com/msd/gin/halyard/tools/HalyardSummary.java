@@ -463,10 +463,10 @@ public final class HalyardSummary extends AbstractHalyardTool {
     public HalyardSummary() {
         super(
             "summary",
-            "Halyard Summary is a MapReduce application that calculates dataset summary and exports it into a file.",
+            "Halyard Summary is an experimental MapReduce application that calculates dataset approximate summary in a form of self-described synthetic RDF schema and exports it into a file.",
             "Example: halyard summary -s my_dataset -g http://my_dataset_summary -t hdfs:/my_folder/my_dataset_summary-{0}.nq.gz");
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
-        addOption("t", "target-file", "target_url", "Target file to export the summary (instead of update) hdfs://<path>/<file_name>{0}.<RDF_ext>[.<compression>], usage of {0} pattern is optional and it will split target file into multiple summarization categories.", true, true);
+        addOption("t", "target-file", "target_url", "Target file to export the summary (instead of update) hdfs://<path>/<file_name>{0}.<RDF_ext>[.<compression>], usage of {0} pattern is optional and it will split output into multiple files for large summaries.", true, true);
         addOption("g", "summary-named-graph", "target_graph", "Optional target named graph of the exported graph summary", false, true);
         addOption("d", "decimation-factor", "decimation_factor", "Optionally overide summary random decimation factor (default is " + DEFAULT_DECIMATION_FACTOR + ")", false, true);
     }
