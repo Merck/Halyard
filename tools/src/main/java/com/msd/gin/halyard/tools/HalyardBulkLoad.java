@@ -514,7 +514,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         );
         addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are searched for the supported files recurrently", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
-        addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store", true, true);
+        addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, target table is created if it does not exist, however optional HBase namespace of the target table must already exist", true, true);
         addOption("i", "skip-invalid", null, "Optionally skip invalid source files and parsing errors", false, false);
         addOption("d", "verify-data-types", null, "Optionally verify RDF data type values while parsing", false, false);
         addOption("r", "truncate-target", null, "Optionally truncate target table just before the loading the new data", false, false);
