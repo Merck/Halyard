@@ -563,7 +563,8 @@ Example: halyard profile -s my_dataset -q 'select * where {?s owl:sameAs ?o}'
 ```
 $ ./halyard endpoint -h
 usage: halyard endpoint [-h] [-v] [-p <http_server_port>] -s <dataset_table> [-i
-       <elastic_index_url>] [-t <evaluation_timeout>] [-q <property_file>] [--verbose]
+       <elastic_index_url>] [-t <evaluation_timeout>] [-q <property_file>] [-w <property_file>]
+       [--verbose]
 Halyard Endpoint is a command-line application designed to launch a simple SPARQL Endpoint to serve
 SPARQL Queries. Any custom commands that are to be run as a new subprocess internally by this tool
 have to be passed at the end of this tool.
@@ -588,6 +589,13 @@ the custom command.
                                           resolve and execute request to
                                           /my_describe_query?my_parameter=http%3A%2F%2Fwhatever%2F
                                           as "describe <http://whatever/>" query.
+ -w,--writer-properties <property_file>   Optional property file with RDF4J Rio WriterConfig
+                                          properties. Each property name is fully qualified
+                                          class.field name of WriterSetting and property value is
+                                          fully qualified  class.field or enum name with the value
+                                          to set. For example:
+                                          "org.eclipse.rdf4j.rio.helpers.JSONLDSettings.JSONLD_MODE=
+                                          org.eclipse.rdf4j.rio.helpers.JSONLDMode.COMPACT"
     --verbose                             Logging mode that records all logging information (by
                                           default only important informative and error messages are
                                           printed)

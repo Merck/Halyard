@@ -40,6 +40,9 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.lang.StringUtils;
+import org.eclipse.rdf4j.rio.RDFWriter;
+import org.eclipse.rdf4j.rio.RioSetting;
+import org.eclipse.rdf4j.rio.WriterConfig;
 
 /**
  * Handles HTTP requests containing SPARQL queries.
@@ -78,21 +81,48 @@ public final class HttpSparqlHandler implements HttpHandler {
     private final SailRepositoryConnection connection;
     // Stored SPARQL queries
     private final Properties storedQueries;
+    // Writer config
+    private final WriterConfig writerConfig;
     // Logger
     private static final Logger LOGGER = Logger.getLogger(HttpSparqlHandler.class.getName());
 
     /**
      * @param connection connection to Sail repository
      * @param storedQueries pre-defined stored SPARQL query templates
+     * @param writerProperties RDF4J RIO WriterConfig properties
      * @param verbose    true when verbose mode enabled, otherwise false
      */
-    public HttpSparqlHandler(SailRepositoryConnection connection, Properties storedQueries, boolean verbose) {
+    @SuppressWarnings("unchecked")
+    public HttpSparqlHandler(SailRepositoryConnection connection, Properties storedQueries, Properties writerProperties, boolean verbose) {
         this.connection = connection;
         if (!verbose) {
             // Verbose mode disabled --> logs with level lower than WARNING will be discarded
             LOGGER.setLevel(Level.WARNING);
         }
         this.storedQueries = storedQueries;
+        this.writerConfig = new WriterConfig();
+        if (writerProperties != null) {
+            for (Map.Entry<Object, Object> me : writerProperties.entrySet()) {
+                writerConfig.set((RioSetting)getStaticField(me.getKey().toString()), getStaticField(me.getValue().toString()));
+            }
+        }
+    }
+
+    /**
+     * retrieves public static field using reflection
+     *
+     * @param fqn fully qualified class.field name
+     * @return content of the field
+     * @throws IllegalArgumentException in case of any reflection errors, class not found, field not found, illegal access...
+     */
+    private static Object getStaticField(String fqn) {
+        try {
+            int i = fqn.lastIndexOf('.');
+            if (i < 1) throw new IllegalArgumentException("Invalid fully qualified name of a config field: " + fqn);
+            return Class.forName(fqn.substring(0, i)).getField(fqn.substring(i + 1)).get(null);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Exception while looking for public static field: " + fqn, e);
+        }
     }
 
     /**
@@ -284,8 +314,9 @@ public final class HttpSparqlHandler implements HttpHandler {
                     TupleQueryResultFormat.SPARQL, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
-                ((TupleQuery) query).evaluate(TupleQueryResultWriterRegistry.getInstance().get(format).get()
-                        .getWriter(response));
+                TupleQueryResultWriter w = TupleQueryResultWriterRegistry.getInstance().get(format).get().getWriter(response);
+                w.setWriterConfig(writerConfig);
+                ((TupleQuery) query).evaluate(w);
             }
         } else if (query instanceof SailGraphQuery) {
             LOGGER.log(Level.INFO, "Evaluating graph query: {0}", sparqlQuery.getQuery());
@@ -293,7 +324,9 @@ public final class HttpSparqlHandler implements HttpHandler {
                     exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
-                ((GraphQuery) query).evaluate(RDFWriterRegistry.getInstance().get(format).get().getWriter(response));
+                RDFWriter w = RDFWriterRegistry.getInstance().get(format).get().getWriter(response);
+                w.setWriterConfig(writerConfig);
+                ((GraphQuery) query).evaluate(w);
             }
         } else if (query instanceof SailBooleanQuery) {
             LOGGER.log(Level.INFO, "Evaluating boolean query: {0}", sparqlQuery.getQuery());

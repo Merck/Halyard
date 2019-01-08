@@ -16,7 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.sun.net.httpserver.HttpExchange;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
@@ -40,6 +39,7 @@ import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import org.apache.commons.io.IOUtils;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -67,6 +67,7 @@ public class HttpSparqlHandlerTest {
     // Response content type
     private static final String XML_CONTENT = "application/sparql-results+xml";
     private static final String JSON_CONTENT = "application/sparql-results+json";
+    private static final String JSONLD_CONTENT = "application/ld+json";
     private static final String TSV_CONTENT = "text/tab-separated-values";
     private static final String CSV_CONTENT = "text/csv";
 
@@ -119,8 +120,13 @@ public class HttpSparqlHandlerTest {
         Properties storedQueries = new Properties();
         storedQueries.put("test_path", "ask {<{{test_parameter1}}> <{{test_parameter2}}> ?obj}");
 
+        // Alter writer configuration
+        Properties writerCfg = new Properties();
+        writerCfg.put("org.eclipse.rdf4j.rio.helpers.JSONLDSettings.COMPACT_ARRAYS", "java.lang.Boolean.FALSE");
+        writerCfg.put("org.eclipse.rdf4j.rio.helpers.JSONLDSettings.JSONLD_MODE", "org.eclipse.rdf4j.rio.helpers.JSONLDMode.COMPACT");
+
         // Create handler with the repositoryConnection to the sail repository
-        HttpSparqlHandler handler = new HttpSparqlHandler(repositoryConnection, storedQueries, true);
+        HttpSparqlHandler handler = new HttpSparqlHandler(repositoryConnection, storedQueries, writerCfg, true);
 
         // Create and start http server
         server = new SimpleHttpServer(PORT, SERVER_CONTEXT, handler);
@@ -395,6 +401,33 @@ public class HttpSparqlHandlerTest {
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
         List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT, TSV_CONTENT, CSV_CONTENT);
         assertTrue(validResponseContent.contains(urlConnection.getContentType()));
+    }
+
+    /**
+     * Invoke graph query with expected compacted JSONLD result
+     */
+    @Test
+    public void testWriterConfig() throws IOException {
+        URL url = new URL(SERVER_URL);
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setDoOutput(true);
+        urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
+        urlConnection.setRequestProperty("Accept", JSONLD_CONTENT);
+        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
+        out.write("prefix w: <http://whatever/> construct {w:a w:b 1.} where {}");
+        out.close();
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+        assertEquals(JSONLD_CONTENT, urlConnection.getContentType());
+        boolean w = false, wa = false, wb = false;
+        for (String line : IOUtils.readLines(urlConnection.getInputStream())) {
+            w |= line.contains("\"w\"");
+            wa |= line.contains("\"w:a\"");
+            wb |= line.contains("\"w:b\"");
+        }
+        assertTrue(w);
+        assertTrue(wa);
+        assertTrue(wb);
     }
 
     /**

@@ -70,6 +70,10 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                 "For example stored queries property file containing: \"my_describe_query=describe <{{my_parameter}}>\" " +
                 "will resolve and execute request to /my_describe_query?my_parameter=http%3A%2F%2Fwhatever%2F as " +
                 "\"describe <http://whatever/>\" query.", false, true);
+        addOption("w", "writer-properties", "property_file", "Optional property file with RDF4J Rio WriterConfig properties. " +
+                "Each property name is fully qualified class.field name of WriterSetting and property value is fully qualified " +
+                " class.field or enum name with the value to set. For example: " +
+                "\"org.eclipse.rdf4j.rio.helpers.JSONLDSettings.JSONLD_MODE=org.eclipse.rdf4j.rio.helpers.JSONLDMode.COMPACT\"", false, true);
         // cannot use short option 'v' due to conflict with the super "--version" option
         addOption(null, "verbose", null, "Logging mode that records all logging information (by default only " +
                 "important informative and error messages are printed)", false, false);
@@ -113,7 +117,13 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                         storedQueries.load(in);
                     }
                 }
-                HttpSparqlHandler handler = new HttpSparqlHandler(connection, storedQueries, verbose);
+                Properties writerConfig = new Properties();
+                if (cmd.hasOption('w')) {
+                    try (FileInputStream in = new FileInputStream(cmd.getOptionValue('w'))) {
+                        writerConfig.load(in);
+                    }
+                }
+                HttpSparqlHandler handler = new HttpSparqlHandler(connection, storedQueries, writerConfig, verbose);
                 SimpleHttpServer server = new SimpleHttpServer(port, CONTEXT, handler);
                 server.start();
                 try {
