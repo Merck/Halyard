@@ -24,6 +24,7 @@ import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import java.io.*;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * @author sykorjan
@@ -63,6 +64,12 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
         addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
         addOption("t", "timeout", "evaluation_timeout", "Timeout in seconds for each query evaluation (default is " +
                 "unlimited timeout)", false, true);
+        addOption("q", "stored-queries", "property_file", "Optional property file with pre-defined stored queries. " +
+                "Each property name will be mapped to URL path and each property value represents SPARQL query template. " +
+                "Query template may contain custom tokens that will be replaced by corresponding request parameter value. " +
+                "For example stored queries property file containing: \"my_describe_query=describe <{{my_parameter}}>\" " +
+                "will resolve and execute request to /my_describe_query?my_parameter=http%3A%2F%2Fwhatever%2F as " +
+                "\"describe <http://whatever/>\" query.", false, true);
         // cannot use short option 'v' due to conflict with the super "--version" option
         addOption(null, "verbose", null, "Logging mode that records all logging information (by default only " +
                 "important informative and error messages are printed)", false, false);
@@ -100,7 +107,13 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
             try {
                 SailRepositoryConnection connection = rep.getConnection();
                 connection.begin();
-                HttpSparqlHandler handler = new HttpSparqlHandler(connection, verbose);
+                Properties storedQueries = new Properties();
+                if (cmd.hasOption('q')) {
+                    try (FileInputStream in = new FileInputStream(cmd.getOptionValue('q'))) {
+                        storedQueries.load(in);
+                    }
+                }
+                HttpSparqlHandler handler = new HttpSparqlHandler(connection, storedQueries, verbose);
                 SimpleHttpServer server = new SimpleHttpServer(port, CONTEXT, handler);
                 server.start();
                 try {

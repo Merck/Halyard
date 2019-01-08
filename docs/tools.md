@@ -563,7 +563,7 @@ Example: halyard profile -s my_dataset -q 'select * where {?s owl:sameAs ?o}'
 ```
 $ ./halyard endpoint -h
 usage: halyard endpoint [-h] [-v] [-p <http_server_port>] -s <dataset_table> [-i
-       <elastic_index_url>] [-t <evaluation_timeout>] [--verbose]
+       <elastic_index_url>] [-t <evaluation_timeout>] [-q <property_file>] [--verbose]
 Halyard Endpoint is a command-line application designed to launch a simple SPARQL Endpoint to serve
 SPARQL Queries. Any custom commands that are to be run as a new subprocess internally by this tool
 have to be passed at the end of this tool.
@@ -578,6 +578,16 @@ the custom command.
  -i,--elastic-index <elastic_index_url>   Optional ElasticSearch index URL
  -t,--timeout <evaluation_timeout>        Timeout in seconds for each query evaluation (default is
                                           unlimited timeout)
+ -q,--stored-queries <property_file>      Optional property file with pre-defined stored queries.
+                                          Each property name will be mapped to URL path and each
+                                          property value represents SPARQL query template. Query
+                                          template may contain custom tokens that will be replaced
+                                          by corresponding request parameter value. For example
+                                          stored queries property file containing:
+                                          "my_describe_query=describe <{{my_parameter}}>" will
+                                          resolve and execute request to
+                                          /my_describe_query?my_parameter=http%3A%2F%2Fwhatever%2F
+                                          as "describe <http://whatever/>" query.
     --verbose                             Logging mode that records all logging information (by
                                           default only important informative and error messages are
                                           printed)

@@ -39,6 +39,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -114,8 +115,12 @@ public class HttpSparqlHandlerTest {
         repositoryConnection.add(factory.createStatement(SUBJ3, PRED3, OBJ3, CONTEXT3));
         repositoryConnection.commit();
 
+        // Provide stored query
+        Properties storedQueries = new Properties();
+        storedQueries.put("test_path", "ask {<{{test_parameter1}}> <{{test_parameter2}}> ?obj}");
+
         // Create handler with the repositoryConnection to the sail repository
-        HttpSparqlHandler handler = new HttpSparqlHandler(repositoryConnection, true);
+        HttpSparqlHandler handler = new HttpSparqlHandler(repositoryConnection, storedQueries, true);
 
         // Create and start http server
         server = new SimpleHttpServer(PORT, SERVER_CONTEXT, handler);
@@ -306,6 +311,44 @@ public class HttpSparqlHandlerTest {
         urlConnection.setRequestProperty("Content-Type", ENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("query=ASK%20%7B%7D");
+        out.close();
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
+        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
+        if (urlConnection.getContentType().equals(XML_CONTENT)) {
+            checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
+        }
+    }
+
+    /**
+     * Invoke correct query operation via GET method
+     */
+    @Test
+    public void testStoredQueryGet() throws IOException {
+        String GET_URL = SERVER_URL + "/test_path?test_parameter1=" + URLEncoder.encode(SUBJ.stringValue(), CHARSET) + "&test_parameter2=" + URLEncoder.encode(PRED.stringValue(), CHARSET);
+        URL url = new URL(GET_URL);
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("GET");
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
+        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
+        if (urlConnection.getContentType().equals(XML_CONTENT)) {
+            checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
+        }
+    }
+
+    /**
+     * Invoke correct query operation via URL-encoded POST
+     */
+    @Test
+    public void testStoredQueryPostForm() throws IOException {
+        URL url = new URL(SERVER_URL + "/test_path");
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setDoOutput(true);
+        urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Content-Type", ENCODED_CONTENT);
+        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
+        out.write("test_parameter1=" + URLEncoder.encode(SUBJ.stringValue(), CHARSET) + "&test_parameter2=" + URLEncoder.encode(PRED.stringValue(), CHARSET));
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
         List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
