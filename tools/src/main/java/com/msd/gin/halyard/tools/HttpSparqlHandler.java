@@ -173,6 +173,13 @@ public final class HttpSparqlHandler implements HttpHandler {
         if (path != null && path.length() > 1) {
             String query = storedQueries.getProperty(path.substring(1));
             if (query == null) {
+                //try to cut the extension
+                int i = path.lastIndexOf('.');
+                if (i > 0) {
+                    query = storedQueries.getProperty(path.substring(1, i));
+                }
+            }
+            if (query == null) {
                 throw new IllegalArgumentException("No stored query for path: " + path);
             }
             sparqlQuery.setQuery(query);
@@ -310,8 +317,8 @@ public final class HttpSparqlHandler implements HttpHandler {
         List<String> acceptedMimeTypes = exchange.getRequestHeaders().get("Accept");
         if (query instanceof SailTupleQuery) {
             LOGGER.log(Level.INFO, "Evaluating tuple query: {0}", sparqlQuery.getQuery());
-            QueryResultFormat format = getFormat(TupleQueryResultWriterRegistry.getInstance(), acceptedMimeTypes,
-                    TupleQueryResultFormat.SPARQL, exchange.getResponseHeaders());
+            QueryResultFormat format = getFormat(TupleQueryResultWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
+                    acceptedMimeTypes, TupleQueryResultFormat.SPARQL, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
                 TupleQueryResultWriter w = TupleQueryResultWriterRegistry.getInstance().get(format).get().getWriter(response);
@@ -320,8 +327,8 @@ public final class HttpSparqlHandler implements HttpHandler {
             }
         } else if (query instanceof SailGraphQuery) {
             LOGGER.log(Level.INFO, "Evaluating graph query: {0}", sparqlQuery.getQuery());
-            RDFFormat format = getFormat(RDFWriterRegistry.getInstance(), acceptedMimeTypes, RDFFormat.RDFXML,
-                    exchange.getResponseHeaders());
+            RDFFormat format = getFormat(RDFWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
+                    acceptedMimeTypes, RDFFormat.RDFXML, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
                 RDFWriter w = RDFWriterRegistry.getInstance().get(format).get().getWriter(response);
@@ -330,12 +337,13 @@ public final class HttpSparqlHandler implements HttpHandler {
             }
         } else if (query instanceof SailBooleanQuery) {
             LOGGER.log(Level.INFO, "Evaluating boolean query: {0}", sparqlQuery.getQuery());
-            QueryResultFormat format = getFormat(BooleanQueryResultWriterRegistry.getInstance(),
+            QueryResultFormat format = getFormat(BooleanQueryResultWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
                     acceptedMimeTypes, BooleanQueryResultFormat.SPARQL, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
-                BooleanQueryResultWriterRegistry.getInstance().get(format).get().getWriter(response)
-                        .write(((BooleanQuery) query).evaluate());
+                BooleanQueryResultWriter w = BooleanQueryResultWriterRegistry.getInstance().get(format).get().getWriter(response);
+                w.setWriterConfig(writerConfig);
+                w.write(((BooleanQuery) query).evaluate());
             }
         }
         LOGGER.log(Level.INFO, "Request successfully processed");
@@ -362,6 +370,7 @@ public final class HttpSparqlHandler implements HttpHandler {
      * If no accepted MIME types are specified, a default file format for the default MIME type is chosen.
      *
      * @param reg           requested result writer registry
+     * @param path          requested file path
      * @param mimeTypes     requested/accepted response MIME types (e.g. application/sparql-results+xml,
      *                      application/xml)
      * @param defaultFormat default file format (e.g. SPARQL/XML)
@@ -371,8 +380,15 @@ public final class HttpSparqlHandler implements HttpHandler {
      * @return
      */
     private <FF extends FileFormat, S extends Object> FF getFormat(FileFormatServiceRegistry<FF, S> reg,
-                                                                   List<String> mimeTypes, FF defaultFormat,
-                                                                   Headers h) {
+                                                                   String path, List<String> mimeTypes,
+                                                                   FF defaultFormat, Headers h) {
+        if (path != null) {
+            Optional<FF> o = reg.getFileFormatForFileName(path);
+            if (o.isPresent()) {
+                h.set("Content-Type", o.get().getDefaultMIMEType());
+                return o.get();
+            }
+        }
         if (mimeTypes != null) {
             for (String mimeType : mimeTypes) {
                 Optional<FF> o = reg.getFileFormatForMIMEType(mimeType);

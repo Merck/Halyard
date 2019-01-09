@@ -297,12 +297,10 @@ public class HttpSparqlHandlerTest {
         URL url = new URL(GET_URL);
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setRequestMethod("GET");
+        urlConnection.setRequestProperty("Accept", XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
-        }
+        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
     /**
@@ -314,16 +312,14 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Accept", XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", ENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("query=ASK%20%7B%7D");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
-        }
+        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
     /**
@@ -335,12 +331,10 @@ public class HttpSparqlHandlerTest {
         URL url = new URL(GET_URL);
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setRequestMethod("GET");
+        urlConnection.setRequestProperty("Accept", XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
-        }
+        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
     /**
@@ -352,16 +346,27 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Accept", XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", ENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("test_parameter1=" + URLEncoder.encode(SUBJ.stringValue(), CHARSET) + "&test_parameter2=" + URLEncoder.encode(PRED.stringValue(), CHARSET));
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
-        }
+        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
+    }
+
+    /**
+     * Invoke correct query operation via GET method
+     */
+    @Test
+    public void testStoredQueryWithJsonExtension() throws IOException {
+        String GET_URL = SERVER_URL + "/test_path.json?test_parameter1=" + URLEncoder.encode(SUBJ.stringValue(), CHARSET) + "&test_parameter2=" + URLEncoder.encode(PRED.stringValue(), CHARSET);
+        URL url = new URL(GET_URL);
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("GET");
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+        assertEquals(JSON_CONTENT, urlConnection.getContentType());
     }
 
     /**
@@ -373,16 +378,14 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Accept", XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("ASK {}");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
-        }
+        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
     /**
@@ -394,6 +397,7 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Accept", XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("SELECT (1 AS ?value) {}");
@@ -479,6 +483,7 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Accept", XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write(
@@ -486,11 +491,8 @@ public class HttpSparqlHandlerTest {
                         "WHERE { ?x ?y ?z  GRAPH ?g { ?s ?p ?o } }");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
-        }
+        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
     }
 
     /**
@@ -502,6 +504,7 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Accept", XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", ENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write(
@@ -514,11 +517,8 @@ public class HttpSparqlHandlerTest {
         );
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
-        }
+        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
     }
 
     /**
@@ -534,12 +534,10 @@ public class HttpSparqlHandlerTest {
         );
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setRequestMethod("GET");
+        urlConnection.setRequestProperty("Accept", XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT);
-        assertTrue(validResponseContent.contains(urlConnection.getContentType()));
-        if (urlConnection.getContentType().equals(XML_CONTENT)) {
-            checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
-        }
+        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
     }
 
     /**
