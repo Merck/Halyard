@@ -70,6 +70,7 @@ public class HttpSparqlHandlerTest {
     private static final String JSONLD_CONTENT = "application/ld+json";
     private static final String TSV_CONTENT = "text/tab-separated-values";
     private static final String CSV_CONTENT = "text/csv";
+    private static final String TURTLE_CONTENT = "text/turtle";
 
     // test data
     private static final ValueFactory factory = SimpleValueFactory.getInstance();
@@ -538,6 +539,20 @@ public class HttpSparqlHandlerTest {
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
         assertEquals(XML_CONTENT, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
+    }
+
+    /**
+     * Invoke correct query operation with multiple MIME types in one Accept header
+     */
+    @Test
+    public void testMultipleMimeTypes() throws IOException {
+        URL url = new URL(SERVER_URL + "?query=" + URLEncoder.encode("CONSTRUCT WHERE { ?s ?p ?o . } LIMIT 10",
+                CHARSET));
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("GET");
+        urlConnection.setRequestProperty("Accept", "application/turtle;q=0.7, text/turtle;q=0.3, */*;q=0.8");
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+        assertEquals(TURTLE_CONTENT, urlConnection.getContentType());
     }
 
     /**
