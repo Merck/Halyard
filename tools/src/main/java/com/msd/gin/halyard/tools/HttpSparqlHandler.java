@@ -188,9 +188,19 @@ public final class HttpSparqlHandler implements HttpHandler {
         }
         if ("GET".equalsIgnoreCase(requestMethod)) {
             // Retrieve from the request URI parameter query and optional parameters defaultGraphs and namedGraphs
-            String requestQuery = exchange.getRequestURI().getQuery();
-            if (requestQuery != null) {
-                StringTokenizer stk = new StringTokenizer(requestQuery, AND_DELIMITER);
+            // Cannot apply directly exchange.getRequestURI().getQuery() since getQuery() method
+            // automatically decodes query (requestQuery must remain unencoded due to parsing by '&' delimiter)
+            String requestQueryRaw = exchange.getRequestURI().toString();
+            if (path != null) {
+                // remove (undecoded) path from the request URI
+                requestQueryRaw = requestQueryRaw.substring(exchange.getRequestURI().getRawPath().length());
+            }
+            if (requestQueryRaw.startsWith("?") ) {
+                // remove Query string ('?') from the request URI
+                requestQueryRaw = requestQueryRaw.substring(1);
+            }
+            if (requestQueryRaw != null) {
+                StringTokenizer stk = new StringTokenizer(requestQueryRaw, AND_DELIMITER);
                 while (stk.hasMoreTokens()) {
                     queryCount += parseParameter(stk.nextToken(), sparqlQuery);
                 }
@@ -234,9 +244,19 @@ public final class HttpSparqlHandler implements HttpHandler {
                     }
                 } else if (baseType.equals(UNENCODED_CONTENT)) {
                     // Retrieve from the request URI optional parameters defaultGraphs and namedGraphs
-                    String requestQuery = exchange.getRequestURI().getQuery();
-                    if (requestQuery != null) {
-                        StringTokenizer stk = new StringTokenizer(requestQuery, AND_DELIMITER);
+                    // Cannot apply directly exchange.getRequestURI().getQuery() since getQuery() method
+                    // automatically decodes query (requestQuery must remain unencoded due to parsing by '&' delimiter)
+                    String requestQueryRaw = exchange.getRequestURI().toString();
+                    if (path != null) {
+                        // remove path (undecoded) from the request URI
+                        requestQueryRaw = requestQueryRaw.substring(exchange.getRequestURI().getRawPath().length());
+                    }
+                    if (requestQueryRaw.startsWith("?") ) {
+                        // remove Query string ('?') from the request URI
+                        requestQueryRaw = requestQueryRaw.substring(1);
+                    }
+                    if (requestQueryRaw != null) {
+                        StringTokenizer stk = new StringTokenizer(requestQueryRaw, AND_DELIMITER);
                         while (stk.hasMoreTokens()) {
                             queryCount += parseParameter(stk.nextToken(), sparqlQuery);
                         }

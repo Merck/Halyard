@@ -556,6 +556,20 @@ public class HttpSparqlHandlerTest {
     }
 
     /**
+     * Invoke correct query operation with a GET method containing '&' characters
+     *
+     * @throws IOException
+     */
+    @Test
+    public void testAmpersandCharacter() throws IOException {
+        URL url = new URL(SERVER_URL + "?query=" + URLEncoder.encode("ASK { [] ?p \"&\" . }", CHARSET));
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("GET");
+        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+    }
+
+    /**
      * Help method for checking response content, only boolean value is expected (result of ASK query)
      *
      * @param urlConnection
