@@ -39,6 +39,7 @@ import java.net.URLDecoder;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import org.apache.commons.lang.StringUtils;
 import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.RioSetting;
@@ -87,10 +88,10 @@ public final class HttpSparqlHandler implements HttpHandler {
     private static final Logger LOGGER = Logger.getLogger(HttpSparqlHandler.class.getName());
 
     /**
-     * @param connection connection to Sail repository
-     * @param storedQueries pre-defined stored SPARQL query templates
+     * @param connection       connection to Sail repository
+     * @param storedQueries    pre-defined stored SPARQL query templates
      * @param writerProperties RDF4J RIO WriterConfig properties
-     * @param verbose    true when verbose mode enabled, otherwise false
+     * @param verbose          true when verbose mode enabled, otherwise false
      */
     @SuppressWarnings("unchecked")
     public HttpSparqlHandler(SailRepositoryConnection connection, Properties storedQueries, Properties writerProperties, boolean verbose) {
@@ -103,7 +104,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         this.writerConfig = new WriterConfig();
         if (writerProperties != null) {
             for (Map.Entry<Object, Object> me : writerProperties.entrySet()) {
-                writerConfig.set((RioSetting)getStaticField(me.getKey().toString()), getStaticField(me.getValue().toString()));
+                writerConfig.set((RioSetting) getStaticField(me.getKey().toString()), getStaticField(me.getValue().toString()));
             }
         }
     }
@@ -187,9 +188,11 @@ public final class HttpSparqlHandler implements HttpHandler {
         }
         if ("GET".equalsIgnoreCase(requestMethod)) {
             // Retrieve from the request URI parameter query and optional parameters defaultGraphs and namedGraphs
-            String requestQuery = exchange.getRequestURI().getQuery();
-            if (requestQuery != null) {
-                StringTokenizer stk = new StringTokenizer(requestQuery, AND_DELIMITER);
+            // Cannot apply directly exchange.getRequestURI().getQuery() since getQuery() method
+            // automatically decodes query (requestQuery must remain unencoded due to parsing by '&' delimiter)
+            String requestQueryRaw = exchange.getRequestURI().getRawQuery();
+            if (requestQueryRaw != null) {
+                StringTokenizer stk = new StringTokenizer(requestQueryRaw, AND_DELIMITER);
                 while (stk.hasMoreTokens()) {
                     queryCount += parseParameter(stk.nextToken(), sparqlQuery);
                 }
@@ -233,9 +236,11 @@ public final class HttpSparqlHandler implements HttpHandler {
                     }
                 } else if (baseType.equals(UNENCODED_CONTENT)) {
                     // Retrieve from the request URI optional parameters defaultGraphs and namedGraphs
-                    String requestQuery = exchange.getRequestURI().getQuery();
-                    if (requestQuery != null) {
-                        StringTokenizer stk = new StringTokenizer(requestQuery, AND_DELIMITER);
+                    // Cannot apply directly exchange.getRequestURI().getQuery() since getQuery() method
+                    // automatically decodes query (requestQuery must remain unencoded due to parsing by '&' delimiter)
+                    String requestQueryRaw = exchange.getRequestURI().getRawQuery();
+                    if (requestQueryRaw != null) {
+                        StringTokenizer stk = new StringTokenizer(requestQueryRaw, AND_DELIMITER);
                         while (stk.hasMoreTokens()) {
                             queryCount += parseParameter(stk.nextToken(), sparqlQuery);
                         }
@@ -270,7 +275,7 @@ public final class HttpSparqlHandler implements HttpHandler {
     /**
      * Parse single parameter from HTTP request parameters or body.
      *
-     * @param param single raw String parameter
+     * @param param       single raw String parameter
      * @param sparqlQuery SparqlQuery to fill from the parsed parameter
      * @throws UnsupportedEncodingException which never happens
      * @returns number of found SPARQL queries
@@ -309,12 +314,16 @@ public final class HttpSparqlHandler implements HttpHandler {
     private void evaluateQuery(SparqlQuery sparqlQuery, HttpExchange exchange) throws IOException, RDF4JException {
         SailQuery query = connection.prepareQuery(QueryLanguage.SPARQL, sparqlQuery.getQuery(), null);
         Dataset dataset = sparqlQuery.getDataset();
-        if(!dataset.getDefaultGraphs().isEmpty() || !dataset.getNamedGraphs().isEmpty()) {
+        if (!dataset.getDefaultGraphs().isEmpty() || !dataset.getNamedGraphs().isEmpty()) {
             // This will include default graphs and named graphs from  the request parameters but default graphs and
             // named graphs contained in the string query will be ignored
             query.getParsedQuery().setDataset(dataset);
         }
-        List<String> acceptedMimeTypes = exchange.getRequestHeaders().get("Accept");
+        List<String> acceptedMimeTypes = new ArrayList<>();
+        List<String> acceptHeaders = exchange.getRequestHeaders().get("Accept");
+        for (String header : acceptHeaders) {
+            acceptedMimeTypes.addAll(parseAcceptHeader(header));
+        }
         if (query instanceof SailTupleQuery) {
             LOGGER.log(Level.INFO, "Evaluating tuple query: {0}", sparqlQuery.getQuery());
             QueryResultFormat format = getFormat(TupleQueryResultWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
@@ -400,6 +409,28 @@ public final class HttpSparqlHandler implements HttpHandler {
         }
         h.set("Content-Type", defaultFormat.getDefaultMIMEType());
         return defaultFormat;
+    }
+
+    /**
+     * Parse Accept header in case it contains multiple mime types. Relative quality factors ('q') are removed.
+     * <p>
+     * Example:
+     * Accept header: "text/html, application/xthml+xml, application/xml;q=0.9, image/webp;q=0.1"
+     * ---> parse to List<String>:
+     * [0] "text/html"
+     * [1] "application/xthml+xml"
+     * [2] "application/xml"
+     * [3] "image/webp"
+     *
+     * @param acceptHeader
+     * @return parsed Accept header
+     */
+    private List<String> parseAcceptHeader(String acceptHeader) {
+        List<String> mimeTypes = Arrays.asList(acceptHeader.trim().split(","));
+        for (int i = 0; i < mimeTypes.size(); i++) {
+            mimeTypes.set(i, mimeTypes.get(i).trim().split(";", 0)[0]);
+        }
+        return mimeTypes;
     }
 
     /**
