@@ -158,17 +158,22 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             "esindex",
             "Halyard ElasticSearch Index is a MapReduce application that indexes all literals in the given dataset into a supplementary ElasticSearch server/cluster. "
                 + "A Halyard repository configured with such supplementary ElasticSearch index can then provide more advanced text search features over the indexed literals.",
-            "Default index mapping is:\n"
+            "Default index configuration is:\n"
             + "\u00A0{\n"
-            + "\u00A0    \"mappings\" : {\n"
-            + "\u00A0        \"l\" : {\n"
-            + "\u00A0            \"properties\" : {\n"
-            + "\u00A0                \"l\" : { \"type\" : \"text\" }\n"
+            + "\u00A0   \"mappings\" : {\n"
+            + "\u00A0       \"l\" : {\n"
+            + "\u00A0           \"properties\" : {\n"
+            + "\u00A0               \"l\" : { \"type\" : \"text\" }\n"
             + "\u00A0            },\n"
-            + "\u00A0            \"_source\" : {\n"
-            + "\u00A0              \"enabled\" : false\n"
+            + "\u00A0           \"_source\" : {\n"
+            + "\u00A0             \"enabled\" : false\n"
             + "\u00A0            }\n"
             + "\u00A0        }\n"
+            + "\u00A0    },\n"
+            + "\u00A0   \"settings\": {\n"
+            + "\u00A0       \"refresh_interval\": \"1h\",\n"
+            + "\u00A0       \"number_of_shards\": 1,\n"
+            + "\u00A0       \"number_of_replicas\": 0\n"
             + "\u00A0    }\n"
             + "\u00A0}\n"
             + "Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index"
@@ -224,6 +229,11 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 + "              \"enabled\" : false\n"
                 + "            }\n"
                 + "        }\n"
+                + "    },\n"
+                + "   \"settings\": {\n"
+                + "       \"refresh_interval\": \"1h\",\n"
+                + "       \"number_of_shards\": 1,\n"
+                + "       \"number_of_replicas\": 0\n"
                 + "    }\n"
                 + "}").getBytes(StandardCharsets.UTF_8);
             http.setFixedLengthStreamingMode(b.length);
@@ -279,6 +289,9 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         job.setMapOutputKeyClass(NullWritable.class);
         job.setMapOutputValueClass(Void.class);
         if (job.waitForCompletion(true)) {
+            HttpURLConnection http = (HttpURLConnection)new URL(target + "_refresh").openConnection();
+            http.connect();
+            http.disconnect();
             LOG.info("Elastic Indexing Completed..");
             return 0;
         }

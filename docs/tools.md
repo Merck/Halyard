@@ -378,17 +378,22 @@ indexed literals.
  -b,--batch-size <batch_size>           Number of literals sent to Elasticsearch for indexing in one
                                         batch (default is 100000)
  -g,--named-graph <named_graph>         Optional restrict indexing to the given named graph only
-Default index mapping is:
+Default index configuration is:
  {
-     "mappings" : {
-         "l" : {
-             "properties" : {
-                 "l" : { "type" : "text" }
+    "mappings" : {
+        "l" : {
+            "properties" : {
+                "l" : { "type" : "text" }
              },
-             "_source" : {
-               "enabled" : false
+            "_source" : {
+              "enabled" : false
              }
          }
+     },
+    "settings": {
+        "refresh_interval": "1h",
+        "number_of_shards": 1,
+        "number_of_replicas": 0
      }
  }
 Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index
