@@ -30,7 +30,11 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
@@ -172,7 +176,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             + "\u00A0    },\n"
             + "\u00A0   \"settings\": {\n"
             + "\u00A0       \"refresh_interval\": \"1h\",\n"
-            + "\u00A0       \"number_of_shards\": 1,\n"
+            + "\u00A0       \"number_of_shards\": 1+(<dataset_table_regions>/256),\n"
             + "\u00A0       \"number_of_replicas\": 0\n"
             + "\u00A0    }\n"
             + "\u00A0}\n"
@@ -215,6 +219,12 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             job.getConfiguration().setInt(BUFFER_LIMIT, Integer.parseInt(cmd.getOptionValue('b')));
         }
         if (cmd.hasOption('c')) {
+            int shards;
+            try (Connection conn = ConnectionFactory.createConnection(getConf())) {
+                try (RegionLocator rl = conn.getRegionLocator(TableName.valueOf(source))) {
+                    shards = 1 + (rl.getStartKeys().length >> 8);
+                }
+            }
             HttpURLConnection http = (HttpURLConnection)new URL(target).openConnection();
             http.setRequestMethod("PUT");
             http.setDoOutput(true);
@@ -232,7 +242,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 + "    },\n"
                 + "   \"settings\": {\n"
                 + "       \"refresh_interval\": \"1h\",\n"
-                + "       \"number_of_shards\": 1,\n"
+                + "       \"number_of_shards\": " + shards + ",\n"
                 + "       \"number_of_replicas\": 0\n"
                 + "    }\n"
                 + "}").getBytes(StandardCharsets.UTF_8);

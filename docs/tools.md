@@ -392,7 +392,7 @@ Default index configuration is:
      },
     "settings": {
         "refresh_interval": "1h",
-        "number_of_shards": 1,
+        "number_of_shards": 1+(<dataset_table_regions>/256),
         "number_of_replicas": 0
      }
  }
