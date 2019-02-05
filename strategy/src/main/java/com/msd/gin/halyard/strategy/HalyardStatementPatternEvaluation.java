@@ -397,7 +397,7 @@ final class HalyardStatementPatternEvaluation {
                         public Statement next() throws QueryEvaluationException {
                             Statement st = super.next();
                             //Filter out contexts
-                            return st.getContext() == null ? st : SimpleValueFactory.getInstance().createStatement(st.getSubject(), st.getPredicate(), st.getObject());
+                            return st.getContext() == null ? st : tripleSource.getValueFactory().createStatement(st.getSubject(), st.getPredicate(), st.getObject());
                         }
                         @Override
                         protected boolean accept(Statement st) {

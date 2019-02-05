@@ -26,10 +26,12 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.Var;
+import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 
@@ -40,10 +42,12 @@ import org.eclipse.rdf4j.sail.SailException;
 public final class HalyardStatsBasedStatementPatternCardinalityCalculator implements HalyardEvaluationStatistics.StatementPatternCardinalityCalculator {
     private static final Logger LOG = Logger.getLogger(HalyardStatsBasedStatementPatternCardinalityCalculator.class.getName());
 
+    private final ValueFactory valueFactory;
     private final SailConnection statsConnection;
 
-    public HalyardStatsBasedStatementPatternCardinalityCalculator(SailConnection statsConnection) {
-        this.statsConnection = statsConnection;
+    public HalyardStatsBasedStatementPatternCardinalityCalculator(Sail sail) {
+    	this.valueFactory = sail.getValueFactory();
+        this.statsConnection = sail.getConnection();
     }
 
     @Override
@@ -121,6 +125,6 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
         if (partitionVar == null || !partitionVar.hasValue()) {
             return defaultCardinality;
         }
-        return getTriplesCount(SimpleValueFactory.getInstance().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(partitionVar.getValue()))), 100l);
+        return getTriplesCount(valueFactory.createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(partitionVar.getValue()))), 100l);
     }
 }

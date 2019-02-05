@@ -184,7 +184,7 @@ public class HalyardTableUtilsScanTest {
             Set<Statement> res = new HashSet<>();
             Result r;
             while ((r = rs.next()) != null) {
-                res.addAll(HalyardTableUtils.parseStatements(r));
+                res.addAll(HalyardTableUtils.parseStatements(r, vf));
             }
             assertTrue(allStatements.containsAll(res));
             assertEquals(expRes, res.size());

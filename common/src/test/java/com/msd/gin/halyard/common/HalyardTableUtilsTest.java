@@ -76,10 +76,10 @@ public class HalyardTableUtilsTest {
         table.flushCommits();
 
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, null))) {
-            assertEquals(obj, HalyardTableUtils.parseStatements(rs.next()).iterator().next().getObject());
+            assertEquals(obj, HalyardTableUtils.parseStatements(rs.next(), vf).iterator().next().getObject());
         }
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, null, null))) {
-            assertEquals(obj, HalyardTableUtils.parseStatements(rs.next()).iterator().next().getObject());
+            assertEquals(obj, HalyardTableUtils.parseStatements(rs.next(), vf).iterator().next().getObject());
         }
     }
 
@@ -105,7 +105,7 @@ public class HalyardTableUtilsTest {
         table.flushCommits();
 
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred1, obj1, null))) {
-            List<Statement> res = HalyardTableUtils.parseStatements(rs.next());
+            List<Statement> res = HalyardTableUtils.parseStatements(rs.next(), vf);
             assertEquals(2, res.size());
             assertTrue(res.contains(SimpleValueFactory.getInstance().createStatement(subj, pred1, obj1)));
             assertTrue(res.contains(SimpleValueFactory.getInstance().createStatement(subj, pred2, obj2)));
@@ -143,7 +143,7 @@ public class HalyardTableUtilsTest {
 
     @Test
     public void testNoResult() {
-        assertEquals(0, HalyardTableUtils.parseStatements(Result.EMPTY_RESULT).size());
+        assertEquals(0, HalyardTableUtils.parseStatements(Result.EMPTY_RESULT, SimpleValueFactory.getInstance()).size());
     }
 
     @Test(expected = IllegalArgumentException.class)
