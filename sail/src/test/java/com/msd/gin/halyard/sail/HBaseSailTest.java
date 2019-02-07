@@ -47,7 +47,6 @@ import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.junit.Test;
 import static org.junit.Assert.*;
-import org.junit.Ignore;
 
 /**
  *
@@ -404,5 +403,27 @@ public class HBaseSailTest {
         assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);
         assertEquals(1.0, sail.statistics.getCardinality(q4), 0.01);
         sail.shutDown();
+    }
+
+    @Test
+    public void testEvaluateServiceWithBindings() throws Exception {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whateverservice2", true, 0, true, 0, null, null);
+        SailRepository rep = new SailRepository(sail);
+        rep.initialize();
+        Random r = new Random(333);
+        sail.addStatement(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj"));
+        sail.commit();
+        TupleQuery q = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL,
+            "select * where {"
+            + "  bind (\"a\" as ?a)\n"
+            + "  SERVICE <" + HALYARD.NAMESPACE + "whateverservice2> {"
+            + "    ?s ?p ?o"
+            + "  }"
+            + "}");
+        TupleQueryResult res = q.evaluate();
+        assertTrue(res.hasNext());
+        assertNotNull(res.next().getValue("a"));
+        rep.shutDown();
     }
 }

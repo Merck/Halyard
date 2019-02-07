@@ -93,6 +93,7 @@ import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
+import org.eclipse.rdf4j.repository.sparql.query.InsertBindingSetCursor;
 
 /**
  * Evaluates {@link TupleExpression}s and it's sub-interfaces and implementations.
@@ -676,7 +677,7 @@ final class HalyardTupleExprEvaluation {
 
                 }
                 // otherwise: perform a SELECT query
-                CloseableIteration<BindingSet, QueryEvaluationException> result = fs.select(service, freeVars, bindings, baseUri);
+                CloseableIteration<BindingSet, QueryEvaluationException> result = new InsertBindingSetCursor(fs.select(service, freeVars, bindings, baseUri), bindings);
                 HalyardStatementPatternEvaluation.enqueue(parent, service.isSilent() ? new SilentIteration(result) : result, service);
             } catch (QueryEvaluationException e) {
                 // suppress exceptions if silent
