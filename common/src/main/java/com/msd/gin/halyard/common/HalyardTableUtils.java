@@ -102,9 +102,14 @@ public final class HalyardTableUtils {
      */
     public static final byte COSP_PREFIX = 5;
 
+    /**
+     * Key hash size in bytes
+     */
+    public static final byte KEY_SIZE = 20;
+
     private static final int PREFIXES = 3;
-    private static final byte[] START_KEY = new byte[20];
-    public static final byte[] STOP_KEY = new byte[20];
+    private static final byte[] START_KEY = new byte[KEY_SIZE];
+    public static final byte[] STOP_KEY = new byte[KEY_SIZE];
     static {
         Arrays.fill(START_KEY, (byte)0);
         Arrays.fill(STOP_KEY, (byte)0xff); /* 0xff is 255 in decimal */

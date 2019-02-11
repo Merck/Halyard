@@ -98,7 +98,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 
         final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
 
-        final byte[] lastKeyFragment = new byte[20], lastCtxFragment = new byte[20], lastClassFragment = new byte[20];
+        final byte[] lastKeyFragment = new byte[HalyardTableUtils.KEY_SIZE], lastCtxFragment = new byte[HalyardTableUtils.KEY_SIZE], lastClassFragment = new byte[HalyardTableUtils.KEY_SIZE];
         IRI statsContext, graphContext;
         byte[] statsContextHash;
         byte lastRegion = -1;
@@ -126,7 +126,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 
         private boolean matchAndCopyKey(byte[] source, int offset, byte[] target) {
             boolean match = true;
-            for (int i=0; i<20; i++) {
+            for (int i=0; i<HalyardTableUtils.KEY_SIZE; i++) {
                 byte b = source[i + offset];
                 if (b != target[i]) {
                     target[i] = b;
@@ -151,7 +151,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             if (region < HalyardTableUtils.CSPO_PREFIX) {
                 hashShift = 1;
             } else {
-                hashShift = 21;
+                hashShift = HalyardTableUtils.KEY_SIZE + 1;
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 1, lastCtxFragment) || region != lastRegion) {
                     cleanup(output);
                     Cell c[] = value.rawCells();
@@ -234,7 +234,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                     break;
                 case HalyardTableUtils.POS_PREFIX:
                 case HalyardTableUtils.CPOS_PREFIX:
-                    if (Arrays.equals(TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + 20, lastClassFragment) || hashChange)) {
+                    if (Arrays.equals(TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + HalyardTableUtils.KEY_SIZE, lastClassFragment) || hashChange)) {
                             classes++;
                     }
                     break;
