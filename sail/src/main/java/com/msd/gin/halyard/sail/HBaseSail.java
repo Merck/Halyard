@@ -94,6 +94,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
+import org.eclipse.rdf4j.repository.sparql.query.InsertBindingSetCursor;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
@@ -234,7 +235,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> select(Service service, Set<String> projectionVars, BindingSet bindings, String baseUri) throws QueryEvaluationException {
-        return evaluate(new ServiceRoot(service.getArg()), null, bindings, true);
+        return new InsertBindingSetCursor(evaluate(new ServiceRoot(service.getArg()), null, bindings, true), bindings);
     }
 
     @Override
