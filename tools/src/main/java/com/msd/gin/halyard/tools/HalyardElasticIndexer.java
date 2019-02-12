@@ -16,8 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.yammer.metrics.core.Gauge;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -26,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
@@ -56,6 +55,9 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.json.JSONObject;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.yammer.metrics.core.Gauge;
+
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
  * @author Adam Sotona (MSD)
@@ -74,7 +76,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
         final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
         long counter = 0, exports = 0, batches = 0, statements = 0;
-        byte[] lastHash = new byte[20], hash = new byte[20];
+		byte[] lastHash = new byte[HalyardTableUtils.KEY_SIZE], hash = new byte[HalyardTableUtils.KEY_SIZE];
         ArrayList<String> literals = new ArrayList<>();
         StringBuilder batch = new StringBuilder();
         URL url;
@@ -95,8 +97,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             if ((counter++ % 100000) == 0) {
                 output.setStatus(MessageFormat.format("{0} st:{1} exp:{2} batch:{3} ", counter, statements, exports, batches));
             }
-            hash = new byte[20];
-            System.arraycopy(key.get(), key.getOffset() + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 1 : 21), hash, 0, 20);
+			hash = new byte[HalyardTableUtils.KEY_SIZE];
+			System.arraycopy(key.get(), key.getOffset() + 1 + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 0 : HalyardTableUtils.KEY_SIZE), hash, 0, HalyardTableUtils.KEY_SIZE);
             if (!Arrays.equals(hash, lastHash)) {
                 export(false);
                 lastHash = hash;
