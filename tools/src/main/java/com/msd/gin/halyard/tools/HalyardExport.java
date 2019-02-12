@@ -16,7 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -25,7 +24,7 @@ import java.io.Writer;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -48,6 +47,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
@@ -73,6 +73,8 @@ import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.RDFWriterRegistry;
 import org.eclipse.rdf4j.rio.Rio;
+
+import com.msd.gin.halyard.sail.HBaseSail;
 
 /**
  * Command line tool to run SPARQL queries and export the results into various target systems. This class could be extended or modified to add new types of
@@ -199,7 +201,7 @@ public final class HalyardExport extends AbstractHalyardTool {
 
         public CSVResultWriter(StatusLog log, OutputStream out) {
             super(log);
-            this.writer = new OutputStreamWriter(out, Charset.forName("UTF-8"));
+			this.writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
         }
 
         @Override

@@ -16,10 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HALYARD;
-import com.msd.gin.halyard.sail.HBaseSail;
-import com.yammer.metrics.core.Gauge;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -29,6 +25,7 @@ import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.BitSet;
 import java.util.Collections;
@@ -36,6 +33,7 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
@@ -77,6 +75,11 @@ import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.sail.SailException;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.sail.HALYARD;
+import com.msd.gin.halyard.sail.HBaseSail;
+import com.yammer.metrics.core.Gauge;
+
 /**
  * MapReduce tool providing summary of a Halyard dataset.
  * @author Adam Sotona (MSD)
@@ -99,7 +102,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
     private static final String DECIMATION_FACTOR = "halyard.summary.decimation";
     private static final int DEFAULT_DECIMATION_FACTOR = 100;
 
-    private static final Charset UTF8 = Charset.forName("UTF-8");
+	private static final Charset UTF8 = StandardCharsets.UTF_8;
 
     static byte toCardinality(long count) {
         return (byte)(63 - Long.numberOfLeadingZeros(count));
@@ -131,7 +134,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 Scan scan = HalyardTableUtils.scan((Resource)instance, RDF.TYPE, null, null);
                 try (ResultScanner scanner = table.getScanner(scan)) {
                     for (Result r : scanner) {
-                        Statement st = HalyardTableUtils.parseStatement(r.rawCells()[0]);
+                        Statement st = HalyardTableUtils.parseStatement(r.rawCells()[0], SVF);
                         if (st.getSubject().equals(instance) && st.getPredicate().equals(RDF.TYPE) && (st.getObject() instanceof IRI)) {
                             res.add((IRI)st.getObject());
                         }
@@ -248,7 +251,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             if (random.nextInt(decimationFactor) == 0) {
-                statementChange(HalyardTableUtils.parseStatement(value.rawCells()[0]));
+                statementChange(HalyardTableUtils.parseStatement(value.rawCells()[0], SVF));
             }
             if (++counter % 10000 == 0) {
                 output.setStatus(MessageFormat.format("{0} cc:{1} pc:{2} pd:{3} pr:{4} pdr:{5}", counter, ccCounter, pcCounter, pdCounter, prCounter, pdrCounter));
