@@ -23,7 +23,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
@@ -40,7 +39,6 @@ import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
@@ -58,6 +56,7 @@ import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.htrace.Trace;
+import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
@@ -93,7 +92,8 @@ public final class HalyardStats extends AbstractHalyardTool {
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
 	private static final Charset UTF8 = StandardCharsets.UTF_8;
-    private static final byte[] TYPE_HASH = HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(RDF.TYPE).getBytes(UTF8));
+
+	private static final byte[] TYPE_HASH = HalyardTableUtils.hashKey(RDF.TYPE);
 
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
@@ -112,7 +112,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         long triples, distinctSubjects, properties, distinctObjects, classes, removed;
         long distinctIRIReferenceSubjects, distinctIRIReferenceObjects, distinctBlankNodeObjects, distinctBlankNodeSubjects, distinctLiterals;
         IRI subsetType;
-        String subsetId;
+		Value subsetId;
         long threshold, setCounter, subsetCounter;
         HBaseSail sail;
 
@@ -124,7 +124,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             statsContext = ssf.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String gc = conf.get(GRAPH_CONTEXT);
             if (gc != null) graphContext = ssf.createIRI(gc);
-            statsContextHash = HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(statsContext).getBytes(UTF8));
+			statsContextHash = HalyardTableUtils.hashKey(statsContext);
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, byte[] target) {
@@ -150,6 +150,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
+			List<Statement> stmts = null;
             int hashShift;
             if (region < HalyardTableUtils.CSPO_PREFIX) {
                 hashShift = 1;
@@ -157,13 +158,8 @@ public final class HalyardStats extends AbstractHalyardTool {
                 hashShift = HalyardTableUtils.KEY_SIZE + 1;
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 1, lastCtxFragment) || region != lastRegion) {
                     cleanup(output);
-                    Cell c[] = value.rawCells();
-                    ByteBuffer bb = ByteBuffer.wrap(c[0].getQualifierArray(), c[0].getQualifierOffset(), c[0].getQualifierLength());
-                    int skip = bb.getInt() + bb.getInt() + bb.getInt();
-                    bb.position(bb.position() + skip);
-                    byte[] cb = new byte[bb.remaining()];
-                    bb.get(cb);
-                    graph = NTriplesUtil.parseURI(new String(cb,UTF8), ssf);
+					stmts = HalyardTableUtils.parseStatements(value, ssf);
+					graph = (IRI) stmts.get(0).getContext();
                 }
                 if (update && region == HalyardTableUtils.CSPO_PREFIX) {
                     if (Arrays.equals(statsContextHash, lastCtxFragment)) {
@@ -172,7 +168,10 @@ public final class HalyardStats extends AbstractHalyardTool {
                             sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
                             sail.initialize();
                         }
-                        for (Statement st : HalyardTableUtils.parseStatements(value, SVF)) {
+						if (stmts == null) {
+							stmts = HalyardTableUtils.parseStatements(value, ssf);
+						}
+						for (Statement st : stmts) {
                             if (statsContext.equals(st.getContext()) && matchingGraphContext(st.getSubject())) {
                                 sail.removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
                                 removed++;
@@ -186,40 +185,37 @@ public final class HalyardStats extends AbstractHalyardTool {
             boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, lastKeyFragment) || region != lastRegion || lastGraph != graph;
             if (hashChange) {
                 cleanupSubset(output);
-                Cell c = value.rawCells()[0];
-                ByteBuffer bb = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
-                byte[] sb = new byte[bb.getInt()];
-                byte[] pb = new byte[bb.getInt()];
-                byte[] ob = new byte[bb.getInt()];
-                bb.get(sb);
-                bb.get(pb);
-                bb.get(ob);
+				if (stmts == null) {
+					stmts = HalyardTableUtils.parseStatements(value, ssf);
+				}
+				Statement stmt = stmts.get(0);
                 switch (region) {
                     case HalyardTableUtils.SPO_PREFIX:
                     case HalyardTableUtils.CSPO_PREFIX:
                         distinctSubjects++;
-                        if (sb[0] == '<') {
+                        Resource subj = stmt.getSubject();
+                        if (subj instanceof IRI) {
                             distinctIRIReferenceSubjects++;
                         } else {
                             distinctBlankNodeSubjects++;
                         }
                         subsetType = VOID_EXT.SUBJECT;
-                        subsetId = new String(sb, UTF8);
+                        subsetId = subj;
                         break;
                     case HalyardTableUtils.POS_PREFIX:
                     case HalyardTableUtils.CPOS_PREFIX:
                         properties++;
                         subsetType = VOID.PROPERTY;
-                        subsetId = new String(pb, UTF8);
+                        subsetId = stmt.getPredicate();
                         break;
                     case HalyardTableUtils.OSP_PREFIX:
                     case HalyardTableUtils.COSP_PREFIX:
                         distinctObjects++;
-                        String obj = new String(ob, UTF8);
-                        if (ob[0] == '<') {
-                            distinctIRIReferenceObjects++;
-                        } else if (obj.startsWith("_:")) {
-                            distinctBlankNodeObjects++;
+                        Value obj = stmt.getObject();
+                        if (obj instanceof IRI) {
+                        	distinctIRIReferenceObjects++;
+                        } else if (obj instanceof BNode) {
+                        	distinctBlankNodeObjects++;
                         } else {
                             distinctLiterals++;
                         }
@@ -252,7 +248,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             }
         }
 
-        private void report(Context output, IRI property, String partitionId, long value) throws IOException, InterruptedException {
+		private void report(Context output, IRI property, Value partitionId, long value) throws IOException, InterruptedException {
             if (value > 0 && (graphContext == null || graphContext.equals(graph))) {
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 try (DataOutputStream dos = new DataOutputStream(baos)) {
@@ -261,7 +257,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                     if (partitionId == null) {
                         dos.writeInt(0);
                     } else {
-                        byte b[] = partitionId.getBytes(UTF8);
+						byte b[] = HalyardTableUtils.writeBytes(partitionId);
                         dos.writeInt(b.length);
                         dos.write(b);
                     }
@@ -411,11 +407,12 @@ public final class HalyardStats extends AbstractHalyardTool {
                     }
                 }
                 if (partitionId.length > 0) {
+					Value partition = HalyardTableUtils.readValue(partitionId, SVF);
                     IRI pred = SVF.createIRI(predicate);
-                    IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(partitionId)));
+					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(partition)));
                     writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);
                     writeStatement(subset, RDF.TYPE, VOID.DATASET);
-                    writeStatement(subset, pred, NTriplesUtil.parseValue(new String(partitionId, UTF8), SVF));
+					writeStatement(subset, pred, partition);
                     writeStatement(subset, VOID.TRIPLES, SVF.createLiteral(count));
                 } else {
                     writeStatement(graphNode, SVF.createIRI(predicate), SVF.createLiteral(count));
@@ -499,12 +496,12 @@ public final class HalyardStats extends AbstractHalyardTool {
         scan.setAllowPartialResults(true);
         if (graphContext != null) { //restricting stats to scan given graph context only
             List<RowRange> ranges = new ArrayList<>();
-            byte[] gcHash = HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(SimpleValueFactory.getInstance().createIRI(graphContext)).getBytes(UTF8));
+			byte[] gcHash = HalyardTableUtils.hashKey(SimpleValueFactory.getInstance().createIRI(graphContext));
             ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX, gcHash));
             ranges.add(rowRange(HalyardTableUtils.CPOS_PREFIX, gcHash));
             ranges.add(rowRange(HalyardTableUtils.COSP_PREFIX, gcHash));
             if (target == null) { //add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
-                ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX, HalyardTableUtils.hashKey(NTriplesUtil.toNTriplesString(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SimpleValueFactory.getInstance().createIRI(targetGraph)).getBytes(UTF8))));
+				ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX, HalyardTableUtils.hashKey(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SimpleValueFactory.getInstance().createIRI(targetGraph))));
             }
             scan.setFilter(new MultiRowRangeFilter(ranges));
         }
