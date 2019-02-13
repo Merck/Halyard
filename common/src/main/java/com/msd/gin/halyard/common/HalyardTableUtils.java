@@ -255,10 +255,10 @@ public final class HalyardTableUtils {
      * @return array of KeyValues
      */
     public static KeyValue[] toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, long timestamp) {
-        byte[] sb = NTriplesUtil.toNTriplesString(subj).getBytes(UTF8); //subject bytes
-        byte[] pb = NTriplesUtil.toNTriplesString(pred).getBytes(UTF8); //predicate bytes
-        byte[] ob = NTriplesUtil.toNTriplesString(obj).getBytes(UTF8);  //object bytes
-        byte[] cb = context == null ? new byte[0] : NTriplesUtil.toNTriplesString(context).getBytes(UTF8); // context (graph) bytes
+		byte[] sb = writeBytes(subj); // subject bytes
+		byte[] pb = writeBytes(pred); // predicate bytes
+		byte[] ob = writeBytes(obj); // object bytes
+		byte[] cb = context == null ? new byte[0] : writeBytes(context); // context (graph) bytes
         byte[] sKey = hashKey(sb);  //subject key
         byte[] pKey = hashKey(pb);  //predicate key
         byte[] oKey = hashKey(ob);  //object key
@@ -403,14 +403,14 @@ public final class HalyardTableUtils {
         bb.get(ob);
         byte[] cb = new byte[bb.remaining()];
         bb.get(cb);
-        Resource subj = NTriplesUtil.parseResource(new String(sb, UTF8), vf);
-        IRI pred = NTriplesUtil.parseURI(new String(pb, UTF8), vf);
-        Value value = NTriplesUtil.parseValue(new String(ob,UTF8), vf);
+        Resource subj = readResource(sb, vf);
+        IRI pred = readIRI(pb, vf);
+        Value value = readValue(ob, vf);
 		Statement stmt;
 		if (cb.length == 0) {
 			stmt = vf.createStatement(subj, pred, value);
 		} else {
-			Resource context = NTriplesUtil.parseResource(new String(cb, UTF8), vf);
+			Resource context = readResource(cb, vf);
 			stmt = vf.createStatement(subj, pred, value, context);
 		}
 		return stmt;
@@ -486,7 +486,7 @@ public final class HalyardTableUtils {
     }
 
     public static byte[] hashKey(Value v) {
-        return v == null ? null : hashKey(NTriplesUtil.toNTriplesString(v).getBytes(UTF8));
+		return v == null ? null : hashKey(writeBytes(v));
     }
 
     public static String encode(byte b[]) {
@@ -507,5 +507,21 @@ public final class HalyardTableUtils {
 
     private static Scan scan(byte prefix, byte[] key1, byte[] key2, byte[] key3, byte[] key4) {
         return scan(concat(prefix, false, key1, key2, key3, key4), concat(prefix, true, key1, key2, key3, key4));
+    }
+
+    public static byte[] writeBytes(Value v) {
+    	return NTriplesUtil.toNTriplesString(v).getBytes(UTF8);
+    }
+
+    public static Value readValue(byte[] b, ValueFactory vf) {
+    	return NTriplesUtil.parseValue(new String(b, UTF8), vf);
+    }
+
+    public static Resource readResource(byte[] b, ValueFactory vf) {
+    	return NTriplesUtil.parseResource(new String(b, UTF8), vf);
+    }
+
+    public static IRI readIRI(byte[] b, ValueFactory vf) {
+    	return NTriplesUtil.parseURI(new String(b, UTF8), vf);
     }
 }
