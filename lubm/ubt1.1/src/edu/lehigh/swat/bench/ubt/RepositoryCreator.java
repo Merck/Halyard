@@ -1,0 +1,43 @@
+/**
+ * by Yuanbo Guo
+ * Semantic Web and Agent Technology Lab, CSE Department, Lehigh University, USA
+ * Copyright (C) 2004
+ *
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+ * Place, Suite 330, Boston, MA 02111-1307 USA
+ */
+
+package edu.lehigh.swat.bench.ubt;
+
+import java.util.*;
+import edu.lehigh.swat.bench.ubt.api.*;
+
+public abstract class RepositoryCreator {
+  /**
+   * Creates the Repository object from the specified repository factory class name.
+   * @param factoryName Name of the repository factory class.
+   * @return The created Repository object, null if the specified class name is invalid.
+   */
+  protected static Repository createRepository(String factoryName) {
+    RepositoryFactory factory;
+    try {
+      factory = (RepositoryFactory)Class.forName(factoryName).newInstance();
+      return factory.create();
+    }
+    catch(Exception e)
+    {
+      e.printStackTrace();
+      return null;
+    }
+  }
+}

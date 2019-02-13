@@ -1,0 +1,13 @@
+# [repository ID]
+# class=<repository factory class>
+# data=<directory where the test data reside>
+# database=<database where the data are stored>
+# ontology=<url of univ-bench ontology> 
+
+# 1000-university
+[HALYARD_1000]
+class=com.msd.gin.halyard.lubm.HalyardRepositoryFactory
+data=e:/SW/ubt/testdata/lubm_owl_0_0
+# HBase table name
+database=lubm_1000
+ontology=file:univ-bench.owl
