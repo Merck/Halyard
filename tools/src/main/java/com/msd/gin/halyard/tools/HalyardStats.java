@@ -71,6 +71,7 @@ import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+import org.eclipse.rdf4j.sail.SailConnection;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HALYARD;
@@ -115,6 +116,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 		Value subsetId;
         long threshold, setCounter, subsetCounter;
         HBaseSail sail;
+		SailConnection conn;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -167,13 +169,14 @@ public final class HalyardStats extends AbstractHalyardTool {
                             Configuration conf = output.getConfiguration();
                             sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
                             sail.initialize();
+							conn = sail.getConnection();
                         }
 						if (stmts == null) {
 							stmts = HalyardTableUtils.parseStatements(value, ssf);
 						}
 						for (Statement st : stmts) {
                             if (statsContext.equals(st.getContext()) && matchingGraphContext(st.getSubject())) {
-                                sail.removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+								conn.removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
                                 removed++;
                             }
                         }
@@ -302,8 +305,10 @@ public final class HalyardStats extends AbstractHalyardTool {
             distinctLiterals = 0;
             cleanupSubset(output);
             if (sail != null) {
-                sail.commit();
-                sail.close();
+				conn.commit();
+				conn.close();
+				conn = null;
+				sail.shutDown();
                 sail = null;
             }
         }
@@ -328,6 +333,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         Map<String, Boolean> graphs;
         IRI statsGraphContext;
         HBaseSail sail;
+		SailConnection conn;
         long removed = 0, added = 0;
 
         @Override
@@ -338,10 +344,11 @@ public final class HalyardStats extends AbstractHalyardTool {
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
                 sail.initialize();
-                sail.setNamespace(SD.PREFIX, SD.NAMESPACE);
-                sail.setNamespace(VOID.PREFIX, VOID.NAMESPACE);
-                sail.setNamespace(VOID_EXT.PREFIX, VOID_EXT.NAMESPACE);
-                sail.setNamespace(HALYARD.PREFIX, HALYARD.NAMESPACE);
+				conn = sail.getConnection();
+				conn.setNamespace(SD.PREFIX, SD.NAMESPACE);
+				conn.setNamespace(VOID.PREFIX, VOID.NAMESPACE);
+				conn.setNamespace(VOID_EXT.PREFIX, VOID_EXT.NAMESPACE);
+				conn.setNamespace(HALYARD.PREFIX, HALYARD.NAMESPACE);
             } else {
                 targetUrl = MessageFormat.format(targetUrl, context.getTaskAttemptID().getTaskID().getId());
                 out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
@@ -375,7 +382,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         }
 
         @Override
-	public void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
+        public void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
             long count = 0;
             for (LongWritable val : values) {
                     count += val.get();
@@ -421,11 +428,11 @@ public final class HalyardStats extends AbstractHalyardTool {
                     context.setStatus(MessageFormat.format("statements removed: {0} added: {1}", removed, added));
                 }
             }
-	}
+        }
 
         private void writeStatement(Resource subj, IRI pred, Value obj) {
             if (writer == null) {
-                sail.addStatement(subj, pred, obj, statsGraphContext);
+				conn.addStatement(subj, pred, obj, statsGraphContext);
             } else {
                 writer.handleStatement(SVF.createStatement(subj, pred, obj, statsGraphContext));
             }
@@ -435,8 +442,9 @@ public final class HalyardStats extends AbstractHalyardTool {
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
             if (writer == null) {
-                sail.commit();
-                sail.close();
+				conn.commit();
+				conn.close();
+				sail.shutDown();
             } else {
                 writer.endRDF();
                 out.close();

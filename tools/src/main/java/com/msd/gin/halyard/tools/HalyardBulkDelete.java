@@ -16,23 +16,26 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.yammer.metrics.core.Gauge;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
 import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
@@ -53,6 +56,9 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.yammer.metrics.core.Gauge;
 
 /**
  *
@@ -194,12 +200,16 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         job.setSpeculativeExecution(false);
         job.setMapSpeculativeExecution(false);
         job.setReduceSpeculativeExecution(false);
-        try (HTable hTable = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
-            HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
+		Connection conn = HalyardTableUtils.getConnection(getConf());
+		try (Table hTable = HalyardTableUtils.getTable(conn, source, false, 0)) {
+			RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());
+			HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), regionLocator);
             FileOutputFormat.setOutputPath(job, new Path(cmd.getOptionValue('f')));
             TableMapReduceUtil.addDependencyJars(job);
             if (job.waitForCompletion(true)) {
-                new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(cmd.getOptionValue('f')), hTable);
+				try (Admin admin = conn.getAdmin()) {
+					new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(cmd.getOptionValue('f')), admin, hTable, regionLocator);
+				}
                 LOG.info("Bulk Delete Completed..");
                 return 0;
             }

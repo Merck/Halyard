@@ -16,9 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HALYARD;
-import static com.msd.gin.halyard.tools.AbstractHalyardTool.LOG;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,6 +27,7 @@ import java.util.Optional;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -39,7 +37,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.RegionLocator;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
 import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
@@ -77,6 +78,9 @@ import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 import org.eclipse.rdf4j.rio.helpers.NTriplesParserSettings;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.rio.turtle.TurtleParser;
+
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.sail.HALYARD;
 
 /**
  * Apache Hadoop MapReduce Tool for bulk loading RDF into HBase
@@ -553,8 +557,10 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         job.setInputFormatClass(RioFileInputFormat.class);
         job.setSpeculativeExecution(false);
         job.setReduceSpeculativeExecution(false);
-        try (HTable hTable = HalyardTableUtils.getTable(getConf(), target, true, getConf().getInt(SPLIT_BITS_PROPERTY, 3))) {
-            HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
+		Connection conn = HalyardTableUtils.getConnection(getConf());
+		try (Table hTable = HalyardTableUtils.getTable(conn, target, true, getConf().getInt(SPLIT_BITS_PROPERTY, 3))) {
+			RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());
+			HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), regionLocator);
             FileInputFormat.setInputDirRecursive(job, true);
             FileInputFormat.setInputPaths(job, source);
             FileOutputFormat.setOutputPath(job, new Path(workdir));
@@ -562,9 +568,12 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
             TableMapReduceUtil.initCredentials(job);
             if (job.waitForCompletion(true)) {
                 if (getConf().getBoolean(TRUNCATE_PROPERTY, false)) {
-                    HalyardTableUtils.truncateTable(hTable).close();
+					HalyardTableUtils.truncateTable(conn, hTable);
+					hTable.close();
                 }
-                new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(workdir), hTable);
+				try (Admin admin = conn.getAdmin()) {
+					new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(workdir), admin, hTable, regionLocator);
+				}
                 LOG.info("Bulk Load Completed..");
                 return 0;
             }

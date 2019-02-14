@@ -109,8 +109,6 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                     new HBaseSail(getConf(), table, false, 0, true, timeout, elasticIndexURL, null));
             rep.initialize();
             try {
-                SailRepositoryConnection connection = rep.getConnection();
-                connection.begin();
                 Properties storedQueries = new Properties();
                 if (cmd.hasOption('q')) {
                     try (FileInputStream in = new FileInputStream(cmd.getOptionValue('q'))) {
@@ -123,7 +121,7 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                         writerConfig.load(in);
                     }
                 }
-                HttpSparqlHandler handler = new HttpSparqlHandler(connection, storedQueries, writerConfig, verbose);
+                HttpSparqlHandler handler = new HttpSparqlHandler(rep, storedQueries, writerConfig, verbose);
                 SimpleHttpServer server = new SimpleHttpServer(port, CONTEXT, handler);
                 server.start();
                 try {

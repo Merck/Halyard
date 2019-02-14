@@ -16,8 +16,8 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.HalyardTableUtils;
+import static org.junit.Assert.assertTrue;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -28,15 +28,22 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
+import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.sail.SailConnection;
+import org.eclipse.rdf4j.sail.SailException;
 import org.junit.AfterClass;
-import static org.junit.Assert.assertTrue;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.HalyardTableUtils;
 
 /**
  *
@@ -70,9 +77,13 @@ public class LiteralSearchStatementScannerTest implements Runnable {
         t.setDaemon(true);
         t.start();
         IRI whatever = SimpleValueFactory.getInstance().createIRI("http://whatever");
-        hbaseSail.addStatement(whatever, whatever, val);
-        hbaseSail.commit();
-        assertTrue(hbaseSail.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("what", HALYARD.SEARCH_TYPE),  true).hasNext());
+		try (SailConnection conn = hbaseSail.getConnection()) {
+			conn.addStatement(whatever, whatever, val);
+			conn.commit();
+			try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("what", HALYARD.SEARCH_TYPE), true)) {
+				assertTrue(iter.hasNext());
+			}
+		}
     }
 
     @Override

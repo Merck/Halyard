@@ -16,12 +16,9 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HBaseSail;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,6 +26,7 @@ import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+
 import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.commons.codec.binary.Hex;
@@ -36,9 +34,16 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.json.JSONObject;
-import static org.junit.Assert.*;
 import org.junit.Test;
+
+import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.sail.HBaseSail;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
 
 /**
  *
@@ -51,11 +56,12 @@ public class HalyardElasticIndexerTest {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "elasticTable", true, 0, true, 0, null, null);
         sail.initialize();
         ValueFactory vf = SimpleValueFactory.getInstance();
-        for (int i = 0; i < 100; i++) {
-            sail.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i),  vf.createLiteral("whatever NT value " + i), (i % 4 == 0) ? null : vf.createIRI("http://whatever/graph#"+(i%4)));
-        }
-        sail.commit();
-        sail.close();
+		try (SailConnection conn = sail.getConnection()) {
+			for (int i = 0; i < 100; i++) {
+				conn.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i), vf.createLiteral("whatever NT value " + i), (i % 4 == 0) ? null : vf.createIRI("http://whatever/graph#" + (i % 4)));
+			}
+			conn.commit();
+		}
         testElasticIndexer(false);
         testElasticIndexer(true);
     }

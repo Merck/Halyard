@@ -16,27 +16,33 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.HalyardTableUtils;
+import static org.junit.Assert.assertEquals;
+
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
+
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.AfterClass;
-import static org.junit.Assert.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+
+import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.HalyardTableUtils;
 
 /**
  *
@@ -45,7 +51,7 @@ import org.junit.runners.Parameterized;
 @RunWith(Parameterized.class)
 public class HBaseSailHashConflictTest {
 
-    private static final Resource SUBJ = SimpleValueFactory.getInstance().createURI("http://testConflictingHash/subject1/");
+	private static final Resource SUBJ = SimpleValueFactory.getInstance().createIRI("http://testConflictingHash/subject1/");
     private static final IRI PRED = SimpleValueFactory.getInstance().createIRI("http://testConflictingHash/pred1/");
     private static final Value OBJ = SimpleValueFactory.getInstance().createLiteral("literal1");
     private static final IRI CONF = SimpleValueFactory.getInstance().createIRI("http://testConflictingHash/conflict/");
@@ -71,7 +77,7 @@ public class HBaseSailHashConflictTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        try (HTable table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", true, 0)) {
+		try (Table table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", true, 0)) {
             long timestamp = System.currentTimeMillis();
             KeyValue triple[] = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp);
             KeyValue conflicts[][] = new KeyValue[][] {
@@ -83,19 +89,20 @@ public class HBaseSailHashConflictTest {
                 HalyardTableUtils.toKeyValues(CONF, CONF,  OBJ, null, false, timestamp),
                 HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null, false, timestamp),
             };
+			List<Put> puts = new ArrayList<>();
             for (int i=0; i<triple.length; i++) {
                 KeyValue kv = triple[i];
-                table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
+				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
                 for (int j=0; j<conflicts.length; j++) {
                     KeyValue xkv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(),
                             kv.getFamilyArray(), kv.getFamilyOffset(), kv.getFamilyLength(),
                             conflicts[j][i].getQualifierArray(), conflicts[j][i].getQualifierOffset(), conflicts[j][i].getQualifierLength(),
                             kv.getTimestamp(), KeyValue.Type.Put,
                             conflicts[j][i].getValueArray(), conflicts[j][i].getValueOffset(), conflicts[j][i].getValueLength());
-                    table.put(new Put(xkv.getRowArray(), xkv.getRowOffset(), xkv.getRowLength(), xkv.getTimestamp()).add(xkv));
+					puts.add(new Put(xkv.getRowArray(), xkv.getRowOffset(), xkv.getRowLength(), xkv.getTimestamp()).add(xkv));
                 }
             }
-            table.flushCommits();
+			table.put(puts);
         }
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", false, 0, true, 0, null, null);
         sail.initialize();
@@ -120,15 +127,14 @@ public class HBaseSailHashConflictTest {
 
     @Test
     public void testConflictingHash() throws Exception {
-        CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(subj, pred, obj, true);
-        HashSet<Statement> res = new HashSet<>();
-        try {
-            while (iter.hasNext()) {
-                res.add(iter.next());
-            }
-        } finally {
-            iter.close();
-        }
-        assertEquals(results, res.size());
+		try (SailConnection conn = sail.getConnection()) {
+			try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(subj, pred, obj, true)) {
+				HashSet<Statement> res = new HashSet<>();
+				while (iter.hasNext()) {
+					res.add(iter.next());
+				}
+				assertEquals(results, res.size());
+			}
+		}
     }
 }

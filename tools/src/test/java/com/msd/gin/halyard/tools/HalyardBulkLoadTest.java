@@ -16,12 +16,15 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.sail.HBaseSail;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.util.zip.GZIPOutputStream;
+
 import org.apache.commons.cli.MissingOptionException;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.Literal;
@@ -30,8 +33,11 @@ import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-import static org.junit.Assert.*;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.junit.Test;
+
+import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.sail.HBaseSail;
 
 /**
  *
@@ -161,7 +167,9 @@ public class HalyardBulkLoadTest {
 
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable2", false, 0, true, 30, null, null);
         sail.initialize();
-        assertEquals(3, sail.size());
+		try (SailConnection conn = sail.getConnection()) {
+			assertEquals(3, conn.size());
+		}
         sail.shutDown();
     }
 

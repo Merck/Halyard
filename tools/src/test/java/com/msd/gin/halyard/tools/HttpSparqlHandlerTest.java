@@ -21,6 +21,7 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
@@ -108,14 +109,15 @@ public class HttpSparqlHandlerTest {
         repository.initialize();
 
         // Create repositoryConnection to the sail repository
-        repositoryConnection = repository.getConnection();
-        repositoryConnection.begin();
-
-        // Add some test data
-        repositoryConnection.add(factory.createStatement(SUBJ, PRED, OBJ, CONTEXT));
-        repositoryConnection.add(factory.createStatement(SUBJ2, PRED2, OBJ2, CONTEXT2));
-        repositoryConnection.add(factory.createStatement(SUBJ3, PRED3, OBJ3, CONTEXT3));
-        repositoryConnection.commit();
+        try(RepositoryConnection repositoryConnection = repository.getConnection()) {
+	        repositoryConnection.begin();
+	
+	        // Add some test data
+	        repositoryConnection.add(factory.createStatement(SUBJ, PRED, OBJ, CONTEXT));
+	        repositoryConnection.add(factory.createStatement(SUBJ2, PRED2, OBJ2, CONTEXT2));
+	        repositoryConnection.add(factory.createStatement(SUBJ3, PRED3, OBJ3, CONTEXT3));
+	        repositoryConnection.commit();
+        }
 
         // Provide stored query
         Properties storedQueries = new Properties();
@@ -127,7 +129,7 @@ public class HttpSparqlHandlerTest {
         writerCfg.put("org.eclipse.rdf4j.rio.helpers.JSONLDSettings.JSONLD_MODE", "org.eclipse.rdf4j.rio.helpers.JSONLDMode.COMPACT");
 
         // Create handler with the repositoryConnection to the sail repository
-        HttpSparqlHandler handler = new HttpSparqlHandler(repositoryConnection, storedQueries, writerCfg, true);
+        HttpSparqlHandler handler = new HttpSparqlHandler(repository, storedQueries, writerCfg, true);
 
         // Create and start http server
         server = new SimpleHttpServer(PORT, SERVER_CONTEXT, handler);

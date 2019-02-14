@@ -16,8 +16,10 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.sail.HBaseSail;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -28,21 +30,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+
 import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Model;
+import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.Rio;
-import static org.junit.Assert.*;
-import org.eclipse.rdf4j.model.Resource;
-import org.eclipse.rdf4j.model.vocabulary.RDFS;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.junit.Test;
+
+import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.sail.HBaseSail;
 
 /**
  *
@@ -74,13 +79,14 @@ public class HalyardSummaryTest {
         for (int i = 0; i < literals.length; i++) {
             literals[i] = svf.createLiteral("0", literalTypes[r.nextInt(literalTypes.length)]);
         }
-        try (HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "summaryTable", true, -1, true, 0, null, null)) {
-            sail.initialize();
+		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "summaryTable", true, -1, true, 0, null, null);
+		sail.initialize();
+		try (SailConnection conn = sail.getConnection()) {
             for (IRI instance : instances) {
                 Collection<IRI> clsC = new ArrayList<>();
                 for (IRI clazz : classes) {
                     if (r.nextBoolean()) {
-                        sail.addStatement(instance, RDF.TYPE, clazz);
+						conn.addStatement(instance, RDF.TYPE, clazz);
                         clsC.add(clazz);
                         classCardinalities.put(clazz, classCardinalities.getOrDefault(clazz, 0) + 1);
                     }
@@ -91,7 +97,7 @@ public class HalyardSummaryTest {
                 for (IRI predicate : predicates) {
                     if (r.nextBoolean()) {
                         Literal l =literals[r.nextInt(literals.length)];
-                        sail.addStatement(instance, predicate, l);
+						conn.addStatement(instance, predicate, l);
                         predicateCardinalities.put(predicate, predicateCardinalities.getOrDefault(predicate, 0) + 1);
                         for (IRI domainClass: classMap.getOrDefault(instance, Collections.emptySet())) {
                             List<IRI> keys = new ArrayList<>(2);
@@ -111,7 +117,7 @@ public class HalyardSummaryTest {
                     }
                     if (r.nextBoolean()) {
                         IRI otherInstance = instances[r.nextInt(instances.length)];
-                        sail.addStatement(instance, predicate, otherInstance);
+						conn.addStatement(instance, predicate, otherInstance);
                         predicateCardinalities.put(predicate, predicateCardinalities.getOrDefault(predicate, 0) + 1);
                         for (IRI domainClass: classMap.getOrDefault(instance, Collections.emptySet())) {
                             List<IRI> keys = new ArrayList<>(2);
@@ -135,8 +141,9 @@ public class HalyardSummaryTest {
                     }
                 }
             }
-            sail.commit();
+			conn.commit();
         }
+		sail.shutDown();
 
         File summary = File.createTempFile("summary", ".trig");
         final IRI namedGraph = svf.createIRI("http://whatever/summary");

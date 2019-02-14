@@ -16,22 +16,22 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HALYARD;
-import com.msd.gin.halyard.sail.HBaseSail;
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY;
-import com.msd.gin.halyard.tools.TimeAwareHBaseSail.TimestampCallbackBinding;
-import com.yammer.metrics.core.Gauge;
+
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
-
+import org.apache.hadoop.hbase.client.RegionLocator;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
 import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
@@ -59,6 +59,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
 import org.eclipse.rdf4j.query.parser.ParsedUpdate;
 import org.eclipse.rdf4j.query.parser.QueryParserUtil;
+import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
@@ -69,7 +70,14 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
+
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.sail.HALYARD;
+import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.tools.TimeAwareHBaseSailConnection.TimestampCallbackBinding;
+import com.yammer.metrics.core.Gauge;
 
 /**
  * Apache Hadoop MapReduce tool for performing SPARQL Graph construct queries and then bulk loading the results back into HBase. Essentially, batch process queries
@@ -136,70 +144,74 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                 Function fn = new ParallelSplitFunction(qis.getRepeatIndex());
                 FunctionRegistry.getInstance().add(fn);
                 try {
-                    final HBaseSail sail = new TimeAwareHBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL, new HBaseSail.Ticker() {
+					final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL, new HBaseSail.Ticker() {
                         @Override
                         public void tick() {
                             context.progress();
                         }
-                    }) {
-                        @Override
-                        protected void put(KeyValue kv) throws IOException {
-                            try {
-                                context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
-                            } catch (InterruptedException ex) {
-                                throw new IOException(ex);
-                            }
-                            if (added.incrementAndGet() % 1000l == 0) {
-                                context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-                                LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
-                            }
-                        }
+					}, new HBaseSail.ConnectionFactory() {
+						@Override
+						public SailConnection createConnection(HBaseSail sail) {
+							return new TimeAwareHBaseSailConnection(sail) {
+								@Override
+								protected void put(KeyValue kv) throws IOException {
+									try {
+										context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
+									} catch (InterruptedException ex) {
+										throw new IOException(ex);
+									}
+									if (added.incrementAndGet() % 1000l == 0) {
+										context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
+										LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] { added.get(), removed.get() });
+									}
+								}
 
-                        @Override
-                        protected void delete(KeyValue kv) throws IOException {
-                            kv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), (int) kv.getRowLength(),
-                                    kv.getFamilyArray(), kv.getFamilyOffset(), (int) kv.getFamilyLength(),
-                                    kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength(),
-                                    kv.getTimestamp(), KeyValue.Type.DeleteColumn, kv.getValueArray(), kv.getValueOffset(),
-                                    kv.getValueLength(), kv.getTagsArray(), kv.getTagsOffset(), kv.getTagsLength());
-                            try {
-                                context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
-                            } catch (InterruptedException ex) {
-                                throw new IOException(ex);
-                            }
-                            if (added.incrementAndGet() % 1000l == 0) {
-                                context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-                                LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
-                            }
-                        }
+								@Override
+								protected void delete(KeyValue kv) throws IOException {
+									kv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), (int) kv.getRowLength(), kv.getFamilyArray(), kv.getFamilyOffset(), (int) kv.getFamilyLength(), kv.getQualifierArray(), kv.getQualifierOffset(),
+											kv.getQualifierLength(), kv.getTimestamp(), KeyValue.Type.DeleteColumn, kv.getValueArray(), kv.getValueOffset(), kv.getValueLength(), kv.getTagsArray(), kv.getTagsOffset(),
+											kv.getTagsLength());
+									try {
+										context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
+									} catch (InterruptedException ex) {
+										throw new IOException(ex);
+									}
+									if (added.incrementAndGet() % 1000l == 0) {
+										context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
+										LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] { added.get(), removed.get() });
+									}
+								}
 
-                        @Override
-                        protected long getDefaultTimeStamp() {
-                            return defaultTimestamp;
-                        }
+								@Override
+								protected long getDefaultTimeStamp() {
+									return defaultTimestamp;
+								}
 
-                        @Override
-                        public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
-                            contexts = normalizeContexts(contexts);
-                            try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
-                                while (iter.hasNext()) {
-                                    Statement st = iter.next();
-                                    removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
-                                }
-                            }
-                        }
-                    };
+								@Override
+								public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
+									contexts = normalizeContexts(contexts);
+									try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
+										while (iter.hasNext()) {
+											Statement st = iter.next();
+											removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+										}
+									}
+								}
+							};
+						}
+					});
                     SailRepository rep = new SailRepository(sail);
                     try {
                         rep.initialize();
-                        SailRepositoryConnection con = rep.getConnection();
-                        Update upd = new SailUpdate(singleUpdate, con){};
-                        ((MapBindingSet)upd.getBindings()).addBinding(new TimestampCallbackBinding());
-                        LOG.log(Level.INFO, "Execution of: {0}", query);
-                        context.setStatus(name);
-                        upd.execute();
-                        context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-                        LOG.log(Level.INFO, "Query finished with {0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
+                        try(SailRepositoryConnection con = rep.getConnection()) {
+	                        Update upd = new SailUpdate(singleUpdate, con){};
+	                        ((MapBindingSet)upd.getBindings()).addBinding(new TimestampCallbackBinding());
+	                        LOG.log(Level.INFO, "Execution of: {0}", query);
+	                        context.setStatus(name);
+	                        upd.execute();
+	                        context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
+	                        LOG.log(Level.INFO, "Query finished with {0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
+                        }
                     } finally {
                         rep.shutDown();
                     }
@@ -260,8 +272,10 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
             job.setInputFormatClass(QueryInputFormat.class);
             job.setSpeculativeExecution(false);
             job.setReduceSpeculativeExecution(false);
-            try (HTable hTable = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
-                HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
+			Connection conn = HalyardTableUtils.getConnection(getConf());
+			try (Table hTable = HalyardTableUtils.getTable(conn, source, false, 0)) {
+				RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());
+				HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), regionLocator);
                 QueryInputFormat.setQueriesFromDirRecursive(job.getConfiguration(), queryFiles, true, stage);
                 Path outPath = new Path(workdir, "stage"+stage);
                 FileOutputFormat.setOutputPath(job, outPath);
@@ -279,7 +293,9 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                     LOG.log(Level.INFO, "Bulk Update will process {0} MapReduce stages.", stages);
                 }
                 if (job.waitForCompletion(true)) {
-                    new LoadIncrementalHFiles(getConf()).doBulkLoad(outPath, hTable);
+					try (Admin admin = conn.getAdmin()) {
+						new LoadIncrementalHFiles(getConf()).doBulkLoad(outPath, admin, hTable, regionLocator);
+					}
                     LOG.log(Level.INFO, "Stage #{0} of {1} completed..", new Object[]{stage, stages});
                 } else {
                     return -1;

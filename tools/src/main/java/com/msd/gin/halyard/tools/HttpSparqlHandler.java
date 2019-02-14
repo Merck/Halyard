@@ -16,34 +16,63 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.sun.net.httpserver.Headers;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
+import java.io.BufferedOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.Scanner;
+import java.util.StringTokenizer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.activation.MimeType;
+import javax.activation.MimeTypeParseException;
+
+import org.apache.commons.lang.StringUtils;
 import org.eclipse.rdf4j.RDF4JException;
 import org.eclipse.rdf4j.common.lang.FileFormat;
 import org.eclipse.rdf4j.common.lang.service.FileFormatServiceRegistry;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.eclipse.rdf4j.query.*;
+import org.eclipse.rdf4j.query.BooleanQuery;
+import org.eclipse.rdf4j.query.Dataset;
+import org.eclipse.rdf4j.query.GraphQuery;
+import org.eclipse.rdf4j.query.QueryLanguage;
+import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.impl.SimpleDataset;
-import org.eclipse.rdf4j.query.resultio.*;
-import org.eclipse.rdf4j.repository.sail.*;
+import org.eclipse.rdf4j.query.resultio.BooleanQueryResultFormat;
+import org.eclipse.rdf4j.query.resultio.BooleanQueryResultWriter;
+import org.eclipse.rdf4j.query.resultio.BooleanQueryResultWriterRegistry;
+import org.eclipse.rdf4j.query.resultio.QueryResultFormat;
+import org.eclipse.rdf4j.query.resultio.TupleQueryResultFormat;
+import org.eclipse.rdf4j.query.resultio.TupleQueryResultWriter;
+import org.eclipse.rdf4j.query.resultio.TupleQueryResultWriterRegistry;
+import org.eclipse.rdf4j.repository.sail.SailBooleanQuery;
+import org.eclipse.rdf4j.repository.sail.SailGraphQuery;
+import org.eclipse.rdf4j.repository.sail.SailQuery;
+import org.eclipse.rdf4j.repository.sail.SailRepository;
+import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
+import org.eclipse.rdf4j.repository.sail.SailTupleQuery;
 import org.eclipse.rdf4j.rio.RDFFormat;
-import org.eclipse.rdf4j.rio.RDFWriterRegistry;
-
-import javax.activation.MimeType;
-import javax.activation.MimeTypeParseException;
-import java.io.*;
-import java.net.URLDecoder;
-import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import org.apache.commons.lang.StringUtils;
 import org.eclipse.rdf4j.rio.RDFWriter;
+import org.eclipse.rdf4j.rio.RDFWriterRegistry;
 import org.eclipse.rdf4j.rio.RioSetting;
 import org.eclipse.rdf4j.rio.WriterConfig;
+
+import com.sun.net.httpserver.Headers;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
 
 /**
  * Handles HTTP requests containing SPARQL queries.
@@ -78,8 +107,8 @@ public final class HttpSparqlHandler implements HttpHandler {
     // Client provides a correct request but service fails to process it (e.g. server failed to send the response)
     private static final int HTTP_INTERNAL_SERVER_ERROR = 500;
 
-    // Connection to the Sail repository
-    private final SailRepositoryConnection connection;
+    // Sail repository
+    private final SailRepository repository;
     // Stored SPARQL queries
     private final Properties storedQueries;
     // Writer config
@@ -88,14 +117,14 @@ public final class HttpSparqlHandler implements HttpHandler {
     private static final Logger LOGGER = Logger.getLogger(HttpSparqlHandler.class.getName());
 
     /**
-     * @param connection       connection to Sail repository
+     * @param rep              Sail repository
      * @param storedQueries    pre-defined stored SPARQL query templates
      * @param writerProperties RDF4J RIO WriterConfig properties
      * @param verbose          true when verbose mode enabled, otherwise false
      */
     @SuppressWarnings("unchecked")
-    public HttpSparqlHandler(SailRepositoryConnection connection, Properties storedQueries, Properties writerProperties, boolean verbose) {
-        this.connection = connection;
+    public HttpSparqlHandler(SailRepository rep, Properties storedQueries, Properties writerProperties, boolean verbose) {
+        this.repository = rep;
         if (!verbose) {
             // Verbose mode disabled --> logs with level lower than WARNING will be discarded
             LOGGER.setLevel(Level.WARNING);
@@ -139,7 +168,9 @@ public final class HttpSparqlHandler implements HttpHandler {
     public void handle(HttpExchange exchange) throws IOException {
         try {
             SparqlQuery sparqlQuery = retrieveQuery(exchange);
-            evaluateQuery(sparqlQuery, exchange);
+        	try(SailRepositoryConnection connection = repository.getConnection()) {
+        		evaluateQuery(connection, sparqlQuery, exchange);
+        	}
         } catch (IllegalArgumentException | RDF4JException e) {
             StringWriter sw = new StringWriter();
             PrintWriter w = new PrintWriter(sw);
@@ -311,7 +342,7 @@ public final class HttpSparqlHandler implements HttpHandler {
      * @throws IOException    If an error occurs during sending response to the client
      * @throws RDF4JException If an error occurs due to illegal SPARQL query (e.g. incorrect syntax)
      */
-    private void evaluateQuery(SparqlQuery sparqlQuery, HttpExchange exchange) throws IOException, RDF4JException {
+    private void evaluateQuery(SailRepositoryConnection connection, SparqlQuery sparqlQuery, HttpExchange exchange) throws IOException, RDF4JException {
         SailQuery query = connection.prepareQuery(QueryLanguage.SPARQL, sparqlQuery.getQuery(), null);
         Dataset dataset = sparqlQuery.getDataset();
         if (!dataset.getDefaultGraphs().isEmpty() || !dataset.getNamedGraphs().isEmpty()) {

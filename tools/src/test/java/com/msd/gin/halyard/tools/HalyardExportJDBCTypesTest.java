@@ -16,8 +16,9 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.sail.HBaseSail;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -26,14 +27,18 @@ import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Date;
+
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.junit.Test;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.junit.BeforeClass;
-import static org.junit.Assert.*;
 import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.TestName;
+
+import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.sail.HBaseSail;
 
 /**
  *
@@ -51,21 +56,23 @@ public class HalyardExportJDBCTypesTest {
         ValueFactory vf = SimpleValueFactory.getInstance();
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, true, 0, true, 0, null, null);
         sail.initialize();
-        for (int i=1; i<10; i++) {
-            sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/date"), vf.createLiteral(new Date(i, i, i)));
-            Date d = new Date(i, i, i, i, i, i);
-            sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/time"), vf.createLiteral(d));
-            sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/timestamp"), vf.createLiteral(new Date(d.getTime() + i))); // add millis
-            sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/string"), vf.createLiteral("value" + i));
-            sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/boolean"), vf.createLiteral(i < 5));
-            sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/byte"), vf.createLiteral((byte)i));
-            sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/double"), vf.createLiteral((double)i/100.0));
-            sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/float"), vf.createLiteral((float)i/10.0));
-            sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/int"), vf.createLiteral(i * 100));
-            sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/long"), vf.createLiteral((long)i * 10000000000l));
-            sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/short"), vf.createLiteral((short)(i * 10)));
-        }
-        sail.commit();
+		try (SailConnection conn = sail.getConnection()) {
+			for (int i = 1; i < 10; i++) {
+				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/date"), vf.createLiteral(new Date(i, i, i)));
+				Date d = new Date(i, i, i, i, i, i);
+				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/time"), vf.createLiteral(d));
+				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/timestamp"), vf.createLiteral(new Date(d.getTime() + i))); // add millis
+				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/string"), vf.createLiteral("value" + i));
+				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/boolean"), vf.createLiteral(i < 5));
+				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/byte"), vf.createLiteral((byte) i));
+				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/double"), vf.createLiteral((double) i / 100.0));
+				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/float"), vf.createLiteral((float) i / 10.0));
+				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/int"), vf.createLiteral(i * 100));
+				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/long"), vf.createLiteral((long) i * 10000000000l));
+				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/short"), vf.createLiteral((short) (i * 10)));
+			}
+			conn.commit();
+		}
         sail.shutDown();
     }
 

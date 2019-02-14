@@ -16,15 +16,16 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import static junit.framework.TestCase.assertTrue;
+
 import java.util.Arrays;
 import java.util.Collection;
-import static junit.framework.TestCase.assertTrue;
+
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -66,9 +67,9 @@ public class ArbitraryLengthPathTest {
     public void testN() throws Exception {
         ValueFactory vf = con.getValueFactory();
         for (int i = 0; i < n; i++) {
-            con.add(vf.createURI("urn:test:root"), vf.createURI("urn:test:hasChild"), vf.createURI("urn:test:node" + i));
+			con.add(vf.createIRI("urn:test:root"), vf.createIRI("urn:test:hasChild"), vf.createIRI("urn:test:node" + i));
         }
-        con.add(vf.createURI("urn:test:root"), vf.createURI("urn:test:hasChild"), vf.createURI("urn:test:node-end"));
+		con.add(vf.createIRI("urn:test:root"), vf.createIRI("urn:test:hasChild"), vf.createIRI("urn:test:node-end"));
         String sparql = "ASK { <urn:test:root> <urn:test:hasChild>* <urn:test:node-end> }";
         assertTrue(con.prepareBooleanQuery(QueryLanguage.SPARQL, sparql).evaluate());
     }
