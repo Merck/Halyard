@@ -66,6 +66,7 @@ import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
+import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.rio.RDFFormat;
@@ -518,15 +519,17 @@ public final class HalyardExport extends AbstractHalyardTool {
                 try {
                     writer.initTimer();
                     log.logStatus("Query execution started");
-                    Query q = rep.getConnection().prepareQuery(QueryLanguage.SPARQL, query);
-                    if (q instanceof TupleQuery) {
-                        writer.writeTupleQueryResult(((TupleQuery)q).evaluate());
-                    } else if (q instanceof GraphQuery) {
-                        writer.writeGraphQueryResult(((GraphQuery)q).evaluate());
-                    } else {
-                        throw new ExportException("Only SPARQL Tuple and Graph query types are supported.");
+                    try(RepositoryConnection conn = rep.getConnection()) {
+	                    Query q = conn.prepareQuery(QueryLanguage.SPARQL, query);
+	                    if (q instanceof TupleQuery) {
+	                        writer.writeTupleQueryResult(((TupleQuery)q).evaluate());
+	                    } else if (q instanceof GraphQuery) {
+	                        writer.writeGraphQueryResult(((GraphQuery)q).evaluate());
+	                    } else {
+	                        throw new ExportException("Only SPARQL Tuple and Graph query types are supported.");
+	                    }
+	                    log.logStatus("Export finished");
                     }
-                    log.logStatus("Export finished");
                 } finally {
                     rep.shutDown();
                 }

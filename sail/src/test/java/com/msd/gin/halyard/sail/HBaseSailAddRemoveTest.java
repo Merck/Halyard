@@ -25,13 +25,14 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.AfterClass;
-import org.junit.Test;
-import static org.junit.Assert.*;
 import org.junit.BeforeClass;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import static org.junit.Assert.*;
 
 /**
  *
@@ -83,36 +84,40 @@ public class HBaseSailAddRemoveTest {
 
     @Test
     public void testAddAndRemoveExplicitStatements() throws Exception {
-        explicitSail.addStatement(null, SUBJ, PRED, OBJ);
-        explicitSail.addStatement(null, SUBJ, PRED, OBJ, CONTEXT);
-        explicitSail.commit();
-        CloseableIteration<? extends Statement, SailException> iter;
-        iter = explicitSail.getStatements(null, null, null, true);
-        assertTrue(iter.hasNext());
-        iter.next();
-        assertTrue(iter.hasNext());
-        Statement st = iter.next();
-        assertFalse(iter.hasNext());
-        iter.close();
-        assertEquals(SUBJ, st.getSubject());
-        assertEquals(PRED, st.getPredicate());
-        assertEquals(OBJ, st.getObject());
-        iter = explicitSail.getStatements(null, null, null, true, CONTEXT);
-        assertTrue(iter.hasNext());
-        st = iter.next();
-        assertFalse(iter.hasNext());
-        iter.close();
-        assertEquals(SUBJ, st.getSubject());
-        assertEquals(PRED, st.getPredicate());
-        assertEquals(OBJ, st.getObject());
-        assertEquals(CONTEXT, st.getContext());
-        explicitSail.removeStatements(subj, pred, obj, CONTEXT);
-        iter = explicitSail.getStatements(null, null, null, true);
-        assertTrue(iter.hasNext());
-        iter.close();
-        explicitSail.removeStatements(subj, pred, obj);
-        iter = explicitSail.getStatements(null, null, null, true);
-        assertFalse(iter.hasNext());
-        iter.close();
+		try (SailConnection conn = explicitSail.getConnection()) {
+			conn.addStatement(null, SUBJ, PRED, OBJ);
+			conn.addStatement(null, SUBJ, PRED, OBJ, CONTEXT);
+			conn.commit();
+			CloseableIteration<? extends Statement, SailException> iter;
+			iter = conn.getStatements(null, null, null, true);
+			assertTrue(iter.hasNext());
+			iter.next();
+			assertTrue(iter.hasNext());
+			Statement st = iter.next();
+			assertFalse(iter.hasNext());
+			iter.close();
+			assertEquals(SUBJ, st.getSubject());
+			assertEquals(PRED, st.getPredicate());
+			assertEquals(OBJ, st.getObject());
+			iter = conn.getStatements(null, null, null, true, CONTEXT);
+			assertTrue(iter.hasNext());
+			st = iter.next();
+			assertFalse(iter.hasNext());
+			iter.close();
+			assertEquals(SUBJ, st.getSubject());
+			assertEquals(PRED, st.getPredicate());
+			assertEquals(OBJ, st.getObject());
+			assertEquals(CONTEXT, st.getContext());
+			conn.removeStatements(subj, pred, obj, CONTEXT);
+			conn.commit();
+			iter = conn.getStatements(null, null, null, true);
+			assertTrue(iter.hasNext());
+			iter.close();
+			conn.removeStatements(subj, pred, obj);
+			conn.commit();
+			iter = conn.getStatements(null, null, null, true);
+			assertFalse(iter.hasNext());
+			iter.close();
+		}
     }
 }

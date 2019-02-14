@@ -30,8 +30,9 @@ import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-import static org.junit.Assert.*;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.junit.Test;
+import static org.junit.Assert.*;
 
 /**
  *
@@ -161,7 +162,9 @@ public class HalyardBulkLoadTest {
 
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable2", false, 0, true, 30, null, null);
         sail.initialize();
-        assertEquals(3, sail.size());
+		try (SailConnection conn = sail.getConnection()) {
+			assertEquals(3, conn.size());
+		}
         sail.shutDown();
     }
 

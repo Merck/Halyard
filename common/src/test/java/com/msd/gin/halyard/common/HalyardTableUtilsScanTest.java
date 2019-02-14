@@ -16,21 +16,23 @@
  */
 package com.msd.gin.halyard.common;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.junit.AfterClass;
-import org.junit.Test;
 import org.junit.BeforeClass;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -140,7 +142,7 @@ public class HalyardTableUtilsScanTest {
            });
     }
 
-    private static HTable table;
+	private static Table table;
     private static Set<Statement> allStatements;
 
     @BeforeClass
@@ -152,12 +154,13 @@ public class HalyardTableUtilsScanTest {
         allStatements.add(vf.createStatement(vf.createIRI(SUBJ1), vf.createIRI(PRED1), vf.createLiteral(EXPL1), vf.createIRI(CTX1)));
         allStatements.add(vf.createStatement(vf.createIRI(SUBJ2), vf.createIRI(PRED2), vf.createLiteral(EXPL2), vf.createIRI(CTX2)));
         long timestamp = System.currentTimeMillis();
+		List<Put> puts = new ArrayList<>();
         for (Statement st : allStatements) {
             for (KeyValue kv : HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext(), false, timestamp)) {
-                    table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
+				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
             }
         }
-        table.flushCommits();
+		table.put(puts);
     }
 
     @AfterClass

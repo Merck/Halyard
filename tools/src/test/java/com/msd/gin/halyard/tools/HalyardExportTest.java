@@ -17,8 +17,8 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.tools.HalyardExport.ExportException;
 import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.tools.HalyardExport.ExportException;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
@@ -30,8 +30,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.cli.MissingOptionException;
-import org.junit.Test;
-import org.junit.BeforeClass;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
@@ -46,11 +44,13 @@ import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.junit.AfterClass;
-import static org.junit.Assert.*;
+import org.junit.BeforeClass;
 import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.TestName;
-
+import static org.junit.Assert.*;
 /**
  *
  * @author Adam Sotona (MSD)
@@ -77,14 +77,16 @@ public class HalyardExportTest {
         ValueFactory vf = SimpleValueFactory.getInstance();
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, true, 0, true, 0, null, null);
         sail.initialize();
-        for (int i=0; i<10; i++) {
-            for (int j=0; j<10; j++) {
-                for (int k=0; k<10; k++) {
-                    sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred" + j), vf.createLiteral("whatever\n\"\\" + k));
-                }
-            }
-        }
-        sail.commit();
+		try (SailConnection conn = sail.getConnection()) {
+			for (int i = 0; i < 10; i++) {
+				for (int j = 0; j < 10; j++) {
+					for (int k = 0; k < 10; k++) {
+						conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred" + j), vf.createLiteral("whatever\n\"\\" + k));
+					}
+				}
+			}
+			conn.commit();
+		}
         sail.shutDown();
     }
 

@@ -25,8 +25,9 @@ import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import static org.junit.Assert.*;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.junit.Test;
+import static org.junit.Assert.*;
 
 /**
  *
@@ -39,11 +40,12 @@ public class HalyardBulkExportTest {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkExportTable", true, 0, true, 0, null, null);
         sail.initialize();
         ValueFactory vf = SimpleValueFactory.getInstance();
-        for (int i = 0; i < 1000; i++) {
-            sail.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i),  vf.createLiteral("whatever NT value " + i));
-        }
-        sail.commit();
-        sail.close();
+		try (SailConnection conn = sail.getConnection()) {
+			for (int i = 0; i < 1000; i++) {
+				conn.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i), vf.createLiteral("whatever NT value " + i));
+			}
+			conn.commit();
+		}
 
         File root = File.createTempFile("test_bulkExport", "");
         root.delete();
@@ -76,11 +78,12 @@ public class HalyardBulkExportTest {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkExportTable2", true, 0, true, 0, null, null);
         sail.initialize();
         ValueFactory vf = SimpleValueFactory.getInstance();
-        for (int i = 0; i < 1000; i++) {
-            sail.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i),  vf.createLiteral("whatever NT value " + i));
-        }
-        sail.commit();
-        sail.close();
+		try (SailConnection conn = sail.getConnection()) {
+			for (int i = 0; i < 1000; i++) {
+				conn.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i), vf.createLiteral("whatever NT value " + i));
+			}
+			conn.commit();
+		}
 
         File root = File.createTempFile("test_parallelBulkExport", "");
         root.delete();

@@ -16,13 +16,12 @@
  */
 package com.msd.gin.halyard.tools;
 
+import static com.msd.gin.halyard.sail.HALYARD.PARALLEL_SPLIT_FUNCTION;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.junit.Test;
 import static org.junit.Assert.*;
-import static com.msd.gin.halyard.sail.HALYARD.PARALLEL_SPLIT_FUNCTION;
-
 /**
  *
  * @author Adam Sotona (MSD)

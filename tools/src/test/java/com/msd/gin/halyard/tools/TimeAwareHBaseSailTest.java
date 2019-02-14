@@ -18,17 +18,13 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
-import org.eclipse.rdf4j.common.iteration.CloseableIteration;
-import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.Update;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
-import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Test;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 /**
  *
@@ -38,8 +34,7 @@ public class TimeAwareHBaseSailTest {
 
     @Test
     public void timestampLongTest() throws Exception {
-        CloseableIteration<? extends Statement, SailException> iter;
-        HBaseSail sail = new TimeAwareHBaseSail(HBaseServerTestInstance.getInstanceConfig(), "timestamptable", true, 0, true, 0, null, null);
+		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "timestamptable", true, 0, true, 0, null, null, new TimeAwareHBaseSailConnection.Factory());
         SailRepository rep = new SailRepository(sail);
         rep.initialize();
         SailRepositoryConnection con = rep.getConnection();
@@ -54,8 +49,7 @@ public class TimeAwareHBaseSailTest {
 
     @Test
     public void timestampDateTimeTest() throws Exception {
-        CloseableIteration<? extends Statement, SailException> iter;
-        HBaseSail sail = new TimeAwareHBaseSail(HBaseServerTestInstance.getInstanceConfig(), "timestamptable", true, 0, true, 0, null, null);
+		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "timestamptable", true, 0, true, 0, null, null, new TimeAwareHBaseSailConnection.Factory());
         SailRepository rep = new SailRepository(sail);
         rep.initialize();
         SailRepositoryConnection con = rep.getConnection();
@@ -69,7 +63,7 @@ public class TimeAwareHBaseSailTest {
 
     private boolean testUpdate(SailRepositoryConnection con, String update) {
         Update u = con.prepareUpdate(update);
-        ((MapBindingSet)u.getBindings()).addBinding(new TimeAwareHBaseSail.TimestampCallbackBinding());
+		((MapBindingSet) u.getBindings()).addBinding(new TimeAwareHBaseSailConnection.TimestampCallbackBinding());
         u.execute();
         con.commit();
         return con.prepareTupleQuery(QueryLanguage.SPARQL, "select * where {<http://whatever> ?p ?o}").evaluate().hasNext();

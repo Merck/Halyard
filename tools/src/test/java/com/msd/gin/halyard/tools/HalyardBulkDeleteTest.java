@@ -27,10 +27,11 @@ import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Assert;
-import static org.junit.Assert.*;
 import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 
 /**
  *
@@ -46,12 +47,14 @@ public class HalyardBulkDeleteTest {
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(conf, TABLE, true, -1, true, 0, null, null);
         sail.initialize();
-        for (int i=0; i<5; i++) {
-            for (int j=0; j<5; j++) {
-                sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj" + j), i == 0 ? null: vf.createIRI("http://whatever/ctx" + i));
-            }
+		try (SailConnection conn = sail.getConnection()) {
+			for (int i = 0; i < 5; i++) {
+				for (int j = 0; j < 5; j++) {
+					conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj" + j), i == 0 ? null : vf.createIRI("http://whatever/ctx" + i));
+				}
+			}
+			conn.commit();
         }
-        sail.commit();
         sail.shutDown();
         File htableDir = File.createTempFile("test_htable", "");
         htableDir.delete();
@@ -79,15 +82,17 @@ public class HalyardBulkDeleteTest {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
         sail.initialize();
         try {
-            int count;
-            try (CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(null, null, null, true)) {
-                count = 0;
-                while (iter.hasNext()) {
-                    iter.next();
-                    count++;
-                }
-            }
-            Assert.assertEquals(expected, count);
+			try (SailConnection conn = sail.getConnection()) {
+				int count;
+				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, true)) {
+					count = 0;
+					while (iter.hasNext()) {
+						iter.next();
+						count++;
+					}
+				}
+				Assert.assertEquals(expected, count);
+			}
         } finally {
             sail.shutDown();
         }

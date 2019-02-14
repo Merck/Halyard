@@ -73,6 +73,7 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
@@ -292,6 +293,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         private long outputLimit;
         private int outputCounter = 0;
         private HBaseSail sail;
+		private SailConnection conn;
         private IRI namedGraph;
         private int decimationFactor;
         private final BitSet ccSet = new BitSet(64), pcSet = new BitSet(64), dcSet = new BitSet(64), rcSet = new BitSet(64), drcSet = new BitSet(64);
@@ -306,6 +308,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
             sail.initialize();
+			conn = sail.getConnection();
             setupOutput();
             write(CARDINALITY, RDF.TYPE, RDF.PROPERTY);
             write(CARDINALITY, RDFS.LABEL, SVF.createLiteral("cardinality"));
@@ -341,7 +344,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 writer.handleNamespace(XMLSchema.PREFIX, XMLSchema.NAMESPACE);
                 writer.handleNamespace(RDF.PREFIX, RDF.NAMESPACE);
                 writer.handleNamespace(RDFS.PREFIX, RDFS.NAMESPACE);
-                try (CloseableIteration<? extends Namespace, SailException> iter = sail.getNamespaces()) {
+				try (CloseableIteration<? extends Namespace, SailException> iter = conn.getNamespaces()) {
                     while (iter.hasNext()) {
                         Namespace ns = iter.next();
                         writer.handleNamespace(ns.getPrefix(), ns.getName());
@@ -360,7 +363,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
         private void copyDescription(Resource subject) throws IOException {
             Statement dedup = null;
-            try (CloseableIteration<? extends Statement, SailException> it = sail.getStatements(subject, null, null, true)) {
+			try (CloseableIteration<? extends Statement, SailException> it = conn.getStatements(subject, null, null, true)) {
                 while (it.hasNext()) {
                     Statement st = it.next();
                     if (!st.getPredicate().stringValue().startsWith(FILTER_NAMESPACE_PREFIX)) {
@@ -378,7 +381,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         }
 
         @Override
-	public void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
+		public void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
             long count = 0;
             for (LongWritable lw : values) {
                 count += lw.get();
@@ -453,13 +456,14 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 }
             }
 
-	}
+		}
 
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
             writer.endRDF();
             out.close();
-            sail.close();
+			conn.close();
+			sail.shutDown();
         }
     }
 

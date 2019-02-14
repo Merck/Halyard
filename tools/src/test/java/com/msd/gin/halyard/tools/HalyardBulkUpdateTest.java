@@ -34,10 +34,11 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.LinkedHashModel;
 import org.eclipse.rdf4j.model.impl.LinkedHashModelFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Assert;
-import static org.junit.Assert.*;
 import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 
 /**
  *
@@ -53,12 +54,14 @@ public class HalyardBulkUpdateTest {
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(conf, TABLE, true, -1, true, 0, null, null);
         sail.initialize();
-        for (int i=0; i<5; i++) {
-            for (int j=0; j<5; j++) {
-                sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj" + j));
-            }
-        }
-        sail.commit();
+		try (SailConnection conn = sail.getConnection()) {
+			for (int i = 0; i < 5; i++) {
+				for (int j = 0; j < 5; j++) {
+					conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj" + j));
+				}
+			}
+			conn.commit();
+		}
         sail.shutDown();
         File queries = File.createTempFile("test_update_queries", "");
         queries.delete();
@@ -84,16 +87,20 @@ public class HalyardBulkUpdateTest {
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
         sail.initialize();
         try {
-            int count;
-            try (CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(null, null, null, true)) {
-                count = 0;
-                while (iter.hasNext()) {
-                    iter.next();
-                    count++;
-                }
-            }
-            Assert.assertEquals(50, count);
-            Assert.assertFalse(sail.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/pred"), null, true).hasNext());
+			try (SailConnection conn = sail.getConnection()) {
+				int count;
+				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, true)) {
+					count = 0;
+					while (iter.hasNext()) {
+						iter.next();
+						count++;
+					}
+				}
+				Assert.assertEquals(50, count);
+				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/pred"), null, true)) {
+					Assert.assertFalse(iter.hasNext());
+				}
+			}
         } finally {
             sail.shutDown();
         }
@@ -150,23 +157,25 @@ public class HalyardBulkUpdateTest {
         IRI deleteGraph = SimpleValueFactory.getInstance().createIRI("http://whatever/deleteGraph");
         IRI insertGraph = SimpleValueFactory.getInstance().createIRI("http://whatever/insertGraph");
         IRI context = SimpleValueFactory.getInstance().createIRI("http://whatever/context");
-        for (Change c : changes.values()) {
-            IRI chSubj = SimpleValueFactory.getInstance().createIRI("http://whatever/change#" + i);
-            IRI delGr = SimpleValueFactory.getInstance().createIRI("http://whatever/graph#" + i + "d");
-            IRI insGr = SimpleValueFactory.getInstance().createIRI("http://whatever/graph#" + i + "i");
-            sail.addStatement(chSubj, timstamp, SimpleValueFactory.getInstance().createLiteral(c.timestamp));
-            sail.addStatement(chSubj, context, targetGraph);
-            sail.addStatement(chSubj, deleteGraph, delGr);
-            sail.addStatement(chSubj, insertGraph, insGr);
-            for (Statement s : c.deletes) {
-                sail.addStatement(s.getSubject(), s.getPredicate(), s.getObject(), delGr);
-            }
-            for (Statement s : c.inserts) {
-                sail.addStatement(s.getSubject(), s.getPredicate(), s.getObject(), insGr);
-            }
-            i++;
-        }
-        sail.commit();
+		try (SailConnection conn = sail.getConnection()) {
+			for (Change c : changes.values()) {
+				IRI chSubj = SimpleValueFactory.getInstance().createIRI("http://whatever/change#" + i);
+				IRI delGr = SimpleValueFactory.getInstance().createIRI("http://whatever/graph#" + i + "d");
+				IRI insGr = SimpleValueFactory.getInstance().createIRI("http://whatever/graph#" + i + "i");
+				conn.addStatement(chSubj, timstamp, SimpleValueFactory.getInstance().createLiteral(c.timestamp));
+				conn.addStatement(chSubj, context, targetGraph);
+				conn.addStatement(chSubj, deleteGraph, delGr);
+				conn.addStatement(chSubj, insertGraph, insGr);
+				for (Statement s : c.deletes) {
+					conn.addStatement(s.getSubject(), s.getPredicate(), s.getObject(), delGr);
+				}
+				for (Statement s : c.inserts) {
+					conn.addStatement(s.getSubject(), s.getPredicate(), s.getObject(), insGr);
+				}
+				i++;
+			}
+			conn.commit();
+		}
         sail.shutDown();
 
         //prepare the update queries
@@ -231,11 +240,13 @@ public class HalyardBulkUpdateTest {
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "timebulkupdatetesttable", false, 0, true, 0, null, null);
         sail.initialize();
         try {
-            try (CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(null, null, null, true, targetGraph)) {
-                while (iter.hasNext()) {
-                    resultModel.add(iter.next());
-                }
-            }
+			try (SailConnection conn = sail.getConnection()) {
+				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, true, targetGraph)) {
+					while (iter.hasNext()) {
+						resultModel.add(iter.next());
+					}
+				}
+			}
         } finally {
             sail.shutDown();
         }

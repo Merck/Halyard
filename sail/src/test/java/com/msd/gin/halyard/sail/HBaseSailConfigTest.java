@@ -22,7 +22,6 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.impl.TreeModel;
 import org.eclipse.rdf4j.repository.config.RepositoryConfigSchema;
 import org.eclipse.rdf4j.repository.sail.config.SailRepositorySchema;
-import org.eclipse.rdf4j.sail.config.AbstractSailImplConfig;
 import org.eclipse.rdf4j.sail.config.SailConfigException;
 import org.eclipse.rdf4j.sail.config.SailConfigSchema;
 import org.junit.Test;

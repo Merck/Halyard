@@ -47,10 +47,10 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
 import org.eclipse.rdf4j.rio.helpers.ParseErrorLogger;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
-import static org.junit.Assert.*;
 import org.junit.Test;
-
+import static org.junit.Assert.*;
 /**
  *
  * @author Adam Sotona (MSD)
@@ -61,18 +61,19 @@ public class HalyardStatsTest {
     public void testStatsTarget() throws Exception {
         final HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "statsTable", true, -1, true, 0, null, null);
         sail.initialize();
-        try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testData.trig")) {
-            RDFParser p = Rio.createParser(RDFFormat.TRIG);
-            p.setPreserveBNodeIDs(true);
-            p.setRDFHandler(new AbstractRDFHandler() {
-                @Override
-                public void handleStatement(Statement st) throws RDFHandlerException {
-                    sail.addStatement(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
-                }
-            }).parse(ref, "");
-        }
-        sail.commit();
-        sail.close();
+		try (SailConnection conn = sail.getConnection()) {
+			try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testData.trig")) {
+				RDFParser p = Rio.createParser(RDFFormat.TRIG);
+				p.setPreserveBNodeIDs(true);
+				p.setRDFHandler(new AbstractRDFHandler() {
+					@Override
+					public void handleStatement(Statement st) throws RDFHandlerException {
+						conn.addStatement(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+					}
+				}).parse(ref, "");
+			}
+			conn.commit();
+		}
 
         File root = File.createTempFile("test_stats", "");
         root.delete();
@@ -149,82 +150,82 @@ public class HalyardStatsTest {
         sail.initialize();
 
         //load test data
-        try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testData.trig")) {
-            RDFParser p = Rio.createParser(RDFFormat.TRIG);
-            p.setPreserveBNodeIDs(true);
-            p.setRDFHandler(new AbstractRDFHandler() {
-                @Override
-                public void handleStatement(Statement st) throws RDFHandlerException {
-                    sail.addStatement(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
-                }
-            }).parse(ref, "");
-        }
-        sail.commit();
+		try (SailConnection conn = sail.getConnection()) {
+			try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testData.trig")) {
+				RDFParser p = Rio.createParser(RDFFormat.TRIG);
+				p.setPreserveBNodeIDs(true);
+				p.setRDFHandler(new AbstractRDFHandler() {
+					@Override
+					public void handleStatement(Statement st) throws RDFHandlerException {
+						conn.addStatement(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+					}
+				}).parse(ref, "");
+			}
+			conn.commit();
 
-        //update stats
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(),
-                new String[]{"-s", "statsTable2", "-r", "100"}));
+			// update stats
+			assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(), new String[] { "-s", "statsTable2", "-r", "100" }));
 
-        //verify with golden file
-        Set<Statement> statsM = new HashSet<>();
-        try (CloseableIteration<? extends Statement,SailException> it = sail.getStatements(null, null, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
-            while (it.hasNext()) {
-                statsM.add(it.next());
-            }
-        }
-        try (InputStream refStream = HalyardStatsTest.class.getResourceAsStream("testStatsTarget.trig")) {
-            Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger());
-            assertEqualModels(refM, statsM);
-        }
+			// verify with golden file
+			Set<Statement> statsM = new HashSet<>();
+			try (CloseableIteration<? extends Statement, SailException> it = conn.getStatements(null, null, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
+				while (it.hasNext()) {
+					statsM.add(it.next());
+				}
+			}
+			try (InputStream refStream = HalyardStatsTest.class.getResourceAsStream("testStatsTarget.trig")) {
+				Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger());
+				assertEqualModels(refM, statsM);
+			}
 
-        //load additional data
-        try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testMoreData.trig")) {
-            RDFParser p = Rio.createParser(RDFFormat.TRIG);
-            p.setPreserveBNodeIDs(true);
-            p.setRDFHandler(new AbstractRDFHandler() {
-                @Override
-                public void handleStatement(Statement st) throws RDFHandlerException {
-                    sail.addStatement(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
-                }
-            }).parse(ref, "");
-        }
-        sail.commit();
+			// load additional data
+			try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testMoreData.trig")) {
+				RDFParser p = Rio.createParser(RDFFormat.TRIG);
+				p.setPreserveBNodeIDs(true);
+				p.setRDFHandler(new AbstractRDFHandler() {
+					@Override
+					public void handleStatement(Statement st) throws RDFHandlerException {
+						conn.addStatement(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+					}
+				}).parse(ref, "");
+			}
+			conn.commit();
 
-        //update stats only for graph1
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(),
-                new String[]{"-s", "statsTable2", "-r", "100", "-c", "http://whatever/graph1"}));
+			// update stats only for graph1
+			assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(), new String[] { "-s", "statsTable2", "-r", "100", "-c", "http://whatever/graph1" }));
 
-        //verify with golden file
-        statsM = new HashSet<>();
-        try (CloseableIteration<? extends Statement,SailException> it = sail.getStatements(null, null, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
-            while (it.hasNext()) {
-                statsM.add(it.next());
-            }
-        }
-        try (InputStream refStream = HalyardStatsTest.class.getResourceAsStream("testStatsMoreTarget.trig")) {
-            Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger());
-            assertEqualModels(refM, statsM);
-        }
+			// verify with golden file
+			statsM = new HashSet<>();
+			try (CloseableIteration<? extends Statement, SailException> it = conn.getStatements(null, null, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
+				while (it.hasNext()) {
+					statsM.add(it.next());
+				}
+			}
+			try (InputStream refStream = HalyardStatsTest.class.getResourceAsStream("testStatsMoreTarget.trig")) {
+				Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger());
+				assertEqualModels(refM, statsM);
+			}
 
-        sail.close();
+		}
     }
 
     @Test
     public void testStatsTargetPartial() throws Exception {
         final HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "statsTable3", true, -1, true, 0, null, null);
         sail.initialize();
-        try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testData.trig")) {
-            RDFParser p = Rio.createParser(RDFFormat.TRIG);
-            p.setPreserveBNodeIDs(true);
-            p.setRDFHandler(new AbstractRDFHandler() {
-                @Override
-                public void handleStatement(Statement st) throws RDFHandlerException {
-                    sail.addStatement(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
-                }
-            }).parse(ref, "");
-        }
-        sail.commit();
-        sail.close();
+		try (SailConnection conn = sail.getConnection()) {
+			try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testData.trig")) {
+				RDFParser p = Rio.createParser(RDFFormat.TRIG);
+				p.setPreserveBNodeIDs(true);
+				p.setRDFHandler(new AbstractRDFHandler() {
+					@Override
+					public void handleStatement(Statement st) throws RDFHandlerException {
+						conn.addStatement(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+					}
+				}).parse(ref, "");
+			}
+			conn.commit();
+		}
 
         File root = File.createTempFile("test_stats", "");
         root.delete();

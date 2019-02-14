@@ -21,8 +21,6 @@ import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.File;
 import java.net.URI;
 import org.apache.commons.cli.MissingOptionException;
-import org.junit.Test;
-import org.junit.BeforeClass;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.util.ToolRunner;
@@ -31,10 +29,13 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.MalformedQueryException;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.TestName;
 
 /**
@@ -61,12 +62,14 @@ public class HalyardUpdateTest {
         ValueFactory vf = SimpleValueFactory.getInstance();
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, true, 0, true, 0, null, null);
         sail.initialize();
-        for (int i=0; i<5; i++) {
-            for (int j=0; j<5; j++) {
-                sail.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj" + j));
-            }
-        }
-        sail.commit();
+		try (SailConnection conn = sail.getConnection()) {
+			for (int i = 0; i < 5; i++) {
+				for (int j = 0; j < 5; j++) {
+					conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj" + j));
+				}
+			}
+			conn.commit();
+		}
         sail.shutDown();
     }
 
@@ -116,14 +119,16 @@ public class HalyardUpdateTest {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
         sail.initialize();
         try {
-            CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/reverse"), null, true);
-            int count = 0;
-            while (iter.hasNext()) {
-                iter.next();
-                count++;
-            }
-            iter.close();
-            Assert.assertEquals(25, count);
+			try (SailConnection conn = sail.getConnection()) {
+				CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/reverse"), null, true);
+				int count = 0;
+				while (iter.hasNext()) {
+					iter.next();
+					count++;
+				}
+				iter.close();
+				Assert.assertEquals(25, count);
+			}
         } finally {
             sail.shutDown();
         }
@@ -132,9 +137,11 @@ public class HalyardUpdateTest {
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
         sail.initialize();
         try {
-            CloseableIteration<? extends Statement, SailException> iter = sail.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/reverse"), null, true);
-            Assert.assertFalse(iter.hasNext());
-            iter.close();
+			try (SailConnection conn = sail.getConnection()) {
+				CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/reverse"), null, true);
+				Assert.assertFalse(iter.hasNext());
+				iter.close();
+			}
         } finally {
             sail.shutDown();
         }

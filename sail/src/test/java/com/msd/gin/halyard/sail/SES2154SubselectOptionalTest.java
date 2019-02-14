@@ -17,15 +17,18 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
+
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQueryResult;
+import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-import static org.junit.Assert.assertEquals;
 import org.junit.Test;
+
+import static org.junit.Assert.*;
 
 /**
  *
@@ -40,12 +43,16 @@ public class SES2154SubselectOptionalTest {
         rep.initialize();
         SimpleValueFactory vf = SimpleValueFactory.getInstance();
         IRI person = vf.createIRI("http://schema.org/Person");
-        for (char c = 'a'; c < 'k'; c++) {
-            sail.addStatement(vf.createIRI("http://example.com/" + c), RDF.TYPE, person);
-        }
-        sail.commit();
-        TupleQueryResult res = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "PREFIX : <http://example.com/>\n" + "PREFIX schema: <http://schema.org/>\n" + "\n" + "SELECT (COUNT(*) AS ?count)\n" + "WHERE {\n" + "  {\n" + "    SELECT ?person\n" + "    WHERE {\n" + "      ?person a schema:Person .\n" + "    }\n" + "    LIMIT 5\n" + "  }\n" + "  OPTIONAL {\n" + "    [] :nonexistent [] .\n" + "  }\n" + "}").evaluate();
-        assertEquals(5, ((Literal) res.next().getBinding("count").getValue()).intValue());
+		try (RepositoryConnection conn = rep.getConnection()) {
+			for (char c = 'a'; c < 'k'; c++) {
+				conn.add(vf.createIRI("http://example.com/" + c), RDF.TYPE, person);
+			}
+			conn.commit();
+			try (TupleQueryResult res = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "PREFIX : <http://example.com/>\n" + "PREFIX schema: <http://schema.org/>\n" + "\n" + "SELECT (COUNT(*) AS ?count)\n" + "WHERE {\n"
+					+ "  {\n" + "    SELECT ?person\n" + "    WHERE {\n" + "      ?person a schema:Person .\n" + "    }\n" + "    LIMIT 5\n" + "  }\n" + "  OPTIONAL {\n" + "    [] :nonexistent [] .\n" + "  }\n" + "}").evaluate()) {
+				assertEquals(5, ((Literal) res.next().getBinding("count").getValue()).intValue());
+			}
+		}
         rep.shutDown();
     }
 

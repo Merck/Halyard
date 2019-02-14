@@ -16,11 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HBaseSail;
-import java.io.IOException;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.KeyValue;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -34,40 +29,47 @@ import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
+import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UpdateContext;
+
+import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
+import com.msd.gin.halyard.sail.HBaseSailConnection;
 
 /**
  * @author Adam Sotona (MSD)
  */
-public class TimeAwareHBaseSail extends HBaseSail {
+public class TimeAwareHBaseSailConnection extends HBaseSailConnection {
 
-    static final String TIMESTAMP_BINDING_NAME = "HALYARD_TIMESTAMP_SPECIAL_VARIABLE";
-    static final String TIMESTAMP_CALLBACK_BINDING_NAME = "HALYARD_TIMESTAMP_SPECIAL_CALLBACK_BINDING";
+	static final String TIMESTAMP_BINDING_NAME = "HALYARD_TIMESTAMP_SPECIAL_VARIABLE";
+	static final String TIMESTAMP_CALLBACK_BINDING_NAME = "HALYARD_TIMESTAMP_SPECIAL_CALLBACK_BINDING";
 
-    /**
-     * TimestampCallbackBinding is a special binding implementation that allows to modify the value to propagate actually evaluated timestamp back to the global
-     * bindings
-     */
-    public static class TimestampCallbackBinding implements Binding {
+	/**
+	 * TimestampCallbackBinding is a special binding implementation that allows to
+	 * modify the value to propagate actually evaluated timestamp back to the global
+	 * bindings
+	 */
+	public static class TimestampCallbackBinding implements Binding {
 
-        private static final long serialVersionUID = 9149803395418843143L;
+		private static final long serialVersionUID = 9149803395418843143L;
 
-        Value v = SimpleValueFactory.getInstance().createLiteral(System.currentTimeMillis());
+		Value v = SimpleValueFactory.getInstance().createLiteral(System.currentTimeMillis());
 
-        @Override
-        public String getName() {
-            return TIMESTAMP_CALLBACK_BINDING_NAME;
-        }
+		@Override
+		public String getName() {
+			return TIMESTAMP_CALLBACK_BINDING_NAME;
+		}
 
-        @Override
-        public Value getValue() {
-            return v;
-        }
+		@Override
+		public Value getValue() {
+			return v;
+		}
 
-    }
-    public TimeAwareHBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker) {
-        super(config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker);
+	}
+
+	public TimeAwareHBaseSailConnection(HBaseSail sail) {
+		super(sail);
     }
 
     private static long longValueOfTimeStamp(Literal ts) {
@@ -81,28 +83,16 @@ public class TimeAwareHBaseSail extends HBaseSail {
     public void addStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
         BindingSet bs;
         Binding b;
-        Value v;
         long timestamp = (op != null && (bs = op.getBindingSet()) != null && (b = bs.getBinding(TIMESTAMP_CALLBACK_BINDING_NAME)) != null) ? longValueOfTimeStamp((Literal) b.getValue()) : System.currentTimeMillis();
-        for (Resource ctx : normalizeContexts(contexts)) {
-            addStatementInternal(subj, pred, obj, ctx, timestamp);
-        }
+		addStatementInternal(subj, pred, obj, contexts, timestamp);
     }
 
     @Override
     public void removeStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
         BindingSet bs;
         Binding b;
-        Value v;
         long timestamp = (op != null && (bs = op.getBindingSet()) != null && (b = bs.getBinding(TIMESTAMP_CALLBACK_BINDING_NAME)) != null) ? longValueOfTimeStamp((Literal) b.getValue()) : System.currentTimeMillis();
-        try {
-            for (Resource ctx : normalizeContexts(contexts)) {
-                for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, true, timestamp)) { //calculate the kv's corresponding to the quad (or triple)
-                    delete(kv);
-                }
-            }
-        } catch (IOException e) {
-            throw new SailException(e);
-        }
+		removeStatementInternal(op, subj, pred, obj, contexts, timestamp);
     }
 
     @Override
@@ -124,4 +114,11 @@ public class TimeAwareHBaseSail extends HBaseSail {
         }
         return iter;
     }
+
+	public static class Factory implements ConnectionFactory {
+		@Override
+		public SailConnection createConnection(HBaseSail sail) {
+			return new TimeAwareHBaseSailConnection(sail);
+		}
+	}
 }

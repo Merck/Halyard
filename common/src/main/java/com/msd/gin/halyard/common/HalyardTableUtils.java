@@ -40,9 +40,9 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.regionserver.BloomType;
@@ -136,18 +136,36 @@ public final class HalyardTableUtils {
     }
 
     /**
-     * Helper method which locates or creates and returns the specified HTable used for triple/ quad storage. The table may be pre-split into regions (rather than HBase's default
-     * of starting with 1). For a discussion of pre-splits take a look at <a href="https://hortonworks.com/blog/apache-hbase-region-splitting-and-merging/">this article</a>
-     * @param config Hadoop Configuration of the cluster running HBase
-     * @param tableName String table name
-     * @param create boolean option to create the table if does not exist
-     * @param splitBits int number of bits used for calculation of HTable region pre-splits (applies for new tables only). Must be between 0 and 16. Higher values generate more
-     * splits.
-     * @throws IOException throws IOException in case of any HBase IO problems
-     * @return the org.apache.hadoop.hbase.client.HTable
-     */
-    public static HTable getTable(Configuration config, String tableName, boolean create, int splitBits) throws IOException {
-        return getTable(config, tableName, create, splitBits < 0 ? null : calculateSplits(splitBits));
+	 * Helper method which locates or creates and returns the specified Table used for triple/ quad storage. The table may be pre-split into regions (rather than HBase's default of
+	 * starting with 1). For a discussion of pre-splits take a look at <a href= "https://hortonworks.com/blog/apache-hbase-region-splitting-and-merging/">this article</a>
+	 * 
+	 * @param config Hadoop Configuration of the cluster running HBase
+	 * @param tableName String table name
+	 * @param create boolean option to create the table if does not exist
+	 * @param splitBits int number of bits used for calculation of Table region pre-splits (applies for new tables only). Must be between 0 and 16. Higher values generate more
+	 * splits.
+	 * @throws IOException throws IOException in case of any HBase IO problems
+	 * @return the org.apache.hadoop.hbase.client.Table
+	 */
+	public static Table getTable(Configuration config, String tableName, boolean create, int splitBits)
+			throws IOException {
+		return getTable(getConnection(config), tableName, create, splitBits);
+	}
+
+	/**
+	 * Helper method which locates or creates and returns the specified Table used for triple/ quad storage. The table may be pre-split into regions (rather than HBase's default of
+	 * starting with 1). For a discussion of pre-splits take a look at <a href= "https://hortonworks.com/blog/apache-hbase-region-splitting-and-merging/">this article</a>
+	 * 
+	 * @param conn Connection to the cluster running HBase
+	 * @param tableName String table name
+	 * @param create boolean option to create the table if does not exist
+	 * @param splitBits int number of bits used for calculation of Table region pre-splits (applies for new tables only). Must be between 0 and 16. Higher values generate more
+	 * splits.
+	 * @throws IOException throws IOException in case of any HBase IO problems
+	 * @return the org.apache.hadoop.hbase.client.Table
+	 */
+	public static Table getTable(Connection conn, String tableName, boolean create, int splitBits) throws IOException {
+		return getTable(conn, tableName, create, splitBits < 0 ? null : calculateSplits(splitBits));
     }
 
     /**
@@ -159,50 +177,55 @@ public final class HalyardTableUtils {
      * @return HTable
      * @throws IOException throws IOException in case of any HBase IO problems
      */
-    public static HTable getTable(Configuration config, String tableName, boolean create, byte[][] splits) throws IOException {
-        Configuration cfg = HBaseConfiguration.create(config);
-        cfg.setLong(HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD, 3600000l);
+	public static Table getTable(Configuration config, String tableName, boolean create, byte[][] splits)
+			throws IOException {
+		return getTable(getConnection(config), tableName, create, splits);
+	}
+
+	/**
+	 * Helper method which locates or creates and returns the specified Table used for triple/ quad storage
+	 * 
+	 * @param conn Connection to the cluster running HBase
+	 * @param tableName String table name
+	 * @param create boolean option to create the table if does not exists
+	 * @param splits array of keys used to pre-split new table, may be null
+	 * @return Table
+	 * @throws IOException throws IOException in case of any HBase IO problems
+	 */
+	public static Table getTable(Connection conn, String tableName, boolean create, byte[][] splits)
+			throws IOException {
+		TableName htableName = TableName.valueOf(tableName);
         if (create) {
-            try (Connection con = ConnectionFactory.createConnection(config)) {
-                try (Admin admin = con.getAdmin()) {
-                	    //check if the table exists and if it doesn't, make it
-                    if (!admin.tableExists(TableName.valueOf(tableName))) {
-                        HTableDescriptor td = new HTableDescriptor(TableName.valueOf(tableName));
-                        td.addFamily(createColumnFamily());
-                        admin.createTable(td, splits);
-                    }
+			try (Admin admin = conn.getAdmin()) {
+				// check if the table exists and if it doesn't, make it
+				if (!admin.tableExists(htableName)) {
+					HTableDescriptor td = new HTableDescriptor(htableName);
+					td.addFamily(createColumnFamily());
+					admin.createTable(td, splits);
                 }
             }
         }
+		return conn.getTable(htableName);
+	}
 
-        //this is deprecated, the recommendation now is to use connection.getTable()
-        HTable table = new HTable(cfg, tableName);
-        table.setAutoFlushTo(false);
-        return table;
-    }
+	public static Connection getConnection(Configuration config) throws IOException {
+		Configuration cfg = HBaseConfiguration.create(config);
+		cfg.setLong(HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD, 3600000l);
+		return ConnectionFactory.createConnection(cfg);
+	}
 
-    /**
-     * Truncates HTable while preserving the region pre-splits
-     * @param table HTable to truncate
-     * @return new instance of the truncated HTable
-     * @throws IOException throws IOException in case of any HBase IO problems
-     */
-    public static HTable truncateTable(HTable table) throws IOException {
-        Configuration conf = table.getConfiguration();
-        byte[][] presplits = table.getRegionLocator().getStartKeys();
-        if (presplits.length > 0 && presplits[0].length == 0) {
-            presplits = Arrays.copyOfRange(presplits, 1, presplits.length);
-        }
-        HTableDescriptor desc = table.getTableDescriptor();
-        table.close();
-        try (Connection con = ConnectionFactory.createConnection(conf)) {
-            try (Admin admin = con.getAdmin()) {
-                admin.disableTable(desc.getTableName());
-                admin.deleteTable(desc.getTableName());
-                admin.createTable(desc, presplits);
-            }
-        }
-        return HalyardTableUtils.getTable(conf, desc.getTableName().getNameAsString(), false, 0);
+	/**
+	 * Truncates Table while preserving the region pre-splits
+	 * 
+	 * @param conn connection to cluster
+	 * @param table Table to truncate
+	 * @throws IOException throws IOException in case of any HBase IO problems
+	 */
+	public static void truncateTable(Connection conn, Table table) throws IOException {
+		try (Admin admin = conn.getAdmin()) {
+			admin.disableTable(table.getName());
+			admin.truncateTable(table.getName(), true);
+		}
     }
 
     /**
@@ -375,10 +398,12 @@ public final class HalyardTableUtils {
     }
 
     /**
-     * Parser method returning all Statements from a single HBase Scan Result
-     * @param res HBase Scan Result
-     * @return List of Statements
-     */
+	 * Parser method returning all Statements from a single HBase Scan Result
+	 * 
+	 * @param res HBase Scan Result
+	 * @param vf ValueFactory
+	 * @return List of Statements
+	 */
     public static List<Statement> parseStatements(Result res, ValueFactory vf) {
     	// multiple triples may have the same hash (i.e. row key)
         ArrayList<Statement> st = new ArrayList<>();
@@ -389,10 +414,12 @@ public final class HalyardTableUtils {
     }
 
     /**
-     * Parser method returning Statement from a single HBase Result Cell
-     * @param c HBase Result Cell
-     * @return Statements
-     */
+	 * Parser method returning Statement from a single HBase Result Cell
+	 * 
+	 * @param c HBase Result Cell
+	 * @param vf ValueFactory
+	 * @return Statements
+	 */
     public static Statement parseStatement(Cell c, ValueFactory vf) {
         ByteBuffer bb = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
         byte[] sb = new byte[bb.getInt()];

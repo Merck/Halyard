@@ -19,11 +19,11 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import org.apache.commons.cli.MissingOptionException;
-import org.junit.Test;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.query.MalformedQueryException;
 import org.eclipse.rdf4j.repository.RepositoryException;
+import org.junit.Test;
 
 /**
  *
