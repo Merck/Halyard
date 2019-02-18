@@ -16,9 +16,6 @@
  */
 package com.msd.gin.halyard.strategy;
 
-import com.msd.gin.halyard.strategy.HalyardTupleExprEvaluation.BindingSetPipe;
-import com.msd.gin.halyard.strategy.collections.BigHashSet;
-import com.msd.gin.halyard.strategy.collections.Sorter;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.HashSet;
@@ -31,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteratorIteration;
 import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
@@ -70,6 +68,7 @@ import org.eclipse.rdf4j.query.algebra.Slice;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.SubQueryValueOperator;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
+import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Union;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
@@ -77,11 +76,15 @@ import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
+import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunction;
+import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.TupleFunctionEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.DescribeIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.GroupIterator;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.PathIteration;
@@ -93,6 +96,9 @@ import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
+
+import com.msd.gin.halyard.strategy.collections.BigHashSet;
+import com.msd.gin.halyard.strategy.collections.Sorter;
 
 /**
  * Evaluates {@link TupleExpression}s and it's sub-interfaces and implementations.
@@ -146,21 +152,38 @@ final class HalyardTupleExprEvaluation {
     }
 
     private final HalyardEvaluationStrategy parentStrategy;
+	private final TupleFunctionRegistry tupleFunctionRegistry;
+	private final TripleSource tripleSource;
+	private final QueryContext queryContext;
     private final HalyardStatementPatternEvaluation statementEvaluation;
     private final long startTime, timeout;
 
     /**
-     * Constructor used by {@link HalyardEvaluationStrategy} to create this helper class
-     * @param parentStrategy
-     * @param tripleSource
-     * @param dataset
-     * @param timeout
-     */
-    HalyardTupleExprEvaluation(HalyardEvaluationStrategy parentStrategy, TripleSource tripleSource, Dataset dataset, long timeout) {
+	 * Constructor used by {@link HalyardEvaluationStrategy} to create this helper
+	 * class
+	 * 
+	 * @param parentStrategy
+	 * @param queryContext
+	 * @param tupleFunctionRegistry
+	 * @param tripleSource
+	 * @param dataset
+	 * @param timeout
+	 */
+	HalyardTupleExprEvaluation(HalyardEvaluationStrategy parentStrategy, QueryContext queryContext,
+			TupleFunctionRegistry tupleFunctionRegistry, TripleSource tripleSource, Dataset dataset, long timeout) {
         this.parentStrategy = parentStrategy;
-        this.statementEvaluation = new HalyardStatementPatternEvaluation(dataset, tripleSource);
+		this.queryContext = queryContext;
+		this.tupleFunctionRegistry = tupleFunctionRegistry;
+		this.tripleSource = tripleSource;
+		this.statementEvaluation = new HalyardStatementPatternEvaluation(dataset, tripleSource, queryContext);
         this.startTime = System.currentTimeMillis();
         this.timeout = timeout;
+    }
+
+	private void enqueue(HalyardTupleExprEvaluation.BindingSetPipe pipe,
+			CloseableIteration<BindingSet, QueryEvaluationException> iter,
+			QueryModelNode node) {
+		HalyardStatementPatternEvaluation.enqueue(pipe, iter, queryContext, node);
     }
 
     /**
@@ -201,6 +224,8 @@ final class HalyardTupleExprEvaluation {
             evaluateArbitraryLengthPath(parent, (ArbitraryLengthPath) expr, bindings);
         } else if (expr instanceof BindingSetAssignment) {
             evaluateBindingSetAssignment(parent, (BindingSetAssignment) expr, bindings);
+		} else if (expr instanceof TupleFunctionCall) {
+			evaluateTupleFunctionCall(parent, (TupleFunctionCall) expr, bindings);
         } else if (expr == null) {
             parent.handleException(new IllegalArgumentException("expr must not be null"));
         } else {
@@ -369,7 +394,8 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateDescribeOperator(BindingSetPipe parent, DescribeOperator operator, BindingSet bindings) {
-        HalyardStatementPatternEvaluation.enqueue(parent, new DescribeIteration(evaluate(operator.getArg(), bindings), parentStrategy, operator.getBindingNames(), bindings), operator);
+		enqueue(parent, new DescribeIteration(evaluate(operator.getArg(), bindings), parentStrategy,
+				operator.getBindingNames(), bindings), operator);
     }
 
     /**
@@ -488,7 +514,7 @@ final class HalyardTupleExprEvaluation {
         //temporary solution using copy of the original iterator
         //re-writing this to push model is a bit more complex task
         try {
-            HalyardStatementPatternEvaluation.enqueue(parent, new GroupIterator(parentStrategy, group, bindings), group);
+			enqueue(parent, new GroupIterator(parentStrategy, group, bindings), group);
         } catch (QueryEvaluationException e) {
             parent.handleException(e);
         }
@@ -677,7 +703,7 @@ final class HalyardTupleExprEvaluation {
                 }
                 // otherwise: perform a SELECT query
                 CloseableIteration<BindingSet, QueryEvaluationException> result = fs.select(service, freeVars, bindings, baseUri);
-                HalyardStatementPatternEvaluation.enqueue(parent, service.isSilent() ? new SilentIteration(result) : result, service);
+				enqueue(parent, service.isSilent() ? new SilentIteration(result) : result, service);
             } catch (QueryEvaluationException e) {
                 // suppress exceptions if silent
                 if (service.isSilent()) {
@@ -1031,7 +1057,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateExternalSet(BindingSetPipe parent, ExternalSet externalSet, BindingSet bindings) {
         try {
-            HalyardStatementPatternEvaluation.enqueue(parent, externalSet.evaluate(bindings), externalSet);
+			enqueue(parent, externalSet.evaluate(bindings), externalSet);
         } catch (QueryEvaluationException e) {
             parent.handleException(e);
         }
@@ -1061,7 +1087,8 @@ final class HalyardTupleExprEvaluation {
         }
         //temporary solution using copy of the original iterator
         //re-writing this to push model is a bit more complex task
-        HalyardStatementPatternEvaluation.enqueue(parent, new ZeroLengthPathIteration(parentStrategy, subjectVar, objVar, subj, obj, contextVar, bindings), zlp);
+		enqueue(parent,
+				new ZeroLengthPathIteration(parentStrategy, subjectVar, objVar, subj, obj, contextVar, bindings), zlp);
     }
 
     /**
@@ -1080,7 +1107,7 @@ final class HalyardTupleExprEvaluation {
         //temporary solution using copy of the original iterator
         //re-writing this to push model is a bit more complex task
         try {
-            HalyardStatementPatternEvaluation.enqueue(parent, new PathIteration(new StrictEvaluationStrategy(null, null) {
+			enqueue(parent, new PathIteration(new StrictEvaluationStrategy(null, null) {
                 @Override
                 public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(ZeroLengthPath zlp, BindingSet bindings) throws QueryEvaluationException {
                     return parentStrategy.evaluate(zlp, bindings);
@@ -1106,10 +1133,10 @@ final class HalyardTupleExprEvaluation {
     private void evaluateBindingSetAssignment(BindingSetPipe parent, BindingSetAssignment bsa, BindingSet bindings) {
         final Iterator<BindingSet> iter = bsa.getBindingSets().iterator();
         if (bindings.size() == 0) { // empty binding set
-            HalyardStatementPatternEvaluation.enqueue(parent, new CloseableIteratorIteration<>(iter), bsa);
+			enqueue(parent, new CloseableIteratorIteration<>(iter), bsa);
         } else {
             final QueryBindingSet b = new QueryBindingSet(bindings);
-            HalyardStatementPatternEvaluation.enqueue(parent, new LookAheadIteration<BindingSet, QueryEvaluationException>() {
+			enqueue(parent, new LookAheadIteration<BindingSet, QueryEvaluationException>() {
                 @Override
                 protected BindingSet getNextElement() throws QueryEvaluationException {
                     QueryBindingSet result = null;
@@ -1145,8 +1172,32 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Returns the limit of the current variable bindings before any further projection.
-     */
+	 * Evaluate {@link TupleFunctionCall} query model nodes
+	 * 
+	 * @param parent
+	 * @param tfc
+	 * @param bindings
+	 */
+	private void evaluateTupleFunctionCall(BindingSetPipe parent, TupleFunctionCall tfc, BindingSet bindings)
+			throws QueryEvaluationException {
+		TupleFunction func = tupleFunctionRegistry.get(tfc.getURI())
+				.orElseThrow(() -> new QueryEvaluationException("Unknown tuple function '" + tfc.getURI() + "'"));
+
+		List<ValueExpr> args = tfc.getArgs();
+
+		Value[] argValues = new Value[args.size()];
+		for (int i = 0; i < args.size(); i++) {
+			argValues[i] = parentStrategy.evaluate(args.get(i), bindings);
+		}
+
+		enqueue(parent, TupleFunctionEvaluationStrategy.evaluate(func,
+				tfc.getResultVars(), bindings, tripleSource.getValueFactory(), argValues), tfc);
+	}
+
+	/**
+	 * Returns the limit of the current variable bindings before any further
+	 * projection.
+	 */
     private static long getLimit(QueryModelNode node) {
         long offset = 0;
         if (node instanceof Slice) {

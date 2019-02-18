@@ -19,3 +19,6 @@
 /strategy/nbproject/
 /tools/nbproject/
 /tools/nbactions.xml
+/**/.settings/
+/**/.classpath
+/**/.project

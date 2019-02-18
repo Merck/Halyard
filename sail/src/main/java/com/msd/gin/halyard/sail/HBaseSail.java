@@ -19,9 +19,11 @@ package com.msd.gin.halyard.sail;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.TimestampedValueFactory;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -39,12 +43,23 @@ import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
-import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.FN;
+import org.eclipse.rdf4j.model.vocabulary.SPIF;
+import org.eclipse.rdf4j.model.vocabulary.SPIN;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
+import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
+import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
+import org.eclipse.rdf4j.spin.SpinParser;
+import org.eclipse.rdf4j.spin.function.AskFunction;
+import org.eclipse.rdf4j.spin.function.ConstructTupleFunction;
+import org.eclipse.rdf4j.spin.function.EvalFunction;
+import org.eclipse.rdf4j.spin.function.SelectTupleFunction;
+import org.eclipse.rdf4j.spin.function.spif.CanInvoke;
+import org.eclipse.rdf4j.spin.function.spif.ConvertSpinRDFToString;
 
 /**
  * HBaseSail is the RDF Storage And Inference Layer (SAIL) implementation on top of Apache HBase.
@@ -74,6 +89,9 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
 	}
 
     private static final long STATUS_CACHING_TIMEOUT = 60000l;
+    private static final String MIN_TIMESTAMP_QUERY_PARAM = "minTimestamp";
+    private static final String MAX_TIMESTAMP_QUERY_PARAM = "maxTimestamp";
+    private static final String MAX_VERSIONS_QUERY_PARAM = "maxVersions";
 
     private final Configuration config; //the configuration of the HBase database
     final String tableName;
@@ -86,6 +104,12 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
     private long readOnlyTimestamp = -1;
     final String elasticIndexURL;
     final Ticker ticker;
+	FunctionRegistry functionRegistry = FunctionRegistry.getInstance();
+	TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
+	SpinParser spinParser = new SpinParser();
+	long minTimestamp = 0;
+	long maxTimestamp = Long.MAX_VALUE;
+	int maxVersions = 1;
 	final ConnectionFactory connFactory;
 	Connection hConnection;
 	final boolean hConnectionIsShared; //whether a Connection is provided or we need to create our own
@@ -201,17 +225,72 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
 			SailFederatedService fedServ = getService(service);
 			return fedServ != null ? ((HBaseSail) fedServ.getSail()).statistics : null;
 		});
+
+		registerSpinParsingFunctions();
+		registerSpinParsingTupleFunctions();
     }
+
+	private void registerSpinParsingFunctions() {
+		if (!(functionRegistry.get(FN.CONCAT.toString()).get() instanceof org.eclipse.rdf4j.spin.function.Concat)) {
+			functionRegistry.add(new org.eclipse.rdf4j.spin.function.Concat());
+		}
+		if (!functionRegistry.has(SPIN.EVAL_FUNCTION.toString())) {
+			functionRegistry.add(new EvalFunction(spinParser));
+		}
+		if (!functionRegistry.has(SPIN.ASK_FUNCTION.toString())) {
+			functionRegistry.add(new AskFunction(spinParser));
+		}
+		if (!functionRegistry.has(SPIF.CONVERT_SPIN_RDF_TO_STRING_FUNCTION.toString())) {
+			functionRegistry.add(new ConvertSpinRDFToString(spinParser));
+		}
+		if (!functionRegistry.has(SPIF.CAN_INVOKE_FUNCTION.toString())) {
+			functionRegistry.add(new CanInvoke(spinParser));
+		}
+	}
+
+	void registerSpinParsingTupleFunctions() {
+		if (!tupleFunctionRegistry.has(SPIN.CONSTRUCT_PROPERTY.stringValue())) {
+			tupleFunctionRegistry.add(new ConstructTupleFunction(spinParser));
+		}
+		if (!tupleFunctionRegistry.has(SPIN.SELECT_PROPERTY.stringValue())) {
+			tupleFunctionRegistry.add(new SelectTupleFunction(spinParser));
+		}
+	}
 
     @Override
 	public SailFederatedService getService(String serviceUrl) throws QueryEvaluationException {
         //provide a service to query over Halyard graphs. Remote service queries are not supported.
         if (serviceUrl.startsWith(HALYARD.NAMESPACE)) {
-            String federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length());
-            SailFederatedService federatedService;
+			final String federatedTable;
+        	List<NameValuePair> queryParams;
+        	int queryParamsPos = serviceUrl.lastIndexOf('?');
+        	if (queryParamsPos != -1) {
+            	federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length(), queryParamsPos);
+                queryParams = URLEncodedUtils.parse(serviceUrl.substring(queryParamsPos+1), StandardCharsets.UTF_8);
+        	} else {
+        		federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length());
+        		queryParams = Collections.emptyList();
+        	}
+
+        	SailFederatedService federatedService;
             try {
-				federatedService = federatedServices.get(federatedTable, () -> {
+				federatedService = federatedServices.get(serviceUrl, () -> {
 				    HBaseSail sail = new HBaseSail(hConnection, config, federatedTable, false, 0, true, evaluationTimeout, null, ticker, HBaseSailConnection.Factory.INSTANCE);
+					for (NameValuePair nvp : queryParams) {
+						switch (nvp.getName()) {
+						case MIN_TIMESTAMP_QUERY_PARAM:
+							sail.minTimestamp = HalyardTableUtils.toHalyardTimestamp(Long.parseLong(nvp.getValue()),
+									false);
+							break;
+						case MAX_TIMESTAMP_QUERY_PARAM:
+							sail.maxTimestamp = HalyardTableUtils.toHalyardTimestamp(Long.parseLong(nvp.getValue()),
+									false);
+							break;
+						case MAX_VERSIONS_QUERY_PARAM:
+							sail.maxVersions = Integer.parseInt(nvp.getValue());
+							break;
+						}
+					}
 				    sail.initialize();
 				    return new SailFederatedService(sail);
 				});
@@ -266,7 +345,7 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
 
     @Override
     public ValueFactory getValueFactory() {
-        return SimpleValueFactory.getInstance();
+        return TimestampedValueFactory.getInstance();
     }
 
     @Override

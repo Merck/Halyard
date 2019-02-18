@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+
 import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
@@ -33,6 +34,7 @@ import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
+import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
@@ -203,10 +205,16 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
         protected void meetNode(QueryModelNode node) {
             if (node instanceof ExternalSet) {
                 meetExternalSet((ExternalSet) node);
+			} else if (node instanceof TupleFunctionCall) {
+				meetTupleFunctionCall((TupleFunctionCall) node);
             } else {
                 node.visitChildren(this);
             }
         }
+
+		protected void meetTupleFunctionCall(TupleFunctionCall node) {
+			cardinality = getCardinality(10.0, ((TupleFunctionCall) node).getResultVars());
+		}
 
         @Override
         public void meet(Service node) {

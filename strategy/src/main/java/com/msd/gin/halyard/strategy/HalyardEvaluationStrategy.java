@@ -26,10 +26,13 @@ import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
+import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
+import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
 
 /**
@@ -70,18 +73,33 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
     Value sharedValueOfNow;
 
     /**
-     * Default constructor of HalyardEvaluationStrategy
-     * @param tripleSource {@code TripleSource} to be queried for the existence of triples in a context
-     * @param dataset {@code Dataset} A dataset consists of a default graph for read and using operations, which is the RDF merge of one or more graphs, a set of named graphs, and a single update graph for INSERT and DELETE
-     * @param serviceResolver {@code FederatedServiceResolver} resolver for any federated services (graphs) required for the evaluation
-     * @param timeout {@code long} query evaluation timeout in seconds, negative values mean no timeout
-     */
-    public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset, FederatedServiceResolver serviceResolver, long timeout) {
+	 * Default constructor of HalyardEvaluationStrategy
+	 * 
+	 * @param tripleSource {@code TripleSource} to be queried for the existence of triples in a context
+	 * @param queryContext {@code QueryContext} to use for query evaluation
+	 * @param tupleFunctionRegistry {@code TupleFunctionRegistry} to use for {@code TupleFunctionCall} evaluation.
+	 * @param functionRegistry {@code FunctionRegistry} to use for {@code FunctionCall} evaluation.
+	 * @param dataset {@code Dataset} A dataset consists of a default graph for read and using operations, which is the RDF merge of one or more graphs, a set of named graphs, and
+	 * a single update graph for INSERT and DELETE
+	 * @param serviceResolver {@code FederatedServiceResolver} resolver for any federated services (graphs) required for the evaluation
+	 * @param timeout {@code long} query evaluation timeout in seconds, negative values mean no timeout
+	 */
+	public HalyardEvaluationStrategy(TripleSource tripleSource, QueryContext queryContext,
+			TupleFunctionRegistry tupleFunctionRegistry,
+			FunctionRegistry functionRegistry, Dataset dataset, FederatedServiceResolver serviceResolver,
+			long timeout) {
         this.serviceResolver = serviceResolver;
-        this.tupleEval = new HalyardTupleExprEvaluation(this, tripleSource, dataset, timeout);
-        this.valueEval = new HalyardValueExprEvaluation(this, tripleSource.getValueFactory());
+		this.tupleEval = new HalyardTupleExprEvaluation(this, queryContext, tupleFunctionRegistry, tripleSource,
+				dataset, timeout);
+		this.valueEval = new HalyardValueExprEvaluation(this, functionRegistry, tripleSource.getValueFactory());
         EvaluationStrategies.register(this);
     }
+
+	public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset,
+			FederatedServiceResolver serviceResolver, long timeout) {
+		this(tripleSource, new QueryContext(), TupleFunctionRegistry.getInstance(), FunctionRegistry.getInstance(),
+				dataset, serviceResolver, timeout);
+	}
 
     /**
      * Get a service for a federated dataset.

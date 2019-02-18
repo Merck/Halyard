@@ -18,12 +18,6 @@ package com.msd.gin.halyard.tools;
 
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HALYARD;
-import com.msd.gin.halyard.sail.HBaseSail;
-import com.msd.gin.halyard.tools.TimeAwareHBaseSailConnection.TimestampCallbackBinding;
-import com.yammer.metrics.core.Gauge;
-
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -62,7 +56,6 @@ import org.eclipse.rdf4j.query.Update;
 import org.eclipse.rdf4j.query.algebra.UpdateExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
-import org.eclipse.rdf4j.query.impl.MapBindingSet;
 import org.eclipse.rdf4j.query.parser.ParsedUpdate;
 import org.eclipse.rdf4j.query.parser.QueryParserUtil;
 import org.eclipse.rdf4j.repository.RepositoryException;
@@ -77,6 +70,12 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
+
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.sail.HALYARD;
+import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.sail.HBaseSailConnection;
+import com.yammer.metrics.core.Gauge;
 
 /**
  * Apache Hadoop MapReduce tool for performing SPARQL Graph construct queries and then bulk loading the results back into HBase. Essentially, batch process queries
@@ -151,7 +150,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 					}, new HBaseSail.ConnectionFactory() {
 						@Override
 						public SailConnection createConnection(HBaseSail sail) {
-							return new TimeAwareHBaseSailConnection(sail) {
+							return new HBaseSailConnection(sail) {
 								@Override
 								protected void put(KeyValue kv) throws IOException {
 									try {
@@ -204,7 +203,6 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                         rep.initialize();
                         try(SailRepositoryConnection con = rep.getConnection()) {
 	                        Update upd = new SailUpdate(singleUpdate, con){};
-	                        ((MapBindingSet)upd.getBindings()).addBinding(new TimestampCallbackBinding());
 	                        LOG.log(Level.INFO, "Execution of: {0}", query);
 	                        context.setStatus(name);
 	                        upd.execute();

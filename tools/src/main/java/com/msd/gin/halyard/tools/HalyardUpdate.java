@@ -16,14 +16,13 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.sail.HBaseSail;
-
 import org.apache.commons.cli.CommandLine;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.Update;
-import org.eclipse.rdf4j.query.impl.MapBindingSet;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
+
+import com.msd.gin.halyard.sail.HBaseSail;
 
 /**
  * Command line tool executing SPARQL Update query on Halyard dataset directly
@@ -44,12 +43,11 @@ public final class HalyardUpdate extends AbstractHalyardTool {
 
 
     public int run(CommandLine cmd) throws Exception {
-		SailRepository rep = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('i'), null, new TimeAwareHBaseSailConnection.Factory()));
+		SailRepository rep = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('i'), null));
         rep.initialize();
         try {
         	try(RepositoryConnection conn = rep.getConnection()) {
 	            Update u = conn.prepareUpdate(QueryLanguage.SPARQL, cmd.getOptionValue('q'));
-				((MapBindingSet) u.getBindings()).addBinding(new TimeAwareHBaseSailConnection.TimestampCallbackBinding());
 	            LOG.info("Update execution started");
 	            u.execute();
 	            LOG.info("Update finished");

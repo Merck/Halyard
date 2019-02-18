@@ -75,8 +75,8 @@ import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.datetime.Now;
-import org.eclipse.rdf4j.query.algebra.evaluation.util.MathUtil;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtil;
+import org.eclipse.rdf4j.query.algebra.evaluation.util.XMLDatatypeMathUtil;
 
 /**
  * Evaluates "value" expressions (low level language functions and operators, instances of {@link ValueExpr}) from SPARQL such as 'Regex', 'IsURI', math expressions etc.
@@ -86,10 +86,13 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtil;
 class HalyardValueExprEvaluation {
 
     private final HalyardEvaluationStrategy parentStrategy;
+	private final FunctionRegistry functionRegistry;
     private final ValueFactory valueFactory;
 
-    HalyardValueExprEvaluation(HalyardEvaluationStrategy parentStrategy, ValueFactory valueFactory) {
+	HalyardValueExprEvaluation(HalyardEvaluationStrategy parentStrategy, FunctionRegistry functionRegistry,
+			ValueFactory valueFactory) {
         this.parentStrategy = parentStrategy;
+		this.functionRegistry = functionRegistry;
         this.valueFactory = valueFactory;
     }
 
@@ -660,7 +663,7 @@ class HalyardValueExprEvaluation {
      * Evaluates a function.
      */
     private Value evaluate(FunctionCall node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Optional<Function> function = FunctionRegistry.getInstance().get(node.getURI());
+		Optional<Function> function = functionRegistry.get(node.getURI());
         if (!function.isPresent()) {
             throw new QueryEvaluationException("Unknown function '" + node.getURI() + "'");
         }
@@ -815,7 +818,8 @@ class HalyardValueExprEvaluation {
     private Value evaluate(Compare node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value leftVal = evaluate(node.getLeftArg(), bindings);
         Value rightVal = evaluate(node.getRightArg(), bindings);
-        return BooleanLiteral.valueOf(QueryEvaluationUtil.compare(leftVal, rightVal, node.getOperator()));
+		return BooleanLiteral.valueOf(
+				QueryEvaluationUtil.compare(leftVal, rightVal, node.getOperator(), false));
     }
 
     /**
@@ -831,7 +835,7 @@ class HalyardValueExprEvaluation {
         Value leftVal = evaluate(node.getLeftArg(), bindings);
         Value rightVal = evaluate(node.getRightArg(), bindings);
         if (leftVal instanceof Literal && rightVal instanceof Literal) {
-            return MathUtil.compute((Literal) leftVal, (Literal) rightVal, node.getOperator());
+			return XMLDatatypeMathUtil.compute((Literal)leftVal, (Literal)rightVal, node.getOperator());
         }
         throw new ValueExprEvaluationException("Both arguments must be numeric literals");
     }

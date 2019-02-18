@@ -25,7 +25,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 
 import org.apache.hadoop.conf.Configuration;
@@ -48,10 +50,12 @@ import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 /**
@@ -127,7 +131,136 @@ public final class HalyardTableUtils {
         }
     };
 
-    static MessageDigest getMessageDigest(String algorithm) {
+	interface ByteWriter {
+		byte[] writeBytes(Literal l);
+	}
+
+	interface ByteReader {
+		Literal readBytes(byte[] b, ValueFactory vf);
+	}
+
+	private static final Map<IRI, ByteWriter> BYTE_WRITERS = new HashMap<>();
+	private static final Map<Byte, ByteReader> BYTE_READERS = new HashMap<>();
+
+	private static final byte FALSE_TYPE = '0';
+	private static final byte TRUE_TYPE = '1';
+	private static final byte BYTE_TYPE = 'b';
+	private static final byte SHORT_TYPE = 's';
+	private static final byte INT_TYPE = 'i';
+	private static final byte LONG_TYPE = 'l';
+	private static final byte FLOAT_TYPE = 'f';
+	private static final byte DOUBLE_TYPE = 'd';
+
+	static {
+		BYTE_WRITERS.put(XMLSchema.BOOLEAN, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				return new byte[] { l.booleanValue() ? TRUE_TYPE : FALSE_TYPE };
+			}
+		});
+		BYTE_READERS.put(FALSE_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				return vf.createLiteral(false);
+			}
+		});
+		BYTE_READERS.put(TRUE_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				return vf.createLiteral(true);
+			}
+		});
+
+		BYTE_WRITERS.put(XMLSchema.BYTE, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				return new byte[] { BYTE_TYPE, l.byteValue() };
+			}
+		});
+		BYTE_READERS.put(BYTE_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				return vf.createLiteral(b[1]);
+			}
+		});
+
+		BYTE_WRITERS.put(XMLSchema.SHORT, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				byte[] b = new byte[3];
+				ByteBuffer.wrap(b).put(SHORT_TYPE).asShortBuffer().put(l.shortValue());
+				return b;
+			}
+		});
+		BYTE_READERS.put(SHORT_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				return vf.createLiteral(ByteBuffer.wrap(b, 1, 2).asShortBuffer().get());
+			}
+		});
+
+		BYTE_WRITERS.put(XMLSchema.INT, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				byte[] b = new byte[5];
+				ByteBuffer.wrap(b).put(INT_TYPE).asIntBuffer().put(l.intValue());
+				return b;
+			}
+		});
+		BYTE_READERS.put(INT_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				return vf.createLiteral(ByteBuffer.wrap(b, 1, 4).asIntBuffer().get());
+			}
+		});
+
+		BYTE_WRITERS.put(XMLSchema.LONG, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				byte[] b = new byte[9];
+				ByteBuffer.wrap(b).put(LONG_TYPE).asLongBuffer().put(l.longValue());
+				return b;
+			}
+		});
+		BYTE_READERS.put(LONG_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				return vf.createLiteral(ByteBuffer.wrap(b, 1, 8).asLongBuffer().get());
+			}
+		});
+
+		BYTE_WRITERS.put(XMLSchema.FLOAT, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				byte[] b = new byte[5];
+				ByteBuffer.wrap(b).put(FLOAT_TYPE).asFloatBuffer().put(l.floatValue());
+				return b;
+			}
+		});
+		BYTE_READERS.put(FLOAT_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				return vf.createLiteral(ByteBuffer.wrap(b, 1, 4).asFloatBuffer().get());
+			}
+		});
+
+		BYTE_WRITERS.put(XMLSchema.DOUBLE, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				byte[] b = new byte[9];
+				ByteBuffer.wrap(b).put(DOUBLE_TYPE).asDoubleBuffer().put(l.doubleValue());
+				return b;
+			}
+		});
+		BYTE_READERS.put(DOUBLE_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				return vf.createLiteral(ByteBuffer.wrap(b, 1, 8).asDoubleBuffer().get());
+			}
+		});
+	}
+
+	static MessageDigest getMessageDigest(String algorithm) {
         try {
             return MessageDigest.getInstance(algorithm);
         } catch (NoSuchAlgorithmException e) {
@@ -287,18 +420,13 @@ public final class HalyardTableUtils {
         byte[] oKey = hashKey(ob);  //object key
 
         //bytes to be used for the HBase column qualifier
-        byte[] cq = ByteBuffer.allocate(sb.length + pb.length + ob.length + cb.length + 12).putInt(sb.length).putInt(pb.length).putInt(ob.length).put(sb).put(pb).put(ob).put(cb).array();
+		byte[] cq = ByteBuffer.allocate(sb.length + pb.length + ob.length + cb.length + 8).putShort((short) sb.length).putShort((short) pb.length).putInt(ob.length).put(sb).put(pb).put(ob).put(cb).array();
 
         KeyValue kv[] =  new KeyValue[context == null ? PREFIXES : 2 * PREFIXES];
 
         KeyValue.Type type = delete ? KeyValue.Type.DeleteColumn : KeyValue.Type.Put;
 
-        //timestamp is shifted one bit left and the last bit is used to prioritize between inserts and deletes of the same time to avoid HBase ambiguity
-        //inserts are considered always later after deletes on a timeline
-        timestamp = timestamp << 1;
-        if (!delete) {
-            timestamp |= 1;
-        }
+		timestamp = toHalyardTimestamp(timestamp, !delete);
 
         //generate HBase key value pairs from: row, family, qualifier, value. Permutations of SPO (and if needed CSPO) are all stored. Values are actually empty.
         kv[0] = new KeyValue(concat(SPO_PREFIX, false, sKey, pKey, oKey), CF_NAME, cq, timestamp, type, EMPTY);
@@ -313,6 +441,24 @@ public final class HalyardTableUtils {
         return kv;
     }
 
+	/**
+	 * Timestamp is shifted one bit left and the last bit is used to prioritize
+	 * between inserts and deletes of the same time to avoid HBase ambiguity inserts
+	 * are considered always later after deletes on a timeline.
+	 */
+	public static long toHalyardTimestamp(long ts, boolean insert) {
+		// use arithmetic operations instead of bit-twiddling to correctly handle
+		// negative timestamps
+		long hts = 2 * ts;
+		if (insert) {
+			hts += 1;
+		}
+		return hts;
+	}
+
+	public static long fromHalyardTimestamp(long hts) {
+		return hts >> 1; // NB: preserve sign
+	}
 
     /**
      * Method constructing HBase Scan from a Statement pattern, any of the arguments can be null
@@ -407,9 +553,11 @@ public final class HalyardTableUtils {
     public static List<Statement> parseStatements(Result res, ValueFactory vf) {
     	// multiple triples may have the same hash (i.e. row key)
         ArrayList<Statement> st = new ArrayList<>();
-        if (res.rawCells() != null) for (Cell c : res.rawCells()) {
-            st.add(parseStatement(c, vf));
-        }
+		if (res.rawCells() != null) {
+			for (Cell c : res.rawCells()) {
+				st.add(parseStatement(c, vf));
+			}
+		}
         return st;
     }
 
@@ -422,8 +570,8 @@ public final class HalyardTableUtils {
 	 */
     public static Statement parseStatement(Cell c, ValueFactory vf) {
         ByteBuffer bb = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
-        byte[] sb = new byte[bb.getInt()];
-        byte[] pb = new byte[bb.getInt()];
+		byte[] sb = new byte[bb.getShort()];
+		byte[] pb = new byte[bb.getShort()];
         byte[] ob = new byte[bb.getInt()];
         bb.get(sb);
         bb.get(pb);
@@ -440,6 +588,9 @@ public final class HalyardTableUtils {
 			Resource context = readResource(cb, vf);
 			stmt = vf.createStatement(subj, pred, value, context);
 		}
+		if (stmt instanceof Timestamped) {
+			((Timestamped) stmt).setTimestamp(fromHalyardTimestamp(c.getTimestamp()));
+        }
 		return stmt;
     }
 
@@ -537,11 +688,27 @@ public final class HalyardTableUtils {
     }
 
     public static byte[] writeBytes(Value v) {
-    	return NTriplesUtil.toNTriplesString(v).getBytes(UTF8);
+		if (v instanceof Literal) {
+			Literal l = (Literal) v;
+			ByteWriter writer = BYTE_WRITERS.get(l.getDatatype());
+			if (writer != null) {
+				return writer.writeBytes(l);
+			} else {
+				return NTriplesUtil.toNTriplesString(v).getBytes(UTF8);
+			}
+		} else {
+			return NTriplesUtil.toNTriplesString(v).getBytes(UTF8);
+		}
     }
 
     public static Value readValue(byte[] b, ValueFactory vf) {
-    	return NTriplesUtil.parseValue(new String(b, UTF8), vf);
+		byte type = b[0];
+		ByteReader reader = BYTE_READERS.get(type);
+		if (reader != null) {
+			return reader.readBytes(b, vf);
+		} else {
+			return NTriplesUtil.parseValue(new String(b, UTF8), vf);
+		}
     }
 
     public static Resource readResource(byte[] b, ValueFactory vf) {
