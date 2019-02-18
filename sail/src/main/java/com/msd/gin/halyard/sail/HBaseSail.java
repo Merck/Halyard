@@ -566,7 +566,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         }
     }
 
-    protected void put(KeyValue kv) throws IOException {
+    protected synchronized void put(KeyValue kv) throws IOException {
         table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
     }
 
