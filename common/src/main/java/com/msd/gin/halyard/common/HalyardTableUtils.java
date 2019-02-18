@@ -18,7 +18,6 @@ package com.msd.gin.halyard.common;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -62,9 +61,8 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
  */
 public final class HalyardTableUtils {
 
-    private static final Charset UTF8 = StandardCharsets.UTF_8;
     private static final byte[] EMPTY = new byte[0];
-    private static final byte[] CF_NAME = "e".getBytes(UTF8);
+    private static final byte[] CF_NAME = "e".getBytes(StandardCharsets.UTF_8);
     private static final String MD_ALGORITHM = "SHA1";
     private static final Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
 
@@ -255,10 +253,10 @@ public final class HalyardTableUtils {
      * @return array of KeyValues
      */
     public static KeyValue[] toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, long timestamp) {
-		byte[] sb = writeBytes(subj); // subject bytes
-		byte[] pb = writeBytes(pred); // predicate bytes
-		byte[] ob = writeBytes(obj); // object bytes
-		byte[] cb = context == null ? new byte[0] : writeBytes(context); // context (graph) bytes
+        byte[] sb = writeBytes(subj); // subject bytes
+        byte[] pb = writeBytes(pred); // predicate bytes
+        byte[] ob = writeBytes(obj); // object bytes
+        byte[] cb = context == null ? new byte[0] : writeBytes(context); // context (graph) bytes
         byte[] sKey = hashKey(sb);  //subject key
         byte[] pKey = hashKey(pb);  //predicate key
         byte[] oKey = hashKey(ob);  //object key
@@ -377,6 +375,7 @@ public final class HalyardTableUtils {
     /**
      * Parser method returning all Statements from a single HBase Scan Result
      * @param res HBase Scan Result
+     * @param vf ValueFactory to construct Statement and its Values
      * @return List of Statements
      */
     public static List<Statement> parseStatements(Result res, ValueFactory vf) {
@@ -391,6 +390,7 @@ public final class HalyardTableUtils {
     /**
      * Parser method returning Statement from a single HBase Result Cell
      * @param c HBase Result Cell
+     * @param vf ValueFactory to construct Statement and its Values
      * @return Statements
      */
     public static Statement parseStatement(Cell c, ValueFactory vf) {
@@ -406,14 +406,14 @@ public final class HalyardTableUtils {
         Resource subj = readResource(sb, vf);
         IRI pred = readIRI(pb, vf);
         Value value = readValue(ob, vf);
-		Statement stmt;
-		if (cb.length == 0) {
-			stmt = vf.createStatement(subj, pred, value);
-		} else {
-			Resource context = readResource(cb, vf);
-			stmt = vf.createStatement(subj, pred, value, context);
-		}
-		return stmt;
+        Statement stmt;
+        if (cb.length == 0) {
+            stmt = vf.createStatement(subj, pred, value);
+        } else {
+            Resource context = readResource(cb, vf);
+            stmt = vf.createStatement(subj, pred, value, context);
+        }
+        return stmt;
     }
 
     /**
@@ -428,8 +428,8 @@ public final class HalyardTableUtils {
         scan.setMaxVersions(1);
         scan.setAllowPartialResults(true);
         scan.setBatch(10);
-        scan.setStartRow(startRow);
-        scan.setStopRow(stopRow);
+        if (startRow != null) scan.setStartRow(startRow);
+        if (stopRow != null) scan.setStopRow(stopRow);
         return scan;
     }
 
@@ -510,18 +510,18 @@ public final class HalyardTableUtils {
     }
 
     public static byte[] writeBytes(Value v) {
-    	return NTriplesUtil.toNTriplesString(v).getBytes(UTF8);
+        return NTriplesUtil.toNTriplesString(v).getBytes(StandardCharsets.UTF_8);
     }
 
     public static Value readValue(byte[] b, ValueFactory vf) {
-    	return NTriplesUtil.parseValue(new String(b, UTF8), vf);
+        return NTriplesUtil.parseValue(new String(b, StandardCharsets.UTF_8), vf);
     }
 
     public static Resource readResource(byte[] b, ValueFactory vf) {
-    	return NTriplesUtil.parseResource(new String(b, UTF8), vf);
+        return NTriplesUtil.parseResource(new String(b, StandardCharsets.UTF_8), vf);
     }
 
     public static IRI readIRI(byte[] b, ValueFactory vf) {
-    	return NTriplesUtil.parseURI(new String(b, UTF8), vf);
+        return NTriplesUtil.parseURI(new String(b, StandardCharsets.UTF_8), vf);
     }
 }

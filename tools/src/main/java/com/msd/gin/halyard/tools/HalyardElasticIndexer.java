@@ -76,7 +76,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
         final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
         long counter = 0, exports = 0, batches = 0, statements = 0;
-		byte[] lastHash = new byte[HalyardTableUtils.KEY_SIZE], hash = new byte[HalyardTableUtils.KEY_SIZE];
+        byte[] lastHash = new byte[HalyardTableUtils.KEY_SIZE], hash = new byte[HalyardTableUtils.KEY_SIZE];
         ArrayList<String> literals = new ArrayList<>();
         StringBuilder batch = new StringBuilder();
         URL url;
@@ -91,14 +91,13 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             bufferLimit = context.getConfiguration().getInt(BUFFER_LIMIT, 100000);
         }
 
-
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             if ((counter++ % 100000) == 0) {
                 output.setStatus(MessageFormat.format("{0} st:{1} exp:{2} batch:{3} ", counter, statements, exports, batches));
             }
-			hash = new byte[HalyardTableUtils.KEY_SIZE];
-			System.arraycopy(key.get(), key.getOffset() + 1 + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 0 : HalyardTableUtils.KEY_SIZE), hash, 0, HalyardTableUtils.KEY_SIZE);
+            hash = new byte[HalyardTableUtils.KEY_SIZE];
+            System.arraycopy(key.get(), key.getOffset() + 1 + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 0 : HalyardTableUtils.KEY_SIZE), hash, 0, HalyardTableUtils.KEY_SIZE);
             if (!Arrays.equals(hash, lastHash)) {
                 export(false);
                 lastHash = hash;
@@ -274,11 +273,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         job.setJarByClass(HalyardElasticIndexer.class);
         TableMapReduceUtil.initCredentials(job);
 
-        Scan scan = new Scan();
-        scan.addFamily("e".getBytes(StandardCharsets.UTF_8));
-        scan.setMaxVersions(1);
-        scan.setBatch(10);
-        scan.setAllowPartialResults(true);
+        Scan scan = HalyardTableUtils.scan(null, null);
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP region(s)
             byte[] graphHash = HalyardTableUtils.hashKey(NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance()));

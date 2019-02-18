@@ -24,8 +24,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.BitSet;
 import java.util.Collections;
@@ -101,8 +99,6 @@ public final class HalyardSummary extends AbstractHalyardTool {
     private static final String TARGET_GRAPH = "halyard.summary.target.graph";
     private static final String DECIMATION_FACTOR = "halyard.summary.decimation";
     private static final int DEFAULT_DECIMATION_FACTOR = 100;
-
-	private static final Charset UTF8 = StandardCharsets.UTF_8;
 
     static byte toCardinality(long count) {
         return (byte)(63 - Long.numberOfLeadingZeros(count));
@@ -498,11 +494,8 @@ public final class HalyardSummary extends AbstractHalyardTool {
         job.setJarByClass(HalyardSummary.class);
         TableMapReduceUtil.initCredentials(job);
 
-        Scan scan = new Scan(new byte[]{HalyardTableUtils.POS_PREFIX}, new byte[]{HalyardTableUtils.POS_PREFIX + 1});
-        scan.addFamily("e".getBytes(UTF8));
-        scan.setMaxVersions(1);
-        scan.setBatch(100);
-        scan.setAllowPartialResults(true);
+        Scan scan = HalyardTableUtils.scan(new byte[]{HalyardTableUtils.POS_PREFIX}, new byte[]{HalyardTableUtils.POS_PREFIX + 1});
+
         TableMapReduceUtil.initTableMapperJob(source,
                 scan,
                 SummaryMapper.class,

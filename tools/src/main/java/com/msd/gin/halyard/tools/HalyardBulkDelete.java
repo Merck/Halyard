@@ -19,7 +19,6 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.yammer.metrics.core.Gauge;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -176,11 +175,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         job.setJarByClass(HalyardBulkDelete.class);
         TableMapReduceUtil.initCredentials(job);
 
-        Scan scan = new Scan();
-        scan.addFamily("e".getBytes(StandardCharsets.UTF_8));
-        scan.setMaxVersions(1);
-        scan.setBatch(10);
-        scan.setAllowPartialResults(true);
+        Scan scan = HalyardTableUtils.scan(null, null);
 
         TableMapReduceUtil.initTableMapperJob(source,
             scan,

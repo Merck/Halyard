@@ -201,7 +201,7 @@ public final class HalyardExport extends AbstractHalyardTool {
 
         public CSVResultWriter(StatusLog log, OutputStream out) {
             super(log);
-			this.writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
+            this.writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
         }
 
         @Override
