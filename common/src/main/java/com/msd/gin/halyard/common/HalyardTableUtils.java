@@ -110,14 +110,29 @@ public final class HalyardTableUtils {
     /**
      * Key hash size in bytes
      */
-    public static final byte KEY_SIZE = 20;
+	public static final byte S_KEY_SIZE = 20;
+	public static final byte P_KEY_SIZE = 20;
+	public static final byte O_KEY_SIZE = 20;
+	public static final byte C_KEY_SIZE = 20;
 
     private static final int PREFIXES = 3;
-    private static final byte[] START_KEY = new byte[KEY_SIZE];
-    public static final byte[] STOP_KEY = new byte[KEY_SIZE];
+	private static final byte[] S_START_KEY = new byte[S_KEY_SIZE];
+	public static final byte[] S_STOP_KEY = new byte[S_KEY_SIZE];
+	private static final byte[] P_START_KEY = new byte[P_KEY_SIZE];
+	public static final byte[] P_STOP_KEY = new byte[P_KEY_SIZE];
+	private static final byte[] O_START_KEY = new byte[O_KEY_SIZE];
+	public static final byte[] O_STOP_KEY = new byte[O_KEY_SIZE];
+	private static final byte[] C_START_KEY = new byte[C_KEY_SIZE];
+	public static final byte[] C_STOP_KEY = new byte[C_KEY_SIZE];
     static {
-        Arrays.fill(START_KEY, (byte)0);
-        Arrays.fill(STOP_KEY, (byte)0xff); /* 0xff is 255 in decimal */
+		Arrays.fill(S_START_KEY, (byte) 0);
+		Arrays.fill(S_STOP_KEY, (byte) 0xff); /* 0xff is 255 in decimal */
+		Arrays.fill(P_START_KEY, (byte) 0);
+		Arrays.fill(P_STOP_KEY, (byte) 0xff); /* 0xff is 255 in decimal */
+		Arrays.fill(O_START_KEY, (byte) 0);
+		Arrays.fill(O_STOP_KEY, (byte) 0xff); /* 0xff is 255 in decimal */
+		Arrays.fill(C_START_KEY, (byte) 0);
+		Arrays.fill(C_STOP_KEY, (byte) 0xff); /* 0xff is 255 in decimal */
     }
     private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
@@ -484,29 +499,29 @@ public final class HalyardTableUtils {
             if (subjHash == null) {
                 if (predHash == null) {
                     if (objHash == null) {
-                        return scan(concat(SPO_PREFIX, false), concat(SPO_PREFIX, true, STOP_KEY, STOP_KEY, STOP_KEY));
+						return scan3_0(SPO_PREFIX, S_STOP_KEY, P_STOP_KEY, O_STOP_KEY);
                     } else {
-                        return scan(OSP_PREFIX, objHash);
+						return scan3_1(OSP_PREFIX, objHash, S_STOP_KEY, P_STOP_KEY);
                     }
                 } else {
                     if (objHash == null) {
-                        return scan(POS_PREFIX, predHash);
+						return scan3_1(POS_PREFIX, predHash, O_STOP_KEY, S_STOP_KEY);
                     } else {
-                        return scan(POS_PREFIX, predHash, objHash);
+						return scan3_2(POS_PREFIX, predHash, objHash, S_STOP_KEY);
                     }
                 }
             } else {
                 if (predHash == null) {
                     if (objHash == null) {
-                        return scan(SPO_PREFIX, subjHash);
+						return scan3_1(SPO_PREFIX, subjHash, P_STOP_KEY, O_STOP_KEY);
                     } else {
-                        return scan(OSP_PREFIX, objHash, subjHash);
+						return scan3_2(OSP_PREFIX, objHash, subjHash, P_STOP_KEY);
                     }
                 } else {
                     if (objHash == null) {
-                        return scan(SPO_PREFIX, subjHash, predHash);
+						return scan3_2(SPO_PREFIX, subjHash, predHash, O_STOP_KEY);
                     } else {
-                        return scan(SPO_PREFIX, subjHash, predHash, objHash);
+						return scan3_3(SPO_PREFIX, subjHash, predHash, objHash);
                     }
                 }
             }
@@ -514,29 +529,29 @@ public final class HalyardTableUtils {
             if (subjHash == null) {
                 if (predHash == null) {
                     if (objHash == null) {
-                        return scan(CSPO_PREFIX, ctxHash);
+						return scan4_1(CSPO_PREFIX, ctxHash, S_STOP_KEY, P_STOP_KEY, O_STOP_KEY);
                     } else {
-                        return scan(COSP_PREFIX, ctxHash, objHash);
+						return scan4_2(COSP_PREFIX, ctxHash, objHash, S_STOP_KEY, P_STOP_KEY);
                     }
                 } else {
                     if (objHash == null) {
-                        return scan(CPOS_PREFIX, ctxHash, predHash);
+						return scan4_2(CPOS_PREFIX, ctxHash, predHash, O_STOP_KEY, S_STOP_KEY);
                     } else {
-                        return scan(CPOS_PREFIX, ctxHash, predHash, objHash);
+						return scan4_3(CPOS_PREFIX, ctxHash, predHash, objHash, S_STOP_KEY);
                     }
                 }
             } else {
                 if (predHash == null) {
                     if (objHash == null) {
-                        return scan(CSPO_PREFIX, ctxHash, subjHash);
+						return scan4_2(CSPO_PREFIX, ctxHash, subjHash, P_STOP_KEY, O_STOP_KEY);
                     } else {
-                        return scan(COSP_PREFIX, ctxHash, objHash, subjHash);
+						return scan4_3(COSP_PREFIX, ctxHash, objHash, subjHash, P_STOP_KEY);
                     }
                 } else {
                     if (objHash == null) {
-                        return scan(CSPO_PREFIX, ctxHash, subjHash, predHash);
+						return scan4_3(CSPO_PREFIX, ctxHash, subjHash, predHash, O_STOP_KEY);
                     } else {
-                        return scan(CSPO_PREFIX, ctxHash, subjHash, predHash, objHash);
+						return scan4_4(CSPO_PREFIX, ctxHash, subjHash, predHash, objHash);
                     }
                 }
             }
@@ -671,19 +686,35 @@ public final class HalyardTableUtils {
         return ENC.encodeToString(b);
     }
 
-    private static Scan scan(byte prefix, byte[] key1) {
-        return scan(concat(prefix, false, key1), concat(prefix, true, key1, STOP_KEY, STOP_KEY, STOP_KEY));
+	private static Scan scan3_0(byte prefix, byte[] stopKey1, byte[] stopKey2, byte[] stopKey3) {
+		return scan(concat(prefix, false), concat(prefix, true, stopKey1, stopKey2, stopKey3));
+	}
+
+	private static Scan scan3_1(byte prefix, byte[] key1, byte[] stopKey2, byte[] stopKey3) {
+		return scan(concat(prefix, false, key1), concat(prefix, true, key1, stopKey2, stopKey3));
+	}
+
+	private static Scan scan3_2(byte prefix, byte[] key1, byte[] key2, byte[] stopKey3) {
+		return scan(concat(prefix, false, key1, key2), concat(prefix, true, key1, key2, stopKey3));
+	}
+
+	private static Scan scan3_3(byte prefix, byte[] key1, byte[] key2, byte[] key3) {
+		return scan(concat(prefix, false, key1, key2, key3), concat(prefix, true, key1, key2, key3));
+	}
+
+	private static Scan scan4_1(byte prefix, byte[] key1, byte[] stopKey2, byte[] stopKey3, byte[] stopKey4) {
+		return scan(concat(prefix, false, key1), concat(prefix, true, key1, stopKey2, stopKey3, stopKey4));
     }
 
-    private static Scan scan(byte prefix, byte[] key1, byte[] key2) {
-        return scan(concat(prefix, false, key1, key2), concat(prefix, true, key1, key2, STOP_KEY, STOP_KEY));
+	private static Scan scan4_2(byte prefix, byte[] key1, byte[] key2, byte[] stopKey3, byte[] stopKey4) {
+		return scan(concat(prefix, false, key1, key2), concat(prefix, true, key1, key2, stopKey3, stopKey4));
     }
 
-    private static Scan scan(byte prefix, byte[] key1, byte[] key2, byte[] key3) {
-        return scan(concat(prefix, false, key1, key2, key3), concat(prefix, true, key1, key2, key3, STOP_KEY));
+	private static Scan scan4_3(byte prefix, byte[] key1, byte[] key2, byte[] key3, byte[] stopKey4) {
+		return scan(concat(prefix, false, key1, key2, key3), concat(prefix, true, key1, key2, key3, stopKey4));
     }
 
-    private static Scan scan(byte prefix, byte[] key1, byte[] key2, byte[] key3, byte[] key4) {
+	private static Scan scan4_4(byte prefix, byte[] key1, byte[] key2, byte[] key3, byte[] key4) {
         return scan(concat(prefix, false, key1, key2, key3, key4), concat(prefix, true, key1, key2, key3, key4));
     }
 

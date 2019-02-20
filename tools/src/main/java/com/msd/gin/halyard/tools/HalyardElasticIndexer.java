@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Hex;
@@ -55,6 +56,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.json.JSONObject;
 
+import com.google.common.primitives.Ints;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.yammer.metrics.core.Gauge;
 
@@ -76,8 +78,9 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
         final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
         long counter = 0, exports = 0, batches = 0, statements = 0;
-		byte[] lastHash = new byte[HalyardTableUtils.KEY_SIZE], hash = new byte[HalyardTableUtils.KEY_SIZE];
-        ArrayList<String> literals = new ArrayList<>();
+        int maxKeySize = Ints.max(HalyardTableUtils.S_KEY_SIZE, HalyardTableUtils.P_KEY_SIZE, HalyardTableUtils.O_KEY_SIZE);
+		byte[] lastHash;
+        List<String> literals = new ArrayList<>();
         StringBuilder batch = new StringBuilder();
         URL url;
         int bufferLimit;
@@ -97,8 +100,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             if ((counter++ % 100000) == 0) {
                 output.setStatus(MessageFormat.format("{0} st:{1} exp:{2} batch:{3} ", counter, statements, exports, batches));
             }
-			hash = new byte[HalyardTableUtils.KEY_SIZE];
-			System.arraycopy(key.get(), key.getOffset() + 1 + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 0 : HalyardTableUtils.KEY_SIZE), hash, 0, HalyardTableUtils.KEY_SIZE);
+			byte[] hash = new byte[HalyardTableUtils.O_KEY_SIZE];
+			System.arraycopy(key.get(), key.getOffset() + 1 + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 0 : HalyardTableUtils.C_KEY_SIZE), hash, 0, HalyardTableUtils.O_KEY_SIZE);
             if (!Arrays.equals(hash, lastHash)) {
                 export(false);
                 lastHash = hash;
@@ -283,7 +286,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             //scan only given named graph from COSP region(s)
             byte[] graphHash = HalyardTableUtils.hashKey(NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance()));
             scan.setStartRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash));
-            scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, true, graphHash, HalyardTableUtils.STOP_KEY, HalyardTableUtils.STOP_KEY, HalyardTableUtils.STOP_KEY));
+            scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, true, graphHash, HalyardTableUtils.O_STOP_KEY, HalyardTableUtils.S_STOP_KEY, HalyardTableUtils.P_STOP_KEY));
         } else {
             //scan all OSP region(s)
             scan.setStartRow(new byte[]{HalyardTableUtils.OSP_PREFIX});

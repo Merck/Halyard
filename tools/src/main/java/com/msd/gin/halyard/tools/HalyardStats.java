@@ -73,6 +73,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.sail.SailConnection;
 
+import com.google.common.primitives.Ints;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
@@ -102,7 +103,9 @@ public final class HalyardStats extends AbstractHalyardTool {
 
         final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
 
-        final byte[] lastKeyFragment = new byte[HalyardTableUtils.KEY_SIZE], lastCtxFragment = new byte[HalyardTableUtils.KEY_SIZE], lastClassFragment = new byte[HalyardTableUtils.KEY_SIZE];
+        final byte[] lastKeyFragment = new byte[Ints.max(HalyardTableUtils.S_KEY_SIZE, HalyardTableUtils.P_KEY_SIZE, HalyardTableUtils.O_KEY_SIZE)];
+        final byte[] lastCtxFragment = new byte[HalyardTableUtils.C_KEY_SIZE];
+        final byte[] lastClassFragment = new byte[HalyardTableUtils.O_KEY_SIZE];
         IRI statsContext, graphContext;
         byte[] statsContextHash;
         byte lastRegion = -1;
@@ -129,9 +132,9 @@ public final class HalyardStats extends AbstractHalyardTool {
 			statsContextHash = HalyardTableUtils.hashKey(statsContext);
         }
 
-        private boolean matchAndCopyKey(byte[] source, int offset, byte[] target) {
+        private boolean matchAndCopyKey(byte[] source, int offset, int len, byte[] target) {
             boolean match = true;
-            for (int i=0; i<HalyardTableUtils.KEY_SIZE; i++) {
+            for (int i=0; i<len; i++) {
                 byte b = source[i + offset];
                 if (b != target[i]) {
                     target[i] = b;
@@ -155,10 +158,12 @@ public final class HalyardStats extends AbstractHalyardTool {
 			List<Statement> stmts = null;
             int hashShift;
             if (region < HalyardTableUtils.CSPO_PREFIX) {
+            	// triple region
                 hashShift = 1;
             } else {
-                hashShift = HalyardTableUtils.KEY_SIZE + 1;
-                if (!matchAndCopyKey(key.get(), key.getOffset() + 1, lastCtxFragment) || region != lastRegion) {
+            	// quad region
+                hashShift = HalyardTableUtils.C_KEY_SIZE + 1;
+                if (!matchAndCopyKey(key.get(), key.getOffset() + 1, HalyardTableUtils.C_KEY_SIZE, lastCtxFragment) || region != lastRegion) {
                     cleanup(output);
 					stmts = HalyardTableUtils.parseStatements(value, ssf);
 					graph = (IRI) stmts.get(0).getContext();
@@ -185,7 +190,25 @@ public final class HalyardStats extends AbstractHalyardTool {
                     }
                 }
             }
-            boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, lastKeyFragment) || region != lastRegion || lastGraph != graph;
+
+            int keyLen;
+            switch (region) {
+                case HalyardTableUtils.SPO_PREFIX:
+                case HalyardTableUtils.CSPO_PREFIX:
+                	keyLen = HalyardTableUtils.S_KEY_SIZE;
+                    break;
+                case HalyardTableUtils.POS_PREFIX:
+                case HalyardTableUtils.CPOS_PREFIX:
+                	keyLen = HalyardTableUtils.P_KEY_SIZE;
+                    break;
+                case HalyardTableUtils.OSP_PREFIX:
+                case HalyardTableUtils.COSP_PREFIX:
+                	keyLen = HalyardTableUtils.O_KEY_SIZE;
+                    break;
+                default:
+                    throw new IOException("Unknown region #" + region);
+            }
+            boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, keyLen, lastKeyFragment) || region != lastRegion || lastGraph != graph;
             if (hashChange) {
                 cleanupSubset(output);
 				if (stmts == null) {
@@ -229,21 +252,22 @@ public final class HalyardStats extends AbstractHalyardTool {
                         throw new IOException("Unknown region #" + region);
                 }
             }
+            int stmtCount = stmts.size();
             switch (region) {
                 case HalyardTableUtils.SPO_PREFIX:
                 case HalyardTableUtils.CSPO_PREFIX:
-                    triples += value.rawCells().length;
+                    triples += stmtCount;
                     break;
                 case HalyardTableUtils.POS_PREFIX:
                 case HalyardTableUtils.CPOS_PREFIX:
-                    if (Arrays.equals(TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + HalyardTableUtils.KEY_SIZE, lastClassFragment) || hashChange)) {
-                            classes++;
+                    if (Arrays.equals(TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + HalyardTableUtils.P_KEY_SIZE, HalyardTableUtils.O_KEY_SIZE, lastClassFragment) || hashChange)) {
+                    	classes++;
                     }
                     break;
                 default:
             }
-            subsetCounter += value.rawCells().length;
-            setCounter += value.rawCells().length;
+            subsetCounter += stmtCount;
+            setCounter += stmtCount;
             lastRegion = region;
             lastGraph = graph;
             if ((counter++ % 100000) == 0) {
@@ -464,8 +488,8 @@ public final class HalyardStats extends AbstractHalyardTool {
         addOption("g", "stats-named-graph", "target_graph", "Optional target named graph of the exported statistics (default value is '" + HALYARD.STATS_GRAPH_CONTEXT.stringValue() + "'), modification is recomended only for external export as internal Halyard optimizers expect the default value", false, true);
     }
 
-    private static RowRange rowRange(byte prefix, byte[] hash) {
-        return new RowRange(HalyardTableUtils.concat(prefix, false, hash), true, HalyardTableUtils.concat(prefix, true, hash, HalyardTableUtils.STOP_KEY, HalyardTableUtils.STOP_KEY, HalyardTableUtils.STOP_KEY), true);
+    private static RowRange rowRange(byte prefix, byte[] key1, byte[] stopKey2, byte[] stopKey3, byte[] stopKey4) {
+        return new RowRange(HalyardTableUtils.concat(prefix, false, key1), true, HalyardTableUtils.concat(prefix, false, key1, stopKey2, stopKey3, stopKey4), true);
     }
 
     @Override
@@ -503,13 +527,15 @@ public final class HalyardStats extends AbstractHalyardTool {
         scan.setBatch(10);
         scan.setAllowPartialResults(true);
         if (graphContext != null) { //restricting stats to scan given graph context only
-            List<RowRange> ranges = new ArrayList<>();
+            List<RowRange> ranges = new ArrayList<>(4);
 			byte[] gcHash = HalyardTableUtils.hashKey(SimpleValueFactory.getInstance().createIRI(graphContext));
-            ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX, gcHash));
-            ranges.add(rowRange(HalyardTableUtils.CPOS_PREFIX, gcHash));
-            ranges.add(rowRange(HalyardTableUtils.COSP_PREFIX, gcHash));
+            ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX, gcHash, HalyardTableUtils.S_STOP_KEY, HalyardTableUtils.P_STOP_KEY, HalyardTableUtils.O_STOP_KEY));
+            ranges.add(rowRange(HalyardTableUtils.CPOS_PREFIX, gcHash, HalyardTableUtils.P_STOP_KEY, HalyardTableUtils.O_STOP_KEY, HalyardTableUtils.S_STOP_KEY));
+            ranges.add(rowRange(HalyardTableUtils.COSP_PREFIX, gcHash, HalyardTableUtils.O_STOP_KEY, HalyardTableUtils.S_STOP_KEY, HalyardTableUtils.P_STOP_KEY));
             if (target == null) { //add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
-				ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX, HalyardTableUtils.hashKey(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SimpleValueFactory.getInstance().createIRI(targetGraph))));
+				ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX,
+						HalyardTableUtils.hashKey(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SVF.createIRI(targetGraph)),
+						HalyardTableUtils.S_STOP_KEY, HalyardTableUtils.P_STOP_KEY, HalyardTableUtils.O_STOP_KEY));
             }
             scan.setFilter(new MultiRowRangeFilter(ranges));
         }
