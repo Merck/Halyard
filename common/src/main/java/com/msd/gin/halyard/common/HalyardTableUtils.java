@@ -20,11 +20,13 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +60,8 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
+import com.google.common.hash.Hashing;
+
 /**
  * Core Halyard utility class performing RDF to HBase mappings and base HBase table and key management. The methods of this class define how
  * Halyard stores and finds data in HBase. This class also provides several constants that define the key encoding.
@@ -69,7 +73,6 @@ public final class HalyardTableUtils {
     private static final Charset UTF8 = StandardCharsets.UTF_8;
     private static final byte[] EMPTY = new byte[0];
     private static final byte[] CF_NAME = "e".getBytes(UTF8);
-    private static final String MD_ALGORITHM = "SHA1";
     private static final Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
 
     /*
@@ -110,10 +113,10 @@ public final class HalyardTableUtils {
     /**
      * Key hash size in bytes
      */
-	public static final byte S_KEY_SIZE = 20;
-	public static final byte P_KEY_SIZE = 20;
-	public static final byte O_KEY_SIZE = 20;
-	public static final byte C_KEY_SIZE = 20;
+	public static final byte S_KEY_SIZE = 16;
+	public static final byte P_KEY_SIZE = 4;
+	public static final byte O_KEY_SIZE = 16;
+	public static final byte C_KEY_SIZE = 8;
 
     private static final int PREFIXES = 3;
 	private static final byte[] S_START_KEY = new byte[S_KEY_SIZE];
@@ -139,10 +142,13 @@ public final class HalyardTableUtils {
     private static final String REGION_MAX_FILESIZE = "10000000000";
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
 
-    private static final ThreadLocal<MessageDigest> MD = new ThreadLocal<MessageDigest>(){
+    private static final ThreadLocal<Map<Integer,MessageDigest>> MDS = new ThreadLocal<Map<Integer,MessageDigest>>(){
         @Override
-        protected MessageDigest initialValue() {
-            return getMessageDigest(MD_ALGORITHM);
+        protected Map<Integer,MessageDigest> initialValue() {
+        	Map<Integer,MessageDigest> mds = new HashMap<>();
+        	mds.put(128, getMessageDigest("Skein-256-128"));
+        	mds.put(256, getMessageDigest("Skein-256-256"));
+        	return Collections.unmodifiableMap(mds);
         }
     };
 
@@ -276,6 +282,7 @@ public final class HalyardTableUtils {
 	}
 
 	static MessageDigest getMessageDigest(String algorithm) {
+		System.setProperty("org.bouncycastle.ec.disable_mqv", "true");
         try {
             return MessageDigest.getInstance(algorithm);
         } catch (NoSuchAlgorithmException e) {
@@ -430,9 +437,9 @@ public final class HalyardTableUtils {
 		byte[] pb = writeBytes(pred); // predicate bytes
 		byte[] ob = writeBytes(obj); // object bytes
 		byte[] cb = context == null ? new byte[0] : writeBytes(context); // context (graph) bytes
-        byte[] sKey = hashKey(sb);  //subject key
-        byte[] pKey = hashKey(pb);  //predicate key
-        byte[] oKey = hashKey(ob);  //object key
+        byte[] sKey = hashSubject(sb);  //subject key
+        byte[] pKey = hashPredicate(pb);  //predicate key
+        byte[] oKey = hashObject(ob);  //object key
 
         //bytes to be used for the HBase column qualifier
 		byte[] cq = ByteBuffer.allocate(sb.length + pb.length + ob.length + cb.length + 8).putShort((short) sb.length).putShort((short) pb.length).putInt(ob.length).put(sb).put(pb).put(ob).put(cb).array();
@@ -448,7 +455,7 @@ public final class HalyardTableUtils {
         kv[1] = new KeyValue(concat(POS_PREFIX, false, pKey, oKey, sKey), CF_NAME, cq, timestamp, type, EMPTY);
         kv[2] = new KeyValue(concat(OSP_PREFIX, false, oKey, sKey, pKey), CF_NAME, cq, timestamp, type, EMPTY);
         if (context != null) {
-            byte[] cKey = hashKey(cb);
+            byte[] cKey = hashContext(cb);
             kv[3] = new KeyValue(concat(CSPO_PREFIX, false, cKey, sKey, pKey, oKey), CF_NAME, cq, timestamp, type, EMPTY);
             kv[4] = new KeyValue(concat(CPOS_PREFIX, false, cKey, pKey, oKey, sKey), CF_NAME, cq, timestamp, type, EMPTY);
             kv[5] = new KeyValue(concat(COSP_PREFIX, false, cKey, oKey, sKey, pKey), CF_NAME, cq, timestamp, type, EMPTY);
@@ -484,7 +491,7 @@ public final class HalyardTableUtils {
      * @return HBase Scan instance to retrieve all data potentially matching the Statement pattern
      */
     public static Scan scan(Resource subj, IRI pred, Value obj, Resource ctx) {
-        return scan(hashKey(subj), hashKey(pred), hashKey(obj), hashKey(ctx));
+        return scan(hashSubject(subj), hashPredicate(pred), hashObject(obj), hashContext(ctx));
     }
     /**
      * Method constructing HBase Scan from a Statement pattern hashes, any of the arguments can be null
@@ -668,8 +675,8 @@ public final class HalyardTableUtils {
                 .setValue(HTableDescriptor.SPLIT_POLICY, REGION_SPLIT_POLICY);
     }
 
-    public static byte[] hashKey(byte[] key) {
-        MessageDigest md = MD.get();
+    public static byte[] hashUnique(byte[] key) {
+        MessageDigest md = MDS.get().get(256);
         try {
             md.update(key);
             return md.digest();
@@ -678,8 +685,50 @@ public final class HalyardTableUtils {
         }
     }
 
-    public static byte[] hashKey(Value v) {
-		return v == null ? null : hashKey(writeBytes(v));
+    public static byte[] hashSubject(byte[] key) {
+    	return digest(key, MDS.get().get(128), S_KEY_SIZE);
+    }
+
+    public static byte[] hashPredicate(byte[] key) {
+    	return Hashing.murmur3_32().hashBytes(key).asBytes();
+    }
+
+    public static byte[] hashObject(byte[] key) {
+    	return digest(key, MDS.get().get(128), O_KEY_SIZE);
+    }
+
+    public static byte[] hashContext(byte[] key) {
+    	return digest(key, MDS.get().get(128), C_KEY_SIZE);
+    }
+
+    private static byte[] digest(byte[] key, MessageDigest md, int hashLen) {
+    	byte[] hash = new byte[hashLen];
+        try {
+            md.update(key);
+            md.digest(hash, 0, hashLen);
+            return hash;
+        }
+		catch (DigestException e) {
+			throw new AssertionError(e);
+		} finally {
+            md.reset();
+        }
+    }
+
+    public static byte[] hashSubject(Resource v) {
+		return v == null ? null : hashSubject(writeBytes(v));
+    }
+
+    public static byte[] hashPredicate(IRI v) {
+		return v == null ? null : hashPredicate(writeBytes(v));
+    }
+
+    public static byte[] hashObject(Value v) {
+		return v == null ? null : hashObject(writeBytes(v));
+    }
+
+    public static byte[] hashContext(Resource v) {
+		return v == null ? null : hashContext(writeBytes(v));
     }
 
     public static String encode(byte b[]) {

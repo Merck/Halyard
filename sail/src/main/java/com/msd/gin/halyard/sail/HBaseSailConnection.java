@@ -641,9 +641,9 @@ public class HBaseSailConnection implements SailConnection {
             this.subj = subj;
             this.pred = pred;
             this.obj = obj;
-            this.subjHash = HalyardTableUtils.hashKey(subj);
-            this.predHash = HalyardTableUtils.hashKey(pred);
-            this.objHash = HalyardTableUtils.hashKey(obj);
+            this.subjHash = HalyardTableUtils.hashSubject(subj);
+            this.predHash = HalyardTableUtils.hashPredicate(pred);
+            this.objHash = HalyardTableUtils.hashObject(obj);
             this.contextsList = Arrays.asList(normalizeContexts(contexts));
             this.contexts = contextsList.iterator();
             this.endTime = startTime + (1000l * sail.evaluationTimeout);
@@ -656,7 +656,7 @@ public class HBaseSailConnection implements SailConnection {
                     if (contexts.hasNext()) {
 
                         //build a ResultScanner from an HBase Scan that finds potential matches
-                    	Scan scan = HalyardTableUtils.scan(subjHash, predHash, objHash, HalyardTableUtils.hashKey(contexts.next()));
+                    	Scan scan = HalyardTableUtils.scan(subjHash, predHash, objHash, HalyardTableUtils.hashContext(contexts.next()));
 						scan.setTimeRange(sail.minTimestamp, sail.maxTimestamp);
 						scan.setMaxVersions(sail.maxVersions);
                         rs = table.getScanner(scan);

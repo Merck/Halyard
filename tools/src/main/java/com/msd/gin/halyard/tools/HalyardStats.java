@@ -77,6 +77,7 @@ import com.google.common.primitives.Ints;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.sail.HalyardStatsBasedStatementPatternCardinalityCalculator;
 import com.msd.gin.halyard.sail.VOID_EXT;
 import com.yammer.metrics.core.Gauge;
 
@@ -95,7 +96,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 
 	private static final Charset UTF8 = StandardCharsets.UTF_8;
 
-	private static final byte[] TYPE_HASH = HalyardTableUtils.hashKey(RDF.TYPE);
+	private static final byte[] TYPE_HASH = HalyardTableUtils.hashPredicate(RDF.TYPE);
 
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
@@ -129,7 +130,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             statsContext = ssf.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String gc = conf.get(GRAPH_CONTEXT);
             if (gc != null) graphContext = ssf.createIRI(gc);
-			statsContextHash = HalyardTableUtils.hashKey(statsContext);
+			statsContextHash = HalyardTableUtils.hashContext(statsContext);
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, int len, byte[] target) {
@@ -440,7 +441,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                 if (partitionId.length > 0) {
 					Value partition = HalyardTableUtils.readValue(partitionId, SVF);
                     IRI pred = SVF.createIRI(predicate);
-					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(partition)));
+					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + HalyardTableUtils.encode(HalyardStatsBasedStatementPatternCardinalityCalculator.hash(pred, partition)));
                     writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);
                     writeStatement(subset, RDF.TYPE, VOID.DATASET);
 					writeStatement(subset, pred, partition);
@@ -528,13 +529,13 @@ public final class HalyardStats extends AbstractHalyardTool {
         scan.setAllowPartialResults(true);
         if (graphContext != null) { //restricting stats to scan given graph context only
             List<RowRange> ranges = new ArrayList<>(4);
-			byte[] gcHash = HalyardTableUtils.hashKey(SimpleValueFactory.getInstance().createIRI(graphContext));
+			byte[] gcHash = HalyardTableUtils.hashContext(SVF.createIRI(graphContext));
             ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX, gcHash, HalyardTableUtils.S_STOP_KEY, HalyardTableUtils.P_STOP_KEY, HalyardTableUtils.O_STOP_KEY));
             ranges.add(rowRange(HalyardTableUtils.CPOS_PREFIX, gcHash, HalyardTableUtils.P_STOP_KEY, HalyardTableUtils.O_STOP_KEY, HalyardTableUtils.S_STOP_KEY));
             ranges.add(rowRange(HalyardTableUtils.COSP_PREFIX, gcHash, HalyardTableUtils.O_STOP_KEY, HalyardTableUtils.S_STOP_KEY, HalyardTableUtils.P_STOP_KEY));
             if (target == null) { //add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
 				ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX,
-						HalyardTableUtils.hashKey(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SVF.createIRI(targetGraph)),
+						HalyardTableUtils.hashContext(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SVF.createIRI(targetGraph)),
 						HalyardTableUtils.S_STOP_KEY, HalyardTableUtils.P_STOP_KEY, HalyardTableUtils.O_STOP_KEY));
             }
             scan.setFilter(new MultiRowRangeFilter(ranges));

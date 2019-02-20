@@ -386,75 +386,77 @@ public final class HalyardSummary extends AbstractHalyardTool {
             for (LongWritable lw : values) {
                 count += lw.get();
             }
-            if (count > 0) try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
-                byte cardinality = toCardinality(count * decimationFactor);
-                SummaryType reportType = SummaryType.values()[dis.readByte()];
-                IRI firstKey = SVF.createIRI(dis.readUTF());
-                switch (reportType) {
-                    case ClassSummary:
-                        IRI ccClass = cardinalityIRI("Class", cardinality);
-                        if (!ccSet.get(cardinality)) {
-                            ccSet.set(cardinality);
-                            write(ccClass, RDFS.SUBCLASSOF, RDFS.CLASS);
-                            write(ccClass, RDFS.LABEL, SVF.createLiteral("rdfs:Class with cardinality " + cardinality));
-                            write(ccClass, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
-                        }
-                        write(firstKey, RDF.TYPE, ccClass);
-                        copyDescription(firstKey);
-                        break;
-                    case PredicateSummary:
-                        IRI pcPred = cardinalityIRI("Property", cardinality);
-                        if (!pcSet.get(cardinality)) {
-                            pcSet.set(cardinality);
-                            write(pcPred, RDFS.SUBCLASSOF, RDF.PROPERTY);
-                            write(pcPred, RDFS.LABEL, SVF.createLiteral("rdf:Property with cardinality " + cardinality));
-                            write(pcPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
-                        }
-                        write(firstKey, RDF.TYPE, pcPred);
-                        copyDescription(firstKey);
-                        break;
-                    case DomainSummary:
-                        IRI dcPred = cardinalityIRI("domain", cardinality);
-                        if (!dcSet.get(cardinality)) {
-                            dcSet.set(cardinality);
-                            write(dcPred, RDFS.SUBPROPERTYOF, RDFS.DOMAIN);
-                            write(dcPred, RDFS.LABEL, SVF.createLiteral("rdfs:domain with cardinality " + cardinality));
-                            write(dcPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
-                        }
-                        write(firstKey, dcPred, SVF.createIRI(dis.readUTF()));
-                        break;
-                    case RangeSummary:
-                        IRI rcPred = cardinalityIRI("range", cardinality);
-                        if (!rcSet.get(cardinality)) {
-                            rcSet.set(cardinality);
-                            write(rcPred, RDFS.SUBPROPERTYOF, RDFS.RANGE);
-                            write(rcPred, RDFS.LABEL, SVF.createLiteral("rdfs:range with cardinality " + cardinality));
-                            write(rcPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
-                        }
-                        write(firstKey, cardinalityIRI("range", cardinality), SVF.createIRI(dis.readUTF()));
-                        break;
-                    case DomainAndRangeSummary:
-                        IRI slicePPred = cardinalityIRI("sliceSubProperty", cardinality);
-                        IRI sliceDPred = cardinalityIRI("sliceDomain", cardinality);
-                        IRI sliceRPred = cardinalityIRI("sliceRange", cardinality);
-                        if (!drcSet.get(cardinality)) {
-                            drcSet.set(cardinality);
-                            write(slicePPred, RDFS.SUBPROPERTYOF, RDFS.SUBPROPERTYOF);
-                            write(slicePPred, RDFS.LABEL, SVF.createLiteral("slice rdfs:subPropertyOf with cardinality " + cardinality));
-                            write(slicePPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
-                            write(sliceDPred, RDFS.SUBPROPERTYOF, RDFS.DOMAIN);
-                            write(sliceDPred, RDFS.LABEL, SVF.createLiteral("slice rdfs:domain with cardinality " + cardinality));
-                            write(sliceDPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
-                            write(sliceRPred, RDFS.SUBPROPERTYOF, RDFS.RANGE);
-                            write(sliceRPred, RDFS.LABEL, SVF.createLiteral("slice rdfs:range with cardinality " + cardinality));
-                            write(sliceRPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
-                        }
-                        IRI generatedRoot = SVF.createIRI(NAMESPACE, HalyardTableUtils.encode(HalyardTableUtils.hashKey(key.get())));
-                        write(generatedRoot, slicePPred, firstKey);
-                        write(generatedRoot, sliceDPred, SVF.createIRI(dis.readUTF()));
-                        write(generatedRoot, sliceRPred, SVF.createIRI(dis.readUTF()));
-                }
-            }
+            if (count > 0) {
+            	try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
+	                byte cardinality = toCardinality(count * decimationFactor);
+	                SummaryType reportType = SummaryType.values()[dis.readByte()];
+	                IRI firstKey = SVF.createIRI(dis.readUTF());
+	                switch (reportType) {
+	                    case ClassSummary:
+	                        IRI ccClass = cardinalityIRI("Class", cardinality);
+	                        if (!ccSet.get(cardinality)) {
+	                            ccSet.set(cardinality);
+	                            write(ccClass, RDFS.SUBCLASSOF, RDFS.CLASS);
+	                            write(ccClass, RDFS.LABEL, SVF.createLiteral("rdfs:Class with cardinality " + cardinality));
+	                            write(ccClass, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
+	                        }
+	                        write(firstKey, RDF.TYPE, ccClass);
+	                        copyDescription(firstKey);
+	                        break;
+	                    case PredicateSummary:
+	                        IRI pcPred = cardinalityIRI("Property", cardinality);
+	                        if (!pcSet.get(cardinality)) {
+	                            pcSet.set(cardinality);
+	                            write(pcPred, RDFS.SUBCLASSOF, RDF.PROPERTY);
+	                            write(pcPred, RDFS.LABEL, SVF.createLiteral("rdf:Property with cardinality " + cardinality));
+	                            write(pcPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
+	                        }
+	                        write(firstKey, RDF.TYPE, pcPred);
+	                        copyDescription(firstKey);
+	                        break;
+	                    case DomainSummary:
+	                        IRI dcPred = cardinalityIRI("domain", cardinality);
+	                        if (!dcSet.get(cardinality)) {
+	                            dcSet.set(cardinality);
+	                            write(dcPred, RDFS.SUBPROPERTYOF, RDFS.DOMAIN);
+	                            write(dcPred, RDFS.LABEL, SVF.createLiteral("rdfs:domain with cardinality " + cardinality));
+	                            write(dcPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
+	                        }
+	                        write(firstKey, dcPred, SVF.createIRI(dis.readUTF()));
+	                        break;
+	                    case RangeSummary:
+	                        IRI rcPred = cardinalityIRI("range", cardinality);
+	                        if (!rcSet.get(cardinality)) {
+	                            rcSet.set(cardinality);
+	                            write(rcPred, RDFS.SUBPROPERTYOF, RDFS.RANGE);
+	                            write(rcPred, RDFS.LABEL, SVF.createLiteral("rdfs:range with cardinality " + cardinality));
+	                            write(rcPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
+	                        }
+	                        write(firstKey, cardinalityIRI("range", cardinality), SVF.createIRI(dis.readUTF()));
+	                        break;
+	                    case DomainAndRangeSummary:
+	                        IRI slicePPred = cardinalityIRI("sliceSubProperty", cardinality);
+	                        IRI sliceDPred = cardinalityIRI("sliceDomain", cardinality);
+	                        IRI sliceRPred = cardinalityIRI("sliceRange", cardinality);
+	                        if (!drcSet.get(cardinality)) {
+	                            drcSet.set(cardinality);
+	                            write(slicePPred, RDFS.SUBPROPERTYOF, RDFS.SUBPROPERTYOF);
+	                            write(slicePPred, RDFS.LABEL, SVF.createLiteral("slice rdfs:subPropertyOf with cardinality " + cardinality));
+	                            write(slicePPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
+	                            write(sliceDPred, RDFS.SUBPROPERTYOF, RDFS.DOMAIN);
+	                            write(sliceDPred, RDFS.LABEL, SVF.createLiteral("slice rdfs:domain with cardinality " + cardinality));
+	                            write(sliceDPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
+	                            write(sliceRPred, RDFS.SUBPROPERTYOF, RDFS.RANGE);
+	                            write(sliceRPred, RDFS.LABEL, SVF.createLiteral("slice rdfs:range with cardinality " + cardinality));
+	                            write(sliceRPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
+	                        }
+	                        IRI generatedRoot = SVF.createIRI(NAMESPACE, HalyardTableUtils.encode(HalyardTableUtils.hashUnique(key.get())));
+	                        write(generatedRoot, slicePPred, firstKey);
+	                        write(generatedRoot, sliceDPred, SVF.createIRI(dis.readUTF()));
+	                        write(generatedRoot, sliceRPred, SVF.createIRI(dis.readUTF()));
+	                }
+	            }
+	        }
 
 		}
 

@@ -103,7 +103,7 @@ public class HalyardElasticIndexerTest {
         for (int i=0; i< response.size(); i+=2) {
             String hash = new JSONObject(response.get(i)).getJSONObject("index").getString("_id");
             String literal = "\"" + new JSONObject(response.get(i+1)).getString("customAttr") + "\"";
-            assertEquals("Invalid hash for literal " + literal, Hex.encodeHexString(HalyardTableUtils.hashKey(literal.getBytes(StandardCharsets.UTF_8))), hash);
+            assertEquals("Invalid hash for literal " + literal, Hex.encodeHexString(HalyardTableUtils.hashObject(literal.getBytes(StandardCharsets.UTF_8))), hash);
         }
     }
 

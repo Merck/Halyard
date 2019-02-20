@@ -283,7 +283,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         scan.setAllowPartialResults(true);
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP region(s)
-            byte[] graphHash = HalyardTableUtils.hashKey(NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance()));
+            byte[] graphHash = HalyardTableUtils.hashContext(NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance()));
             scan.setStartRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash));
             scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, true, graphHash, HalyardTableUtils.O_STOP_KEY, HalyardTableUtils.S_STOP_KEY, HalyardTableUtils.P_STOP_KEY));
         } else {
