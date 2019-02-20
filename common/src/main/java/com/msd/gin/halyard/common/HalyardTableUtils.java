@@ -20,9 +20,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.Security;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -51,6 +51,7 @@ import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -298,8 +299,12 @@ public final class HalyardTableUtils {
 		});
 	}
 
-	static MessageDigest getMessageDigest(String algorithm) {
+	static {
 		System.setProperty("org.bouncycastle.ec.disable_mqv", "true");
+		Security.addProvider(new BouncyCastleProvider());
+	}
+
+	static MessageDigest getMessageDigest(String algorithm) {
         try {
             return MessageDigest.getInstance(algorithm);
         } catch (NoSuchAlgorithmException e) {
@@ -723,14 +728,17 @@ public final class HalyardTableUtils {
     }
 
     private static byte[] digest(byte[] key, MessageDigest md, int hashLen) {
-    	byte[] hash = new byte[hashLen];
+    	byte[] hash;
         try {
             md.update(key);
-            md.digest(hash, 0, hashLen);
+            byte[] digest = md.digest();
+            if(hashLen < digest.length) {
+            	hash = new byte[hashLen];
+            	System.arraycopy(digest, 0, hash, 0, hashLen);
+            } else {
+            	hash = digest;
+            }
             return hash;
-        }
-		catch (DigestException e) {
-			throw new AssertionError(e);
 		} finally {
             md.reset();
         }
