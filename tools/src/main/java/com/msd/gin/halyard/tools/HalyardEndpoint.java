@@ -127,9 +127,14 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                 SimpleHttpServer server = new SimpleHttpServer(port, CONTEXT, handler);
                 server.start();
                 try {
-                    ProcessBuilder pb = new ProcessBuilder(cmdArgs).inheritIO();
-                    pb.environment().put("ENDPOINT", HOSTNAME + ":" + server.getAddress().getPort() + "/");
-                    return pb.start().waitFor();
+                    if (cmdArgs.size() > 0) {
+                        ProcessBuilder pb = new ProcessBuilder(cmdArgs).inheritIO();
+                        pb.environment().put("ENDPOINT", HOSTNAME + ":" + server.getAddress().getPort() + "/");
+                        return pb.start().waitFor();
+                    } else synchronized (HalyardEndpoint.class) {
+                        HalyardEndpoint.class.wait();
+                        return 0;
+                    }
                 } finally {
                     server.stop();
                 }
