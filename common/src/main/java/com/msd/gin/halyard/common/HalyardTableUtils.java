@@ -628,8 +628,12 @@ public final class HalyardTableUtils {
         scan.setMaxVersions(1);
         scan.setAllowPartialResults(true);
         scan.setBatch(10);
-        scan.setStartRow(startRow);
-        scan.setStopRow(stopRow);
+        if(startRow != null) {
+        	scan.setStartRow(startRow);
+        }
+        if(stopRow != null) {
+        	scan.setStopRow(stopRow);
+        }
         return scan;
     }
 

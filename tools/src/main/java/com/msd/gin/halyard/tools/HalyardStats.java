@@ -23,8 +23,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -93,8 +91,6 @@ public final class HalyardStats extends AbstractHalyardTool {
     private static final String THRESHOLD = "halyard.stats.threshold";
     private static final String TARGET_GRAPH = "halyard.stats.target.graph";
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
-
-	private static final Charset UTF8 = StandardCharsets.UTF_8;
 
 	private static final byte[] TYPE_HASH = HalyardTableUtils.hashPredicate(RDF.TYPE);
 
@@ -522,11 +518,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         job.setJarByClass(HalyardStats.class);
         TableMapReduceUtil.initCredentials(job);
 
-        Scan scan = new Scan();
-        scan.addFamily("e".getBytes(UTF8));
-        scan.setMaxVersions(1);
-        scan.setBatch(10);
-        scan.setAllowPartialResults(true);
+        Scan scan = HalyardTableUtils.scan(null, null);
         if (graphContext != null) { //restricting stats to scan given graph context only
             List<RowRange> ranges = new ArrayList<>(4);
 			byte[] gcHash = HalyardTableUtils.hashContext(SVF.createIRI(graphContext));
