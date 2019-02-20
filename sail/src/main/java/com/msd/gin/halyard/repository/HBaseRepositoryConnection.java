@@ -366,13 +366,13 @@ public class HBaseRepositoryConnection extends SailRepositoryConnection {
 				if(HALYARD.TIMESTAMP_PROPERTY.stringValue().equals(tfc.getURI())) {
 					List<ValueExpr> args = tfc.getArgs();
 					Resource tsSubj = (Resource) getValueForVar((Var)args.get(0), bindings);
-					IRI tsPred = (IRI) getValueForVar((Var)args.get(2), bindings);
-					Value tsObj = getValueForVar((Var)args.get(3), bindings);
+					IRI tsPred = (IRI) getValueForVar((Var)args.get(1), bindings);
+					Value tsObj = getValueForVar((Var)args.get(2), bindings);
 					Statement tsStmt;
 					if(args.size() == 3) {
 						tsStmt = vf.createStatement(tsSubj, tsPred, tsObj);
 					} else if(args.size() == 4) {
-						Resource tsCtx = (Resource) getValueForVar((Var)args.get(4), bindings);
+						Resource tsCtx = (Resource) getValueForVar((Var)args.get(3), bindings);
 						tsStmt = vf.createStatement(tsSubj, tsPred, tsObj, tsCtx);
 					} else {
 						tsStmt = null;

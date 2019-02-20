@@ -73,7 +73,7 @@ public class HBaseSailVersionTest {
 		}
 		try (RepositoryConnection conn = rep.getConnection()) {
 			TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL,
-					"select ?s ?p ?t where {?s ?p \"whatever\". (?s ?p \"whatever\") halyard:timestamp ?t}");
+					"prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s ?p ?t where {?s ?p \"whatever\". (?s ?p \"whatever\") halyard:timestamp ?t}");
 			try (TupleQueryResult res = q.evaluate()) {
 				assertTrue(res.hasNext());
 				BindingSet bs = res.next();
@@ -99,7 +99,7 @@ public class HBaseSailVersionTest {
 		}
 		try (RepositoryConnection conn = rep.getConnection()) {
 			TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL,
-					"select ?t where {(<http://whatever/subj/> <http://whatever/pred/> \"whatever\") halyard:timestamp ?t}");
+					"prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?t where {(<http://whatever/subj/> <http://whatever/pred/> \"whatever\") halyard:timestamp ?t}");
 			try (TupleQueryResult res = q.evaluate()) {
 				assertTrue(res.hasNext());
 				BindingSet bs = res.next();
@@ -116,15 +116,15 @@ public class HBaseSailVersionTest {
         rep.initialize();
         try(SailRepositoryConnection con = rep.getConnection()) {
 			assertTrue(testUpdate(con,
-					"insert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.2\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
+					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.2\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
 			assertTrue(testUpdate(con,
-					"delete {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.1\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
+					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://whatever> <http://whatever> <http://whatever>. ?ls rdf:first <http://whatever>. ?ls rdf:rest ?lp. ?lp rdf:first <http://whatever>. ?lp rdf:rest ?lo. ?lo rdf:first <http://whatever>. ?lo rdf:rest rdf:nil. ?ls halyard:timestamp ?t } where { ?ls rdf:first <http://whatever>. ?ls rdf:rest ?lp. ?lp rdf:first <http://whatever>. ?lp rdf:rest ?lo. ?lo rdf:first <http://whatever>. ?lo rdf:rest rdf:nil. bind(\"2002-05-30T09:30:10.1\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
 			assertFalse(testUpdate(con,
-					"delete {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
+					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://whatever> <http://whatever> <http://whatever>. ?ls rdf:first <http://whatever>. ?ls rdf:rest ?lp. ?lp rdf:first <http://whatever>. ?lp rdf:rest ?lo. ?lo rdf:first <http://whatever>. ?lo rdf:rest rdf:nil. ?ls halyard:timestamp ?t } where { ?ls rdf:first <http://whatever>. ?ls rdf:rest ?lp. ?lp rdf:first <http://whatever>. ?lp rdf:rest ?lo. ?lo rdf:first <http://whatever>. ?lo rdf:rest rdf:nil. bind(\"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
 			assertFalse(testUpdate(con,
-					"insert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.3\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
+					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.3\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
 			assertTrue(testUpdate(con,
-					"insert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
+					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
         }
         rep.shutDown();
     }

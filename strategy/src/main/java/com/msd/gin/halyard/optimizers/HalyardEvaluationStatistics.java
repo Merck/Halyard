@@ -213,7 +213,7 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
         }
 
 		protected void meetTupleFunctionCall(TupleFunctionCall node) {
-			cardinality = getCardinality(10.0, ((TupleFunctionCall) node).getResultVars());
+			cardinality = Double.MAX_VALUE;
 		}
 
         @Override

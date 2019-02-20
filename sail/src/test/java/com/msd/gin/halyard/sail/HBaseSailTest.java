@@ -143,7 +143,7 @@ public class HBaseSailTest {
 
     @Test
     public void testGetValueFactory() throws Exception {
-        assertSame(SimpleValueFactory.getInstance(), new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null).getValueFactory());
+        assertNotNull(new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null).getValueFactory());
     }
 
     @Test

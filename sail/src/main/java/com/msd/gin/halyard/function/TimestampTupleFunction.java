@@ -49,7 +49,7 @@ public class TimestampTupleFunction extends AbstractSpinFunction implements Tupl
 		if (!(args[2] instanceof Value)) {
 			throw new ValueExprEvaluationException("Third argument must be an object");
 		}
-		if (args[3] != null && !(args[3] instanceof Resource)) {
+		if (args.length == 4 && !(args[3] instanceof Resource)) {
 			throw new ValueExprEvaluationException("Fourth argument must be a context");
 		}
 
