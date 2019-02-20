@@ -24,7 +24,9 @@ import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Hex;
@@ -80,7 +82,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         long counter = 0, exports = 0, batches = 0, statements = 0;
         int maxKeySize = Ints.max(HalyardTableUtils.S_KEY_SIZE, HalyardTableUtils.P_KEY_SIZE, HalyardTableUtils.O_KEY_SIZE);
 		byte[] lastHash;
-        List<String> literals = new ArrayList<>();
+        Set<String> literals = new HashSet<>();
         StringBuilder batch = new StringBuilder();
         URL url;
         int bufferLimit;
@@ -110,9 +112,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 statements++;
                 if (st.getObject() instanceof Literal) {
                     String l = st.getObject().stringValue();
-                    if (!literals.contains(l)) {
-                        literals.add(l);
-                    }
+                    literals.add(l);
                 }
             }
         }
@@ -120,14 +120,13 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         private void export(boolean flush) throws IOException {
             if (literals.size() > 0) {
                 batch.append("{\"index\":{\"_id\":\"").append(Hex.encodeHex(lastHash)).append("\"}}\n{");
-                for (int i = 0; i < literals.size(); i++) {
-                    if (i > 0) {
-                        batch.append(',');
-                    }
-                    batch.append('\"').append(attr).append("\":").append(JSONObject.quote(literals.get(i)));
+                String sep = "";
+                for (String l : literals) {
+                    batch.append(sep).append('\"').append(attr).append("\":").append(JSONObject.quote(l));
+                    sep = ",";
                 }
                 batch.append("}\n");
-                literals.clear();
+                literals = new HashSet<>();
                 exports++;
             }
             if ((flush && batch.length() > 0) || batch.length() > bufferLimit) {
