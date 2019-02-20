@@ -51,6 +51,7 @@ import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
@@ -58,7 +59,6 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
-import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 import com.google.common.hash.Hashing;
 
@@ -163,6 +163,9 @@ public final class HalyardTableUtils {
 	private static final Map<IRI, ByteWriter> BYTE_WRITERS = new HashMap<>();
 	private static final Map<Byte, ByteReader> BYTE_READERS = new HashMap<>();
 
+	private static final byte IRI_TYPE = '<';
+	private static final byte BNODE_TYPE = '_';
+	private static final byte FULL_LITERAL_TYPE = '\"';
 	private static final byte FALSE_TYPE = '0';
 	private static final byte TRUE_TYPE = '1';
 	private static final byte BYTE_TYPE = 'b';
@@ -171,6 +174,7 @@ public final class HalyardTableUtils {
 	private static final byte LONG_TYPE = 'l';
 	private static final byte FLOAT_TYPE = 'f';
 	private static final byte DOUBLE_TYPE = 'd';
+	private static final byte STRING_TYPE = 'z';
 
 	static {
 		BYTE_WRITERS.put(XMLSchema.BOOLEAN, new ByteWriter() {
@@ -277,6 +281,19 @@ public final class HalyardTableUtils {
 			@Override
 			public Literal readBytes(byte[] b, ValueFactory vf) {
 				return vf.createLiteral(ByteBuffer.wrap(b, 1, 8).asDoubleBuffer().get());
+			}
+		});
+
+		BYTE_WRITERS.put(XMLSchema.STRING, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				return new StringBuilder().append((char)STRING_TYPE).append(l.getLabel()).toString().getBytes(UTF8);
+			}
+		});
+		BYTE_READERS.put(STRING_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				return vf.createLiteral(new String(b, 1, b.length-1, UTF8));
 			}
 		});
 	}
@@ -600,14 +617,14 @@ public final class HalyardTableUtils {
         bb.get(ob);
         byte[] cb = new byte[bb.remaining()];
         bb.get(cb);
-        Resource subj = readResource(sb, vf);
-        IRI pred = readIRI(pb, vf);
+        Resource subj = (Resource) readValue(sb, vf);
+        IRI pred = (IRI) readValue(pb, vf);
         Value value = readValue(ob, vf);
 		Statement stmt;
 		if (cb.length == 0) {
 			stmt = vf.createStatement(subj, pred, value);
 		} else {
-			Resource context = readResource(cb, vf);
+			Resource context = (Resource) readValue(cb, vf);
 			stmt = vf.createStatement(subj, pred, value, context);
 		}
 		if (stmt instanceof Timestamped) {
@@ -772,34 +789,44 @@ public final class HalyardTableUtils {
     }
 
     public static byte[] writeBytes(Value v) {
-		if (v instanceof Literal) {
+    	if (v instanceof IRI) {
+    		return ("<"+v.stringValue()+">").getBytes(UTF8);
+    	} else if (v instanceof BNode) {
+    		return v.toString().getBytes(UTF8);
+    	} else if (v instanceof Literal) {
 			Literal l = (Literal) v;
 			ByteWriter writer = BYTE_WRITERS.get(l.getDatatype());
 			if (writer != null) {
 				return writer.writeBytes(l);
 			} else {
-				return NTriplesUtil.toNTriplesString(v).getBytes(UTF8);
+				return l.toString().getBytes(UTF8);
 			}
 		} else {
-			return NTriplesUtil.toNTriplesString(v).getBytes(UTF8);
+			throw new AssertionError(v);
 		}
     }
 
     public static Value readValue(byte[] b, ValueFactory vf) {
 		byte type = b[0];
-		ByteReader reader = BYTE_READERS.get(type);
-		if (reader != null) {
-			return reader.readBytes(b, vf);
-		} else {
-			return NTriplesUtil.parseValue(new String(b, UTF8), vf);
+		switch(type) {
+			case IRI_TYPE:
+				return vf.createIRI(new String(b, 1, b.length-2, UTF8));
+			case BNODE_TYPE:
+				return vf.createBNode(new String(b, 2, b.length-2, UTF8));
+			case FULL_LITERAL_TYPE:
+				String s = new String(b, UTF8);
+				int endOfLabel = s.lastIndexOf('\"');
+				String label = s.substring(1, endOfLabel);
+				int startOfLang = s.indexOf('@', endOfLabel+1);
+				if(startOfLang != -1) {
+					return vf.createLiteral(label, s.substring(startOfLang+1));
+				} else {
+					int startOfDatatype = s.indexOf("^^<", endOfLabel+1);
+					return vf.createLiteral(label, vf.createIRI(s.substring(startOfDatatype+3, s.length()-1)));
+				}
+			default:
+				ByteReader reader = BYTE_READERS.get(type);
+				return reader.readBytes(b, vf);
 		}
-    }
-
-    public static Resource readResource(byte[] b, ValueFactory vf) {
-    	return NTriplesUtil.parseResource(new String(b, UTF8), vf);
-    }
-
-    public static IRI readIRI(byte[] b, ValueFactory vf) {
-    	return NTriplesUtil.parseURI(new String(b, UTF8), vf);
     }
 }

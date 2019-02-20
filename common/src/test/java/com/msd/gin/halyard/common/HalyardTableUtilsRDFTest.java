@@ -8,8 +8,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 
-import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -29,7 +27,8 @@ public class HalyardTableUtilsRDFTest {
 				{ vf.createLiteral(true) }, { vf.createLiteral((byte) 6) }, { vf.createLiteral((short) 7843) }, { vf.createLiteral(34) }, { vf.createLiteral(87.232) },
 				{ vf.createLiteral(74234l) }, { vf.createLiteral(4.809f) },
 				{ vf.createLiteral(BigInteger.valueOf(96)) }, { vf.createLiteral(BigDecimal.valueOf(856.03)) },
-				{ vf.createIRI(RDF.NAMESPACE) }, { vf.createLiteral(new Date()) } });
+				{ vf.createIRI(RDF.NAMESPACE) }, { vf.createLiteral(new Date()) },
+				{ vf.createLiteral("foo", vf.createIRI("urn:bar:1"))}, { vf.createLiteral("foo", "en-gb") }});
 	}
 
 	private Value expected;
@@ -43,13 +42,5 @@ public class HalyardTableUtilsRDFTest {
 		byte[] b = HalyardTableUtils.writeBytes(expected);
 		Value actual = HalyardTableUtils.readValue(b, vf);
 		assertEquals(expected, actual);
-		if (expected instanceof Resource) {
-			Resource actualResource = HalyardTableUtils.readResource(b, vf);
-			assertEquals(expected, actualResource);
-		}
-		if (expected instanceof IRI) {
-			Resource actualIRI = HalyardTableUtils.readIRI(b, vf);
-			assertEquals(expected, actualIRI);
-		}
 	}
 }
