@@ -565,6 +565,7 @@ Example: halyard profile -s my_dataset -q 'select * where {?s owl:sameAs ?o}'
 ```
 
 ### Halyard Endpoint
+{% raw %}
 ```
 $ ./halyard endpoint -h
 usage: halyard endpoint [-h] [-v] [-p <http_server_port>] -s <dataset_table> [-i
@@ -606,6 +607,7 @@ the custom command.
                                           printed)
 Example: halyard endpoint -p 8000 -s TABLE --verbose customScript.sh customArg1 customArg2
 ```
+{% endraw %}
 
 ### Halyard Summary
 ```
