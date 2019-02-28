@@ -126,6 +126,10 @@ genericHadoopOptions are:
                                              reduce cluster
 -archives <comma separated list of archives> specify comma separated archives to be unarchived on
                                              the compute machines.
+
+JVM options of the Halyard command and local command-line applications can be specified using
+HADOOP_OPTS and HADOOP_CLIENT_OPTS environment variables, however JVM options of the Halyard
+MapReduce applications can only be modified using specific Hadoop properties.
 ```
 
 ### Halyard PreSplit

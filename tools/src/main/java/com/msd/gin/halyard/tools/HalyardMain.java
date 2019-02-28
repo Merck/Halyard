@@ -78,6 +78,7 @@ public final class HalyardMain {
                 hf.printWrapped(pw, 100, 45, "-jt <local|jobtracker:port>                  specify a job tracker");
                 hf.printWrapped(pw, 100, 45, "-files <comma separated list of files>       specify comma separated files to be copied to the map reduce cluster");
                 hf.printWrapped(pw, 100, 45, "-archives <comma separated list of archives> specify comma separated archives to be unarchived on the compute machines.");
+                hf.printWrapped(pw, 100, 0, "\nJVM options of the Halyard command and local command-line applications can be specified using HADOOP_OPTS and HADOOP_CLIENT_OPTS environment variables, however JVM options of the Halyard MapReduce applications can only be modified using specific Hadoop properties.");
                 pw.flush();
             }
         }
