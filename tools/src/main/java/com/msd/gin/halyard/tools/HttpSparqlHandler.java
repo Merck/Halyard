@@ -327,7 +327,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         if (query instanceof SailTupleQuery) {
             LOGGER.log(Level.INFO, "Evaluating tuple query: {0}", sparqlQuery.getQuery());
             QueryResultFormat format = getFormat(TupleQueryResultWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
-                    acceptedMimeTypes, TupleQueryResultFormat.SPARQL, exchange.getResponseHeaders());
+                    acceptedMimeTypes, TupleQueryResultFormat.CSV, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
                 TupleQueryResultWriter w = TupleQueryResultWriterRegistry.getInstance().get(format).get().getWriter(response);
@@ -337,7 +337,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         } else if (query instanceof SailGraphQuery) {
             LOGGER.log(Level.INFO, "Evaluating graph query: {0}", sparqlQuery.getQuery());
             RDFFormat format = getFormat(RDFWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
-                    acceptedMimeTypes, RDFFormat.RDFXML, exchange.getResponseHeaders());
+                    acceptedMimeTypes, RDFFormat.NTRIPLES, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
                 RDFWriter w = RDFWriterRegistry.getInstance().get(format).get().getWriter(response);
@@ -347,7 +347,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         } else if (query instanceof SailBooleanQuery) {
             LOGGER.log(Level.INFO, "Evaluating boolean query: {0}", sparqlQuery.getQuery());
             QueryResultFormat format = getFormat(BooleanQueryResultWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
-                    acceptedMimeTypes, BooleanQueryResultFormat.SPARQL, exchange.getResponseHeaders());
+                    acceptedMimeTypes, BooleanQueryResultFormat.JSON, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
                 BooleanQueryResultWriter w = BooleanQueryResultWriterRegistry.getInstance().get(format).get().getWriter(response);
