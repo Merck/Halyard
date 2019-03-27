@@ -19,6 +19,7 @@ package com.msd.gin.halyard.strategy;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -335,7 +336,6 @@ final class HalyardStatementPatternEvaluation {
                         emptyGraph = graphs.isEmpty() && !dataset.getDefaultGraphs().isEmpty();
                     }
                 }
-
                 if (emptyGraph) {
                     // Search zero contexts
                     parent.push(null); //no results from this statement pattern
@@ -412,6 +412,15 @@ final class HalyardStatementPatternEvaluation {
                             }
                         }
 
+                    };
+                } else if (graphs != null && graphs.contains(SESAME.NIL)) {
+                    // usage of SESAME.NIL triggers query over all graphs, which must be filtered here
+                    final Set<Resource> ctxSet = new HashSet<>(Arrays.asList(contexts));
+                    stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
+                        @Override
+                        protected boolean accept(Statement st) {
+                            return ctxSet.contains(st.getContext());
+                        }
                     };
                 }
             } catch (ClassCastException e) {

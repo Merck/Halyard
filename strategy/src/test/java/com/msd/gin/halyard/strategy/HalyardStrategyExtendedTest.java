@@ -22,6 +22,7 @@ import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.SESAME;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQueryResult;
@@ -155,5 +156,14 @@ public class HalyardStrategyExtendedTest {
     @Test (expected = QueryEvaluationException.class)
     public void testInvalidFunction() {
         con.prepareTupleQuery(QueryLanguage.SPARQL, "PREFIX fn: <http://example.com/>\nSELECT ?whatever\nWHERE {\nBIND (fn:whatever(\"foo\") AS ?whatever)\n}").evaluate().hasNext();
+    }
+
+    @Test
+    public void testSesameNil() throws Exception {
+        SimpleValueFactory vf = SimpleValueFactory.getInstance();
+        con.add(vf.createIRI("http://a"), vf.createIRI("http://b"), vf.createIRI("http://c"));
+        con.add(vf.createIRI("http://a"), vf.createIRI("http://d"), vf.createIRI("http://e"), vf.createIRI("http://f"));
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, "PREFIX sesame: <" + SESAME.NAMESPACE + ">\nSELECT (COUNT(*) AS ?count)\n" + "FROM sesame:nil WHERE {?s ?p ?o}").evaluate();
+        assertEquals(1, ((Literal) res.next().getBinding("count").getValue()).intValue());
     }
 }
