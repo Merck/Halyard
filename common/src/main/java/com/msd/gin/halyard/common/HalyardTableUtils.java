@@ -27,10 +27,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+
+import javax.xml.datatype.DatatypeConfigurationException;
+import javax.xml.datatype.DatatypeConstants;
+import javax.xml.datatype.DatatypeFactory;
+import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
@@ -153,6 +159,17 @@ public final class HalyardTableUtils {
         }
     };
 
+	private static final DatatypeFactory DATATYPE_FACTORY;
+
+	static {
+		try {
+			DATATYPE_FACTORY = DatatypeFactory.newInstance();
+		}
+		catch (DatatypeConfigurationException e) {
+			throw new AssertionError(e);
+		}
+	}
+
 	interface ByteWriter {
 		byte[] writeBytes(Literal l);
 	}
@@ -176,6 +193,9 @@ public final class HalyardTableUtils {
 	private static final byte FLOAT_TYPE = 'f';
 	private static final byte DOUBLE_TYPE = 'd';
 	private static final byte STRING_TYPE = 'z';
+	private static final byte TIME_TYPE = 't';
+	private static final byte DATE_TYPE = 'D';
+	private static final byte DATETIME_TYPE = 'T';
 
 	static {
 		BYTE_WRITERS.put(XMLSchema.BOOLEAN, new ByteWriter() {
@@ -214,14 +234,14 @@ public final class HalyardTableUtils {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				byte[] b = new byte[3];
-				ByteBuffer.wrap(b).put(SHORT_TYPE).asShortBuffer().put(l.shortValue());
+				ByteBuffer.wrap(b).put(SHORT_TYPE).putShort(l.shortValue());
 				return b;
 			}
 		});
 		BYTE_READERS.put(SHORT_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(ByteBuffer.wrap(b, 1, 2).asShortBuffer().get());
+				return vf.createLiteral(ByteBuffer.wrap(b, 1, 2).getShort());
 			}
 		});
 
@@ -229,14 +249,14 @@ public final class HalyardTableUtils {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				byte[] b = new byte[5];
-				ByteBuffer.wrap(b).put(INT_TYPE).asIntBuffer().put(l.intValue());
+				ByteBuffer.wrap(b).put(INT_TYPE).putInt(l.intValue());
 				return b;
 			}
 		});
 		BYTE_READERS.put(INT_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(ByteBuffer.wrap(b, 1, 4).asIntBuffer().get());
+				return vf.createLiteral(ByteBuffer.wrap(b, 1, 4).getInt());
 			}
 		});
 
@@ -244,14 +264,14 @@ public final class HalyardTableUtils {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				byte[] b = new byte[9];
-				ByteBuffer.wrap(b).put(LONG_TYPE).asLongBuffer().put(l.longValue());
+				ByteBuffer.wrap(b).put(LONG_TYPE).putLong(l.longValue());
 				return b;
 			}
 		});
 		BYTE_READERS.put(LONG_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(ByteBuffer.wrap(b, 1, 8).asLongBuffer().get());
+				return vf.createLiteral(ByteBuffer.wrap(b, 1, 8).getLong());
 			}
 		});
 
@@ -259,14 +279,14 @@ public final class HalyardTableUtils {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				byte[] b = new byte[5];
-				ByteBuffer.wrap(b).put(FLOAT_TYPE).asFloatBuffer().put(l.floatValue());
+				ByteBuffer.wrap(b).put(FLOAT_TYPE).putFloat(l.floatValue());
 				return b;
 			}
 		});
 		BYTE_READERS.put(FLOAT_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(ByteBuffer.wrap(b, 1, 4).asFloatBuffer().get());
+				return vf.createLiteral(ByteBuffer.wrap(b, 1, 4).getFloat());
 			}
 		});
 
@@ -274,14 +294,14 @@ public final class HalyardTableUtils {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				byte[] b = new byte[9];
-				ByteBuffer.wrap(b).put(DOUBLE_TYPE).asDoubleBuffer().put(l.doubleValue());
+				ByteBuffer.wrap(b).put(DOUBLE_TYPE).putDouble(l.doubleValue());
 				return b;
 			}
 		});
 		BYTE_READERS.put(DOUBLE_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(ByteBuffer.wrap(b, 1, 8).asDoubleBuffer().get());
+				return vf.createLiteral(ByteBuffer.wrap(b, 1, 8).getDouble());
 			}
 		});
 
@@ -297,6 +317,87 @@ public final class HalyardTableUtils {
 				return vf.createLiteral(new String(b, 1, b.length-1, UTF8));
 			}
 		});
+
+		BYTE_WRITERS.put(XMLSchema.TIME, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				return calendarTypeToBytes(TIME_TYPE, l.calendarValue());
+			}
+		});
+		BYTE_READERS.put(TIME_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				long millis = ByteBuffer.wrap(b, 1, 8).getLong();
+				GregorianCalendar c = new GregorianCalendar();
+				c.setTimeInMillis(millis);
+				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
+				cal.setYear(null);
+				cal.setMonth(DatatypeConstants.FIELD_UNDEFINED);
+				cal.setDay(DatatypeConstants.FIELD_UNDEFINED);
+				int tz = ByteBuffer.wrap(b, 9, 2).getShort();
+				if(tz == Short.MIN_VALUE) {
+					tz = DatatypeConstants.FIELD_UNDEFINED;
+				}
+				cal.setTimezone(tz);
+				return vf.createLiteral(cal);
+			}
+		});
+
+		BYTE_WRITERS.put(XMLSchema.DATE, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				return calendarTypeToBytes(DATE_TYPE, l.calendarValue());
+			}
+		});
+		BYTE_READERS.put(DATE_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				long millis = ByteBuffer.wrap(b, 1, 8).getLong();
+				GregorianCalendar c = new GregorianCalendar();
+				c.setTimeInMillis(millis);
+				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
+				cal.setTime(DatatypeConstants.FIELD_UNDEFINED, DatatypeConstants.FIELD_UNDEFINED, DatatypeConstants.FIELD_UNDEFINED, null);
+				int tz = ByteBuffer.wrap(b, 9, 2).getShort();
+				if(tz == Short.MIN_VALUE) {
+					tz = DatatypeConstants.FIELD_UNDEFINED;
+				}
+				cal.setTimezone(tz);
+				return vf.createLiteral(cal);
+			}
+		});
+
+		BYTE_WRITERS.put(XMLSchema.DATETIME, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				return calendarTypeToBytes(DATETIME_TYPE, l.calendarValue());
+			}
+		});
+		BYTE_READERS.put(DATETIME_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(byte[] b, ValueFactory vf) {
+				long millis = ByteBuffer.wrap(b, 1, 8).getLong();
+				GregorianCalendar c = new GregorianCalendar();
+				c.setTimeInMillis(millis);
+				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
+				int tz = ByteBuffer.wrap(b, 9, 2).getShort();
+				if(tz == Short.MIN_VALUE) {
+					tz = DatatypeConstants.FIELD_UNDEFINED;
+				}
+				cal.setTimezone(tz);
+				return vf.createLiteral(cal);
+			}
+		});
+	}
+
+	private static byte[] calendarTypeToBytes(byte type, XMLGregorianCalendar cal) {
+		byte[] b = new byte[11];
+		ByteBuffer buf = ByteBuffer.wrap(b).put(type).putLong(cal.toGregorianCalendar().getTimeInMillis());
+		if(cal.getTimezone() != DatatypeConstants.FIELD_UNDEFINED) {
+			buf.putShort((short) cal.getTimezone());
+		} else {
+			buf.putShort(Short.MIN_VALUE);
+		}
+		return b;
 	}
 
 	static {
