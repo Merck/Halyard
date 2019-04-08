@@ -28,6 +28,7 @@ import org.eclipse.rdf4j.query.QueryInterruptedException;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.Update;
 import org.eclipse.rdf4j.query.UpdateExecutionException;
+import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.Modify;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
@@ -40,6 +41,7 @@ import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
+import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
@@ -146,19 +148,23 @@ public class HBaseRepositoryConnection extends SailRepositoryConnection {
 
 		protected void executeModify(Modify modify, UpdateContext uc, int maxExecutionTime) throws SailException {
 			try {
+				ModifyInfo insertInfo = null;
 				TupleExpr insertClause = modify.getInsertExpr();
 				if(insertClause != null) {
+					// for inserts, TupleFunctions are expected in the insert clause
 					insertClause = optimize(insertClause, uc.getDataset(), uc.getBindingSet());
+					insertInfo = InsertCollector.process(insertClause);
 				}
-				ExpressionInfo insertInfo = (insertClause != null) ? ExpressionInfo.extract(insertClause) : null;
 
+				ModifyInfo deleteInfo = null;
 				TupleExpr deleteClause = modify.getDeleteExpr();
-				if(deleteClause != null) {
-					deleteClause = optimize(deleteClause, uc.getDataset(), uc.getBindingSet());
-				}
-				ExpressionInfo deleteInfo = (deleteClause != null) ? ExpressionInfo.extract(deleteClause) : null;
-
 				TupleExpr whereClause = modify.getWhereExpr();
+				if(deleteClause != null) {
+					// for deletes, TupleFunctions are expected in the where clause
+					whereClause = optimize(whereClause, uc.getDataset(), uc.getBindingSet());
+					deleteInfo = new ModifyInfo(StatementPatternCollector.process(deleteClause), WhereCollector.process(whereClause));
+				}
+
 				if (!(whereClause instanceof QueryRoot)) {
 					whereClause = new QueryRoot(whereClause);
 				}
@@ -290,7 +296,7 @@ public class HBaseRepositoryConnection extends SailRepositoryConnection {
 			}
 		}
 
-		private void deleteBoundTriples(BindingSet whereBinding, ExpressionInfo deleteClause, TimestampedUpdateContext uc) throws SailException {
+		private void deleteBoundTriples(BindingSet whereBinding, ModifyInfo deleteClause, TimestampedUpdateContext uc) throws SailException {
 			if (deleteClause != null) {
 				List<StatementPattern> deletePatterns = deleteClause.getStatementPatterns();
 
@@ -318,7 +324,7 @@ public class HBaseRepositoryConnection extends SailRepositoryConnection {
 						continue;
 					}
 
-					Statement toBeDeleted = vf.createStatement(subject, predicate, object, context);
+					Statement toBeDeleted = (context != null) ? vf.createStatement(subject, predicate, object, context) : vf.createStatement(subject, predicate, object);
 					setTimestamp(uc, toBeDeleted, deleteClause.getTupleFunctionCalls(), whereBinding);
 
 					if (context != null) {
@@ -335,7 +341,7 @@ public class HBaseRepositoryConnection extends SailRepositoryConnection {
 			}
 		}
 
-		private void insertBoundTriples(BindingSet whereBinding, ExpressionInfo insertClause, TimestampedUpdateContext uc) throws SailException {
+		private void insertBoundTriples(BindingSet whereBinding, ModifyInfo insertClause, TimestampedUpdateContext uc) throws SailException {
 			if (insertClause != null) {
 				List<StatementPattern> insertPatterns = insertClause.getStatementPatterns();
 
@@ -504,13 +510,31 @@ public class HBaseRepositoryConnection extends SailRepositoryConnection {
 	}
 
 
-	static class ExpressionInfo extends StatementPatternCollector {
+	static class ModifyInfo {
+		private final List<StatementPattern> stPatterns;
+		private final List<TupleFunctionCall> tupleFunctionCalls;
+
+		ModifyInfo(List<StatementPattern> stPatterns, List<TupleFunctionCall> tupleFunctionCalls) {
+			this.stPatterns = stPatterns;
+			this.tupleFunctionCalls = tupleFunctionCalls;
+		}
+
+		public List<StatementPattern> getStatementPatterns() {
+			return stPatterns;
+		}
+
+		public List<TupleFunctionCall> getTupleFunctionCalls() {
+			return tupleFunctionCalls;
+		}
+	}
+
+	static class InsertCollector extends StatementPatternCollector {
 		private final List<TupleFunctionCall> tupleFunctionCalls = new ArrayList<>();
 
-		static ExpressionInfo extract(TupleExpr tupleExpr) {
-			ExpressionInfo info = new ExpressionInfo();
-			tupleExpr.visit(info);
-			return info;
+		static ModifyInfo process(TupleExpr expr) {
+			InsertCollector insertCollector = new InsertCollector();
+			expr.visit(insertCollector);
+			return new ModifyInfo(insertCollector.getStatementPatterns(), insertCollector.getTupleFunctionCalls());
 		}
 
 		public List<TupleFunctionCall> getTupleFunctionCalls() {
@@ -520,6 +544,46 @@ public class HBaseRepositoryConnection extends SailRepositoryConnection {
 		public void meet(Union node) {
 			if(node.getRightArg() instanceof TupleFunctionCall) {
 				tupleFunctionCalls.add((TupleFunctionCall)node.getRightArg());
+			}
+		}
+	}
+
+	static class WhereCollector extends AbstractQueryModelVisitor<RuntimeException> {
+		private final List<TupleFunctionCall> tupleFunctionCalls = new ArrayList<>();
+
+		static List<TupleFunctionCall> process(TupleExpr expr) {
+			WhereCollector whereCollector = new WhereCollector();
+			expr.visit(whereCollector);
+			return whereCollector.getTupleFunctionCalls();
+		}
+
+		public List<TupleFunctionCall> getTupleFunctionCalls() {
+			return tupleFunctionCalls;
+		}
+
+		@Override
+		public void meet(Filter node) {
+			// Skip boolean constraints
+			node.getArg().visit(this);
+		}
+
+		@Override
+		public void meet(StatementPattern node) {
+			// skip
+		}
+
+		public void meet(Union node) {
+			if(node.getRightArg() instanceof TupleFunctionCall) {
+				TupleFunctionCall tfc = (TupleFunctionCall)node.getRightArg();
+				tupleFunctionCalls.add(tfc);
+				if(HALYARD.TIMESTAMP_PROPERTY.stringValue().equals(tfc.getURI())) {
+					List<ValueExpr> args = tfc.getArgs();
+					StatementPattern stmt = new StatementPattern((Var) args.get(0), (Var) args.get(1), (Var) args.get(2));
+					if(args.size() == 4) {
+						stmt.setContextVar((Var) args.get(3));
+					}
+					node.replaceWith(stmt);
+				}
 			}
 		}
 	}

@@ -20,7 +20,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -50,6 +50,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 
+import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 
 /**
@@ -138,6 +139,20 @@ final class HalyardStatementPatternEvaluation {
                 wait();
             }
             return e;
+        }
+
+        /**
+         * For debug.
+         */
+        public synchronized String toString() {
+        	StringBuilder buf = new StringBuilder();
+            for (int i=q.length - 1; i >= 0; i--) {
+                LinkedList<E> subQueue = q[i];
+                if(subQueue != null && !subQueue.isEmpty()) {
+                	buf.append(String.format("Level %d: %s\n", i, subQueue));
+                }
+            }
+            return buf.toString();
         }
     }
 
@@ -265,23 +280,28 @@ final class HalyardStatementPatternEvaluation {
                             if (pai.priority % THREADS == threadNum) {
                                 PRIORITY_QUEUE.put(pai.priority, pai); //always keep some threads out of execution to avoid thread exhaustion
                                 Thread.sleep(100);
-                            } else try {
-                                if (pai.pipe.isClosed()) {
-                                    pai.iter.close();
-                                } else {
-                                    BindingSet bs = pai.iter.next();
-                                    if (pai.pipe.push(bs)) { //true indicates more data is expected from this binding set, put it on the queue
-                                        if (bs != null) {
-                                            PRIORITY_QUEUE.put(pai.priority, pai);
-                                        }
-                                    } else { //no more data from this binding set close the iterator of this PipeAndIteration
-                                        pai.iter.close();
-                                    }
-                                }
-                            } catch (NoSuchElementException e) {
-                                pai.pipe.push(null);
-                            } catch (Exception e) {
-                                pai.pipe.handleException(e);
+                            } else {
+                            	try {
+	                                if (pai.pipe.isClosed()) {
+	                                    pai.iter.close();
+	                                } else {
+	                                	if(pai.iter.hasNext()) {
+		                                    BindingSet bs = pai.iter.next();
+		                                    if (pai.pipe.push(bs)) { //true indicates more data is expected from this binding set, put it on the queue
+		                                        if (bs != null) {
+		                                            PRIORITY_QUEUE.put(pai.priority, pai);
+		                                        }
+		                                    } else { //no more data from this binding set close the iterator of this PipeAndIteration
+		                                        pai.iter.close();
+		                                    }
+	                                	} else {
+	                                		pai.iter.close();
+	                                		pai.pipe.push(null);
+	                                	}
+	                                }
+	                            } catch (Exception e) {
+	                                pai.pipe.handleException(e);
+	                            }
                             }
                         }
                     } catch (InterruptedException e) {
@@ -403,6 +423,7 @@ final class HalyardStatementPatternEvaluation {
                         private Resource lastSubj;
                         private IRI lastPred;
                         private Value lastObj;
+                        private Long lastTS;
                         @Override
                         public Statement next() throws QueryEvaluationException {
                             Statement st = super.next();
@@ -412,16 +433,20 @@ final class HalyardStatementPatternEvaluation {
                         @Override
                         protected boolean accept(Statement st) {
                             //de-duplicate triples
-                            if (st.getSubject().equals(lastSubj) && st.getPredicate().equals(lastPred) && st.getObject().equals(lastObj)) {
+                            if (st.getSubject().equals(lastSubj) && st.getPredicate().equals(lastPred) && st.getObject().equals(lastObj) && Objects.equals(getTimestamp(st), lastTS)) {
                                 return false;
                             } else {
                                 lastSubj = st.getSubject();
                                 lastPred = st.getPredicate();
                                 lastObj = st.getObject();
+                                lastTS = getTimestamp(st);
                                 return true;
                             }
                         }
 
+                        private Long getTimestamp(Statement st) {
+                        	return (st instanceof Timestamped) ? ((Timestamped)st).getTimestamp() : null;
+                        }
                     };
                 }
             } catch (ClassCastException e) {

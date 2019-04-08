@@ -16,11 +16,21 @@
  */
 package com.msd.gin.halyard.sail;
 
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -28,6 +38,7 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
@@ -111,29 +122,81 @@ public class HBaseSailVersionTest {
 
     @Test
     public void testModify() throws Exception {
+		TableName htableName = TableName.valueOf("timestamptable");
+		try (Admin admin = hconn.getAdmin()) {
+			HTableDescriptor td = new HTableDescriptor(htableName);
+			td.addFamily(new HColumnDescriptor("e".getBytes()).setMaxVersions(5));
+			admin.createTable(td, null);
+        }
+
 		HBaseSail sail = new HBaseSail(hconn, "timestamptable", true, 0, true, 0, null, null);
 		HBaseRepository rep = new HBaseRepository(sail);
         rep.initialize();
         try(SailRepositoryConnection con = rep.getConnection()) {
-			assertTrue(testUpdate(con,
-					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.2\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
-			assertTrue(testUpdate(con,
-					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://whatever> <http://whatever> <http://whatever>. ?ls rdf:first <http://whatever>. ?ls rdf:rest ?lp. ?lp rdf:first <http://whatever>. ?lp rdf:rest ?lo. ?lo rdf:first <http://whatever>. ?lo rdf:rest rdf:nil. ?ls halyard:timestamp ?t } where { ?ls rdf:first <http://whatever>. ?ls rdf:rest ?lp. ?lp rdf:first <http://whatever>. ?lp rdf:rest ?lo. ?lo rdf:first <http://whatever>. ?lo rdf:rest rdf:nil. bind(\"2002-05-30T09:30:10.1\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
-			assertFalse(testUpdate(con,
-					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://whatever> <http://whatever> <http://whatever>. ?ls rdf:first <http://whatever>. ?ls rdf:rest ?lp. ?lp rdf:first <http://whatever>. ?lp rdf:rest ?lo. ?lo rdf:first <http://whatever>. ?lo rdf:rest rdf:nil. ?ls halyard:timestamp ?t } where { ?ls rdf:first <http://whatever>. ?ls rdf:rest ?lp. ?lp rdf:first <http://whatever>. ?lp rdf:rest ?lo. ?lo rdf:first <http://whatever>. ?lo rdf:rest rdf:nil. bind(\"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
-			assertFalse(testUpdate(con,
-					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.3\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
-			assertTrue(testUpdate(con,
-					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}"));
+            // insert a stmt in the past
+            update(con,
+            		"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.2\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}");
+            assertEquals(toTimestamp("2002-05-30T09:30:10.2"), selectLatest(con));
+
+            // delete a stmt further in the past
+            update(con,
+            		"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://whatever> <http://whatever> <http://whatever>} where { (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp \"2002-05-30T09:30:10.1\"^^<http://www.w3.org/2001/XMLSchema#dateTime> }");
+            assertEquals(toTimestamp("2002-05-30T09:30:10.2"), selectLatest(con));
+
+            // delete a more recent stmt
+            update(con,
+            		"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://whatever> <http://whatever> <http://whatever>} where { (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp \"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> }");
+            assertEquals(-1L, selectLatest(con));
+
+            // insert an older stmt
+            update(con,
+            		"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.3\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}");
+            assertEquals(-1L, selectLatest(con));
+
+            // insert a recent stmt
+            update(con,
+            		"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp ?t} where {bind(\"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> as ?t)}");
+            assertEquals(toTimestamp("2002-05-30T09:30:10.4"), selectLatest(con));
+
+            // insert a stmt now
+            update(con,
+            		"insert data {<http://whatever> <http://whatever> <http://whatever>}");
+            assertNotEquals(-1L, selectLatest(con));
+            assertEquals(2, selectAllVersions(con).size());
         }
         rep.shutDown();
     }
 
-    private boolean testUpdate(SailRepositoryConnection con, String update) {
+    private static long toTimestamp(String datetime) {
+    	return SimpleValueFactory.getInstance().createLiteral(datetime, XMLSchema.DATETIME).calendarValue().toGregorianCalendar().getTimeInMillis();
+    }
+
+    private void update(SailRepositoryConnection con, String update) {
         con.prepareUpdate(update).execute();
         con.commit();
-        try(TupleQueryResult iter = con.prepareTupleQuery(QueryLanguage.SPARQL, "select * where {<http://whatever> ?p ?o}").evaluate()) {
-        	return iter.hasNext();
+    }
+
+    private long selectLatest(SailRepositoryConnection con) {
+    	Set<Long> results = selectTimestamps(con,
+    			"prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?t where {<http://whatever> ?p ?o. (<http://whatever> ?p ?o) halyard:timestamp ?t}");
+    	return results.size() == 1 ? results.iterator().next() : -1L;
+    }
+
+
+    private Set<Long> selectAllVersions(SailRepositoryConnection con) {
+    	return selectTimestamps(con,
+                "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?t where {service <http://merck.github.io/Halyard/ns#timestamptable?maxVersions=5> {<http://whatever> ?p ?o. (<http://whatever> ?p ?o) halyard:timestamp ?t}}");
+    }
+
+    private Set<Long> selectTimestamps(SailRepositoryConnection con, String query) {
+        Set<Long> results = new HashSet<>();
+        try(TupleQueryResult iter = con.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate()) {
+                while(iter.hasNext()) {
+                        BindingSet bs = iter.next();
+                        Literal t = (Literal) bs.getValue("t");
+                        results.add(t.calendarValue().toGregorianCalendar().getTimeInMillis());
+                }
         }
+        return results;
     }
 }

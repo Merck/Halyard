@@ -103,6 +103,7 @@ import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
 import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
 import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
+import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 
 public class HBaseSailConnection implements SailConnection {
     private static final Logger LOG = Logger.getLogger(HBaseSailConnection.class.getName());
@@ -188,8 +189,11 @@ public class HBaseSailConnection implements SailConnection {
 
 		queryContext.begin();
 		try {
-			new SpinFunctionInterpreter(sail.spinParser, source, sail.functionRegistry).optimize(tupleExpr, dataset, bindings);
-			new SpinMagicPropertyInterpreter(sail.spinParser, source, sail.tupleFunctionRegistry, null).optimize(tupleExpr, dataset, bindings);
+			if(!(tupleExpr instanceof ServiceRoot)) {
+				// if this is a Halyard federated query then the full query has already passed through the optimizer so don't need to re-run these again
+				new SpinFunctionInterpreter(sail.spinParser, source, sail.functionRegistry).optimize(tupleExpr, dataset, bindings);
+				new SpinMagicPropertyInterpreter(sail.spinParser, source, sail.tupleFunctionRegistry, null).optimize(tupleExpr, dataset, bindings);
+			}
 			new BindingAssigner().optimize(tupleExpr, dataset, bindings);
 			new ConstantOptimizer(strategy).optimize(tupleExpr, dataset, bindings);
 			new CompareOptimizer().optimize(tupleExpr, dataset, bindings);

@@ -130,12 +130,16 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 
 		public Resource getContext() {
 			Resource ctx = super.getContext();
-			if (ctx instanceof IRI) {
-				return new StatementIRI((IRI) ctx, this);
-			} else if (ctx instanceof BNode) {
-				return new StatementBNode((BNode) ctx, this);
+			if (ctx != null) {
+				if (ctx instanceof IRI) {
+					return new StatementIRI((IRI) ctx, this);
+				} else if (ctx instanceof BNode) {
+					return new StatementBNode((BNode) ctx, this);
+				} else {
+					throw new AssertionError();
+				}
 			} else {
-				throw new AssertionError();
+				return null;
 			}
 		}
 	}

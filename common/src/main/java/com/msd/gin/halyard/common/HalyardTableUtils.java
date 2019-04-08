@@ -590,6 +590,9 @@ public final class HalyardTableUtils {
 	 * Timestamp is shifted one bit left and the last bit is used to prioritize
 	 * between inserts and deletes of the same time to avoid HBase ambiguity inserts
 	 * are considered always later after deletes on a timeline.
+	 * @param ts timestamp
+	 * @param insert true if timestamp of an 'insert'
+	 * @return Halyard internal timestamp value
 	 */
 	public static long toHalyardTimestamp(long ts, boolean insert) {
 		// use arithmetic operations instead of bit-twiddling to correctly handle
