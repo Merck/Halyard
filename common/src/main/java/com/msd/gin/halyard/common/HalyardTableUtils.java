@@ -18,7 +18,6 @@ package com.msd.gin.halyard.common;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -77,9 +76,8 @@ import com.google.common.hash.Hashing;
  */
 public final class HalyardTableUtils {
 
-    private static final Charset UTF8 = StandardCharsets.UTF_8;
     private static final byte[] EMPTY = new byte[0];
-    private static final byte[] CF_NAME = "e".getBytes(UTF8);
+    private static final byte[] CF_NAME = "e".getBytes(StandardCharsets.UTF_8);
     private static final Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
 
     /*
@@ -308,13 +306,13 @@ public final class HalyardTableUtils {
 		BYTE_WRITERS.put(XMLSchema.STRING, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
-				return new StringBuilder().append((char)STRING_TYPE).append(l.getLabel()).toString().getBytes(UTF8);
+				return new StringBuilder().append((char)STRING_TYPE).append(l.getLabel()).toString().getBytes(StandardCharsets.UTF_8);
 			}
 		});
 		BYTE_READERS.put(STRING_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(new String(b, 1, b.length-1, UTF8));
+				return vf.createLiteral(new String(b, 1, b.length-1, StandardCharsets.UTF_8));
 			}
 		});
 
@@ -902,16 +900,16 @@ public final class HalyardTableUtils {
 
     public static byte[] writeBytes(Value v) {
     	if (v instanceof IRI) {
-    		return ("<"+v.stringValue()+">").getBytes(UTF8);
+    		return ("<"+v.stringValue()+">").getBytes(StandardCharsets.UTF_8);
     	} else if (v instanceof BNode) {
-    		return v.toString().getBytes(UTF8);
+    		return v.toString().getBytes(StandardCharsets.UTF_8);
     	} else if (v instanceof Literal) {
 			Literal l = (Literal) v;
 			ByteWriter writer = BYTE_WRITERS.get(l.getDatatype());
 			if (writer != null) {
 				return writer.writeBytes(l);
 			} else {
-				return l.toString().getBytes(UTF8);
+				return l.toString().getBytes(StandardCharsets.UTF_8);
 			}
 		} else {
 			throw new AssertionError(v);
@@ -922,11 +920,11 @@ public final class HalyardTableUtils {
 		byte type = b[0];
 		switch(type) {
 			case IRI_TYPE:
-				return vf.createIRI(new String(b, 1, b.length-2, UTF8));
+				return vf.createIRI(new String(b, 1, b.length-2, StandardCharsets.UTF_8));
 			case BNODE_TYPE:
-				return vf.createBNode(new String(b, 2, b.length-2, UTF8));
+				return vf.createBNode(new String(b, 2, b.length-2, StandardCharsets.UTF_8));
 			case FULL_LITERAL_TYPE:
-				String s = new String(b, UTF8);
+				String s = new String(b, StandardCharsets.UTF_8);
 				int endOfLabel = s.lastIndexOf('\"');
 				String label = s.substring(1, endOfLabel);
 				int startOfLang = s.indexOf('@', endOfLabel+1);

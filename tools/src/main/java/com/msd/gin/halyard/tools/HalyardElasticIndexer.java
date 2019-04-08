@@ -276,11 +276,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         job.setJarByClass(HalyardElasticIndexer.class);
         TableMapReduceUtil.initCredentials(job);
 
-        Scan scan = new Scan();
-        scan.addFamily("e".getBytes(StandardCharsets.UTF_8));
-        scan.setMaxVersions(1);
-        scan.setBatch(10);
-        scan.setAllowPartialResults(true);
+        Scan scan = HalyardTableUtils.scan(null, null);
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP region(s)
             byte[] graphHash = HalyardTableUtils.hashContext(NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance()));

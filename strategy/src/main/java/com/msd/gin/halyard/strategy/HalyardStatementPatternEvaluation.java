@@ -18,6 +18,7 @@ package com.msd.gin.halyard.strategy;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Objects;
@@ -139,20 +140,6 @@ final class HalyardStatementPatternEvaluation {
                 wait();
             }
             return e;
-        }
-
-        /**
-         * For debug.
-         */
-        public synchronized String toString() {
-        	StringBuilder buf = new StringBuilder();
-            for (int i=q.length - 1; i >= 0; i--) {
-                LinkedList<E> subQueue = q[i];
-                if(subQueue != null && !subQueue.isEmpty()) {
-                	buf.append(String.format("Level %d: %s\n", i, subQueue));
-                }
-            }
-            return buf.toString();
         }
     }
 
@@ -448,6 +435,15 @@ final class HalyardStatementPatternEvaluation {
                         	return (st instanceof Timestamped) ? ((Timestamped)st).getTimestamp() : null;
                         }
                     };
+                } else if (graphs != null && graphs.contains(SESAME.NIL)) {
+                    // usage of SESAME.NIL triggers query over all graphs, which must be filtered here
+                    final Set<Resource> ctxSet = new HashSet<>(Arrays.asList(contexts));
+                    stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
+                        @Override
+                        protected boolean accept(Statement st) {
+                            return ctxSet.contains(st.getContext());
+                        }
+                    };                	
                 }
             } catch (ClassCastException e) {
                 // Invalid value type for subject, predicate and/or context

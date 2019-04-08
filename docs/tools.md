@@ -126,6 +126,10 @@ genericHadoopOptions are:
                                              reduce cluster
 -archives <comma separated list of archives> specify comma separated archives to be unarchived on
                                              the compute machines.
+
+JVM options of the Halyard command and local command-line applications can be specified using
+HADOOP_OPTS and HADOOP_CLIENT_OPTS environment variables, however JVM options of the Halyard
+MapReduce applications can only be modified using specific Hadoop properties.
 ```
 
 ### Halyard PreSplit
@@ -565,6 +569,7 @@ Example: halyard profile -s my_dataset -q 'select * where {?s owl:sameAs ?o}'
 ```
 
 ### Halyard Endpoint
+{% raw %}
 ```
 $ ./halyard endpoint -h
 usage: halyard endpoint [-h] [-v] [-p <http_server_port>] -s <dataset_table> [-i
@@ -606,6 +611,7 @@ the custom command.
                                           printed)
 Example: halyard endpoint -p 8000 -s TABLE --verbose customScript.sh customArg1 customArg2
 ```
+{% endraw %}
 
 ### Halyard Summary
 ```
