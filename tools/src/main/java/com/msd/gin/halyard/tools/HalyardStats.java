@@ -152,7 +152,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
-			List<Statement> stmts = null;
+			List<Statement> stmts = HalyardTableUtils.parseStatements(value, ssf);
             int hashShift;
             if (region < HalyardTableUtils.CSPO_PREFIX) {
             	// triple region
@@ -162,7 +162,6 @@ public final class HalyardStats extends AbstractHalyardTool {
                 hashShift = HalyardTableUtils.C_KEY_SIZE + 1;
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 1, HalyardTableUtils.C_KEY_SIZE, lastCtxFragment) || region != lastRegion) {
                     cleanup(output);
-					stmts = HalyardTableUtils.parseStatements(value, ssf);
 					graph = (IRI) stmts.get(0).getContext();
                 }
                 if (update && region == HalyardTableUtils.CSPO_PREFIX) {
@@ -173,9 +172,6 @@ public final class HalyardStats extends AbstractHalyardTool {
                             sail.initialize();
 							conn = sail.getConnection();
                         }
-						if (stmts == null) {
-							stmts = HalyardTableUtils.parseStatements(value, ssf);
-						}
 						for (Statement st : stmts) {
                             if (statsContext.equals(st.getContext()) && matchingGraphContext(st.getSubject())) {
 								conn.removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
@@ -208,9 +204,6 @@ public final class HalyardStats extends AbstractHalyardTool {
             boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, keyLen, lastKeyFragment) || region != lastRegion || lastGraph != graph;
             if (hashChange) {
                 cleanupSubset(output);
-				if (stmts == null) {
-					stmts = HalyardTableUtils.parseStatements(value, ssf);
-				}
 				Statement stmt = stmts.get(0);
                 switch (region) {
                     case HalyardTableUtils.SPO_PREFIX:
