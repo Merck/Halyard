@@ -34,6 +34,7 @@ import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.util.ToolRunner;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
@@ -58,11 +59,11 @@ public class HalyardElasticIndexerTest {
 			}
 			conn.commit();
 		}
-        testElasticIndexer(false);
-        testElasticIndexer(true);
+        testElasticIndexer(false, vf);
+        testElasticIndexer(true, vf);
     }
 
-    public void testElasticIndexer(boolean namedGraphOnly) throws Exception {
+    public void testElasticIndexer(boolean namedGraphOnly, ValueFactory vf) throws Exception {
         final String[] requestUri = new String[2];
         final JSONObject[] create = new JSONObject[1];
         final ArrayList<String> response = new ArrayList<>(200);
@@ -102,8 +103,8 @@ public class HalyardElasticIndexerTest {
         assertEquals((namedGraphOnly ? 50 : 200), response.size());
         for (int i=0; i< response.size(); i+=2) {
             String hash = new JSONObject(response.get(i)).getJSONObject("index").getString("_id");
-            String literal = "\"" + new JSONObject(response.get(i+1)).getString("customAttr") + "\"";
-            assertEquals("Invalid hash for literal " + literal, Hex.encodeHexString(HalyardTableUtils.hashObject(literal.getBytes(StandardCharsets.UTF_8))), hash);
+            Literal literal = vf.createLiteral(new JSONObject(response.get(i+1)).getString("customAttr"));
+            assertEquals("Invalid hash for literal " + literal, Hex.encodeHexString(HalyardTableUtils.hashObject(literal)), hash);
         }
     }
 
