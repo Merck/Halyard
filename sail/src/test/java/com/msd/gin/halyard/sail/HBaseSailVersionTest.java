@@ -16,17 +16,14 @@
  */
 package com.msd.gin.halyard.sail;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
+import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.repository.HBaseRepository;
 
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
@@ -50,9 +47,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.repository.HBaseRepository;
+import static org.junit.Assert.*;
 
 public class HBaseSailVersionTest {
 

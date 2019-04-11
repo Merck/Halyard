@@ -46,9 +46,7 @@ import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
-import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
-import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 
 import com.msd.gin.halyard.common.Timestamped;
@@ -79,10 +77,10 @@ final class HalyardStatementPatternEvaluation {
          * @param priority the 'level' of the evaluation in the over-all tree
          */
 		public PipeAndIteration(HalyardTupleExprEvaluation.BindingSetPipe pipe,
-				CloseableIteration<BindingSet, QueryEvaluationException> iter, QueryContext queryContext,
+				CloseableIteration<BindingSet, QueryEvaluationException> iter,
 				int priority) {
             this.pipe = pipe;
-			this.iter = new QueryContextIteration(iter, queryContext);
+            this.iter = iter;
             this.priority = priority;
         }
     }
@@ -177,7 +175,6 @@ final class HalyardStatementPatternEvaluation {
 
     private final Dataset dataset;
     private final TripleSource tripleSource;
-	private final QueryContext queryContext;
     //a map of query model nodes and their priority
     private static final Map<IdentityWrapper<QueryModelNode>, Integer> PRIORITY_MAP_CACHE = Collections.synchronizedMap(new WeakHashMap<>());
     private static final PriorityQueue<PipeAndIteration> PRIORITY_QUEUE = new PriorityQueue<>();
@@ -189,10 +186,10 @@ final class HalyardStatementPatternEvaluation {
      * @param node an implementation of any {@QueryModelNode} sub-type, typically a {@code ValueExpression}, {@Code UpdateExpression} or {@TupleExpression}
      */
 	static void enqueue(HalyardTupleExprEvaluation.BindingSetPipe pipe,
-			CloseableIteration<BindingSet, QueryEvaluationException> iter, QueryContext queryContext,
+			CloseableIteration<BindingSet, QueryEvaluationException> iter,
 			QueryModelNode node) {
         int priority = getPriorityForNode(node);
-		PRIORITY_QUEUE.put(priority, new PipeAndIteration(pipe, iter, queryContext, priority));
+		PRIORITY_QUEUE.put(priority, new PipeAndIteration(pipe, iter, priority));
     }
 
     /**
@@ -306,10 +303,9 @@ final class HalyardStatementPatternEvaluation {
      * @param dataset against which operations can be evaluated (e.g. INSERT, UPDATE)
      * @param tripleSource against which the query is evaluated
      */
-	HalyardStatementPatternEvaluation(Dataset dataset, TripleSource tripleSource, QueryContext queryContext) {
+	HalyardStatementPatternEvaluation(Dataset dataset, TripleSource tripleSource) {
         this.dataset = dataset;
         this.tripleSource = tripleSource;
-		this.queryContext = queryContext;
     }
 
     /**
@@ -523,7 +519,7 @@ final class HalyardStatementPatternEvaluation {
 
                 return result;
             }
-		}, queryContext, sp);
+		}, sp);
     }
 
     protected boolean isUnbound(Var var, BindingSet bindings) {

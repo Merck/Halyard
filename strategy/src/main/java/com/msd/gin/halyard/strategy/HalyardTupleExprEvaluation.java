@@ -89,6 +89,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.iterator.DescribeIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.GroupIterator;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.PathIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ProjectionIterator;
+import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.SilentIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ZeroLengthPathIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
@@ -175,7 +176,7 @@ final class HalyardTupleExprEvaluation {
 		this.queryContext = queryContext;
 		this.tupleFunctionRegistry = tupleFunctionRegistry;
 		this.tripleSource = tripleSource;
-		this.statementEvaluation = new HalyardStatementPatternEvaluation(dataset, tripleSource, queryContext);
+		this.statementEvaluation = new HalyardStatementPatternEvaluation(dataset, tripleSource);
         this.startTime = System.currentTimeMillis();
         this.timeout = timeout;
     }
@@ -183,7 +184,7 @@ final class HalyardTupleExprEvaluation {
 	private void enqueue(HalyardTupleExprEvaluation.BindingSetPipe pipe,
 			CloseableIteration<BindingSet, QueryEvaluationException> iter,
 			QueryModelNode node) {
-		HalyardStatementPatternEvaluation.enqueue(pipe, iter, queryContext, node);
+		HalyardStatementPatternEvaluation.enqueue(pipe, iter, node);
     }
 
     /**
@@ -1190,8 +1191,14 @@ final class HalyardTupleExprEvaluation {
 			argValues[i] = parentStrategy.evaluate(args.get(i), bindings);
 		}
 
-		enqueue(parent, TupleFunctionEvaluationStrategy.evaluate(func,
-				tfc.getResultVars(), bindings, tripleSource.getValueFactory(), argValues), tfc);
+		CloseableIteration<BindingSet, QueryEvaluationException> iter;
+		queryContext.begin();
+		try {
+			iter = TupleFunctionEvaluationStrategy.evaluate(func, tfc.getResultVars(), bindings, tripleSource.getValueFactory(), argValues);
+		} finally {
+			queryContext.end();
+		}
+		enqueue(parent, new QueryContextIteration(iter, queryContext), tfc);
 	}
 
 	/**

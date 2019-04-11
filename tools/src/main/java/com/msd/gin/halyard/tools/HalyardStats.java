@@ -71,7 +71,6 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.sail.SailConnection;
 
-import com.google.common.primitives.Ints;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
@@ -100,7 +99,9 @@ public final class HalyardStats extends AbstractHalyardTool {
 
         final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
 
-        final byte[] lastKeyFragment = new byte[Ints.max(HalyardTableUtils.S_KEY_SIZE, HalyardTableUtils.P_KEY_SIZE, HalyardTableUtils.O_KEY_SIZE)];
+        final byte[] lastSubjFragment = new byte[HalyardTableUtils.S_KEY_SIZE];
+        final byte[] lastPredFragment = new byte[HalyardTableUtils.P_KEY_SIZE];
+        final byte[] lastObjFragment = new byte[HalyardTableUtils.O_KEY_SIZE];
         final byte[] lastCtxFragment = new byte[HalyardTableUtils.C_KEY_SIZE];
         final byte[] lastClassFragment = new byte[HalyardTableUtils.O_KEY_SIZE];
         IRI statsContext, graphContext;
@@ -185,18 +186,22 @@ public final class HalyardStats extends AbstractHalyardTool {
             }
 
             int keyLen;
+            byte[] lastKeyFragment;
             switch (region) {
                 case HalyardTableUtils.SPO_PREFIX:
                 case HalyardTableUtils.CSPO_PREFIX:
                 	keyLen = HalyardTableUtils.S_KEY_SIZE;
+                	lastKeyFragment = lastSubjFragment;
                     break;
                 case HalyardTableUtils.POS_PREFIX:
                 case HalyardTableUtils.CPOS_PREFIX:
                 	keyLen = HalyardTableUtils.P_KEY_SIZE;
+                	lastKeyFragment = lastPredFragment;
                     break;
                 case HalyardTableUtils.OSP_PREFIX:
                 case HalyardTableUtils.COSP_PREFIX:
                 	keyLen = HalyardTableUtils.O_KEY_SIZE;
+                	lastKeyFragment = lastObjFragment;
                     break;
                 default:
                     throw new IOException("Unknown region #" + region);

@@ -258,7 +258,6 @@ public class HBaseSailConnection implements SailConnection {
 				// evaluate the expression against the TripleSource according to the
 				// EvaluationStrategy.
 				CloseableIteration<BindingSet, QueryEvaluationException> iter = evaluateInternal(strategy, tupleExpr);
-				iter = new QueryContextIteration(iter, queryContext);
 				return sail.evaluationTimeout <= 0 ? iter
 						: new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter,
 								1000l * sail.evaluationTimeout) {

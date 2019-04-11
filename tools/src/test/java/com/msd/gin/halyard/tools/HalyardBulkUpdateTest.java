@@ -97,7 +97,7 @@ public class HalyardBulkUpdateTest {
 					}
 				}
 				Assert.assertEquals(50, count);
-				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, SimpleValueFactory.getInstance().createIRI("http://whatever/pred"), null, true)) {
+				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, vf.createIRI("http://whatever/pred"), null, true)) {
 					Assert.assertFalse(iter.hasNext());
 				}
 			}
@@ -114,16 +114,17 @@ public class HalyardBulkUpdateTest {
 
     @Test
     public void testTimeAwareBulkUpdate() throws Exception {
+        ValueFactory vf = SimpleValueFactory.getInstance();
         //generate inserts and deletes and create reference model
         TreeMap<Integer, Change> changes = new TreeMap<>();
-        IRI targetGraph = SimpleValueFactory.getInstance().createIRI("http://whatever/targetGraph");
+        IRI targetGraph = vf.createIRI("http://whatever/targetGraph");
         IRI subj[] = new IRI[5];
         for (int i=0; i<subj.length; i++) {
-            subj[i] = SimpleValueFactory.getInstance().createIRI("http://whtever/subj#" + i);
+            subj[i] = vf.createIRI("http://whtever/subj#" + i);
         }
         IRI pred[] = new IRI[5];
         for (int i=0; i<pred.length; i++) {
-            pred[i] = SimpleValueFactory.getInstance().createIRI("http://whtever/pred#" + i);
+            pred[i] = vf.createIRI("http://whtever/pred#" + i);
         }
         LinkedHashModel referenceModel = new LinkedHashModelFactory().createEmptyModel();
         Random r = new Random(1234);
@@ -140,7 +141,7 @@ public class HalyardBulkUpdateTest {
                 referenceModel.remove(s);
             }
             for (int j=0; j<r.nextInt(40); j++) {
-                Statement s = SimpleValueFactory.getInstance().createStatement(subj[r.nextInt(subj.length)], pred[r.nextInt(pred.length)], SimpleValueFactory.getInstance().createLiteral(r.nextInt(100)), targetGraph);
+                Statement s = vf.createStatement(subj[r.nextInt(subj.length)], pred[r.nextInt(pred.length)], vf.createLiteral(r.nextInt(100)), targetGraph);
                 ch.inserts.add(s);
                 referenceModel.add(s);
             }
@@ -153,16 +154,16 @@ public class HalyardBulkUpdateTest {
         HBaseSail sail = new HBaseSail(conf, "timebulkupdatetesttable", true, -1, true, 0, null, null);
         sail.initialize();
         int i=0;
-        IRI timstamp = SimpleValueFactory.getInstance().createIRI("http://whatever/timestamp");
-        IRI deleteGraph = SimpleValueFactory.getInstance().createIRI("http://whatever/deleteGraph");
-        IRI insertGraph = SimpleValueFactory.getInstance().createIRI("http://whatever/insertGraph");
-        IRI context = SimpleValueFactory.getInstance().createIRI("http://whatever/context");
+        IRI timestamp = vf.createIRI("http://whatever/timestamp");
+        IRI deleteGraph = vf.createIRI("http://whatever/deleteGraph");
+        IRI insertGraph = vf.createIRI("http://whatever/insertGraph");
+        IRI context = vf.createIRI("http://whatever/context");
 		try (SailConnection conn = sail.getConnection()) {
 			for (Change c : changes.values()) {
-				IRI chSubj = SimpleValueFactory.getInstance().createIRI("http://whatever/change#" + i);
-				IRI delGr = SimpleValueFactory.getInstance().createIRI("http://whatever/graph#" + i + "d");
-				IRI insGr = SimpleValueFactory.getInstance().createIRI("http://whatever/graph#" + i + "i");
-				conn.addStatement(chSubj, timstamp, SimpleValueFactory.getInstance().createLiteral(c.timestamp));
+				IRI chSubj = vf.createIRI("http://whatever/change#" + i);
+				IRI delGr = vf.createIRI("http://whatever/graph#" + i + "d");
+				IRI insGr = vf.createIRI("http://whatever/graph#" + i + "i");
+				conn.addStatement(chSubj, timestamp, vf.createLiteral(c.timestamp));
 				conn.addStatement(chSubj, context, targetGraph);
 				conn.addStatement(chSubj, deleteGraph, delGr);
 				conn.addStatement(chSubj, insertGraph, insGr);
@@ -196,11 +197,12 @@ public class HalyardBulkUpdateTest {
                         "}" +
                         "WHERE {" +
                         "  ?change :context   ?targetGraph ;" +
-                        "          :timestamp ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE ." +
+                        "          :timestamp ?t ." +
                         "  OPTIONAL {" +
                         "    ?change :deleteGraph ?delGr ." +
                         "    GRAPH ?delGr {" +
                         "      ?deleteSubj ?deletePred ?deleteObj ." +
+                        "     (?deleteSubj ?deletePred ?deleteObj) halyard:timestamp ?t ." +
                         "    }" +
                         "  }" +
                         "}");
@@ -211,11 +213,12 @@ public class HalyardBulkUpdateTest {
                         "INSERT {" +
                         "  GRAPH ?targetGraph {" +
                         "    ?insertSubj ?insertPred ?insertObj ." +
+                        "   (?insertSubj ?insertPred ?insertObj) halyard:timestamp ?t ." +
                         "  }" +
                         "}" +
                         "WHERE {" +
                         "  ?change :context   ?targetGraph ;" +
-                        "          :timestamp ?HALYARD_TIMESTAMP_SPECIAL_VARIABLE ." +
+                        "          :timestamp ?t ." +
                         "  FILTER (halyard:forkAndFilterBy(2, ?change))" +
                         "  OPTIONAL {" +
                         "    ?change :insertGraph ?insGr ." +
