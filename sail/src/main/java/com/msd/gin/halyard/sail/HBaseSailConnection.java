@@ -16,6 +16,15 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Timestamped;
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
+import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
+import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
+import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
+import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
+
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
@@ -28,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.WeakHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -81,7 +91,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.IterativeEvaluationOptimi
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.OrderLimitOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.sail.SailConnection;
@@ -95,15 +104,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
-
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.Timestamped;
-import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
-import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
-import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
-import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
-import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
-import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 
 public class HBaseSailConnection implements SailConnection {
     private static final Logger LOG = Logger.getLogger(HBaseSailConnection.class.getName());
@@ -259,8 +259,7 @@ public class HBaseSailConnection implements SailConnection {
 				// EvaluationStrategy.
 				CloseableIteration<BindingSet, QueryEvaluationException> iter = evaluateInternal(strategy, tupleExpr);
 				return sail.evaluationTimeout <= 0 ? iter
-						: new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter,
-								1000l * sail.evaluationTimeout) {
+						: new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter, TimeUnit.SECONDS.toMillis(sail.evaluationTimeout)) {
 							@Override
 							protected void throwInterruptedException() throws QueryEvaluationException {
 								throw new QueryEvaluationException(
@@ -626,7 +625,9 @@ public class HBaseSailConnection implements SailConnection {
         }
     }
 
-    private class StatementScanner implements CloseableIteration<Statement, SailException> {
+	private static final int TIMEOUT_POLL_MILLIS = 1000;
+
+	private class StatementScanner implements CloseableIteration<Statement, SailException> {
 
         private final Resource subj;
         private final IRI pred;
@@ -639,6 +640,9 @@ public class HBaseSailConnection implements SailConnection {
         private final long endTime;
         private Statement next = null;
         private Iterator<Statement> iter = null;
+		private int counter = 0;
+		private int timeoutCount = 1;
+		private long counterStartTime;
 
         public StatementScanner(long startTime, Resource subj, IRI pred, Value obj, Resource...contexts) throws SailException {
             this.subj = subj;
@@ -649,7 +653,8 @@ public class HBaseSailConnection implements SailConnection {
             this.objHash = HalyardTableUtils.hashObject(obj);
             this.contextsList = Arrays.asList(normalizeContexts(contexts));
             this.contexts = contextsList.iterator();
-            this.endTime = startTime + (1000l * sail.evaluationTimeout);
+			this.endTime = startTime + TimeUnit.SECONDS.toMillis(sail.evaluationTimeout);
+			this.counterStartTime = startTime;
             LOG.log(Level.FINEST, "New StatementScanner {0} {1} {2} {3}", new Object[]{subj, pred, obj, contextsList});
         }
 
@@ -687,10 +692,30 @@ public class HBaseSailConnection implements SailConnection {
 
         @Override
         public synchronized boolean hasNext() throws SailException {
-            if (sail.evaluationTimeout > 0 && System.currentTimeMillis() > endTime) {
-                throw new SailException("Statements scanning exceeded specified timeout " + sail.evaluationTimeout + "s");
-            }
-            if (next == null) try { //try and find the next result
+			if (sail.evaluationTimeout > 0) {
+				// avoid the cost of calling System.currentTimeMillis() too often
+				counter++;
+				if (counter >= timeoutCount) {
+					long time = System.currentTimeMillis();
+					if (time > endTime) {
+						throw new SailException("Statements scanning exceeded specified timeout " + sail.evaluationTimeout + "s");
+					}
+					int elapsed = (int) (time - counterStartTime);
+					if (elapsed > 0) {
+						timeoutCount = (timeoutCount * TIMEOUT_POLL_MILLIS) / elapsed;
+						if (timeoutCount == 0) {
+							timeoutCount = 1;
+						}
+					} else {
+						timeoutCount *= 2;
+					}
+					counter = 0;
+					counterStartTime = time;
+				}
+			}
+
+			if (next == null)
+				try { // try and find the next result
                 while (true) {
                     if (iter == null) {
                         Result res = nextResult();

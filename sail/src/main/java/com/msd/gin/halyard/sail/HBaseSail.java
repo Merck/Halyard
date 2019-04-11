@@ -324,10 +324,11 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
 
     @Override
     public boolean isWritable() throws SailException {
-        if (readOnlyTimestamp + STATUS_CACHING_TIMEOUT < System.currentTimeMillis()) {
+		long time = System.currentTimeMillis();
+		if (readOnlyTimestamp + STATUS_CACHING_TIMEOUT < time) {
 			try (Table table = getTable()) {
         		readOnly = table.getTableDescriptor().isReadOnly();
-	            readOnlyTimestamp = System.currentTimeMillis();
+				readOnlyTimestamp = time;
 	        } catch (IOException ex) {
 	            throw new SailException(ex);
 	        }

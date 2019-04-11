@@ -157,18 +157,17 @@ final class HalyardTupleExprEvaluation {
 	private final TripleSource tripleSource;
 	private final QueryContext queryContext;
     private final HalyardStatementPatternEvaluation statementEvaluation;
-    private final long startTime, timeout;
+	private final long endTime, timeout;
 
     /**
-	 * Constructor used by {@link HalyardEvaluationStrategy} to create this helper
-	 * class
+	 * Constructor used by {@link HalyardEvaluationStrategy} to create this helper class
 	 * 
 	 * @param parentStrategy
 	 * @param queryContext
 	 * @param tupleFunctionRegistry
 	 * @param tripleSource
 	 * @param dataset
-	 * @param timeout
+	 * @param timeout seconds
 	 */
 	HalyardTupleExprEvaluation(HalyardEvaluationStrategy parentStrategy, QueryContext queryContext,
 			TupleFunctionRegistry tupleFunctionRegistry, TripleSource tripleSource, Dataset dataset, long timeout) {
@@ -177,8 +176,8 @@ final class HalyardTupleExprEvaluation {
 		this.tupleFunctionRegistry = tupleFunctionRegistry;
 		this.tripleSource = tripleSource;
 		this.statementEvaluation = new HalyardStatementPatternEvaluation(dataset, tripleSource);
-        this.startTime = System.currentTimeMillis();
-        this.timeout = timeout;
+		this.endTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(timeout);
+		this.timeout = timeout;
     }
 
 	private void enqueue(HalyardTupleExprEvaluation.BindingSetPipe pipe,
@@ -1260,6 +1259,7 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
+	private static final int TIMEOUT_POLL_MILLIS = 1000;
     private static final BindingSet NULL = new EmptyBindingSet();
 
     private final class BindingSetPipeIterator extends LookAheadIteration<BindingSet, QueryEvaluationException> {
@@ -1296,11 +1296,39 @@ final class HalyardTupleExprEvaluation {
 
         @Override
         protected BindingSet getNextElement() throws QueryEvaluationException {
-            try {
+			int counter = 0;
+			int timeoutCount = 1;
+			long counterStartTime = System.currentTimeMillis();
+
+			try {
                 while (true) {
-                    BindingSet bs = queue.poll(1, TimeUnit.SECONDS);
+					BindingSet bs = queue.poll(TIMEOUT_POLL_MILLIS, TimeUnit.MILLISECONDS);
                     if (exception != null) throw new QueryEvaluationException(exception);
-                    if (timeout > 0 && System.currentTimeMillis() - startTime > 1000l * timeout) throw new QueryEvaluationException("Query evaluation exceeded specified timeout " + timeout + "s");
+
+					if (timeout > 0) {
+						// avoid the cost of calling System.currentTimeMillis() too often
+						counter++;
+						if (counter >= timeoutCount || bs == null) {
+							long time = System.currentTimeMillis();
+							if (time > endTime) {
+								throw new QueryEvaluationException("Query evaluation exceeded specified timeout " + timeout + "s");
+							}
+							if (bs != null) {
+								int elapsed = (int) (time - counterStartTime);
+								if (elapsed > 0) {
+									timeoutCount = (timeoutCount * TIMEOUT_POLL_MILLIS) / elapsed;
+									if (timeoutCount == 0) {
+										timeoutCount = 1;
+									}
+								} else {
+									timeoutCount *= 2;
+								}
+							}
+							counter = 0;
+							counterStartTime = time;
+						}
+					}
+
                     if (bs != null) {
                         return bs == NULL ? null : bs;
                     }
