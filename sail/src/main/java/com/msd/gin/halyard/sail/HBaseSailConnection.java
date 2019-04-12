@@ -55,6 +55,7 @@ import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteratorIteration;
+import org.eclipse.rdf4j.common.iteration.EmptyIteration;
 import org.eclipse.rdf4j.common.iteration.ExceptionConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.TimeLimitIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -65,7 +66,9 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SD;
+import org.eclipse.rdf4j.model.vocabulary.SPIN;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -162,17 +165,22 @@ public class HBaseSailConnection implements SailConnection {
         TripleSource source = new TripleSource() {
             @Override
             public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
-                try {
-                    return new ExceptionConvertingIteration<Statement, QueryEvaluationException>(createScanner(startTime, subj, pred, obj, contexts)) {
-                        @Override
-                        protected QueryEvaluationException convert(Exception e) {
-                            return new QueryEvaluationException(e);
-                        }
-
-                    };
-                } catch (SailException ex) {
-                    throw new QueryEvaluationException(ex);
-                }
+            	if (RDF.TYPE.equals(pred) && SPIN.MAGIC_PROPERTIES_CLASS.equals(obj)) {
+            		// cache magic property definitions here
+            		return new EmptyIteration<>();
+            	} else {
+	                try {
+	                    return new ExceptionConvertingIteration<Statement, QueryEvaluationException>(createScanner(startTime, subj, pred, obj, contexts)) {
+	                        @Override
+	                        protected QueryEvaluationException convert(Exception e) {
+	                            return new QueryEvaluationException(e);
+	                        }
+	
+	                    };
+	                } catch (SailException ex) {
+	                    throw new QueryEvaluationException(ex);
+	                }
+            	}
             }
 
             @Override
