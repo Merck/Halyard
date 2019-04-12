@@ -20,20 +20,31 @@ import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.repository.HBaseRepository;
 
+import java.io.File;
+import java.io.PrintStream;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.util.ToolRunner;
+import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.model.impl.LinkedHashModel;
+import org.eclipse.rdf4j.model.impl.LinkedHashModelFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -41,9 +52,13 @@ import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
+import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
+import org.eclipse.rdf4j.sail.SailConnection;
+import org.eclipse.rdf4j.sail.SailException;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -135,12 +150,12 @@ public class HBaseSailVersionTest {
 
             // delete a stmt further in the past
             update(con,
-            		"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://whatever> <http://whatever> <http://whatever>} where { (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp \"2002-05-30T09:30:10.1\"^^<http://www.w3.org/2001/XMLSchema#dateTime> }");
+            		"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://whatever> <http://whatever> <http://whatever>} where {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp \"2002-05-30T09:30:10.1\"^^<http://www.w3.org/2001/XMLSchema#dateTime> }");
             assertEquals(toTimestamp("2002-05-30T09:30:10.2"), selectLatest(con));
 
             // delete a more recent stmt
             update(con,
-            		"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://whatever> <http://whatever> <http://whatever>} where { (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp \"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> }");
+            		"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://whatever> <http://whatever> <http://whatever>} where {<http://whatever> <http://whatever> <http://whatever>. (<http://whatever> <http://whatever> <http://whatever>) halyard:timestamp \"2002-05-30T09:30:10.4\"^^<http://www.w3.org/2001/XMLSchema#dateTime> }");
             assertEquals(-1L, selectLatest(con));
 
             // insert an older stmt
@@ -193,5 +208,167 @@ public class HBaseSailVersionTest {
                 }
         }
         return results;
+    }
+
+
+
+    @Test
+    public void testTimeAwareModify() throws Exception {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        //generate inserts and deletes and create reference model
+        TreeMap<Integer, Change> changes = new TreeMap<>();
+        IRI targetGraph = vf.createIRI("http://whatever/targetGraph");
+        IRI subj[] = new IRI[5];
+        for (int i=0; i<subj.length; i++) {
+            subj[i] = vf.createIRI("http://whtever/subj#" + i);
+        }
+        IRI pred[] = new IRI[5];
+        for (int i=0; i<pred.length; i++) {
+            pred[i] = vf.createIRI("http://whtever/pred#" + i);
+        }
+        LinkedHashModel referenceModel = new LinkedHashModelFactory().createEmptyModel();
+        Random r = new Random(1234);
+        for (int i=0; i<1000; i++) {
+            int ds = referenceModel.size();
+            Change ch = new Change();
+            ch.timestamp = i;
+            if (ds > 0) for (Statement s : referenceModel) {
+                if (r.nextInt(ds) > 20) {
+                    ch.deletes.add(s);
+                }
+            }
+            for (Statement s : ch.deletes) {
+                referenceModel.remove(s);
+            }
+            for (int j=0; j<r.nextInt(40); j++) {
+                Statement s = vf.createStatement(subj[r.nextInt(subj.length)], pred[r.nextInt(pred.length)], vf.createLiteral(r.nextInt(100)), targetGraph);
+                ch.inserts.add(s);
+                referenceModel.add(s);
+            }
+            //shuffle the changes
+            changes.put(r.nextInt(), ch);
+        }
+
+        //fill the change graph with change events
+        Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+        HBaseSail sail = new HBaseSail(conf, "timebulkupdatetesttable", true, -1, true, 0, null, null);
+		HBaseRepository rep = new HBaseRepository(sail);
+        rep.initialize();
+        int i=0;
+        IRI timestamp = vf.createIRI("http://whatever/timestamp");
+        IRI deleteGraph = vf.createIRI("http://whatever/deleteGraph");
+        IRI insertGraph = vf.createIRI("http://whatever/insertGraph");
+        IRI context = vf.createIRI("http://whatever/context");
+		try (RepositoryConnection conn = rep.getConnection()) {
+			conn.begin();
+			for (Change c : changes.values()) {
+				IRI chSubj = vf.createIRI("http://whatever/change#" + i);
+				IRI delGr = vf.createIRI("http://whatever/graph#" + i + "d");
+				IRI insGr = vf.createIRI("http://whatever/graph#" + i + "i");
+				conn.add(chSubj, timestamp, vf.createLiteral(c.timestamp));
+				conn.add(chSubj, context, targetGraph);
+				conn.add(chSubj, deleteGraph, delGr);
+				conn.add(chSubj, insertGraph, insGr);
+				for (Statement s : c.deletes) {
+					conn.add(s.getSubject(), s.getPredicate(), s.getObject(), delGr);
+				}
+				for (Statement s : c.inserts) {
+					conn.add(s.getSubject(), s.getPredicate(), s.getObject(), insGr);
+				}
+				i++;
+			}
+			conn.commit();
+		}
+
+        //execute the update queries
+		try (RepositoryConnection conn = rep.getConnection()) {
+			conn.begin();
+			conn.prepareUpdate(
+						"PREFIX : <http://whatever/> " +
+                        "PREFIX halyard: <http://merck.github.io/Halyard/ns#> " +
+                        "DELETE {" +
+                        "  GRAPH ?targetGraph {" +
+                        "    ?deleteSubj ?deletePred ?deleteObj ." +
+                        "  }" +
+                        "}" +
+                        "WHERE {" +
+                        "  ?change :context   ?targetGraph ;" +
+                        "          :timestamp ?t ." +
+                        "  OPTIONAL {" +
+                        "    ?change :deleteGraph ?delGr ." +
+                        "    GRAPH ?delGr {" +
+                        "      ?deleteSubj ?deletePred ?deleteObj ." +
+                        "    }" +
+                        "    (?deleteSubj ?deletePred ?deleteObj ?targetGraph) halyard:timestamp ?t ." +
+                        "  }" +
+                        "}").execute();
+			conn.commit();
+
+			conn.begin();
+            conn.prepareUpdate(
+            			"PREFIX : <http://whatever/> " +
+                        "PREFIX halyard: <http://merck.github.io/Halyard/ns#> " +
+                        "INSERT {" +
+                        "  GRAPH ?targetGraph {" +
+                        "    ?insertSubj ?insertPred ?insertObj ." +
+                        "  }" +
+                        "  (?insertSubj ?insertPred ?insertObj ?targetGraph) halyard:timestamp ?t ." +
+                        "}" +
+                        "WHERE {" +
+                        "  ?change :context   ?targetGraph ;" +
+                        "          :timestamp ?t ." +
+                        "  OPTIONAL {" +
+                        "    ?change :insertGraph ?insGr ." +
+                        "    GRAPH ?insGr {" +
+                        "      ?insertSubj ?insertPred ?insertObj ." +
+                        "    }" +
+                        "  }" +
+                        "}").execute();
+            conn.commit();
+		}
+
+        //read transformed data into model
+        LinkedHashModel resultModel = new LinkedHashModelFactory().createEmptyModel();
+		try (RepositoryConnection conn = rep.getConnection()) {
+			try (CloseableIteration<? extends Statement, RepositoryException> iter = conn.getStatements(null, null, null, true, targetGraph)) {
+				while (iter.hasNext()) {
+					Statement stmt = iter.next();
+					resultModel.add(stmt);
+				}
+			}
+		}
+
+        rep.shutDown();
+
+        //compare the models
+        TreeMap<String,String> fail = new TreeMap<>();
+        Iterator<Statement> it = referenceModel.iterator();
+        while (it.hasNext()) {
+            Statement st = it.next();
+            if (!resultModel.contains(st)) {
+                fail.put(st.toString(), "-" + st.toString());
+            }
+        }
+        it = resultModel.iterator();
+        while (it.hasNext()) {
+            Statement st = it.next();
+            if (!referenceModel.contains(st)) {
+                fail.put(st.toString(), "+" + st.toString());
+            }
+        }
+        if (fail.size() > 0) {
+            StringBuilder sb = new StringBuilder();
+            sb.append('\n');
+            for (String line : fail.values()) {
+                sb.append(line).append('\n');
+            }
+            Assert.fail(sb.toString());
+        }
+    }
+
+    private static class Change {
+        int timestamp;
+        HashSet<Statement> inserts = new HashSet<>();
+        HashSet<Statement> deletes = new HashSet<>();
     }
 }

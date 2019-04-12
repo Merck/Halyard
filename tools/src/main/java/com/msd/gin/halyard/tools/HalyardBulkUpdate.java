@@ -174,7 +174,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 									} catch (InterruptedException ex) {
 										throw new IOException(ex);
 									}
-									if (added.incrementAndGet() % 1000l == 0) {
+									if (removed.incrementAndGet() % 1000l == 0) {
 										context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
 										LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] { added.get(), removed.get() });
 									}

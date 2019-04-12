@@ -202,8 +202,8 @@ public class HalyardBulkUpdateTest {
                         "    ?change :deleteGraph ?delGr ." +
                         "    GRAPH ?delGr {" +
                         "      ?deleteSubj ?deletePred ?deleteObj ." +
-                        "     (?deleteSubj ?deletePred ?deleteObj) halyard:timestamp ?t ." +
                         "    }" +
+                        "    (?deleteSubj ?deletePred ?deleteObj ?targetGraph) halyard:timestamp ?t ." +
                         "  }" +
                         "}");
         }
@@ -213,8 +213,8 @@ public class HalyardBulkUpdateTest {
                         "INSERT {" +
                         "  GRAPH ?targetGraph {" +
                         "    ?insertSubj ?insertPred ?insertObj ." +
-                        "   (?insertSubj ?insertPred ?insertObj) halyard:timestamp ?t ." +
                         "  }" +
+                        "  (?insertSubj ?insertPred ?insertObj ?targetGraph) halyard:timestamp ?t ." +
                         "}" +
                         "WHERE {" +
                         "  ?change :context   ?targetGraph ;" +

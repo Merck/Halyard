@@ -22,6 +22,7 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.SESAME;
+import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
@@ -33,6 +34,7 @@ import org.eclipse.rdf4j.query.algebra.Modify;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
+import org.eclipse.rdf4j.query.algebra.StatementPattern.Scope;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.Union;
@@ -363,13 +365,15 @@ public class HBaseUpdate extends SailUpdate {
 					}
 					if (stmt.equals(tsStmt)) {
 						Literal ts = (Literal) getValueForVar(tfc.getResultVars().get(0), bindings);
-						uc.setTimestamp(ts.calendarValue().toGregorianCalendar().getTimeInMillis());
+						if(XMLSchema.DATETIME.equals(ts.getDatatype())) {
+							uc.setTimestamp(ts.calendarValue().toGregorianCalendar().getTimeInMillis());
+						} else {
+							uc.setTimestamp(ts.longValue());
+						}
 						return;
 					}
 				}
 			}
-
-			uc.useDefaultTimestamp();
 		}
 
 		private Statement createStatementFromPattern(StatementPattern pattern, BindingSet sourceBinding, MapBindingSet bnodeMapping) throws SailException {
@@ -554,12 +558,7 @@ public class HBaseUpdate extends SailUpdate {
 				TupleFunctionCall tfc = (TupleFunctionCall) node.getRightArg();
 				tupleFunctionCalls.add(tfc);
 				if (HALYARD.TIMESTAMP_PROPERTY.stringValue().equals(tfc.getURI())) {
-					List<ValueExpr> args = tfc.getArgs();
-					StatementPattern stmt = new StatementPattern((Var) args.get(0), (Var) args.get(1), (Var) args.get(2));
-					if (args.size() == 4) {
-						stmt.setContextVar((Var) args.get(3));
-					}
-					node.replaceWith(stmt);
+					node.replaceWith(new SingletonSet());
 				}
 			}
 		}

@@ -79,6 +79,10 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 				throw new AssertionError();
 			}
 		}
+
+		public String toString() {
+			return super.toString()+" {"+ts+"}";
+		}
 	}
 
 	static final class TimestampedContextStatement extends ContextStatement implements Timestamped {
@@ -141,6 +145,10 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 			} else {
 				return null;
 			}
+		}
+
+		public String toString() {
+			return super.toString()+" {"+ts+"}";
 		}
 	}
 

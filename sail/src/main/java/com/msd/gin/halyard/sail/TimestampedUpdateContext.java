@@ -8,8 +8,7 @@ import org.eclipse.rdf4j.sail.UpdateContext;
 import com.msd.gin.halyard.common.Timestamped;
 
 public class TimestampedUpdateContext extends UpdateContext implements Timestamped {
-	private final long defaultTs = System.currentTimeMillis();
-	private long ts;
+	private long ts = System.currentTimeMillis();
 
 	public TimestampedUpdateContext(UpdateExpr updateExpr, Dataset dataset, BindingSet bindings,
 			boolean includeInferred)
@@ -27,7 +26,7 @@ public class TimestampedUpdateContext extends UpdateContext implements Timestamp
 		this.ts = ts;
 	}
 
-	public void useDefaultTimestamp() {
-		this.ts = defaultTs;
+	public String toString() {
+		return ts+"\n"+super.toString();
 	}
 }
