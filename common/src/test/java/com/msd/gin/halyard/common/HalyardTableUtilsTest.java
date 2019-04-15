@@ -100,8 +100,8 @@ public class HalyardTableUtilsTest {
 					.add(kv1[i]));
             KeyValue conflicting = new KeyValue(kv1[i].getRowArray(), kv1[i].getRowOffset(), kv1[i].getRowLength(),
                     kv1[i].getFamilyArray(), kv1[i].getFamilyOffset(), kv1[i].getFamilyLength(),
-                    kv2[i].getQualifierArray(), kv1[i].getQualifierOffset(), kv1[i].getQualifierLength(),
-                    kv1[i].getTimestamp(), KeyValue.Type.Put, kv2[i].getValueArray(), kv1[i].getValueOffset(), kv1[i].getValueLength());
+                    kv2[i].getQualifierArray(), kv2[i].getQualifierOffset(), kv2[i].getQualifierLength(),
+                    kv1[i].getTimestamp(), KeyValue.Type.Put, kv2[i].getValueArray(), kv2[i].getValueOffset(), kv2[i].getValueLength());
 			puts.add(new Put(conflicting.getRowArray(), conflicting.getRowOffset(), conflicting.getRowLength(),
 					conflicting.getTimestamp()).add(conflicting));
         }
@@ -109,9 +109,8 @@ public class HalyardTableUtilsTest {
 
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred1, obj1, null))) {
             List<Statement> res = HalyardTableUtils.parseStatements(rs.next(), vf);
-            assertEquals(2, res.size());
+            assertEquals(1, res.size());
             assertTrue(res.contains(SimpleValueFactory.getInstance().createStatement(subj, pred1, obj1)));
-            assertTrue(res.contains(SimpleValueFactory.getInstance().createStatement(subj, pred2, obj2)));
         }
     }
 

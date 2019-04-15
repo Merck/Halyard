@@ -97,8 +97,6 @@ public final class HalyardStats extends AbstractHalyardTool {
 
     static final class StatsMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
 
-        final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
-
         final byte[] lastSubjFragment = new byte[HalyardTableUtils.S_KEY_SIZE];
         final byte[] lastPredFragment = new byte[HalyardTableUtils.P_KEY_SIZE];
         final byte[] lastObjFragment = new byte[HalyardTableUtils.O_KEY_SIZE];
@@ -124,9 +122,9 @@ public final class HalyardStats extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             update = conf.get(TARGET) == null;
             threshold = conf.getLong(THRESHOLD, 1000);
-            statsContext = ssf.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
+            statsContext = SVF.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String gc = conf.get(GRAPH_CONTEXT);
-            if (gc != null) graphContext = ssf.createIRI(gc);
+            if (gc != null) graphContext = SVF.createIRI(gc);
 			statsContextHash = HalyardTableUtils.hashContext(statsContext);
         }
 
@@ -153,7 +151,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
-			List<Statement> stmts = HalyardTableUtils.parseStatements(value, ssf);
+			List<Statement> stmts = HalyardTableUtils.parseStatements(value, SVF);
             int hashShift;
             if (region < HalyardTableUtils.CSPO_PREFIX) {
             	// triple region

@@ -16,16 +16,17 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.yammer.metrics.core.Gauge;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.cli.CommandLine;
@@ -58,10 +59,6 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.json.JSONObject;
 
-import com.google.common.primitives.Ints;
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.yammer.metrics.core.Gauge;
-
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
  * @author Adam Sotona (MSD)
@@ -71,29 +68,26 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
     private static final String SOURCE = "halyard.elastic.source";
     private static final String TARGET = "halyard.elastic.target";
     private static final String DOCUMENT = "halyard.elastic.document";
-    private static final String ATTRIBUTE = "halyard.elastic.attribute";
     private static final String BUFFER_LIMIT = "halyard.elastic.buffer";
 
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
     static final class IndexerMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
 
-        final SimpleValueFactory ssf = SimpleValueFactory.getInstance();
         long counter = 0, exports = 0, batches = 0, statements = 0;
-        int maxKeySize = Ints.max(HalyardTableUtils.S_KEY_SIZE, HalyardTableUtils.P_KEY_SIZE, HalyardTableUtils.O_KEY_SIZE);
 		byte[] lastHash;
-        Set<String> literals = new HashSet<>();
-        StringBuilder batch = new StringBuilder();
+        Set<Literal> literals = new HashSet<>();
+        StringBuilder batch;
         URL url;
         int bufferLimit;
-        String doc, attr;
+        String doc;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             doc = context.getConfiguration().get(DOCUMENT, "l");
-            attr = context.getConfiguration().get(ATTRIBUTE, "l");
             url = new URL(context.getConfiguration().get(TARGET)+"/" +doc + "/_bulk");
             bufferLimit = context.getConfiguration().getInt(BUFFER_LIMIT, 100000);
+            batch = new StringBuilder(bufferLimit);
         }
 
 
@@ -111,21 +105,19 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             for (Statement st : HalyardTableUtils.parseStatements(value, SVF)) {
                 statements++;
                 if (st.getObject() instanceof Literal) {
-                    String l = st.getObject().stringValue();
-                    literals.add(l);
+                    literals.add((Literal) st.getObject());
                 }
             }
         }
 
         private void export(boolean flush) throws IOException {
             if (literals.size() > 0) {
-                batch.append("{\"index\":{\"_id\":\"").append(Hex.encodeHex(lastHash)).append("\"}}\n{");
-                String sep = "";
-                for (String l : literals) {
-                    batch.append(sep).append('\"').append(attr).append("\":").append(JSONObject.quote(l));
-                    sep = ",";
-                }
-                batch.append("}\n");
+            	for(Literal l : literals) {
+	                batch.append("{\"index\":{\"_id\":\"").append(Hex.encodeHex(HalyardTableUtils.id(l)));
+	                batch.append("\"}}\n{\"label\":").append(JSONObject.quote(l.getLabel()));
+                    batch.append(",\"datatype\":").append(JSONObject.quote(l.getDatatype().stringValue()));
+	                batch.append("}\n");
+            	}
                 literals = new HashSet<>();
                 exports++;
             }
@@ -135,7 +127,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 http.setDoOutput(true);
                 http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
                 byte b[] = batch.toString().getBytes(StandardCharsets.UTF_8);
-                batch = new StringBuilder();
+                batch = new StringBuilder(bufferLimit);
                 http.setFixedLengthStreamingMode(b.length);
                 http.connect();
                 try {
@@ -171,10 +163,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             + "\u00A0   \"mappings\" : {\n"
             + "\u00A0       \"l\" : {\n"
             + "\u00A0           \"properties\" : {\n"
-            + "\u00A0               \"l\" : { \"type\" : \"text\" }\n"
-            + "\u00A0            },\n"
-            + "\u00A0           \"_source\" : {\n"
-            + "\u00A0             \"enabled\" : false\n"
+            + "\u00A0               \"label\" : { \"type\" : \"text\" }\n"
+            + "\u00A0               \"datatype\" : { \"type\" : \"text\" }\n"
             + "\u00A0            }\n"
             + "\u00A0        }\n"
             + "\u00A0    },\n"
@@ -190,7 +180,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         addOption("t", "target-index", "target_url", "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
         addOption("c", "create-index", null, "Optionally create Elasticsearch index", false, true);
         addOption("d", "document-type", "document_type", "Optionally specify document type within the index, default is 'l'", false, true);
-        addOption("a", "attribute-name", "attribute_name", "Optionally specify attribute name to index literals within the document, default is 'l'", false, true);
         addOption("b", "batch-size", "batch_size", "Number of literals sent to Elasticsearch for indexing in one batch (default is 100000)", false, true);
         addOption("g", "named-graph", "named_graph", "Optional restrict indexing to the given named graph only", false, true);
     }
@@ -200,7 +189,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         String source = cmd.getOptionValue('s');
         String target = cmd.getOptionValue('t');
         String doc = cmd.getOptionValue('d', "l");
-        String attr = cmd.getOptionValue('a', "l");
         TableMapReduceUtil.addDependencyJars(getConf(),
                HalyardExport.class,
                NTriplesUtil.class,
@@ -218,7 +206,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         job.getConfiguration().set(SOURCE, source);
         job.getConfiguration().set(TARGET, target);
         job.getConfiguration().set(DOCUMENT, doc);
-        job.getConfiguration().set(ATTRIBUTE, attr);
         if (cmd.hasOption('b')) {
             job.getConfiguration().setInt(BUFFER_LIMIT, Integer.parseInt(cmd.getOptionValue('b')));
         }
@@ -237,10 +224,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 + "    \"mappings\" : {\n"
                 + "        \"" + doc + "\" : {\n"
                 + "            \"properties\" : {\n"
-                + "                \"" + attr + "\" : { \"type\" : \"text\" }\n"
-                + "            },\n"
-                + "            \"_source\" : {\n"
-                + "              \"enabled\" : false\n"
+                + "                \"label\" : { \"type\" : \"text\" },\n"
+                + "                \"datatype\" : { \"type\" : \"text\" }\n"
                 + "            }\n"
                 + "        }\n"
                 + "    },\n"

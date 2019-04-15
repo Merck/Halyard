@@ -72,7 +72,7 @@ public class LiteralSearchStatementScannerTest implements Runnable {
     @Test
     public void statementLiteralSearchTest() throws Exception {
         Literal val = SimpleValueFactory.getInstance().createLiteral("Whatever Text");
-        response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: 30\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + Hex.encodeHexString(HalyardTableUtils.hashObject(val)) + "\"}]}}";
+        response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: 30\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + HalyardTableUtils.id(val) + "\",\"_source\":{\"label\":\""+val.getLabel()+"\",\"datatype\":\""+val.getDatatype()+"\"}}]}}";
         Thread t = new Thread(this);
         t.setDaemon(true);
         t.start();

@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.common;
 
+import com.google.common.hash.Hashing;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -25,7 +27,6 @@ import java.security.Security;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.filter.ColumnPrefixFilter;
 import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.regionserver.BloomType;
@@ -65,8 +67,6 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
-
-import com.google.common.hash.Hashing;
 
 /**
  * Core Halyard utility class performing RDF to HBase mappings and base HBase table and key management. The methods of this class define how
@@ -147,13 +147,20 @@ public final class HalyardTableUtils {
     private static final String REGION_MAX_FILESIZE = "10000000000";
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
 
-    private static final ThreadLocal<Map<Integer,MessageDigest>> MDS = new ThreadLocal<Map<Integer,MessageDigest>>(){
+	private static class MDHolder {
+		final MessageDigest md128;
+		final MessageDigest md256;
+
+		MDHolder() {
+			this.md128 = getMessageDigest("Skein-256-128");
+			this.md256 = getMessageDigest("Skein-256-256");
+		}
+	}
+
+	private static final ThreadLocal<MDHolder> MDS = new ThreadLocal<MDHolder>() {
         @Override
-        protected Map<Integer,MessageDigest> initialValue() {
-        	Map<Integer,MessageDigest> mds = new HashMap<>();
-        	mds.put(128, getMessageDigest("Skein-256-128"));
-        	mds.put(256, getMessageDigest("Skein-256-256"));
-        	return Collections.unmodifiableMap(mds);
+		protected MDHolder initialValue() {
+			return new MDHolder();
         }
     };
 
@@ -325,14 +332,15 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(TIME_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(byte[] b, ValueFactory vf) {
-				long millis = ByteBuffer.wrap(b, 1, 8).getLong();
+				ByteBuffer buf = ByteBuffer.wrap(b, 1, 10);
+				long millis = buf.getLong();
+				int tz = buf.getShort();
 				GregorianCalendar c = new GregorianCalendar();
 				c.setTimeInMillis(millis);
 				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
 				cal.setYear(null);
 				cal.setMonth(DatatypeConstants.FIELD_UNDEFINED);
 				cal.setDay(DatatypeConstants.FIELD_UNDEFINED);
-				int tz = ByteBuffer.wrap(b, 9, 2).getShort();
 				if(tz == Short.MIN_VALUE) {
 					tz = DatatypeConstants.FIELD_UNDEFINED;
 				}
@@ -350,12 +358,13 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(DATE_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(byte[] b, ValueFactory vf) {
-				long millis = ByteBuffer.wrap(b, 1, 8).getLong();
+				ByteBuffer buf = ByteBuffer.wrap(b, 1, 10);
+				long millis = buf.getLong();
+				int tz = buf.getShort();
 				GregorianCalendar c = new GregorianCalendar();
 				c.setTimeInMillis(millis);
 				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
 				cal.setTime(DatatypeConstants.FIELD_UNDEFINED, DatatypeConstants.FIELD_UNDEFINED, DatatypeConstants.FIELD_UNDEFINED, null);
-				int tz = ByteBuffer.wrap(b, 9, 2).getShort();
 				if(tz == Short.MIN_VALUE) {
 					tz = DatatypeConstants.FIELD_UNDEFINED;
 				}
@@ -373,11 +382,12 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(DATETIME_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(byte[] b, ValueFactory vf) {
-				long millis = ByteBuffer.wrap(b, 1, 8).getLong();
+				ByteBuffer buf = ByteBuffer.wrap(b, 1, 10);
+				long millis = buf.getLong();
+				int tz = buf.getShort();
 				GregorianCalendar c = new GregorianCalendar();
 				c.setTimeInMillis(millis);
 				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
-				int tz = ByteBuffer.wrap(b, 9, 2).getShort();
 				if(tz == Short.MIN_VALUE) {
 					tz = DatatypeConstants.FIELD_UNDEFINED;
 				}
@@ -554,16 +564,14 @@ public final class HalyardTableUtils {
      * @return array of KeyValues
      */
     public static KeyValue[] toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, long timestamp) {
-		byte[] sb = writeBytes(subj); // subject bytes
-		byte[] pb = writeBytes(pred); // predicate bytes
-		byte[] ob = writeBytes(obj); // object bytes
-		byte[] cb = context == null ? new byte[0] : writeBytes(context); // context (graph) bytes
-        byte[] sKey = hashSubject(sb);  //subject key
-        byte[] pKey = hashPredicate(pb);  //predicate key
-        byte[] oKey = hashObject(ob);  //object key
+    	if(subj == null || pred == null || obj == null) {
+    		throw new NullPointerException();
+    	}
 
-        //bytes to be used for the HBase column qualifier
-		byte[] cq = ByteBuffer.allocate(sb.length + pb.length + ob.length + cb.length + 8).putShort((short) sb.length).putShort((short) pb.length).putInt(ob.length).put(sb).put(pb).put(ob).put(cb).array();
+    	RDFValue<Resource> sb = RDFValue.createSubject(subj); // subject bytes
+		RDFValue<IRI> pb = RDFValue.createPredicate(pred); // predicate bytes
+		RDFValue<Value> ob = RDFValue.createObject(obj); // object bytes
+		RDFValue<Resource> cb = RDFValue.createContext(context); // context (graph) bytes
 
         KeyValue kv[] =  new KeyValue[context == null ? PREFIXES : 2 * PREFIXES];
 
@@ -572,19 +580,106 @@ public final class HalyardTableUtils {
 		timestamp = toHalyardTimestamp(timestamp, !delete);
 
         //generate HBase key value pairs from: row, family, qualifier, value. Permutations of SPO (and if needed CSPO) are all stored. Values are actually empty.
-        kv[0] = new KeyValue(concat(SPO_PREFIX, false, sKey, pKey, oKey), CF_NAME, cq, timestamp, type, EMPTY);
-        kv[1] = new KeyValue(concat(POS_PREFIX, false, pKey, oKey, sKey), CF_NAME, cq, timestamp, type, EMPTY);
-        kv[2] = new KeyValue(concat(OSP_PREFIX, false, oKey, sKey, pKey), CF_NAME, cq, timestamp, type, EMPTY);
+        kv[0] = new KeyValue(concat(SPO_PREFIX, false, sb.hash, pb.hash, ob.hash), CF_NAME, qualifier(SPO_PREFIX, sb.ser, pb.ser, ob.ser, cb != null ? cb.ser : null), timestamp, type, EMPTY);
+        kv[1] = new KeyValue(concat(POS_PREFIX, false, pb.hash, ob.hash, sb.hash), CF_NAME, qualifier(POS_PREFIX, pb.ser, ob.ser, sb.ser, cb != null ? cb.ser : null), timestamp, type, EMPTY);
+        kv[2] = new KeyValue(concat(OSP_PREFIX, false, ob.hash, sb.hash, pb.hash), CF_NAME, qualifier(OSP_PREFIX, ob.ser, sb.ser, pb.ser, cb != null ? cb.ser : null), timestamp, type, EMPTY);
         if (context != null) {
-            byte[] cKey = hashContext(cb);
-            kv[3] = new KeyValue(concat(CSPO_PREFIX, false, cKey, sKey, pKey, oKey), CF_NAME, cq, timestamp, type, EMPTY);
-            kv[4] = new KeyValue(concat(CPOS_PREFIX, false, cKey, pKey, oKey, sKey), CF_NAME, cq, timestamp, type, EMPTY);
-            kv[5] = new KeyValue(concat(COSP_PREFIX, false, cKey, oKey, sKey, pKey), CF_NAME, cq, timestamp, type, EMPTY);
+            kv[3] = new KeyValue(concat(CSPO_PREFIX, false, cb.hash, sb.hash, pb.hash, ob.hash), CF_NAME, qualifier(CSPO_PREFIX, cb.ser, sb.ser, pb.ser, ob.ser), timestamp, type, EMPTY);
+            kv[4] = new KeyValue(concat(CPOS_PREFIX, false, cb.hash, pb.hash, ob.hash, sb.hash), CF_NAME, qualifier(CPOS_PREFIX, cb.ser, pb.ser, ob.ser, sb.ser), timestamp, type, EMPTY);
+            kv[5] = new KeyValue(concat(COSP_PREFIX, false, cb.hash, ob.hash, sb.hash, pb.hash), CF_NAME, qualifier(COSP_PREFIX, cb.ser, ob.ser, sb.ser, pb.ser), timestamp, type, EMPTY);
         }
         return kv;
     }
 
-	/**
+    private static byte[] qualifier(byte prefix, byte[] v1, byte[] v2, byte[] v3, byte[] v4) {
+    	ByteBuffer cq;
+        switch(prefix) {
+        	case SPO_PREFIX:
+        		cq = ByteBuffer.allocate(2+v1.length + (v2 != null ? 2+v2.length : 0) + (v3 != null ? 4+v3.length : 0) + (v4 != null ? v4.length : 0));
+        		cq.putShort((short) v1.length).put(v1);
+        		if(v2 != null) {
+        			cq.putShort((short) v2.length).put(v2);
+        			if(v3 != null) {
+        				cq.putInt(v3.length).put(v3);
+        				if(v4 != null) {
+        					cq.put(v4);
+        				}
+        			}
+        		}
+                break;
+        	case POS_PREFIX:
+        		cq = ByteBuffer.allocate(2+v1.length + (v2 != null ? 4+v2.length : 0) + (v3 != null ? 2+v3.length : 0) + (v4 != null ? v4.length : 0));
+        		cq.putShort((short) v1.length).put(v1);
+        		if(v2 != null) {
+	        		cq.putInt(v2.length).put(v2);
+	        		if(v3 != null) {
+		        		cq.putShort((short) v3.length).put(v3);
+		        		if(v4 != null) {
+		        			cq.put(v4);
+		        		}
+	        		}
+        		}
+                break;
+        	case OSP_PREFIX:
+        		cq = ByteBuffer.allocate(4+v1.length + (v2 != null ? 2+v2.length : 0) + (v3 != null ? 2+v3.length : 0) + (v4 != null ? v4.length : 0));
+        		cq.putInt(v1.length).put(v1);
+        		if(v2 != null) {
+	        		cq.putShort((short) v2.length).put(v2);
+	        		if(v3 != null) {
+		        		cq.putShort((short) v3.length).put(v3);
+		        		if(v4 != null) {
+		        			cq.put(v4);
+		        		}
+	        		}
+        		}
+                break;
+        		
+        	case CSPO_PREFIX:
+        		cq = ByteBuffer.allocate(2+v1.length + (v2 != null ? 2+v2.length : 0) + (v3 != null ? 2+v3.length : 0) + (v4 != null ? v4.length : 0));
+        		cq.putShort((short) v1.length).put(v1);
+        		if(v2 != null) {
+	        		cq.putShort((short) v2.length).put(v2);
+	        		if(v3 != null) {
+		        		cq.putShort((short) v3.length).put(v3);
+		        		if(v4 != null) {
+		        			cq.put(v4);
+		        		}
+	        		}
+        		}
+                break;
+        	case CPOS_PREFIX:
+        		cq = ByteBuffer.allocate(2+v1.length + (v2 != null ? 2+v2.length : 0) + (v3 != null ? 4+v3.length : 0) + (v4 != null ? v4.length : 0));
+        		cq.putShort((short) v1.length).put(v1);
+        		if(v2 != null) {
+	        		cq.putShort((short) v2.length).put(v2);
+	        		if(v3 != null) {
+	        			cq.putInt(v3.length).put(v3);
+	        			if(v4 != null) {
+	        				cq.put(v4);
+	        			}
+	        		}
+        		}
+                break;
+        	case COSP_PREFIX:
+        		cq = ByteBuffer.allocate(2+v1.length + (v2 != null ? 4+v2.length : 0) + (v3 != null ? 2+v3.length : 0) + (v4 != null ? v4.length : 0));
+        		cq.putShort((short) v1.length).put(v1);
+        		if(v2 != null) {
+	        		cq.putInt(v2.length).put(v2);
+	        		if(v3 != null) {
+		        		cq.putShort((short) v3.length).put(v3);
+		        		if(v4 != null) {
+		        			cq.put(v4);
+		        		}
+	        		}
+        		}
+                break;
+            default:
+            	throw new AssertionError("Invalid prefix: "+prefix);
+        }
+        return cq.array();
+    }
+
+    /**
 	 * Timestamp is shifted one bit left and the last bit is used to prioritize
 	 * between inserts and deletes of the same time to avoid HBase ambiguity inserts
 	 * are considered always later after deletes on a timeline.
@@ -615,74 +710,74 @@ public final class HalyardTableUtils {
      * @return HBase Scan instance to retrieve all data potentially matching the Statement pattern
      */
     public static Scan scan(Resource subj, IRI pred, Value obj, Resource ctx) {
-        return scan(hashSubject(subj), hashPredicate(pred), hashObject(obj), hashContext(ctx));
+        return scan(RDFValue.createSubject(subj), RDFValue.createPredicate(pred), RDFValue.createObject(obj), RDFValue.createContext(ctx));
     }
     /**
      * Method constructing HBase Scan from a Statement pattern hashes, any of the arguments can be null
-     * @param subjHash optional subject Resource hash
-     * @param predHash optional predicate IRI hash
-     * @param objHash optional object Value hash
-     * @param ctxHash optional context Resource hash
+     * @param subj optional subject Resource
+     * @param pred optional predicate IRI
+     * @param obj optional object Value
+     * @param ctx optional context Resource
      * @return HBase Scan instance to retrieve all data potentially matching the Statement pattern
      */
-    public static Scan scan(byte[] subjHash, byte[] predHash, byte[] objHash, byte[] ctxHash) {
-        if (ctxHash == null) {
-            if (subjHash == null) {
-                if (predHash == null) {
-                    if (objHash == null) {
+	public static Scan scan(RDFValue<Resource> subj, RDFValue<IRI> pred, RDFValue<Value> obj, RDFValue<Resource> ctx) {
+		if (ctx == null) {
+			if (subj == null) {
+				if (pred == null) {
+					if (obj == null) {
 						return scan3_0(SPO_PREFIX, S_STOP_KEY, P_STOP_KEY, O_STOP_KEY);
                     } else {
-						return scan3_1(OSP_PREFIX, objHash, S_STOP_KEY, P_STOP_KEY);
+						return scan3_1(OSP_PREFIX, obj, S_STOP_KEY, P_STOP_KEY);
                     }
                 } else {
-                    if (objHash == null) {
-						return scan3_1(POS_PREFIX, predHash, O_STOP_KEY, S_STOP_KEY);
+					if (obj == null) {
+						return scan3_1(POS_PREFIX, pred, O_STOP_KEY, S_STOP_KEY);
                     } else {
-						return scan3_2(POS_PREFIX, predHash, objHash, S_STOP_KEY);
+						return scan3_2(POS_PREFIX, pred, obj, S_STOP_KEY);
                     }
                 }
             } else {
-                if (predHash == null) {
-                    if (objHash == null) {
-						return scan3_1(SPO_PREFIX, subjHash, P_STOP_KEY, O_STOP_KEY);
+				if (pred == null) {
+					if (obj == null) {
+						return scan3_1(SPO_PREFIX, subj, P_STOP_KEY, O_STOP_KEY);
                     } else {
-						return scan3_2(OSP_PREFIX, objHash, subjHash, P_STOP_KEY);
+						return scan3_2(OSP_PREFIX, obj, subj, P_STOP_KEY);
                     }
                 } else {
-                    if (objHash == null) {
-						return scan3_2(SPO_PREFIX, subjHash, predHash, O_STOP_KEY);
+					if (obj == null) {
+						return scan3_2(SPO_PREFIX, subj, pred, O_STOP_KEY);
                     } else {
-						return scan3_3(SPO_PREFIX, subjHash, predHash, objHash);
+						return scan3_3(SPO_PREFIX, subj, pred, obj);
                     }
                 }
             }
         } else {
-            if (subjHash == null) {
-                if (predHash == null) {
-                    if (objHash == null) {
-						return scan4_1(CSPO_PREFIX, ctxHash, S_STOP_KEY, P_STOP_KEY, O_STOP_KEY);
+			if (subj == null) {
+				if (pred == null) {
+					if (obj == null) {
+						return scan4_1(CSPO_PREFIX, ctx, S_STOP_KEY, P_STOP_KEY, O_STOP_KEY);
                     } else {
-						return scan4_2(COSP_PREFIX, ctxHash, objHash, S_STOP_KEY, P_STOP_KEY);
+						return scan4_2(COSP_PREFIX, ctx, obj, S_STOP_KEY, P_STOP_KEY);
                     }
                 } else {
-                    if (objHash == null) {
-						return scan4_2(CPOS_PREFIX, ctxHash, predHash, O_STOP_KEY, S_STOP_KEY);
+					if (obj == null) {
+						return scan4_2(CPOS_PREFIX, ctx, pred, O_STOP_KEY, S_STOP_KEY);
                     } else {
-						return scan4_3(CPOS_PREFIX, ctxHash, predHash, objHash, S_STOP_KEY);
+						return scan4_3(CPOS_PREFIX, ctx, pred, obj, S_STOP_KEY);
                     }
                 }
             } else {
-                if (predHash == null) {
-                    if (objHash == null) {
-						return scan4_2(CSPO_PREFIX, ctxHash, subjHash, P_STOP_KEY, O_STOP_KEY);
+				if (pred == null) {
+					if (obj == null) {
+						return scan4_2(CSPO_PREFIX, ctx, subj, P_STOP_KEY, O_STOP_KEY);
                     } else {
-						return scan4_3(COSP_PREFIX, ctxHash, objHash, subjHash, P_STOP_KEY);
+						return scan4_3(COSP_PREFIX, ctx, obj, subj, P_STOP_KEY);
                     }
                 } else {
-                    if (objHash == null) {
-						return scan4_3(CSPO_PREFIX, ctxHash, subjHash, predHash, O_STOP_KEY);
+					if (obj == null) {
+						return scan4_3(CSPO_PREFIX, ctx, subj, pred, O_STOP_KEY);
                     } else {
-						return scan4_4(CSPO_PREFIX, ctxHash, subjHash, predHash, objHash);
+						return scan4_4(CSPO_PREFIX, ctx, subj, pred, obj);
                     }
                 }
             }
@@ -715,15 +810,75 @@ public final class HalyardTableUtils {
 	 * @return Statements
 	 */
     public static Statement parseStatement(Cell c, ValueFactory vf) {
-        ByteBuffer bb = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
-		byte[] sb = new byte[bb.getShort()];
-		byte[] pb = new byte[bb.getShort()];
-        byte[] ob = new byte[bb.getInt()];
-        bb.get(sb);
-        bb.get(pb);
-        bb.get(ob);
-        byte[] cb = new byte[bb.remaining()];
-        bb.get(cb);
+    	ByteBuffer key = ByteBuffer.wrap(c.getRowArray(), c.getRowOffset(), c.getRowLength());
+    	byte prefix = key.get();
+        ByteBuffer cq = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
+        byte[] sb, pb, ob, cb;
+        switch(prefix) {
+        	case SPO_PREFIX:
+        		sb = new byte[cq.getShort()];
+                cq.get(sb);
+        		pb = new byte[cq.getShort()];
+                cq.get(pb);
+                ob = new byte[cq.getInt()];
+                cq.get(ob);
+                cb = new byte[cq.remaining()];
+                cq.get(cb);
+                break;
+        	case POS_PREFIX:
+        		pb = new byte[cq.getShort()];
+                cq.get(pb);
+                ob = new byte[cq.getInt()];
+                cq.get(ob);
+        		sb = new byte[cq.getShort()];
+                cq.get(sb);
+                cb = new byte[cq.remaining()];
+                cq.get(cb);
+                break;
+        	case OSP_PREFIX:
+                ob = new byte[cq.getInt()];
+                cq.get(ob);
+        		sb = new byte[cq.getShort()];
+                cq.get(sb);
+        		pb = new byte[cq.getShort()];
+                cq.get(pb);
+                cb = new byte[cq.remaining()];
+                cq.get(cb);
+                break;
+        		
+        	case CSPO_PREFIX:
+                cb = new byte[cq.getShort()];
+                cq.get(cb);
+        		sb = new byte[cq.getShort()];
+                cq.get(sb);
+        		pb = new byte[cq.getShort()];
+                cq.get(pb);
+                ob = new byte[cq.remaining()];
+                cq.get(ob);
+                break;
+        	case CPOS_PREFIX:
+                cb = new byte[cq.getShort()];
+                cq.get(cb);
+        		pb = new byte[cq.getShort()];
+                cq.get(pb);
+                ob = new byte[cq.getInt()];
+                cq.get(ob);
+        		sb = new byte[cq.remaining()];
+                cq.get(sb);
+                break;
+        	case COSP_PREFIX:
+                cb = new byte[cq.getShort()];
+                cq.get(cb);
+                ob = new byte[cq.getInt()];
+                cq.get(ob);
+        		sb = new byte[cq.getShort()];
+                cq.get(sb);
+        		pb = new byte[cq.remaining()];
+                cq.get(pb);
+                break;
+            default:
+            	throw new AssertionError("Invalid prefix: "+prefix);
+        }
         Resource subj = (Resource) readValue(sb, vf);
         IRI pred = (IRI) readValue(pb, vf);
         Value value = readValue(ob, vf);
@@ -804,7 +959,7 @@ public final class HalyardTableUtils {
     }
 
     public static byte[] hashUnique(byte[] key) {
-        MessageDigest md = MDS.get().get(256);
+		MessageDigest md = MDS.get().md256;
         try {
             md.update(key);
             return md.digest();
@@ -813,20 +968,20 @@ public final class HalyardTableUtils {
         }
     }
 
-    public static byte[] hashSubject(byte[] key) {
-    	return digest(key, MDS.get().get(128), S_KEY_SIZE);
+    static byte[] hashSubject(byte[] key) {
+		return digest(key, MDS.get().md128, S_KEY_SIZE);
     }
 
-    public static byte[] hashPredicate(byte[] key) {
+    static byte[] hashPredicate(byte[] key) {
     	return Hashing.murmur3_32().hashBytes(key).asBytes();
     }
 
-    public static byte[] hashObject(byte[] key) {
-    	return digest(key, MDS.get().get(128), O_KEY_SIZE);
+    static byte[] hashObject(byte[] key) {
+		return digest(key, MDS.get().md128, O_KEY_SIZE);
     }
 
-    public static byte[] hashContext(byte[] key) {
-    	return digest(key, MDS.get().get(128), C_KEY_SIZE);
+    static byte[] hashContext(byte[] key) {
+		return digest(key, MDS.get().md128, C_KEY_SIZE);
     }
 
     private static byte[] digest(byte[] key, MessageDigest md, int hashLen) {
@@ -846,20 +1001,24 @@ public final class HalyardTableUtils {
         }
     }
 
+	public static byte[] id(Value v) {
+		return hashUnique(writeBytes(v));
+	}
+
     public static byte[] hashSubject(Resource v) {
-		return v == null ? null : hashSubject(writeBytes(v));
+		return hashSubject(writeBytes(v));
     }
 
     public static byte[] hashPredicate(IRI v) {
-		return v == null ? null : hashPredicate(writeBytes(v));
+		return hashPredicate(writeBytes(v));
     }
 
     public static byte[] hashObject(Value v) {
-		return v == null ? null : hashObject(writeBytes(v));
+		return hashObject(writeBytes(v));
     }
 
     public static byte[] hashContext(Resource v) {
-		return v == null ? null : hashContext(writeBytes(v));
+		return hashContext(writeBytes(v));
     }
 
     public static String encode(byte b[]) {
@@ -870,32 +1029,36 @@ public final class HalyardTableUtils {
 		return scan(concat(prefix, false), concat(prefix, true, stopKey1, stopKey2, stopKey3));
 	}
 
-	private static Scan scan3_1(byte prefix, byte[] key1, byte[] stopKey2, byte[] stopKey3) {
-		return scan(concat(prefix, false, key1), concat(prefix, true, key1, stopKey2, stopKey3));
+	private static Scan scan3_1(byte prefix, RDFValue<?> key1, byte[] stopKey2, byte[] stopKey3) {
+		return scan(concat(prefix, false, key1.hash), concat(prefix, true, key1.hash, stopKey2, stopKey3))
+				.setFilter(new ColumnPrefixFilter(qualifier(prefix, key1.ser, null, null, null)));
 	}
 
-	private static Scan scan3_2(byte prefix, byte[] key1, byte[] key2, byte[] stopKey3) {
-		return scan(concat(prefix, false, key1, key2), concat(prefix, true, key1, key2, stopKey3));
+	private static Scan scan3_2(byte prefix, RDFValue<?> key1, RDFValue<?> key2, byte[] stopKey3) {
+		return scan(concat(prefix, false, key1.hash, key2.hash), concat(prefix, true, key1.hash, key2.hash, stopKey3))
+				.setFilter(new ColumnPrefixFilter(qualifier(prefix, key1.ser, key2.ser, null, null)));
 	}
 
-	private static Scan scan3_3(byte prefix, byte[] key1, byte[] key2, byte[] key3) {
-		return scan(concat(prefix, false, key1, key2, key3), concat(prefix, true, key1, key2, key3));
+	private static Scan scan3_3(byte prefix, RDFValue<?> key1, RDFValue<?> key2, RDFValue<?> key3) {
+		return scan(concat(prefix, false, key1.hash, key2.hash, key3.hash), concat(prefix, true, key1.hash, key2.hash, key3.hash))
+				.setFilter(new ColumnPrefixFilter(qualifier(prefix, key1.ser, key2.ser, key3.ser, null)));
 	}
 
-	private static Scan scan4_1(byte prefix, byte[] key1, byte[] stopKey2, byte[] stopKey3, byte[] stopKey4) {
-		return scan(concat(prefix, false, key1), concat(prefix, true, key1, stopKey2, stopKey3, stopKey4));
+	private static Scan scan4_1(byte prefix, RDFValue<?> key1, byte[] stopKey2, byte[] stopKey3, byte[] stopKey4) {
+		return scan(concat(prefix, false, key1.hash), concat(prefix, true, key1.hash, stopKey2, stopKey3, stopKey4)).setFilter(new ColumnPrefixFilter(qualifier(prefix, key1.ser, null, null, null)));
     }
 
-	private static Scan scan4_2(byte prefix, byte[] key1, byte[] key2, byte[] stopKey3, byte[] stopKey4) {
-		return scan(concat(prefix, false, key1, key2), concat(prefix, true, key1, key2, stopKey3, stopKey4));
+	private static Scan scan4_2(byte prefix, RDFValue<?> key1, RDFValue<?> key2, byte[] stopKey3, byte[] stopKey4) {
+		return scan(concat(prefix, false, key1.hash, key2.hash), concat(prefix, true, key1.hash, key2.hash, stopKey3, stopKey4)).setFilter(new ColumnPrefixFilter(qualifier(prefix, key1.ser, key2.ser, null, null)));
     }
 
-	private static Scan scan4_3(byte prefix, byte[] key1, byte[] key2, byte[] key3, byte[] stopKey4) {
-		return scan(concat(prefix, false, key1, key2, key3), concat(prefix, true, key1, key2, key3, stopKey4));
+	private static Scan scan4_3(byte prefix, RDFValue<?> key1, RDFValue<?> key2, RDFValue<?> key3, byte[] stopKey4) {
+		return scan(concat(prefix, false, key1.hash, key2.hash, key3.hash), concat(prefix, true, key1.hash, key2.hash, key3.hash, stopKey4)).setFilter(new ColumnPrefixFilter(qualifier(prefix, key1.ser, key2.ser, key3.ser, null)));
     }
 
-	private static Scan scan4_4(byte prefix, byte[] key1, byte[] key2, byte[] key3, byte[] key4) {
-        return scan(concat(prefix, false, key1, key2, key3, key4), concat(prefix, true, key1, key2, key3, key4));
+	private static Scan scan4_4(byte prefix, RDFValue<?> key1, RDFValue<?> key2, RDFValue<?> key3, RDFValue<?> key4) {
+		return scan(concat(prefix, false, key1.hash, key2.hash, key3.hash, key4.hash), concat(prefix, true, key1.hash, key2.hash, key3.hash, key4.hash))
+				.setFilter(new ColumnPrefixFilter(qualifier(prefix, key1.ser, key2.ser, key3.ser, key4.ser)));
     }
 
     public static byte[] writeBytes(Value v) {

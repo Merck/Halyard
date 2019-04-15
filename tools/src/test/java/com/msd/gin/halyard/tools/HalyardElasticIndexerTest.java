@@ -22,6 +22,7 @@ import com.msd.gin.halyard.sail.HBaseSail;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,6 +30,7 @@ import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+
 import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.commons.codec.binary.Hex;
@@ -40,6 +42,7 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.json.JSONObject;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 /**
@@ -65,7 +68,7 @@ public class HalyardElasticIndexerTest {
 
     public void testElasticIndexer(boolean namedGraphOnly, ValueFactory vf) throws Exception {
         final String[] requestUri = new String[2];
-        final JSONObject[] create = new JSONObject[1];
+        final JSONObject[] createRequest = new JSONObject[1];
         final ArrayList<String> response = new ArrayList<>(200);
 
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
@@ -75,7 +78,7 @@ public class HalyardElasticIndexerTest {
                 if ("PUT".equalsIgnoreCase(he.getRequestMethod())) {
                     requestUri[0] = he.getRequestURI().getPath();
                     try (InputStream in  = he.getRequestBody()) {
-                        create[0] = new JSONObject(IOUtils.toString(in, StandardCharsets.UTF_8));
+                        createRequest[0] = new JSONObject(IOUtils.toString(in, StandardCharsets.UTF_8));
                     }
                 } else if ("POST".equalsIgnoreCase(he.getRequestMethod())) {
                     requestUri[1] = he.getRequestURI().getPath();
@@ -92,19 +95,21 @@ public class HalyardElasticIndexerTest {
         server.start();
         try {
             assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardElasticIndexer(),
-                namedGraphOnly ? new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c", "-d", "customDoc", "-a", "customAttr", "-g", "<http://whatever/graph#1>"}
-                               : new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c", "-d", "customDoc", "-a", "customAttr"}));
+                namedGraphOnly ? new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c", "-d", "customDoc", "-g", "<http://whatever/graph#1>"}
+                               : new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c", "-d", "customDoc"}));
         } finally {
             server.stop(0);
         }
         assertEquals("/my_index", requestUri[0]);
-        assertNotNull(create[0].toString(), create[0].getJSONObject("mappings").getJSONObject("customDoc").getJSONObject("properties").getJSONObject("customAttr"));
+        JSONObject mappingProps = createRequest[0].getJSONObject("mappings").getJSONObject("customDoc").getJSONObject("properties");
+        assertNotNull(createRequest[0].toString(), mappingProps.getJSONObject("label"));
+        assertNotNull(createRequest[0].toString(), mappingProps.getJSONObject("datatype"));
         assertEquals("/my_index/customDoc/_bulk", requestUri[1]);
         assertEquals((namedGraphOnly ? 50 : 200), response.size());
         for (int i=0; i< response.size(); i+=2) {
-            String hash = new JSONObject(response.get(i)).getJSONObject("index").getString("_id");
-            Literal literal = vf.createLiteral(new JSONObject(response.get(i+1)).getString("customAttr"));
-            assertEquals("Invalid hash for literal " + literal, Hex.encodeHexString(HalyardTableUtils.hashObject(literal)), hash);
+            String id = new JSONObject(response.get(i)).getJSONObject("index").getString("_id");
+            Literal literal = vf.createLiteral(new JSONObject(response.get(i+1)).getString("label"), vf.createIRI(new JSONObject(response.get(i+1)).getString("datatype")));
+            assertEquals("Invalid hash for literal " + literal, Hex.encodeHexString(HalyardTableUtils.id(literal)), id);
         }
     }
 

@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFValue;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
@@ -41,8 +42,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Delete;
@@ -560,12 +559,13 @@ public class HBaseSailConnection implements SailConnection {
         sail.namespaces.clear();
     }
 
-    private static final Map <String, List<byte[]>> SEARCH_CACHE = new WeakHashMap<>();
+	private static final Map<String, List<RDFValue<Value>>> SEARCH_CACHE = new WeakHashMap<>();
 
     //Scans the Halyard table for statements that match the specified pattern
     private class LiteralSearchStatementScanner extends StatementScanner {
 
-        Iterator<byte[]> objectHashes = null;
+		final ValueFactory vf = sail.getValueFactory();
+		Iterator<RDFValue<Value>> objectHashes = null;
         private final String literalSearchQuery;
 
         public LiteralSearchStatementScanner(long startTime, Resource subj, IRI pred, String literalSearchQuery, Resource... contexts) throws SailException {
@@ -579,10 +579,10 @@ public class HBaseSailConnection implements SailConnection {
         @Override
         protected Result nextResult() throws IOException {
             while (true) {
-                if (objHash == null) {
+                if (obj == null) {
                     if (objectHashes == null) { //perform ES query and parse results
                         synchronized (SEARCH_CACHE) {
-                            List<byte[]> objectHashesList = SEARCH_CACHE.get(literalSearchQuery);
+							List<RDFValue<Value>> objectHashesList = SEARCH_CACHE.get(literalSearchQuery);
                             if (objectHashesList == null) {
                                 objectHashesList = new ArrayList<>();
                                 HttpURLConnection http = (HttpURLConnection)(new URL(sail.elasticIndexURL + "/_search").openConnection());
@@ -592,7 +592,7 @@ public class HBaseSailConnection implements SailConnection {
                                     http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
                                     http.connect();
                                     try (PrintStream out = new PrintStream(http.getOutputStream(), true, "UTF-8")) {
-                                        out.print("{\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"_source\":false,\"stored_fields\":\"_id\",\"size\":" + ELASTIC_RESULT_SIZE + "}");
+										out.print("{\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"size\":" + ELASTIC_RESULT_SIZE + "}");
                                     }
                                     int response = http.getResponseCode();
                                     String msg = http.getResponseMessage();
@@ -602,12 +602,13 @@ public class HBaseSailConnection implements SailConnection {
                                         try (InputStreamReader isr = new InputStreamReader(http.getInputStream(), "UTF-8")) {
                                             JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
                                             for (int i=0; i<hits.length(); i++) {
-                                                objectHashesList.add(Hex.decodeHex(hits.getJSONObject(i).getString("_id").toCharArray()));
+												JSONObject source = hits.getJSONObject(i).getJSONObject("_source");
+												objectHashesList.add(RDFValue.createObject(vf.createLiteral(source.getString("label"), vf.createIRI(source.getString("datatype")))));
                                             }
                                         }
                                         SEARCH_CACHE.put(new String(literalSearchQuery), objectHashesList);
                                     }
-                                } catch (JSONException | DecoderException ex) {
+								} catch (JSONException ex) {
                                     throw new IOException(ex);
                                 } finally {
                                     http.disconnect();
@@ -617,7 +618,7 @@ public class HBaseSailConnection implements SailConnection {
                         }
                     }
                     if (objectHashes.hasNext()) {
-                        objHash = objectHashes.next();
+                        obj = objectHashes.next();
                     } else {
                         return null;
                     }
@@ -625,7 +626,7 @@ public class HBaseSailConnection implements SailConnection {
                 }
                 Result res = super.nextResult();
                 if (res == null) {
-                    objHash = null;
+                    obj = null;
                 } else {
                     return res;
                 }
@@ -637,13 +638,11 @@ public class HBaseSailConnection implements SailConnection {
 
 	private class StatementScanner implements CloseableIteration<Statement, SailException> {
 
-        private final Resource subj;
-        private final IRI pred;
-        private final Value obj;
-        private final byte[] subjHash, predHash;
+        private final RDFValue<Resource> subj;
+        private final RDFValue<IRI> pred;
+		protected RDFValue<Value> obj;
         protected final List<Resource> contextsList;
         protected Iterator<Resource> contexts;
-        protected byte[] objHash;
         private ResultScanner rs = null;
         private final long endTime;
         private Statement next = null;
@@ -653,12 +652,9 @@ public class HBaseSailConnection implements SailConnection {
 		private long counterStartTime;
 
         public StatementScanner(long startTime, Resource subj, IRI pred, Value obj, Resource...contexts) throws SailException {
-            this.subj = subj;
-            this.pred = pred;
-            this.obj = obj;
-            this.subjHash = HalyardTableUtils.hashSubject(subj);
-            this.predHash = HalyardTableUtils.hashPredicate(pred);
-            this.objHash = HalyardTableUtils.hashObject(obj);
+            this.subj = RDFValue.createSubject(subj);
+            this.pred = RDFValue.createPredicate(pred);
+            this.obj = RDFValue.createObject(obj);
             this.contextsList = Arrays.asList(normalizeContexts(contexts));
             this.contexts = contextsList.iterator();
 			this.endTime = startTime + TimeUnit.SECONDS.toMillis(sail.evaluationTimeout);
@@ -672,7 +668,8 @@ public class HBaseSailConnection implements SailConnection {
                     if (contexts.hasNext()) {
 
                         //build a ResultScanner from an HBase Scan that finds potential matches
-                    	Scan scan = HalyardTableUtils.scan(subjHash, predHash, objHash, HalyardTableUtils.hashContext(contexts.next()));
+                    	RDFValue<Resource> ctx = RDFValue.createContext(contexts.next());
+                    	Scan scan = HalyardTableUtils.scan(subj, pred, obj, ctx);
 						scan.setTimeRange(sail.minTimestamp, sail.maxTimestamp);
 						scan.setMaxVersions(sail.maxVersions);
                         rs = table.getScanner(scan);
@@ -722,31 +719,30 @@ public class HBaseSailConnection implements SailConnection {
 				}
 			}
 
-			if (next == null)
+			if (next == null) {
 				try { // try and find the next result
-                while (true) {
-                    if (iter == null) {
-                        Result res = nextResult();
-                        if (res == null) {
-                            return false; //no more Results
-                        } else {
-                            iter = HalyardTableUtils.parseStatements(res, sail.getValueFactory()).iterator();
-                        }
-                    }
-                    while (iter.hasNext()) {
-                        Statement s = iter.next();
-                        if ((subj == null || subj.equals(s.getSubject())) && (pred == null || pred.equals(s.getPredicate())) && (obj == null || obj.equals(s.getObject()))) {
-                            next = s;  //cache the next statement which will be returned with a call to next().
-                            return true; //there is another statement
-                        }
-                    }
-                    iter = null;
-                }
-            } catch (IOException e) {
-                throw new SailException(e);
-            } else {
-                return true;
-            }
+					while (true) {
+						if (iter == null) {
+							Result res = nextResult();
+							if (res == null) {
+								return false; // no more Results
+							} else {
+								iter = HalyardTableUtils.parseStatements(res, sail.getValueFactory()).iterator();
+							}
+						}
+						while (iter.hasNext()) {
+							Statement s = iter.next();
+							next = s; // cache the next statement which will be returned with a call to next().
+							return true; // there is another statement
+						}
+						iter = null;
+					}
+				} catch (IOException e) {
+					throw new SailException(e);
+				}
+			} else {
+				return true;
+			}
         }
 
         @Override
