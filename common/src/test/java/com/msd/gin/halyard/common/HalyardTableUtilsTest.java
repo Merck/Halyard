@@ -19,10 +19,12 @@ package com.msd.gin.halyard.common;
 import java.util.List;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
@@ -40,22 +42,28 @@ import static org.junit.Assert.*;
  */
 public class HalyardTableUtilsTest {
 
-    private static HTable table;
+    private static Connection con;
+    private static Table table;
 
     @BeforeClass
     public static void setup() throws Exception {
-        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, -1);
+        con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig());
+        table = HalyardTableUtils.getTable(con, "testUtils", true, -1);
     }
 
     @AfterClass
     public static void teardown() throws Exception {
-        table.close();
+        try {
+            table.close();
+        } finally {
+            con.close();
+        }
     }
 
     @Test
     public void testGetTheSameTableAgain() throws Exception {
         table.close();
-        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, 1);
+        table = HalyardTableUtils.getTable(con, "testUtils", true, 1);
     }
 
     @Test
@@ -67,7 +75,7 @@ public class HalyardTableUtilsTest {
         for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, null, false, System.currentTimeMillis())) {
                 table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
-        table.flushCommits();
+//        table.flushCommits();
 
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, null))) {
             assertEquals(obj, HalyardTableUtils.parseStatements(rs.next(), vf).iterator().next().getObject());
@@ -96,7 +104,7 @@ public class HalyardTableUtilsTest {
                     kv1[i].getTimestamp(), KeyValue.Type.Put, kv2[i].getValueArray(), kv1[i].getValueOffset(), kv1[i].getValueLength());
             table.put(new Put(conflicting.getRowArray(), conflicting.getRowOffset(), conflicting.getRowLength(), conflicting.getTimestamp()).add(conflicting));
         }
-        table.flushCommits();
+//        table.flushCommits();
 
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred1, obj1, null))) {
             List<Statement> res = HalyardTableUtils.parseStatements(rs.next(), vf);
@@ -115,11 +123,11 @@ public class HalyardTableUtilsTest {
         for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, expl, null, false, System.currentTimeMillis())) {
                 table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
-        table.flushCommits();
+//        table.flushCommits();
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, expl, null))) {
             assertNotNull(rs.next());
         }
-        table = HalyardTableUtils.truncateTable(table);
+        table = HalyardTableUtils.truncateTable(con, table);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, expl, null))) {
             assertNull(rs.next());
         }

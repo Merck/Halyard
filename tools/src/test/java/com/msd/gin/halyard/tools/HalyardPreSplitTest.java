@@ -22,7 +22,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 import org.apache.commons.cli.MissingOptionException;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.util.ToolRunner;
 import static org.junit.Assert.*;
 import org.junit.Test;
@@ -43,8 +45,8 @@ public class HalyardPreSplitTest {
 
         assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardPreSplit(), new String[]{"-d", "1", "-l",  "0", "-s", file.toURI().toURL().toString(), "-t", "preSplitTable"}));
 
-        try (HTable t = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "preSplitTable", false, 0)) {
-            assertEquals(17, t.getRegionLocator().getStartKeys().length);
+        try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
+            assertEquals(17, con.getRegionLocator(TableName.valueOf("preSplitTable")).getStartKeys().length);
         }
     }
 
@@ -56,7 +58,9 @@ public class HalyardPreSplitTest {
             ps.println("<http://whatever/NTsubj2> <http://whatever/NTpred2> \"whatever NT value 2\" <http://whatever/ctx2> .");
         }
 
-        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "preSplitTable2", true, -1).close();
+        try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
+            HalyardTableUtils.getTable(con, "preSplitTable2", true, -1).close();
+        }
 
         assertEquals(-1, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardPreSplit(), new String[]{"-d", "1", "-l",  "0", "-s", file.toURI().toURL().toString(), "-t", "preSplitTable2"}));
     }

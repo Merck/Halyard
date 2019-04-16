@@ -21,10 +21,12 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -140,12 +142,14 @@ public class HalyardTableUtilsScanTest {
            });
     }
 
-    private static HTable table;
+    private static Table table;
+    private static Connection con;
     private static Set<Statement> allStatements;
 
     @BeforeClass
     public static void setup() throws Exception {
-        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testScan", true, 0);
+        con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig());
+        table = HalyardTableUtils.getTable(con, "testScan", true, 0);
 
         allStatements = new HashSet<>();
         SimpleValueFactory vf = SimpleValueFactory.getInstance();
@@ -157,7 +161,7 @@ public class HalyardTableUtilsScanTest {
                     table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
             }
         }
-        table.flushCommits();
+//        table.flushCommits();
     }
 
     @AfterClass

@@ -27,21 +27,19 @@ import java.util.Base64;
 import java.util.List;
 import java.util.TreeSet;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeepDeletedCells;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.ColumnFamilyDescriptor;
+import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Connection;
-import org.apache.hadoop.hbase.client.ConnectionFactory;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.client.TableDescriptor;
+import org.apache.hadoop.hbase.client.TableDescriptorBuilder;
 import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.regionserver.BloomType;
@@ -136,71 +134,57 @@ public final class HalyardTableUtils {
     /**
      * Helper method which locates or creates and returns the specified HTable used for triple/ quad storage. The table may be pre-split into regions (rather than HBase's default
      * of starting with 1). For a discussion of pre-splits take a look at <a href="https://hortonworks.com/blog/apache-hbase-region-splitting-and-merging/">this article</a>
-     * @param config Hadoop Configuration of the cluster running HBase
+     * @param connection HBase Connection instance
      * @param tableName String table name
      * @param create boolean option to create the table if does not exist
      * @param splitBits int number of bits used for calculation of HTable region pre-splits (applies for new tables only). Must be between 0 and 16. Higher values generate more
      * splits.
      * @throws IOException throws IOException in case of any HBase IO problems
-     * @return the org.apache.hadoop.hbase.client.HTable
+     * @return the org.apache.hadoop.hbase.client.Table
      */
-    public static HTable getTable(Configuration config, String tableName, boolean create, int splitBits) throws IOException {
-        return getTable(config, tableName, create, splitBits < 0 ? null : calculateSplits(splitBits));
+    public static Table getTable(Connection connection, String tableName, boolean create, int splitBits) throws IOException {
+        return getTable(connection, tableName, create, splitBits < 0 ? null : calculateSplits(splitBits));
     }
 
     /**
      * Helper method which locates or creates and returns the specified HTable used for triple/ quad storage
-     * @param config Hadoop Configuration of the cluster running HBase
+     * @param connection HBase Connection instance
      * @param tableName String table name
      * @param create boolean option to create the table if does not exists
      * @param splits array of keys used to pre-split new table, may be null
-     * @return HTable
+     * @return Table
      * @throws IOException throws IOException in case of any HBase IO problems
      */
-    public static HTable getTable(Configuration config, String tableName, boolean create, byte[][] splits) throws IOException {
-        Configuration cfg = HBaseConfiguration.create(config);
-        cfg.setLong(HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD, 3600000l);
-        if (create) {
-            try (Connection con = ConnectionFactory.createConnection(config)) {
-                try (Admin admin = con.getAdmin()) {
-                	    //check if the table exists and if it doesn't, make it
-                    if (!admin.tableExists(TableName.valueOf(tableName))) {
-                        HTableDescriptor td = new HTableDescriptor(TableName.valueOf(tableName));
-                        td.addFamily(createColumnFamily());
-                        admin.createTable(td, splits);
-                    }
-                }
+    public static Table getTable(Connection connection, String tableName, boolean create, byte[][] splits) throws IOException {
+        if (create) try (Admin admin = connection.getAdmin()) {
+            //check if the table exists and if it doesn't, make it
+            if (!admin.tableExists(TableName.valueOf(tableName))) {
+                admin.createTable(TableDescriptorBuilder.newBuilder(TableName.valueOf(tableName)).setColumnFamily(createColumnFamily()).build(), splits);
             }
         }
-
-        //this is deprecated, the recommendation now is to use connection.getTable()
-        HTable table = new HTable(cfg, tableName);
-        table.setAutoFlushTo(false);
-        return table;
+        return connection.getTable(TableName.valueOf(tableName));
     }
 
     /**
      * Truncates HTable while preserving the region pre-splits
+     * @param connection HBace Connection
      * @param table HTable to truncate
      * @return new instance of the truncated HTable
      * @throws IOException throws IOException in case of any HBase IO problems
      */
-    public static HTable truncateTable(HTable table) throws IOException {
-        Configuration conf = table.getConfiguration();
-        byte[][] presplits = table.getRegionLocator().getStartKeys();
+    public static Table truncateTable(Connection connection, Table table) throws IOException {
+        byte[][] presplits = connection.getRegionLocator(table.getName()).getStartKeys();
         if (presplits.length > 0 && presplits[0].length == 0) {
             presplits = Arrays.copyOfRange(presplits, 1, presplits.length);
         }
-        HTableDescriptor desc = table.getTableDescriptor();
+        TableDescriptor desc = table.getDescriptor();
         table.close();
-        try (Connection con = ConnectionFactory.createConnection(conf)) {
-            try (Admin admin = con.getAdmin()) {
-                admin.disableTable(desc.getTableName());
-                admin.deleteTable(desc.getTableName());
-                admin.createTable(desc, presplits);
-            }
+        try (Admin admin = connection.getAdmin()) {
+            admin.disableTable(desc.getTableName());
+            admin.deleteTable(desc.getTableName());
+            admin.createTable(desc, presplits);
         }
-        return HalyardTableUtils.getTable(conf, desc.getTableName().getNameAsString(), false, 0);
+        return HalyardTableUtils.getTable(connection, desc.getTableName().getNameAsString(), false, 0);
     }
 
     /**
@@ -425,11 +409,11 @@ public final class HalyardTableUtils {
     public static Scan scan(byte[] startRow, byte[] stopRow) {
         Scan scan = new Scan();
         scan.addFamily(CF_NAME);
-        scan.setMaxVersions(1);
+        scan.readVersions(1);
         scan.setAllowPartialResults(true);
         scan.setBatch(10);
-        if (startRow != null) scan.setStartRow(startRow);
-        if (stopRow != null) scan.setStopRow(stopRow);
+        if (startRow != null) scan.withStartRow(startRow, true);
+        if (stopRow != null) scan.withStopRow(stopRow, true);
         return scan;
     }
 
@@ -460,8 +444,8 @@ public final class HalyardTableUtils {
 
 // private methods
 
-    private static HColumnDescriptor createColumnFamily() {
-        return new HColumnDescriptor(CF_NAME)
+    private static ColumnFamilyDescriptor createColumnFamily() {
+        return ColumnFamilyDescriptorBuilder.newBuilder(CF_NAME)
                 .setMaxVersions(1)
                 .setBlockCacheEnabled(true)
                 .setBloomFilterType(BloomType.ROW)
@@ -471,8 +455,9 @@ public final class HalyardTableUtils {
                 .setCacheDataOnWrite(true)
                 .setCacheIndexesOnWrite(true)
                 .setKeepDeletedCells(KeepDeletedCells.FALSE)
-                .setValue(HTableDescriptor.MAX_FILESIZE, REGION_MAX_FILESIZE)
-                .setValue(HTableDescriptor.SPLIT_POLICY, REGION_SPLIT_POLICY);
+                .setValue(TableDescriptorBuilder.MAX_FILESIZE, REGION_MAX_FILESIZE)
+                .setValue(TableDescriptorBuilder.SPLIT_POLICY, REGION_SPLIT_POLICY)
+            .build();
     }
 
     public static byte[] hashKey(byte[] key) {

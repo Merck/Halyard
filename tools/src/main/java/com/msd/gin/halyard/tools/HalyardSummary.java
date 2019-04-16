@@ -76,7 +76,8 @@ import org.eclipse.rdf4j.sail.SailException;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
-import com.yammer.metrics.core.Gauge;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 
 /**
  * MapReduce tool providing summary of a Halyard dataset.
@@ -112,6 +113,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
         private int decimationFactor;
         private final Random random = new Random(0);
+        private Connection con;
         private Table table;
 
         @Override
@@ -120,7 +122,10 @@ public final class HalyardSummary extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             if (table == null) {
-                table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
+                if (con == null) {
+                    con = ConnectionFactory.createConnection(conf);
+                }
+                table = HalyardTableUtils.getTable(con, conf.get(SOURCE), false, 0);
             }
         }
 
@@ -260,6 +265,10 @@ public final class HalyardSummary extends AbstractHalyardTool {
             if (table != null) {
                 table.close();;
                 table = null;
+            }
+            if (con != null) {
+                con.close();
+                con = null;
             }
         }
 
@@ -483,8 +492,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                HTable.class,
                HBaseConfiguration.class,
                AuthenticationProtos.class,
-               Trace.class,
-               Gauge.class);
+               Trace.class);
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardSummary " + source + (target == null ? " update" : " -> " + target));
         job.getConfiguration().set(SOURCE, source);

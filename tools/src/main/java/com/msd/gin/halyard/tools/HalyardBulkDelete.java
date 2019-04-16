@@ -17,7 +17,6 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.yammer.metrics.core.Gauge;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -29,15 +28,18 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
-import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
+import org.apache.hadoop.hbase.tool.LoadIncrementalHFiles;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -156,8 +158,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
             HTable.class,
             HBaseConfiguration.class,
             AuthenticationProtos.class,
-            Trace.class,
-            Gauge.class);
+            Trace.class);
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardDelete " + source);
         if (cmd.hasOption('s')) {
@@ -189,14 +190,16 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         job.setSpeculativeExecution(false);
         job.setMapSpeculativeExecution(false);
         job.setReduceSpeculativeExecution(false);
-        try (HTable hTable = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
-            HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
-            FileOutputFormat.setOutputPath(job, new Path(cmd.getOptionValue('f')));
-            TableMapReduceUtil.addDependencyJars(job);
-            if (job.waitForCompletion(true)) {
-                new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(cmd.getOptionValue('f')), hTable);
-                LOG.info("Bulk Delete Completed..");
-                return 0;
+        try (Connection con = ConnectionFactory.createConnection(getConf())) {
+            try (Table hTable = HalyardTableUtils.getTable(con, source, false, 0)) {
+                HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), con.getRegionLocator(hTable.getName()));
+                FileOutputFormat.setOutputPath(job, new Path(cmd.getOptionValue('f')));
+                TableMapReduceUtil.addDependencyJars(job);
+                if (job.waitForCompletion(true)) {
+                    new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(cmd.getOptionValue('f')), con.getAdmin(), hTable, con.getRegionLocator(hTable.getName()));
+                    LOG.info("Bulk Delete Completed..");
+                    return 0;
+                }
             }
         }
         return -1;

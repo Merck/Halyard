@@ -39,11 +39,13 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
-import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.tool.LoadIncrementalHFiles;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -553,22 +555,25 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         job.setInputFormatClass(RioFileInputFormat.class);
         job.setSpeculativeExecution(false);
         job.setReduceSpeculativeExecution(false);
-        try (HTable hTable = HalyardTableUtils.getTable(getConf(), target, true, getConf().getInt(SPLIT_BITS_PROPERTY, 3))) {
-            HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), hTable.getRegionLocator());
-            FileInputFormat.setInputDirRecursive(job, true);
-            FileInputFormat.setInputPaths(job, source);
-            FileOutputFormat.setOutputPath(job, new Path(workdir));
-            TableMapReduceUtil.addDependencyJars(job);
-            TableMapReduceUtil.initCredentials(job);
-            if (job.waitForCompletion(true)) {
-                if (getConf().getBoolean(TRUNCATE_PROPERTY, false)) {
-                    HalyardTableUtils.truncateTable(hTable).close();
+        try (Connection con = ConnectionFactory.createConnection(getConf())) {
+            try (Table hTable = HalyardTableUtils.getTable(con, target, true, getConf().getInt(SPLIT_BITS_PROPERTY, 3))) {
+                HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), con.getRegionLocator(hTable.getName()));
+                FileInputFormat.setInputDirRecursive(job, true);
+                FileInputFormat.setInputPaths(job, source);
+                FileOutputFormat.setOutputPath(job, new Path(workdir));
+                TableMapReduceUtil.addDependencyJars(job);
+                TableMapReduceUtil.initCredentials(job);
+                if (job.waitForCompletion(true)) {
+                    Table t = hTable;
+                    if (getConf().getBoolean(TRUNCATE_PROPERTY, false)) {
+                        t = HalyardTableUtils.truncateTable(con, hTable);
+                    }
+                    new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(workdir), con.getAdmin(), t, con.getRegionLocator(t.getName()));
+                    LOG.info("Bulk Load Completed..");
+                    return 0;
                 }
-                new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(workdir), hTable);
-                LOG.info("Bulk Load Completed..");
-                return 0;
             }
+            return -1;
         }
-        return -1;
     }
 }

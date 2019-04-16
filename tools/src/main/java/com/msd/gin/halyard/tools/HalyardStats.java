@@ -74,7 +74,6 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.VOID_EXT;
-import com.yammer.metrics.core.Gauge;
 
 /**
  * MapReduce tool providing statistics about a Halyard dataset. Statistics about a dataset are reported in RDF using the VOID ontology. These statistics can be useful
@@ -473,8 +472,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             HTable.class,
             HBaseConfiguration.class,
             AuthenticationProtos.class,
-            Trace.class,
-            Gauge.class);
+            Trace.class);
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardStats " + source + (target == null ? " update" : " -> " + target));
         job.getConfiguration().set(SOURCE, source);

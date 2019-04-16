@@ -16,7 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.yammer.metrics.core.Gauge;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -150,8 +149,7 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
                HTable.class,
                HBaseConfiguration.class,
                AuthenticationProtos.class,
-               Trace.class,
-               Gauge.class);
+               Trace.class);
         HBaseConfiguration.addHbaseResources(getConf());
         String cp = cmd.getOptionValue('l');
         if (cp != null) {

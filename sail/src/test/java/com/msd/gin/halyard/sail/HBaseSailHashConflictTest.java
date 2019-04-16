@@ -22,8 +22,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
@@ -71,31 +73,33 @@ public class HBaseSailHashConflictTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        try (HTable table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", true, 0)) {
-            long timestamp = System.currentTimeMillis();
-            KeyValue triple[] = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp);
-            KeyValue conflicts[][] = new KeyValue[][] {
-                HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(SUBJ, CONF,  OBJ, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(CONF, PRED,  OBJ, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(CONF, PRED, CONF, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(CONF, CONF,  OBJ, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null, false, timestamp),
-            };
-            for (int i=0; i<triple.length; i++) {
-                KeyValue kv = triple[i];
-                table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
-                for (int j=0; j<conflicts.length; j++) {
-                    KeyValue xkv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(),
-                            kv.getFamilyArray(), kv.getFamilyOffset(), kv.getFamilyLength(),
-                            conflicts[j][i].getQualifierArray(), conflicts[j][i].getQualifierOffset(), conflicts[j][i].getQualifierLength(),
-                            kv.getTimestamp(), KeyValue.Type.Put,
-                            conflicts[j][i].getValueArray(), conflicts[j][i].getValueOffset(), conflicts[j][i].getValueLength());
-                    table.put(new Put(xkv.getRowArray(), xkv.getRowOffset(), xkv.getRowLength(), xkv.getTimestamp()).add(xkv));
+        try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
+            try (Table table = HalyardTableUtils.getTable(con, "testConflictingHash", true, 0)) {
+                long timestamp = System.currentTimeMillis();
+                KeyValue triple[] = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp);
+                KeyValue conflicts[][] = new KeyValue[][] {
+                    HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null, false, timestamp),
+                    HalyardTableUtils.toKeyValues(SUBJ, CONF,  OBJ, null, false, timestamp),
+                    HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null, false, timestamp),
+                    HalyardTableUtils.toKeyValues(CONF, PRED,  OBJ, null, false, timestamp),
+                    HalyardTableUtils.toKeyValues(CONF, PRED, CONF, null, false, timestamp),
+                    HalyardTableUtils.toKeyValues(CONF, CONF,  OBJ, null, false, timestamp),
+                    HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null, false, timestamp),
+                };
+                for (int i=0; i<triple.length; i++) {
+                    KeyValue kv = triple[i];
+                    table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
+                    for (int j=0; j<conflicts.length; j++) {
+                        KeyValue xkv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(),
+                                kv.getFamilyArray(), kv.getFamilyOffset(), kv.getFamilyLength(),
+                                conflicts[j][i].getQualifierArray(), conflicts[j][i].getQualifierOffset(), conflicts[j][i].getQualifierLength(),
+                                kv.getTimestamp(), KeyValue.Type.Put,
+                                conflicts[j][i].getValueArray(), conflicts[j][i].getValueOffset(), conflicts[j][i].getValueLength());
+                        table.put(new Put(xkv.getRowArray(), xkv.getRowOffset(), xkv.getRowLength(), xkv.getTimestamp()).add(xkv));
+                    }
                 }
+//                table.flushCommits();
             }
-            table.flushCommits();
         }
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", false, 0, true, 0, null, null);
         sail.initialize();

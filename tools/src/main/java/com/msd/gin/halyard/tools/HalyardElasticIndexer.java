@@ -56,7 +56,6 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.json.JSONObject;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.yammer.metrics.core.Gauge;
 
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
@@ -208,8 +207,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                HTable.class,
                HBaseConfiguration.class,
                AuthenticationProtos.class,
-               Trace.class,
-               Gauge.class);
+               Trace.class);
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardElasticIndexer " + source + " -> " + target);
         job.getConfiguration().set(SOURCE, source);

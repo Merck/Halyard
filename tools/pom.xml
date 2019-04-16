@@ -36,7 +36,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-server</artifactId>
+            <artifactId>hbase-mapreduce</artifactId>
             <version>${hbase.version}</version>
             <scope>provided</scope>
         </dependency>

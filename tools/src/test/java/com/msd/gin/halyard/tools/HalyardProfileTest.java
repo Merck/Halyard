@@ -21,6 +21,8 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import org.apache.commons.cli.MissingOptionException;
 import org.junit.Test;
 import org.apache.commons.cli.ParseException;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.query.MalformedQueryException;
 import org.eclipse.rdf4j.repository.RepositoryException;
@@ -63,7 +65,9 @@ public class HalyardProfileTest {
 
     @Test(expected = MalformedQueryException.class)
     public void testInvalidQuery() throws Exception {
-        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "profile", true, -1);
+        try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
+            HalyardTableUtils.getTable(con, "profile", true, -1);
+        }
         runProfile("-s", "profile", "-q", "invalid * query {}");
     }
 
@@ -74,19 +78,25 @@ public class HalyardProfileTest {
 
     @Test
     public void testProfile() throws Exception {
-        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "profile", true, -1);
+        try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
+            HalyardTableUtils.getTable(con, "profile", true, -1);
+        }
         runProfile("-s", "profile", "-q", "select * where {{?s <http://whatever/pred> ?o, ?o2} union {?s ?p ?o3. optional {?s ?p2 ?o4 }}}");
     }
 
     @Test
     public void testProfileGraph() throws Exception {
-        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "profile", true, -1);
+        try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
+            HalyardTableUtils.getTable(con, "profile", true, -1);
+        }
         runProfile("-s", "profile", "-q", "construct {?s ?o ?o2} where {{?s <http://whatever/pred> ?o, ?o2} union {?s ?p ?o3. optional {?s ?p2 ?o4 }}}");
     }
 
     @Test
     public void testProfileBoolean() throws Exception {
-        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "profile", true, -1);
+        try (Connection con = ConnectionFactory.createConnection(HBaseServerTestInstance.getInstanceConfig())) {
+            HalyardTableUtils.getTable(con, "profile", true, -1);
+        }
         runProfile("-s", "profile", "-q", "ask where {{?s <http://whatever/pred> ?o, ?o2} union {?s ?p ?o3. optional {?s ?p2 ?o4 }}}");
     }
 

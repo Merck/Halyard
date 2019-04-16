@@ -44,11 +44,13 @@ import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -141,7 +143,8 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     final String elasticIndexURL;
     private final Ticker ticker;
 
-    HTable table = null;
+    Connection con;
+    Table table = null;
 
     private final Map<String, Namespace> namespaces = new HashMap<>();
     private final Map<String, HBaseSail> federatedServices = new HashMap<>();
@@ -186,12 +189,16 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     public File getDataDir() {
         throw new UnsupportedOperationException();
     }
-
     @Override
     public void initialize() throws SailException { //initialize the SAIL
+        initialize(null);
+    }
+
+    private void initialize(Connection sharedConnection) throws SailException { //initialize the SAIL
         try {
-        	    //get or create and get the HBase table
-            table = HalyardTableUtils.getTable(config, tableName, create, splitBits);
+            //get or create and get the HBase table
+            con = sharedConnection == null ? ConnectionFactory.createConnection(config) : sharedConnection;
+            table = HalyardTableUtils.getTable(con, tableName, create, splitBits);
 
             //Iterate over statements relating to namespaces and add them to the namespace map.
             try (CloseableIteration<? extends Statement, SailException> nsIter = getStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null, true)) {
@@ -250,21 +257,29 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
     @Override
     public void shutdown() throws QueryEvaluationException {
-        shutDown();
-    }
-
-    @Override
-    public void shutDown() throws SailException { //release resources
         try {
             table.close(); //close the HTable
             table = null;
         } catch (IOException ex) {
             throw new SailException(ex);
         }
-        for (HBaseSail s : federatedServices.values()) { //shutdown all federated services
-            s.shutdown();
+    }
+
+    @Override
+    public void shutDown() throws SailException { //release resources
+        try {
+            shutdown();
+            for (HBaseSail s : federatedServices.values()) { //shutdown all federated services
+                s.shutdown();
+            }
+            federatedServices.clear(); // release the references to the services
+        } finally {
+            try {
+                con.close();
+            } catch (IOException ex) {
+                throw new SailException(ex);
+            }
         }
-        federatedServices.clear(); // release the references to the services
     }
 
     @Override
@@ -522,11 +537,11 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
     @Override
     public void commit() throws SailException {
-        try {
-            table.flushCommits(); //execute all buffered puts in HBase
-        } catch (IOException ex) {
-            throw new SailException(ex);
-        }
+//        try {
+//            table.flushCommits(); //execute all buffered puts in HBase
+//        } catch (IOException ex) {
+//            throw new SailException(ex);
+//        }
     }
 
     @Override
@@ -628,7 +643,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     private void clearAll() throws SailException {
         if (!isWritable()) throw new SailException(tableName + " is read only");
         try {
-            table = HalyardTableUtils.truncateTable(table); //delete all triples, the whole DB but retains splits!
+            table = HalyardTableUtils.truncateTable(con, table); //delete all triples, the whole DB but retains splits!
         } catch (IOException ex) {
             throw new SailException(ex);
         }
