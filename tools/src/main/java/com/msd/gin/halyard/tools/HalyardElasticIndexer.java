@@ -102,7 +102,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 export(false);
                 lastHash = hash;
             }
-            for (Statement st : HalyardTableUtils.parseStatements(value, SVF)) {
+            for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, SVF)) {
                 statements++;
                 if (st.getObject() instanceof Literal) {
                     literals.add((Literal) st.getObject());

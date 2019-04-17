@@ -75,6 +75,7 @@ import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFValue;
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.yammer.metrics.core.Gauge;
@@ -128,10 +129,12 @@ public final class HalyardSummary extends AbstractHalyardTool {
         private Set<IRI> queryForClasses(Value instance) throws IOException {
             if (instance instanceof Resource) {
                 Set<IRI> res = new HashSet<>();
-                Scan scan = HalyardTableUtils.scan((Resource)instance, RDF.TYPE, null, null);
+                RDFValue<Resource> s = RDFValue.createSubject((Resource)instance);
+                RDFValue<IRI> p = RDFValue.createPredicate(RDF.TYPE);
+                Scan scan = HalyardTableUtils.scan(s, p, null, null);
                 try (ResultScanner scanner = table.getScanner(scan)) {
                     for (Result r : scanner) {
-                        Statement st = HalyardTableUtils.parseStatement(r.rawCells()[0], SVF);
+                        Statement st = HalyardTableUtils.parseStatement(s, p, null, null, r.rawCells()[0], SVF);
                         if (st.getSubject().equals(instance) && st.getPredicate().equals(RDF.TYPE) && (st.getObject() instanceof IRI)) {
                             res.add((IRI)st.getObject());
                         }
@@ -248,7 +251,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             if (random.nextInt(decimationFactor) == 0) {
-                statementChange(HalyardTableUtils.parseStatement(value.rawCells()[0], SVF));
+                statementChange(HalyardTableUtils.parseStatement(null, null, null, null, value.rawCells()[0], SVF));
             }
             if (++counter % 10000 == 0) {
                 output.setStatus(MessageFormat.format("{0} cc:{1} pc:{2} pd:{3} pr:{4} pdr:{5}", counter, ccCounter, pcCounter, pdCounter, prCounter, pdrCounter));

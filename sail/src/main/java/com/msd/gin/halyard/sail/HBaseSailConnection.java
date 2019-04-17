@@ -641,6 +641,7 @@ public class HBaseSailConnection implements SailConnection {
         private final RDFValue<Resource> subj;
         private final RDFValue<IRI> pred;
 		protected RDFValue<Value> obj;
+		private RDFValue<Resource> ctx;
         protected final List<Resource> contextsList;
         protected Iterator<Resource> contexts;
         private ResultScanner rs = null;
@@ -668,7 +669,7 @@ public class HBaseSailConnection implements SailConnection {
                     if (contexts.hasNext()) {
 
                         //build a ResultScanner from an HBase Scan that finds potential matches
-                    	RDFValue<Resource> ctx = RDFValue.createContext(contexts.next());
+                    	ctx = RDFValue.createContext(contexts.next());
                     	Scan scan = HalyardTableUtils.scan(subj, pred, obj, ctx);
 						scan.setTimeRange(sail.minTimestamp, sail.maxTimestamp);
 						scan.setMaxVersions(sail.maxVersions);
@@ -727,7 +728,7 @@ public class HBaseSailConnection implements SailConnection {
 							if (res == null) {
 								return false; // no more Results
 							} else {
-								iter = HalyardTableUtils.parseStatements(res, sail.getValueFactory()).iterator();
+								iter = HalyardTableUtils.parseStatements(subj, pred, obj, ctx, res, sail.getValueFactory()).iterator();
 							}
 						}
 						while (iter.hasNext()) {

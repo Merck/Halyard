@@ -151,7 +151,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
-			List<Statement> stmts = HalyardTableUtils.parseStatements(value, SVF);
+			List<Statement> stmts = HalyardTableUtils.parseStatements(null, null, null, null, value, SVF);
             int hashShift;
             if (region < HalyardTableUtils.CSPO_PREFIX) {
             	// triple region

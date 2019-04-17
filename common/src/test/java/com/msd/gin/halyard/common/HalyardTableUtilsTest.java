@@ -16,8 +16,14 @@
  */
 package com.msd.gin.halyard.common;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
 import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Connection;
@@ -34,7 +40,6 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import static org.junit.Assert.*;
 
 /**
  *
@@ -75,11 +80,14 @@ public class HalyardTableUtilsTest {
         }
 		table.put(puts);
 
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, null))) {
-            assertEquals(obj, HalyardTableUtils.parseStatements(rs.next(), vf).iterator().next().getObject());
+        RDFValue<Resource> s = RDFValue.createSubject(subj);
+        RDFValue<IRI> p = RDFValue.createPredicate(pred);
+        RDFValue<Value> o = RDFValue.createObject(obj);
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
+            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, o, null, rs.next(), vf).iterator().next().getObject());
         }
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, null, null))) {
-            assertEquals(obj, HalyardTableUtils.parseStatements(rs.next(), vf).iterator().next().getObject());
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, null, null))) {
+            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, null, null, rs.next(), vf).iterator().next().getObject());
         }
     }
 
@@ -107,8 +115,11 @@ public class HalyardTableUtilsTest {
         }
 		table.put(puts);
 
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred1, obj1, null))) {
-            List<Statement> res = HalyardTableUtils.parseStatements(rs.next(), vf);
+        RDFValue<Resource> s = RDFValue.createSubject(subj);
+        RDFValue<IRI> p1 = RDFValue.createPredicate(pred1);
+        RDFValue<Value> o1 = RDFValue.createObject(obj1);
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p1, o1, null))) {
+            List<Statement> res = HalyardTableUtils.parseStatements(s, p1, o1, null, rs.next(), vf);
             assertEquals(1, res.size());
             assertTrue(res.contains(SimpleValueFactory.getInstance().createStatement(subj, pred1, obj1)));
         }
@@ -125,11 +136,14 @@ public class HalyardTableUtilsTest {
 			puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
 		table.put(puts);
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, expl, null))) {
+        RDFValue<Resource> s = RDFValue.createSubject(subj);
+        RDFValue<IRI> p = RDFValue.createPredicate(pred);
+        RDFValue<Value> o = RDFValue.createObject(expl);
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
             assertNotNull(rs.next());
         }
 		HalyardTableUtils.truncateTable(conn, table);
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, expl, null))) {
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
             assertNull(rs.next());
         }
     }
@@ -146,7 +160,7 @@ public class HalyardTableUtilsTest {
 
     @Test
     public void testNoResult() {
-        assertEquals(0, HalyardTableUtils.parseStatements(Result.EMPTY_RESULT, SimpleValueFactory.getInstance()).size());
+        assertEquals(0, HalyardTableUtils.parseStatements(null, null, null, null, Result.EMPTY_RESULT, SimpleValueFactory.getInstance()).size());
     }
 
     @Test(expected = IllegalArgumentException.class)

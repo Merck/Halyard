@@ -16,8 +16,6 @@
  */
 package com.msd.gin.halyard.common;
 
-import com.google.common.hash.Hashing;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -67,6 +65,8 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+
+import com.google.common.hash.Hashing;
 
 /**
  * Core Halyard utility class performing RDF to HBase mappings and base HBase table and key management. The methods of this class define how
@@ -702,17 +702,6 @@ public final class HalyardTableUtils {
 	}
 
     /**
-     * Method constructing HBase Scan from a Statement pattern, any of the arguments can be null
-     * @param subj optional subject Resource
-     * @param pred optional predicate IRI
-     * @param obj optional object Value
-     * @param ctx optional context Resource
-     * @return HBase Scan instance to retrieve all data potentially matching the Statement pattern
-     */
-    public static Scan scan(Resource subj, IRI pred, Value obj, Resource ctx) {
-        return scan(RDFValue.createSubject(subj), RDFValue.createPredicate(pred), RDFValue.createObject(obj), RDFValue.createContext(ctx));
-    }
-    /**
      * Method constructing HBase Scan from a Statement pattern hashes, any of the arguments can be null
      * @param subj optional subject Resource
      * @param pred optional predicate IRI
@@ -787,16 +776,20 @@ public final class HalyardTableUtils {
     /**
 	 * Parser method returning all Statements from a single HBase Scan Result
 	 * 
+     * @param subj subject if known
+     * @param pred predicate if known
+     * @param obj object if known
+     * @param ctx context if known
 	 * @param res HBase Scan Result
 	 * @param vf ValueFactory
 	 * @return List of Statements
 	 */
-    public static List<Statement> parseStatements(Result res, ValueFactory vf) {
+    public static List<Statement> parseStatements(RDFValue<Resource> subj, RDFValue<IRI> pred, RDFValue<Value> obj, RDFValue<Resource> ctx, Result res, ValueFactory vf) {
     	// multiple triples may have the same hash (i.e. row key)
         ArrayList<Statement> st = new ArrayList<>();
 		if (res.rawCells() != null) {
 			for (Cell c : res.rawCells()) {
-				st.add(parseStatement(c, vf));
+				st.add(parseStatement(subj, pred, obj, ctx, c, vf));
 			}
 		}
         return st;
@@ -805,94 +798,86 @@ public final class HalyardTableUtils {
     /**
 	 * Parser method returning Statement from a single HBase Result Cell
 	 * 
+     * @param subj subject if known
+     * @param pred predicate if known
+     * @param obj object if known
+     * @param ctx context if known
 	 * @param c HBase Result Cell
 	 * @param vf ValueFactory
 	 * @return Statements
 	 */
-    public static Statement parseStatement(Cell c, ValueFactory vf) {
-    	ByteBuffer key = ByteBuffer.wrap(c.getRowArray(), c.getRowOffset(), c.getRowLength());
+    public static Statement parseStatement(RDFValue<Resource> subj, RDFValue<IRI> pred, RDFValue<Value> obj, RDFValue<Resource> ctx, Cell cell, ValueFactory vf) {
+    	ByteBuffer key = ByteBuffer.wrap(cell.getRowArray(), cell.getRowOffset(), cell.getRowLength());
     	byte prefix = key.get();
-        ByteBuffer cq = ByteBuffer.wrap(c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength());
-        byte[] sb, pb, ob, cb;
+        ByteBuffer cq = ByteBuffer.wrap(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
+        Resource s;
+        IRI p;
+        Value o;
+        Resource c;
         switch(prefix) {
         	case SPO_PREFIX:
-        		sb = new byte[cq.getShort()];
-                cq.get(sb);
-        		pb = new byte[cq.getShort()];
-                cq.get(pb);
-                ob = new byte[cq.getInt()];
-                cq.get(ob);
-                cb = new byte[cq.remaining()];
-                cq.get(cb);
+        		s = parseValue(subj, cq, cq.getShort(), vf);
+        		p = parseValue(pred, cq, cq.getShort(), vf);
+        		o = parseValue(obj, cq, cq.getInt(), vf);
+        		c = parseValue(ctx, cq, cq.remaining(), vf);
                 break;
         	case POS_PREFIX:
-        		pb = new byte[cq.getShort()];
-                cq.get(pb);
-                ob = new byte[cq.getInt()];
-                cq.get(ob);
-        		sb = new byte[cq.getShort()];
-                cq.get(sb);
-                cb = new byte[cq.remaining()];
-                cq.get(cb);
+        		p = parseValue(pred, cq, cq.getShort(), vf);
+        		o = parseValue(obj, cq, cq.getInt(), vf);
+        		s = parseValue(subj, cq, cq.getShort(), vf);
+        		c = parseValue(ctx, cq, cq.remaining(), vf);
                 break;
         	case OSP_PREFIX:
-                ob = new byte[cq.getInt()];
-                cq.get(ob);
-        		sb = new byte[cq.getShort()];
-                cq.get(sb);
-        		pb = new byte[cq.getShort()];
-                cq.get(pb);
-                cb = new byte[cq.remaining()];
-                cq.get(cb);
+        		o = parseValue(obj, cq, cq.getInt(), vf);
+        		s = parseValue(subj, cq, cq.getShort(), vf);
+        		p = parseValue(pred, cq, cq.getShort(), vf);
+        		c = parseValue(ctx, cq, cq.remaining(), vf);
                 break;
-        		
         	case CSPO_PREFIX:
-                cb = new byte[cq.getShort()];
-                cq.get(cb);
-        		sb = new byte[cq.getShort()];
-                cq.get(sb);
-        		pb = new byte[cq.getShort()];
-                cq.get(pb);
-                ob = new byte[cq.remaining()];
-                cq.get(ob);
+        		c = parseValue(ctx, cq, cq.getShort(), vf);
+        		s = parseValue(subj, cq, cq.getShort(), vf);
+        		p = parseValue(pred, cq, cq.getShort(), vf);
+        		o = parseValue(obj, cq, cq.remaining(), vf);
                 break;
         	case CPOS_PREFIX:
-                cb = new byte[cq.getShort()];
-                cq.get(cb);
-        		pb = new byte[cq.getShort()];
-                cq.get(pb);
-                ob = new byte[cq.getInt()];
-                cq.get(ob);
-        		sb = new byte[cq.remaining()];
-                cq.get(sb);
+        		c = parseValue(ctx, cq, cq.getShort(), vf);
+        		p = parseValue(pred, cq, cq.getShort(), vf);
+        		o = parseValue(obj, cq, cq.getInt(), vf);
+        		s = parseValue(subj, cq, cq.remaining(), vf);
                 break;
         	case COSP_PREFIX:
-                cb = new byte[cq.getShort()];
-                cq.get(cb);
-                ob = new byte[cq.getInt()];
-                cq.get(ob);
-        		sb = new byte[cq.getShort()];
-                cq.get(sb);
-        		pb = new byte[cq.remaining()];
-                cq.get(pb);
+        		c = parseValue(ctx, cq, cq.getShort(), vf);
+        		o = parseValue(obj, cq, cq.getInt(), vf);
+        		s = parseValue(subj, cq, cq.getShort(), vf);
+        		p = parseValue(pred, cq, cq.remaining(), vf);
                 break;
             default:
             	throw new AssertionError("Invalid prefix: "+prefix);
         }
-        Resource subj = (Resource) readValue(sb, vf);
-        IRI pred = (IRI) readValue(pb, vf);
-        Value value = readValue(ob, vf);
-		Statement stmt;
-		if (cb.length == 0) {
-			stmt = vf.createStatement(subj, pred, value);
+
+        Statement stmt;
+		if (c == null) {
+			stmt = vf.createStatement(s, p, o);
 		} else {
-			Resource context = (Resource) readValue(cb, vf);
-			stmt = vf.createStatement(subj, pred, value, context);
+			stmt = vf.createStatement(s, p, o, c);
 		}
 		if (stmt instanceof Timestamped) {
-			((Timestamped) stmt).setTimestamp(fromHalyardTimestamp(c.getTimestamp()));
+			((Timestamped) stmt).setTimestamp(fromHalyardTimestamp(cell.getTimestamp()));
         }
 		return stmt;
+    }
+
+    private static <V extends Value> V parseValue(RDFValue<V> pattern, ByteBuffer cq, int len, ValueFactory vf) {
+    	if(pattern != null) {
+			cq.position(cq.position()+len);
+			return pattern.val;
+		} else if(len > 0) {
+    		byte[] b = new byte[len];
+            cq.get(b);
+            return (V) readValue(b, vf);
+		} else {
+			return null;
+		}
     }
 
     /**
