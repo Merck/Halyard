@@ -36,6 +36,7 @@ import javax.activation.MimeType;
 import javax.activation.MimeTypeParseException;
 import java.io.*;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -56,7 +57,7 @@ import org.eclipse.rdf4j.rio.WriterConfig;
  */
 public final class HttpSparqlHandler implements HttpHandler {
     private static final String AND_DELIMITER = "&";
-    private static final String CHARSET = "UTF-8";
+    private static final String CHARSET = StandardCharsets.UTF_8.name();
     private static final ValueFactory SVF = SimpleValueFactory.getInstance();
 
 
@@ -220,7 +221,7 @@ public final class HttpSparqlHandler implements HttpHandler {
                 MimeType mimeType = new MimeType(headers.getFirst("Content-Type"));
                 String baseType = mimeType.getBaseType();
                 String charset = mimeType.getParameter("charset");
-                if (charset != null && !charset.equals(CHARSET)) {
+                if (charset != null && !charset.equalsIgnoreCase(CHARSET)) {
                     throw new IllegalArgumentException("Illegal Content-Type charset. Only UTF-8 is supported");
                 }
 
