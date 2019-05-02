@@ -19,8 +19,11 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.yammer.metrics.core.Gauge;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -28,6 +31,7 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Hex;
@@ -67,7 +71,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.elastic.source";
     private static final String TARGET = "halyard.elastic.target";
-    private static final String DOCUMENT = "halyard.elastic.document";
     private static final String BUFFER_LIMIT = "halyard.elastic.buffer";
 
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
@@ -77,17 +80,17 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         long counter = 0, exports = 0, batches = 0, statements = 0;
 		byte[] lastHash;
         Set<Literal> literals = new HashSet<>();
-        StringBuilder batch;
+        ByteArrayOutputStream batch;
+        Writer batchWriter;
         URL url;
         int bufferLimit;
-        String doc;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
-            doc = context.getConfiguration().get(DOCUMENT, "l");
-            url = new URL(context.getConfiguration().get(TARGET)+"/" +doc + "/_bulk");
+            url = new URL(context.getConfiguration().get(TARGET) + "/_bulk");
             bufferLimit = context.getConfiguration().getInt(BUFFER_LIMIT, 100000);
-            batch = new StringBuilder(bufferLimit);
+            batch = new ByteArrayOutputStream(bufferLimit);
+            batchWriter = new OutputStreamWriter(new GZIPOutputStream(batch), StandardCharsets.UTF_8);
         }
 
 
@@ -113,26 +116,29 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         private void export(boolean flush) throws IOException {
             if (literals.size() > 0) {
             	for(Literal l : literals) {
-	                batch.append("{\"index\":{\"_id\":\"").append(Hex.encodeHex(HalyardTableUtils.id(l)));
-	                batch.append("\"}}\n{\"label\":").append(JSONObject.quote(l.getLabel()));
-                    batch.append(",\"datatype\":").append(JSONObject.quote(l.getDatatype().stringValue()));
-	                batch.append("}\n");
+	                batchWriter.write("{\"index\":{\"_id\":\"");
+	                batchWriter.write(Hex.encodeHex(HalyardTableUtils.id(l)));
+	                batchWriter.write("\"}}\n{\"label\":");
+	                batchWriter.write(JSONObject.quote(l.getLabel()));
+	                batchWriter.write(",\"datatype\":");
+	                batchWriter.write(JSONObject.quote(l.getDatatype().stringValue()));
+	                batchWriter.write("}\n");
             	}
                 literals = new HashSet<>();
                 exports++;
             }
-            if ((flush && batch.length() > 0) || batch.length() > bufferLimit) {
+            if ((flush && batch.size() > 0) || batch.size() > bufferLimit) {
+            	batchWriter.close();
                 HttpURLConnection http = (HttpURLConnection)url.openConnection();
                 http.setRequestMethod("POST");
                 http.setDoOutput(true);
                 http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                byte b[] = batch.toString().getBytes(StandardCharsets.UTF_8);
-                batch = new StringBuilder(bufferLimit);
-                http.setFixedLengthStreamingMode(b.length);
+                http.setRequestProperty("Content-Encoding", "gzip");
+                http.setFixedLengthStreamingMode(batch.size());
                 http.connect();
                 try {
                     try (OutputStream post = http.getOutputStream()) {
-                        post.write(b);
+                        post.write(batch.toByteArray());
                     }
                     int response = http.getResponseCode();
                     String msg = http.getResponseMessage();
@@ -144,6 +150,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 } finally {
                     http.disconnect();
                 }
+                batch = new ByteArrayOutputStream(bufferLimit);
+                batchWriter = new OutputStreamWriter(new GZIPOutputStream(batch), StandardCharsets.UTF_8);
             }
         }
 
@@ -161,14 +169,13 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             "Default index configuration is:\n"
             + "\u00A0{\n"
             + "\u00A0   \"mappings\" : {\n"
-            + "\u00A0       \"l\" : {\n"
-            + "\u00A0           \"properties\" : {\n"
-            + "\u00A0               \"label\" : { \"type\" : \"text\" }\n"
-            + "\u00A0               \"datatype\" : { \"type\" : \"text\" }\n"
-            + "\u00A0            }\n"
+            + "\u00A0       \"properties\" : {\n"
+            + "\u00A0           \"label\" : { \"type\" : \"text\" }\n"
+            + "\u00A0           \"datatype\" : { \"type\" : \"keyword\" }\n"
             + "\u00A0        }\n"
             + "\u00A0    },\n"
             + "\u00A0   \"settings\": {\n"
+            + "\u00A0       \"index.query.default_field\": \"label\",\n"
             + "\u00A0       \"refresh_interval\": \"1h\",\n"
             + "\u00A0       \"number_of_shards\": 1+(<dataset_table_regions>/256),\n"
             + "\u00A0       \"number_of_replicas\": 0\n"
@@ -179,7 +186,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-index", "target_url", "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
         addOption("c", "create-index", null, "Optionally create Elasticsearch index", false, true);
-        addOption("d", "document-type", "document_type", "Optionally specify document type within the index, default is 'l'", false, true);
         addOption("b", "batch-size", "batch_size", "Number of literals sent to Elasticsearch for indexing in one batch (default is 100000)", false, true);
         addOption("g", "named-graph", "named_graph", "Optional restrict indexing to the given named graph only", false, true);
     }
@@ -188,7 +194,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
     public int run(CommandLine cmd) throws Exception {
         String source = cmd.getOptionValue('s');
         String target = cmd.getOptionValue('t');
-        String doc = cmd.getOptionValue('d', "l");
         TableMapReduceUtil.addDependencyJars(getConf(),
                HalyardExport.class,
                NTriplesUtil.class,
@@ -205,7 +210,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         Job job = Job.getInstance(getConf(), "HalyardElasticIndexer " + source + " -> " + target);
         job.getConfiguration().set(SOURCE, source);
         job.getConfiguration().set(TARGET, target);
-        job.getConfiguration().set(DOCUMENT, doc);
         if (cmd.hasOption('b')) {
             job.getConfiguration().setInt(BUFFER_LIMIT, Integer.parseInt(cmd.getOptionValue('b')));
         }
@@ -222,14 +226,13 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
             byte b[] = ("{\n"
                 + "    \"mappings\" : {\n"
-                + "        \"" + doc + "\" : {\n"
-                + "            \"properties\" : {\n"
-                + "                \"label\" : { \"type\" : \"text\" },\n"
-                + "                \"datatype\" : { \"type\" : \"text\" }\n"
-                + "            }\n"
+                + "        \"properties\" : {\n"
+                + "            \"label\" : { \"type\" : \"text\" },\n"
+                + "            \"datatype\" : { \"type\" : \"keyword\" }\n"
                 + "        }\n"
                 + "    },\n"
                 + "   \"settings\": {\n"
+                + "       \"index.query.default_field\": \"label\",\n"
                 + "       \"refresh_interval\": \"1h\",\n"
                 + "       \"number_of_shards\": " + shards + ",\n"
                 + "       \"number_of_replicas\": 0\n"

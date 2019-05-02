@@ -802,7 +802,7 @@ public final class HalyardTableUtils {
      * @param pred predicate if known
      * @param obj object if known
      * @param ctx context if known
-	 * @param c HBase Result Cell
+	 * @param cell HBase Result Cell
 	 * @param vf ValueFactory
 	 * @return Statements
 	 */

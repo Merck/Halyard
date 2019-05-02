@@ -30,6 +30,7 @@ import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.UnrecognizedOptionException;
@@ -81,8 +82,9 @@ public class HalyardElasticIndexerTest {
                         createRequest[0] = new JSONObject(IOUtils.toString(in, StandardCharsets.UTF_8));
                     }
                 } else if ("POST".equalsIgnoreCase(he.getRequestMethod())) {
+                	assertEquals("gzip", he.getRequestHeaders().getFirst("Content-Encoding"));
                     requestUri[1] = he.getRequestURI().getPath();
-                    try (BufferedReader br = new BufferedReader(new InputStreamReader(he.getRequestBody(), StandardCharsets.UTF_8))) {
+                    try (BufferedReader br = new BufferedReader(new InputStreamReader(new GZIPInputStream(he.getRequestBody()), StandardCharsets.UTF_8))) {
                         String line;
                         while ((line = br.readLine()) != null) {
                             response.add(line);
@@ -95,16 +97,16 @@ public class HalyardElasticIndexerTest {
         server.start();
         try {
             assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardElasticIndexer(),
-                namedGraphOnly ? new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c", "-d", "customDoc", "-g", "<http://whatever/graph#1>"}
-                               : new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c", "-d", "customDoc"}));
+                namedGraphOnly ? new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c", "-g", "<http://whatever/graph#1>"}
+                               : new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + "/my_index", "-c"}));
         } finally {
             server.stop(0);
         }
         assertEquals("/my_index", requestUri[0]);
-        JSONObject mappingProps = createRequest[0].getJSONObject("mappings").getJSONObject("customDoc").getJSONObject("properties");
+        JSONObject mappingProps = createRequest[0].getJSONObject("mappings").getJSONObject("properties");
         assertNotNull(createRequest[0].toString(), mappingProps.getJSONObject("label"));
         assertNotNull(createRequest[0].toString(), mappingProps.getJSONObject("datatype"));
-        assertEquals("/my_index/customDoc/_bulk", requestUri[1]);
+        assertEquals("/my_index/_bulk", requestUri[1]);
         assertEquals((namedGraphOnly ? 50 : 200), response.size());
         for (int i=0; i< response.size(); i+=2) {
             String id = new JSONObject(response.get(i)).getJSONObject("index").getString("_id");
