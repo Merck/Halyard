@@ -25,6 +25,7 @@ import java.security.Security;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
@@ -786,13 +787,21 @@ public final class HalyardTableUtils {
 	 */
     public static List<Statement> parseStatements(RDFValue<Resource> subj, RDFValue<IRI> pred, RDFValue<Value> obj, RDFValue<Resource> ctx, Result res, ValueFactory vf) {
     	// multiple triples may have the same hash (i.e. row key)
-        ArrayList<Statement> st = new ArrayList<>();
-		if (res.rawCells() != null) {
-			for (Cell c : res.rawCells()) {
-				st.add(parseStatement(subj, pred, obj, ctx, c, vf));
+		List<Statement> st;
+		Cell[] cells = res.rawCells();
+		if (cells != null && cells.length > 0) {
+			if (cells.length == 1) {
+				st = Collections.singletonList(parseStatement(subj, pred, obj, ctx, cells[0], vf));
+			} else {
+				st = new ArrayList<>(cells.length);
+				for (Cell c : cells) {
+					st.add(parseStatement(subj, pred, obj, ctx, c, vf));
+				}
 			}
+		} else {
+			st = Collections.emptyList();
 		}
-        return st;
+		return st;
     }
 
     /**

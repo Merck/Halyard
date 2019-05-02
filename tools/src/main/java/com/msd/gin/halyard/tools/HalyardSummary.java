@@ -134,9 +134,10 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 Scan scan = HalyardTableUtils.scan(s, p, null, null);
                 try (ResultScanner scanner = table.getScanner(scan)) {
                     for (Result r : scanner) {
-                        Statement st = HalyardTableUtils.parseStatement(s, p, null, null, r.rawCells()[0], SVF);
-                        if (st.getSubject().equals(instance) && st.getPredicate().equals(RDF.TYPE) && (st.getObject() instanceof IRI)) {
-                            res.add((IRI)st.getObject());
+                        for (Statement st : HalyardTableUtils.parseStatements(s, p, null, null, r, SVF)) {
+	                        if (st.getSubject().equals(instance) && st.getPredicate().equals(RDF.TYPE) && (st.getObject() instanceof IRI)) {
+	                            res.add((IRI)st.getObject());
+	                        }
                         }
                     }
                 }
