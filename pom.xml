@@ -25,6 +25,7 @@
         <rdf4j.version>2.4.6</rdf4j.version>
         <hbase.version>1.1.2</hbase.version>
         <hadoop.version>2.5.1</hadoop.version>
+        <elasticsearch.version>7.0.1</elasticsearch.version>
     </properties>
     <modules>
         <module>common</module>

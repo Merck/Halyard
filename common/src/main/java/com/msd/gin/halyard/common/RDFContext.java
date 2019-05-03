@@ -27,12 +27,7 @@ public final class RDFContext extends RDFValue<Resource> {
 		return HalyardTableUtils.hash64(ser);
 	}
 
-	public byte[] getEndHash() {
+	byte[] getEndHash() {
 		throw new AssertionError("Context is never at end");
-	}
-
-
-	public static byte[] hash(Resource v) {
-		return HalyardTableUtils.hash64(HalyardTableUtils.writeBytes(v));
 	}
 }

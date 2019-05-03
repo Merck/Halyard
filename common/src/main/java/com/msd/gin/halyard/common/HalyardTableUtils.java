@@ -548,10 +548,11 @@ public final class HalyardTableUtils {
     }
 
     /**
-     * Calculates the split keys (one for each purmutation of the CSPO HBase Key prefix).
-     * @param splitBits must be between 0 and 16, larger values result in more keys.
-     * @return An array of keys represented as {@code byte[]}s
-     */
+	 * Calculates the split keys (one for each permutation of the CSPO HBase Key prefix).
+	 * 
+	 * @param splitBits must be between 0 and 16, larger values result in more keys.
+	 * @return An array of keys represented as {@code byte[]}s
+	 */
     static byte[][] calculateSplits(int splitBits) {
         TreeSet<byte[]> splitKeys = new TreeSet<>(Bytes.BYTES_COMPARATOR);
         //basic presplits

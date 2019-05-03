@@ -1,7 +1,5 @@
 package com.msd.gin.halyard.common;
 
-import static org.junit.Assert.assertEquals;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -9,6 +7,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -17,6 +18,8 @@ import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+
+import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class HalyardTableUtilsRDFTest {
@@ -55,5 +58,37 @@ public class HalyardTableUtilsRDFTest {
 		extbuf.position(1).limit(extbuf.capacity() - 1);
 		actual = HalyardTableUtils.readValue(extbuf, vf);
 		assertEquals(expected, actual);
+	}
+
+	@Test
+	public void testRDFValue() {
+		if (expected instanceof Literal) {
+			RDFObject obj = RDFObject.create(expected);
+			assertTrue(RDFObject.isLiteral(obj.getHash()));
+			assertTrue(RDFObject.isLiteral(obj.getEndHash()));
+		} else if (expected instanceof IRI) {
+			RDFObject obj = RDFObject.create(expected);
+			assertFalse(RDFObject.isLiteral(obj.getHash()));
+			assertFalse(RDFObject.isLiteral(obj.getEndHash()));
+			RDFSubject subj = RDFSubject.create((IRI) expected);
+			subj.getHash();
+			subj.getEndHash();
+			RDFContext ctx = RDFContext.create((IRI) expected);
+			ctx.getHash();
+			RDFPredicate pred = RDFPredicate.create((IRI) expected);
+			pred.getHash();
+			pred.getEndHash();
+		} else if (expected instanceof Resource) {
+			RDFObject obj = RDFObject.create(expected);
+			assertFalse(RDFObject.isLiteral(obj.getHash()));
+			assertFalse(RDFObject.isLiteral(obj.getEndHash()));
+			RDFSubject subj = RDFSubject.create((Resource) expected);
+			subj.getHash();
+			subj.getEndHash();
+			RDFContext ctx = RDFContext.create((Resource) expected);
+			ctx.getHash();
+		} else {
+			throw new AssertionError();
+		}
 	}
 }

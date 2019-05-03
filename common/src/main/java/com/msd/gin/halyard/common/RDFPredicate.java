@@ -26,11 +26,7 @@ public final class RDFPredicate extends RDFValue<IRI> {
 		return HalyardTableUtils.hash32(ser);
 	}
 
-	public byte[] getEndHash() {
+	byte[] getEndHash() {
 		return HalyardTableUtils.hash16(ser);
-	}
-
-	public static byte[] hash(IRI v) {
-		return HalyardTableUtils.hash32(HalyardTableUtils.writeBytes(v));
 	}
 }

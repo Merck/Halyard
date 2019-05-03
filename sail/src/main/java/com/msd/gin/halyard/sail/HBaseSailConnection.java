@@ -606,7 +606,11 @@ public class HBaseSailConnection implements SailConnection {
                                             JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
                                             for (int i=0; i<hits.length(); i++) {
 												JSONObject source = hits.getJSONObject(i).getJSONObject("_source");
-												objectHashesList.add(RDFObject.create(vf.createLiteral(source.getString("label"), vf.createIRI(source.getString("datatype")))));
+												if(source.has("lang")) {
+													objectHashesList.add(RDFObject.create(vf.createLiteral(source.getString("label"), source.getString("lang"))));
+												} else {
+													objectHashesList.add(RDFObject.create(vf.createLiteral(source.getString("label"), vf.createIRI(source.getString("datatype")))));
+												}
                                             }
                                         }
                                         SEARCH_CACHE.put(new String(literalSearchQuery), objectHashesList);

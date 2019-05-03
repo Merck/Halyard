@@ -25,5 +25,5 @@ public abstract class RDFValue<V extends Value> {
 
 	protected abstract byte[] hash();
 
-	public abstract byte[] getEndHash();
+	abstract byte[] getEndHash();
 }

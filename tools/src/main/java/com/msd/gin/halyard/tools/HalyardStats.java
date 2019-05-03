@@ -96,7 +96,7 @@ public final class HalyardStats extends AbstractHalyardTool {
     private static final String TARGET_GRAPH = "halyard.stats.target.graph";
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
-	private static final byte[] TYPE_HASH = RDFPredicate.hash(RDF.TYPE);
+	private static final byte[] TYPE_HASH = RDFPredicate.create(RDF.TYPE).getHash();
 
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
@@ -130,7 +130,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             statsContext = SVF.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String gc = conf.get(GRAPH_CONTEXT);
             if (gc != null) graphContext = SVF.createIRI(gc);
-			statsContextHash = RDFContext.hash(statsContext);
+			statsContextHash = RDFContext.create(statsContext).getHash();
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, int len, byte[] target) {
@@ -522,13 +522,13 @@ public final class HalyardStats extends AbstractHalyardTool {
         Scan scan = HalyardTableUtils.scan(null, null);
         if (graphContext != null) { //restricting stats to scan given graph context only
             List<RowRange> ranges = new ArrayList<>(4);
-			byte[] gcHash = RDFContext.hash(SVF.createIRI(graphContext));
+			byte[] gcHash = RDFContext.create(SVF.createIRI(graphContext)).getHash();
             ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX, gcHash, RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY));
             ranges.add(rowRange(HalyardTableUtils.CPOS_PREFIX, gcHash, RDFPredicate.STOP_KEY, RDFObject.STOP_KEY, RDFSubject.END_STOP_KEY));
             ranges.add(rowRange(HalyardTableUtils.COSP_PREFIX, gcHash, RDFObject.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY));
             if (target == null) { //add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
 				ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX,
-						RDFContext.hash(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SVF.createIRI(targetGraph)),
+						RDFContext.create(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SVF.createIRI(targetGraph)).getHash(),
 						RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY));
             }
             scan.setFilter(new MultiRowRangeFilter(ranges));

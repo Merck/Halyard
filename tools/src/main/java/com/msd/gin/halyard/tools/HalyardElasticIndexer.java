@@ -16,26 +16,19 @@
  */
 package com.msd.gin.halyard.tools;
 
-import java.io.ByteArrayOutputStream;
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFObject;
+import com.yammer.metrics.core.Gauge;
+
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Reader;
-import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.cli.CommandLine;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.TableName;
@@ -49,10 +42,9 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
-import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Statement;
@@ -62,15 +54,8 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
-import org.json.JSONArray;
+import org.elasticsearch.hadoop.mr.EsOutputFormat;
 import org.json.JSONObject;
-
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFContext;
-import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.RDFPredicate;
-import com.msd.gin.halyard.common.RDFSubject;
-import com.yammer.metrics.core.Gauge;
 
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
@@ -79,111 +64,38 @@ import com.yammer.metrics.core.Gauge;
 public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.elastic.source";
-    private static final String TARGET = "halyard.elastic.target";
-    private static final String BUFFER_LIMIT = "halyard.elastic.buffer";
 
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
-    static final class IndexerMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
+    static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
 
-        long counter = 0, exports = 0, batches = 0, statements = 0;
-		byte[] lastHash;
-        Set<Literal> literals = new HashSet<>();
-        List<String> esNodes;
-        ByteArrayOutputStream batch;
-        Writer batchWriter;
-        URL indexUrl;
-        int bufferLimit;
-
-        @Override
-        protected void setup(Context context) throws IOException, InterruptedException {
-            indexUrl = new URL(context.getConfiguration().get(TARGET));
-            bufferLimit = context.getConfiguration().getInt(BUFFER_LIMIT, 100000);
-            batch = new ByteArrayOutputStream(bufferLimit);
-            batchWriter = new OutputStreamWriter(new GZIPOutputStream(batch), StandardCharsets.UTF_8);
-            try(Reader in = new InputStreamReader(new URL(indexUrl.getProtocol(), indexUrl.getHost(), indexUrl.getPort(), "_nodes").openStream(), StandardCharsets.UTF_8)) {
-            	JSONObject response = new JSONObject(in);
-            	JSONArray nodes = response.getJSONArray("nodes");
-            	esNodes = new ArrayList<>(nodes.length());
-            	for(int i=0; i<nodes.length(); i++) {
-            		JSONObject node = nodes.getJSONObject(i);
-            		JSONArray roles = node.getJSONArray("roles");
-            		for(int j=0; j<roles.length(); j++) {
-            			if("data".equals(roles.getString(j))) {
-                    		esNodes.add(node.getString("ip"));
-                    		break;
-            			}
-            		}
-            	}
-            }
-        }
-
+        long counter = 0, exports = 0, statements = 0;
+        Literal lastLiteral;
 
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             if ((counter++ % 100000) == 0) {
-                output.setStatus(MessageFormat.format("{0} st:{1} exp:{2} batch:{3} ", counter, statements, exports, batches));
+                output.setStatus(MessageFormat.format("{0} st:{1} exp:{2} ", counter, statements, exports));
             }
-			byte[] hash = new byte[RDFObject.KEY_SIZE];
-			System.arraycopy(key.get(), key.getOffset() + 1 + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 0 : RDFContext.KEY_SIZE), hash, 0, RDFObject.KEY_SIZE);
-            if (!Arrays.equals(hash, lastHash)) {
-                export(false);
-                lastHash = hash;
-            }
+
             for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, SVF)) {
                 statements++;
-                if (st.getObject() instanceof Literal) {
-                    literals.add((Literal) st.getObject());
+            	Literal l = (Literal) st.getObject();
+                if (!l.equals(lastLiteral)) {
+            		StringBuilder json = new StringBuilder(128);
+	                json.append("{\"id\":\"").append(HalyardTableUtils.encode(HalyardTableUtils.id(l)));
+	                json.append("\",\"label\":").append(JSONObject.quote(l.getLabel()));
+	                if(l.getLanguage().isPresent()) {
+		                json.append(",\"lang\":").append(l.getLanguage().get());
+	                } else {
+		                json.append(",\"datatype\":").append(JSONObject.quote(l.getDatatype().stringValue()));
+	                }
+	                json.append("}\n");
+	                output.write(NullWritable.get(), new Text(json.toString()));
+	                lastLiteral = l;
+	                exports++;
                 }
             }
-        }
-
-        private void export(boolean flush) throws IOException {
-            if (literals.size() > 0) {
-            	for(Literal l : literals) {
-	                batchWriter.write("{\"index\":{\"_id\":\"");
-	                batchWriter.write(Hex.encodeHex(HalyardTableUtils.id(l)));
-	                batchWriter.write("\"}}\n{\"label\":");
-	                batchWriter.write(JSONObject.quote(l.getLabel()));
-	                batchWriter.write(",\"datatype\":");
-	                batchWriter.write(JSONObject.quote(l.getDatatype().stringValue()));
-	                batchWriter.write("}\n");
-            	}
-                literals = new HashSet<>();
-                exports++;
-            }
-            if ((flush && batch.size() > 0) || batch.size() > bufferLimit) {
-            	batchWriter.close();
-            	String esNode = esNodes.get((int)(batches % esNodes.size()));
-                HttpURLConnection http = (HttpURLConnection)new URL(indexUrl.getProtocol(), esNode, indexUrl.getPort(), "_bulk").openConnection();
-                http.setRequestMethod("POST");
-                http.setDoOutput(true);
-                http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                http.setRequestProperty("Content-Encoding", "gzip");
-                http.setFixedLengthStreamingMode(batch.size());
-                http.connect();
-                try {
-                    try (OutputStream post = http.getOutputStream()) {
-                        post.write(batch.toByteArray());
-                    }
-                    int response = http.getResponseCode();
-                    String msg = http.getResponseMessage();
-                    if (exports > 0 && response != 200) {
-                        LOG.severe(IOUtils.toString(http.getErrorStream()));
-                        throw new IOException(msg);
-                    }
-                    batches++;
-                } finally {
-                    http.disconnect();
-                }
-                batch = new ByteArrayOutputStream(bufferLimit);
-                batchWriter = new OutputStreamWriter(new GZIPOutputStream(batch), StandardCharsets.UTF_8);
-            }
-        }
-
-        @Override
-        protected void cleanup(Context output) throws IOException, InterruptedException {
-            export(true);
         }
     }
 
@@ -197,7 +109,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             + "\u00A0   \"mappings\" : {\n"
             + "\u00A0       \"properties\" : {\n"
             + "\u00A0           \"label\" : { \"type\" : \"text\" }\n"
-            + "\u00A0           \"datatype\" : { \"type\" : \"keyword\" }\n"
             + "\u00A0        }\n"
             + "\u00A0    },\n"
             + "\u00A0   \"settings\": {\n"
@@ -212,7 +123,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-index", "target_url", "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
         addOption("c", "create-index", null, "Optionally create Elasticsearch index", false, true);
-        addOption("b", "batch-size", "batch_size", "Number of literals sent to Elasticsearch for indexing in one batch (default is 100000)", false, true);
         addOption("g", "named-graph", "named_graph", "Optional restrict indexing to the given named graph only", false, true);
     }
 
@@ -220,6 +130,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
     public int run(CommandLine cmd) throws Exception {
         String source = cmd.getOptionValue('s');
         String target = cmd.getOptionValue('t');
+        URL targetUrl = new URL(target);
         TableMapReduceUtil.addDependencyJars(getConf(),
                HalyardExport.class,
                NTriplesUtil.class,
@@ -232,13 +143,12 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                AuthenticationProtos.class,
                Trace.class,
                Gauge.class);
+        if (System.getProperty("exclude.es-hadoop") == null) {
+        	TableMapReduceUtil.addDependencyJars(getConf(), EsOutputFormat.class);
+        }
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardElasticIndexer " + source + " -> " + target);
         job.getConfiguration().set(SOURCE, source);
-        job.getConfiguration().set(TARGET, target);
-        if (cmd.hasOption('b')) {
-            job.getConfiguration().setInt(BUFFER_LIMIT, Integer.parseInt(cmd.getOptionValue('b')));
-        }
         if (cmd.hasOption('c')) {
             int shards;
             try (Connection conn = ConnectionFactory.createConnection(getConf())) {
@@ -246,15 +156,14 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                     shards = 1 + (rl.getStartKeys().length >> 8);
                 }
             }
-            HttpURLConnection http = (HttpURLConnection)new URL(target).openConnection();
+            HttpURLConnection http = (HttpURLConnection)targetUrl.openConnection();
             http.setRequestMethod("PUT");
             http.setDoOutput(true);
             http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
             byte b[] = ("{\n"
                 + "    \"mappings\" : {\n"
                 + "        \"properties\" : {\n"
-                + "            \"label\" : { \"type\" : \"text\" },\n"
-                + "            \"datatype\" : { \"type\" : \"keyword\" }\n"
+                + "            \"label\" : { \"type\" : \"text\" }\n"
                 + "        }\n"
                 + "    },\n"
                 + "   \"settings\": {\n"
@@ -292,26 +201,30 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
         Scan scan = HalyardTableUtils.scan(null, null);
         if (cmd.hasOption('g')) {
-            //scan only given named graph from COSP region(s)
-            byte[] graphHash = RDFContext.hash(NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance()));
+            //scan only given named graph from COSP literal region(s)
+            byte[] graphHash = RDFContext.create(NTriplesUtil.parseResource(cmd.getOptionValue('g'), SVF)).getHash();
             scan.setStartRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash));
-            scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, true, graphHash, RDFObject.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY));
+            scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash, RDFObject.LITERAL_STOP_KEY));
         } else {
-            //scan all OSP region(s)
-            scan.setStartRow(new byte[]{HalyardTableUtils.OSP_PREFIX});
-            scan.setStopRow(new byte[]{HalyardTableUtils.OSP_PREFIX+1});
+            //scan OSP literal region(s)
+            scan.setStartRow(HalyardTableUtils.concat(HalyardTableUtils.OSP_PREFIX, false));
+            scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.OSP_PREFIX, false, RDFObject.LITERAL_STOP_KEY));
         }
         TableMapReduceUtil.initTableMapperJob(
                 source,
                 scan,
                 IndexerMapper.class,
-                ImmutableBytesWritable.class,
-                LongWritable.class,
+                NullWritable.class,
+                Text.class,
                 job);
-        job.setOutputFormatClass(NullOutputFormat.class);
+        job.getConfiguration().setBoolean("mapreduce.map.speculative", false);    
+        job.getConfiguration().setBoolean("mapreduce.reduce.speculative", false); 
+        job.getConfiguration().set("es.nodes", targetUrl.getHost()+":"+targetUrl.getPort());
+        job.getConfiguration().set("es.resource", targetUrl.getPath());
+        job.getConfiguration().set("es.mapping.id", "id");
+        job.getConfiguration().set("es.input.json", "yes");
+        job.setOutputFormatClass(EsOutputFormat.class);
         job.setNumReduceTasks(0);
-        job.setMapOutputKeyClass(NullWritable.class);
-        job.setMapOutputValueClass(Void.class);
         if (job.waitForCompletion(true)) {
             HttpURLConnection http = (HttpURLConnection)new URL(target + "_refresh").openConnection();
             http.connect();

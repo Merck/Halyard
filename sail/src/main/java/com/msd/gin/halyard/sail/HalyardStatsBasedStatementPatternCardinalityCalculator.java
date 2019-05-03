@@ -136,11 +136,11 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
     public static byte[] hash(IRI partitionType, Value partition) {
         byte[] hash;
         if(VOID_EXT.SUBJECT.equals(partitionType)) {
-    		hash = RDFSubject.hash((Resource) partition);
+			hash = RDFSubject.create((Resource) partition).getHash();
         } else if(VOID.PROPERTY.equals(partitionType)) {
-    		hash = RDFPredicate.hash((IRI) partition);
+			hash = RDFPredicate.create((IRI) partition).getHash();
         } else if(VOID_EXT.OBJECT.equals(partitionType)) {
-    		hash = RDFObject.hash(partition);
+			hash = RDFObject.create(partition).getHash();
         } else {
         	throw new AssertionError(partitionType);
         }

@@ -28,12 +28,7 @@ public final class RDFSubject extends RDFValue<Resource> {
 		return HalyardTableUtils.hash128(ser);
 	}
 
-	public byte[] getEndHash() {
+	byte[] getEndHash() {
 		return HalyardTableUtils.hash64(ser);
-	}
-
-
-	public static byte[] hash(Resource v) {
-		return HalyardTableUtils.hash128(HalyardTableUtils.writeBytes(v));
 	}
 }

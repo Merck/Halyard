@@ -35,6 +35,11 @@
             <version>${rdf4j.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.elasticsearch</groupId>
+            <artifactId>elasticsearch-hadoop</artifactId>
+            <version>${elasticsearch.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-server</artifactId>
             <version>${hbase.version}</version>
@@ -96,5 +101,5 @@
             <version>10.12.1.1</version>
             <scope>test</scope>
         </dependency>
-    </dependencies>
+      </dependencies>
 </project>
