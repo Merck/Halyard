@@ -16,21 +16,22 @@
  */
 package com.msd.gin.halyard.common;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Table;
-import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
-import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.junit.AfterClass;
@@ -39,7 +40,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
-import static org.junit.Assert.*;
 
 /**
  *
@@ -186,10 +186,10 @@ public class HalyardTableUtilsScanTest {
     public void testScan() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
 
-        RDFValue<Resource> subj = RDFValue.createSubject(s == null ? null : vf.createIRI(s));
-        RDFValue<IRI> pred = RDFValue.createPredicate(p == null ? null : vf.createIRI(p));
-        RDFValue<Value> obj = RDFValue.createObject(o == null ? null : vf.createLiteral(o));
-        RDFValue<Resource> ctx = RDFValue.createContext(c == null ? null : vf.createIRI(c));
+        RDFSubject subj = RDFSubject.create(s == null ? null : vf.createIRI(s));
+        RDFPredicate pred = RDFPredicate.create(p == null ? null : vf.createIRI(p));
+        RDFObject obj = RDFObject.create(o == null ? null : vf.createLiteral(o));
+        RDFContext ctx = RDFContext.create(c == null ? null : vf.createIRI(c));
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, ctx))) {
             Set<Statement> res = new HashSet<>();
             Result r;

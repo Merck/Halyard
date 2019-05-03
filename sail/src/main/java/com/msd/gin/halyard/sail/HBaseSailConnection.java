@@ -17,7 +17,10 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFValue;
+import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.RDFPredicate;
+import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
@@ -559,13 +562,13 @@ public class HBaseSailConnection implements SailConnection {
         sail.namespaces.clear();
     }
 
-	private static final Map<String, List<RDFValue<Value>>> SEARCH_CACHE = new WeakHashMap<>();
+	private static final Map<String, List<RDFObject>> SEARCH_CACHE = new WeakHashMap<>();
 
     //Scans the Halyard table for statements that match the specified pattern
     private class LiteralSearchStatementScanner extends StatementScanner {
 
 		final ValueFactory vf = sail.getValueFactory();
-		Iterator<RDFValue<Value>> objectHashes = null;
+		Iterator<RDFObject> objectHashes = null;
         private final String literalSearchQuery;
 
         public LiteralSearchStatementScanner(long startTime, Resource subj, IRI pred, String literalSearchQuery, Resource... contexts) throws SailException {
@@ -582,7 +585,7 @@ public class HBaseSailConnection implements SailConnection {
                 if (obj == null) {
                     if (objectHashes == null) { //perform ES query and parse results
                         synchronized (SEARCH_CACHE) {
-							List<RDFValue<Value>> objectHashesList = SEARCH_CACHE.get(literalSearchQuery);
+							List<RDFObject> objectHashesList = SEARCH_CACHE.get(literalSearchQuery);
                             if (objectHashesList == null) {
                                 objectHashesList = new ArrayList<>();
                                 HttpURLConnection http = (HttpURLConnection)(new URL(sail.elasticIndexURL + "/_search").openConnection());
@@ -603,7 +606,7 @@ public class HBaseSailConnection implements SailConnection {
                                             JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
                                             for (int i=0; i<hits.length(); i++) {
 												JSONObject source = hits.getJSONObject(i).getJSONObject("_source");
-												objectHashesList.add(RDFValue.createObject(vf.createLiteral(source.getString("label"), vf.createIRI(source.getString("datatype")))));
+												objectHashesList.add(RDFObject.create(vf.createLiteral(source.getString("label"), vf.createIRI(source.getString("datatype")))));
                                             }
                                         }
                                         SEARCH_CACHE.put(new String(literalSearchQuery), objectHashesList);
@@ -638,10 +641,10 @@ public class HBaseSailConnection implements SailConnection {
 
 	private class StatementScanner implements CloseableIteration<Statement, SailException> {
 
-        private final RDFValue<Resource> subj;
-        private final RDFValue<IRI> pred;
-		protected RDFValue<Value> obj;
-		private RDFValue<Resource> ctx;
+        private final RDFSubject subj;
+        private final RDFPredicate pred;
+		protected RDFObject obj;
+		private RDFContext ctx;
         protected final List<Resource> contextsList;
         protected Iterator<Resource> contexts;
         private ResultScanner rs = null;
@@ -653,9 +656,9 @@ public class HBaseSailConnection implements SailConnection {
 		private long counterStartTime;
 
         public StatementScanner(long startTime, Resource subj, IRI pred, Value obj, Resource...contexts) throws SailException {
-            this.subj = RDFValue.createSubject(subj);
-            this.pred = RDFValue.createPredicate(pred);
-            this.obj = RDFValue.createObject(obj);
+            this.subj = RDFSubject.create(subj);
+            this.pred = RDFPredicate.create(pred);
+            this.obj = RDFObject.create(obj);
             this.contextsList = Arrays.asList(normalizeContexts(contexts));
             this.contexts = contextsList.iterator();
 			this.endTime = startTime + TimeUnit.SECONDS.toMillis(sail.evaluationTimeout);
@@ -669,7 +672,7 @@ public class HBaseSailConnection implements SailConnection {
                     if (contexts.hasNext()) {
 
                         //build a ResultScanner from an HBase Scan that finds potential matches
-                    	ctx = RDFValue.createContext(contexts.next());
+                    	ctx = RDFContext.create(contexts.next());
                     	Scan scan = HalyardTableUtils.scan(subj, pred, obj, ctx);
 						scan.setTimeRange(sail.minTimestamp, sail.maxTimestamp);
 						scan.setMaxVersions(sail.maxVersions);

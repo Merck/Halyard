@@ -16,20 +16,21 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.yammer.metrics.core.Gauge;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.Reader;
 import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 
@@ -61,7 +62,15 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+import org.json.JSONArray;
 import org.json.JSONObject;
+
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.RDFPredicate;
+import com.msd.gin.halyard.common.RDFSubject;
+import com.yammer.metrics.core.Gauge;
 
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
@@ -80,17 +89,33 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         long counter = 0, exports = 0, batches = 0, statements = 0;
 		byte[] lastHash;
         Set<Literal> literals = new HashSet<>();
+        List<String> esNodes;
         ByteArrayOutputStream batch;
         Writer batchWriter;
-        URL url;
+        URL indexUrl;
         int bufferLimit;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
-            url = new URL(context.getConfiguration().get(TARGET) + "/_bulk");
+            indexUrl = new URL(context.getConfiguration().get(TARGET));
             bufferLimit = context.getConfiguration().getInt(BUFFER_LIMIT, 100000);
             batch = new ByteArrayOutputStream(bufferLimit);
             batchWriter = new OutputStreamWriter(new GZIPOutputStream(batch), StandardCharsets.UTF_8);
+            try(Reader in = new InputStreamReader(new URL(indexUrl.getProtocol(), indexUrl.getHost(), indexUrl.getPort(), "_nodes").openStream(), StandardCharsets.UTF_8)) {
+            	JSONObject response = new JSONObject(in);
+            	JSONArray nodes = response.getJSONArray("nodes");
+            	esNodes = new ArrayList<>(nodes.length());
+            	for(int i=0; i<nodes.length(); i++) {
+            		JSONObject node = nodes.getJSONObject(i);
+            		JSONArray roles = node.getJSONArray("roles");
+            		for(int j=0; j<roles.length(); j++) {
+            			if("data".equals(roles.getString(j))) {
+                    		esNodes.add(node.getString("ip"));
+                    		break;
+            			}
+            		}
+            	}
+            }
         }
 
 
@@ -99,8 +124,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             if ((counter++ % 100000) == 0) {
                 output.setStatus(MessageFormat.format("{0} st:{1} exp:{2} batch:{3} ", counter, statements, exports, batches));
             }
-			byte[] hash = new byte[HalyardTableUtils.O_KEY_SIZE];
-			System.arraycopy(key.get(), key.getOffset() + 1 + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 0 : HalyardTableUtils.C_KEY_SIZE), hash, 0, HalyardTableUtils.O_KEY_SIZE);
+			byte[] hash = new byte[RDFObject.KEY_SIZE];
+			System.arraycopy(key.get(), key.getOffset() + 1 + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 0 : RDFContext.KEY_SIZE), hash, 0, RDFObject.KEY_SIZE);
             if (!Arrays.equals(hash, lastHash)) {
                 export(false);
                 lastHash = hash;
@@ -129,7 +154,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             }
             if ((flush && batch.size() > 0) || batch.size() > bufferLimit) {
             	batchWriter.close();
-                HttpURLConnection http = (HttpURLConnection)url.openConnection();
+            	String esNode = esNodes.get((int)(batches % esNodes.size()));
+                HttpURLConnection http = (HttpURLConnection)new URL(indexUrl.getProtocol(), esNode, indexUrl.getPort(), "_bulk").openConnection();
                 http.setRequestMethod("POST");
                 http.setDoOutput(true);
                 http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
@@ -267,9 +293,9 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         Scan scan = HalyardTableUtils.scan(null, null);
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP region(s)
-            byte[] graphHash = HalyardTableUtils.hashContext(NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance()));
+            byte[] graphHash = RDFContext.hash(NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance()));
             scan.setStartRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash));
-            scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, true, graphHash, HalyardTableUtils.O_STOP_KEY, HalyardTableUtils.S_STOP_KEY, HalyardTableUtils.P_STOP_KEY));
+            scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, true, graphHash, RDFObject.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY));
         } else {
             //scan all OSP region(s)
             scan.setStartRow(new byte[]{HalyardTableUtils.OSP_PREFIX});

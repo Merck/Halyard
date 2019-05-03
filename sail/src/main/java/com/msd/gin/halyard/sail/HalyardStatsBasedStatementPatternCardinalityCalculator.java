@@ -35,6 +35,9 @@ import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.RDFPredicate;
+import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 
 /**
@@ -133,11 +136,11 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
     public static byte[] hash(IRI partitionType, Value partition) {
         byte[] hash;
         if(VOID_EXT.SUBJECT.equals(partitionType)) {
-    		hash = HalyardTableUtils.hashSubject((Resource) partition);
+    		hash = RDFSubject.hash((Resource) partition);
         } else if(VOID.PROPERTY.equals(partitionType)) {
-    		hash = HalyardTableUtils.hashPredicate((IRI) partition);
+    		hash = RDFPredicate.hash((IRI) partition);
         } else if(VOID_EXT.OBJECT.equals(partitionType)) {
-    		hash = HalyardTableUtils.hashObject(partition);
+    		hash = RDFObject.hash(partition);
         } else {
         	throw new AssertionError(partitionType);
         }

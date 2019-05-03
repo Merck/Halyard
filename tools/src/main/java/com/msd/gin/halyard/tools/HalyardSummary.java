@@ -75,7 +75,8 @@ import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFValue;
+import com.msd.gin.halyard.common.RDFPredicate;
+import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.yammer.metrics.core.Gauge;
@@ -129,8 +130,8 @@ public final class HalyardSummary extends AbstractHalyardTool {
         private Set<IRI> queryForClasses(Value instance) throws IOException {
             if (instance instanceof Resource) {
                 Set<IRI> res = new HashSet<>();
-                RDFValue<Resource> s = RDFValue.createSubject((Resource)instance);
-                RDFValue<IRI> p = RDFValue.createPredicate(RDF.TYPE);
+                RDFSubject s = RDFSubject.create((Resource)instance);
+                RDFPredicate p = RDFPredicate.create(RDF.TYPE);
                 Scan scan = HalyardTableUtils.scan(s, p, null, null);
                 try (ResultScanner scanner = table.getScanner(scan)) {
                     for (Result r : scanner) {

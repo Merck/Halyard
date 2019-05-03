@@ -80,9 +80,9 @@ public class HalyardTableUtilsTest {
         }
 		table.put(puts);
 
-        RDFValue<Resource> s = RDFValue.createSubject(subj);
-        RDFValue<IRI> p = RDFValue.createPredicate(pred);
-        RDFValue<Value> o = RDFValue.createObject(obj);
+        RDFSubject s = RDFSubject.create(subj);
+        RDFPredicate p = RDFPredicate.create(pred);
+        RDFObject o = RDFObject.create(obj);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
             assertEquals(obj, HalyardTableUtils.parseStatements(s, p, o, null, rs.next(), vf).iterator().next().getObject());
         }
@@ -115,9 +115,9 @@ public class HalyardTableUtilsTest {
         }
 		table.put(puts);
 
-        RDFValue<Resource> s = RDFValue.createSubject(subj);
-        RDFValue<IRI> p1 = RDFValue.createPredicate(pred1);
-        RDFValue<Value> o1 = RDFValue.createObject(obj1);
+        RDFSubject s = RDFSubject.create(subj);
+        RDFPredicate p1 = RDFPredicate.create(pred1);
+        RDFObject o1 = RDFObject.create(obj1);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p1, o1, null))) {
             List<Statement> res = HalyardTableUtils.parseStatements(s, p1, o1, null, rs.next(), vf);
             assertEquals(1, res.size());
@@ -136,9 +136,9 @@ public class HalyardTableUtilsTest {
 			puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
 		table.put(puts);
-        RDFValue<Resource> s = RDFValue.createSubject(subj);
-        RDFValue<IRI> p = RDFValue.createPredicate(pred);
-        RDFValue<Value> o = RDFValue.createObject(expl);
+        RDFSubject s = RDFSubject.create(subj);
+        RDFPredicate p = RDFPredicate.create(pred);
+        RDFObject o = RDFObject.create(expl);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
             assertNotNull(rs.next());
         }
