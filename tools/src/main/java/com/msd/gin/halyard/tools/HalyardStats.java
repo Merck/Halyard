@@ -23,6 +23,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -410,12 +411,12 @@ public final class HalyardStats extends AbstractHalyardTool {
             }
             String graph;
             String predicate;
-            byte partitionId[];
+            ByteBuffer partitionId;
             try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
                 graph = dis.readUTF();
                 predicate = dis.readUTF();
-                partitionId = new byte[dis.readInt()];
-                dis.readFully(partitionId);
+                partitionId = ByteBuffer.allocate(dis.readInt());
+                dis.readFully(partitionId.array());
             }
             if (SD.NAMED_GRAPH_PROPERTY.toString().equals(predicate)) { //workaround to at least count all small named graph that are below the treshold
                 writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, SVF.createIRI(graph));
@@ -434,7 +435,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                         writeStatement(graphNode, RDF.TYPE, VOID.DATASET);
                     }
                 }
-                if (partitionId.length > 0) {
+                if (partitionId.hasRemaining()) {
 					Value partition = HalyardTableUtils.readValue(partitionId, SVF);
                     IRI pred = SVF.createIRI(predicate);
 					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + HalyardTableUtils.encode(HalyardStatsBasedStatementPatternCardinalityCalculator.hash(pred, partition)));

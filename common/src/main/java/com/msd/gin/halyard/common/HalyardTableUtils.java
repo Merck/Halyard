@@ -30,6 +30,8 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.TreeSet;
 
 import javax.xml.datatype.DatatypeConfigurationException;
@@ -65,8 +67,21 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.model.util.Vocabularies;
+import org.eclipse.rdf4j.model.vocabulary.DC;
+import org.eclipse.rdf4j.model.vocabulary.DCTERMS;
+import org.eclipse.rdf4j.model.vocabulary.FOAF;
+import org.eclipse.rdf4j.model.vocabulary.GEO;
+import org.eclipse.rdf4j.model.vocabulary.ORG;
+import org.eclipse.rdf4j.model.vocabulary.OWL;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.RDFS;
+import org.eclipse.rdf4j.model.vocabulary.SD;
+import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import com.google.common.hash.Hashing;
 
 /**
@@ -161,18 +176,43 @@ public final class HalyardTableUtils {
 		}
 	}
 
+	private static final BiMap<ByteBuffer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(256);
+
+	static {
+		Class<?>[] defaultVocabs = { RDF.class, RDFS.class, XMLSchema.class, SD.class, VOID.class, FOAF.class,
+				OWL.class, DC.class, DCTERMS.class, ORG.class, GEO.class };
+		List<Class<?>> vocabs = new ArrayList<>(32);
+		Collections.addAll(vocabs, defaultVocabs);
+
+		for(Vocabulary vocab : ServiceLoader.load(Vocabulary.class)) {
+			vocabs.add(vocab.getClass());
+		}
+
+		for(Class<?> vocab : vocabs) {
+			Set<IRI> iris = Vocabularies.getIRIs(vocab);
+			for (IRI iri : iris) {
+				ByteBuffer hash = ByteBuffer.wrap(hash32(iri.toString().getBytes(StandardCharsets.UTF_8))).asReadOnlyBuffer();
+				if (WELL_KNOWN_IRIS.putIfAbsent(hash, iri) != null) {
+					throw new AssertionError(String.format("Hash collision between %s and %s",
+							WELL_KNOWN_IRIS.get(hash), iri));
+				}
+			}
+		}
+	}
+
 	interface ByteWriter {
 		byte[] writeBytes(Literal l);
 	}
 
 	interface ByteReader {
-		Literal readBytes(byte[] b, ValueFactory vf);
+		Literal readBytes(ByteBuffer b, ValueFactory vf);
 	}
 
 	private static final Map<IRI, ByteWriter> BYTE_WRITERS = new HashMap<>();
 	private static final Map<Byte, ByteReader> BYTE_READERS = new HashMap<>();
 
 	private static final byte IRI_TYPE = '<';
+	private static final byte IRI_HASH_TYPE = '#';
 	private static final byte BNODE_TYPE = '_';
 	private static final byte FULL_LITERAL_TYPE = '\"';
 	private static final byte FALSE_TYPE = '0';
@@ -197,13 +237,13 @@ public final class HalyardTableUtils {
 		});
 		BYTE_READERS.put(FALSE_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return vf.createLiteral(false);
 			}
 		});
 		BYTE_READERS.put(TRUE_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return vf.createLiteral(true);
 			}
 		});
@@ -216,8 +256,9 @@ public final class HalyardTableUtils {
 		});
 		BYTE_READERS.put(BYTE_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(b[1]);
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				b.get(); // type
+				return vf.createLiteral(b.get());
 			}
 		});
 
@@ -231,8 +272,9 @@ public final class HalyardTableUtils {
 		});
 		BYTE_READERS.put(SHORT_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(ByteBuffer.wrap(b, 1, 2).getShort());
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				b.get(); // type
+				return vf.createLiteral(b.getShort());
 			}
 		});
 
@@ -246,8 +288,9 @@ public final class HalyardTableUtils {
 		});
 		BYTE_READERS.put(INT_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(ByteBuffer.wrap(b, 1, 4).getInt());
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				b.get(); // type
+				return vf.createLiteral(b.getInt());
 			}
 		});
 
@@ -261,8 +304,9 @@ public final class HalyardTableUtils {
 		});
 		BYTE_READERS.put(LONG_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(ByteBuffer.wrap(b, 1, 8).getLong());
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				b.get(); // type
+				return vf.createLiteral(b.getLong());
 			}
 		});
 
@@ -276,8 +320,9 @@ public final class HalyardTableUtils {
 		});
 		BYTE_READERS.put(FLOAT_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(ByteBuffer.wrap(b, 1, 4).getFloat());
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				b.get(); // type
+				return vf.createLiteral(b.getFloat());
 			}
 		});
 
@@ -291,8 +336,9 @@ public final class HalyardTableUtils {
 		});
 		BYTE_READERS.put(DOUBLE_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(ByteBuffer.wrap(b, 1, 8).getDouble());
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				b.get(); // type
+				return vf.createLiteral(b.getDouble());
 			}
 		});
 
@@ -304,8 +350,9 @@ public final class HalyardTableUtils {
 		});
 		BYTE_READERS.put(STRING_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
-				return vf.createLiteral(new String(b, 1, b.length-1, StandardCharsets.UTF_8));
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				b.get(); // type
+				return vf.createLiteral(StandardCharsets.UTF_8.decode(b).toString());
 			}
 		});
 
@@ -317,10 +364,10 @@ public final class HalyardTableUtils {
 		});
 		BYTE_READERS.put(TIME_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
-				ByteBuffer buf = ByteBuffer.wrap(b, 1, 10);
-				long millis = buf.getLong();
-				int tz = buf.getShort();
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				b.get(); // type
+				long millis = b.getLong();
+				int tz = b.getShort();
 				GregorianCalendar c = new GregorianCalendar();
 				c.setTimeInMillis(millis);
 				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
@@ -343,10 +390,10 @@ public final class HalyardTableUtils {
 		});
 		BYTE_READERS.put(DATE_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
-				ByteBuffer buf = ByteBuffer.wrap(b, 1, 10);
-				long millis = buf.getLong();
-				int tz = buf.getShort();
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				b.get(); // type
+				long millis = b.getLong();
+				int tz = b.getShort();
 				GregorianCalendar c = new GregorianCalendar();
 				c.setTimeInMillis(millis);
 				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
@@ -367,10 +414,10 @@ public final class HalyardTableUtils {
 		});
 		BYTE_READERS.put(DATETIME_TYPE, new ByteReader() {
 			@Override
-			public Literal readBytes(byte[] b, ValueFactory vf) {
-				ByteBuffer buf = ByteBuffer.wrap(b, 1, 10);
-				long millis = buf.getLong();
-				int tz = buf.getShort();
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				b.get(); // type
+				long millis = b.getLong();
+				int tz = b.getShort();
 				GregorianCalendar c = new GregorianCalendar();
 				c.setTimeInMillis(millis);
 				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
@@ -876,9 +923,11 @@ public final class HalyardTableUtils {
 			cq.position(cq.position()+len);
 			return pattern.val;
 		} else if(len > 0) {
-    		byte[] b = new byte[len];
-            cq.get(b);
-            return (V) readValue(b, vf);
+			int limit = cq.limit();
+			cq.limit(cq.position() + len);
+			V value = (V) readValue(cq, vf);
+			cq.limit(limit);
+			return value;
 		} else {
 			return null;
 		}
@@ -1024,6 +1073,10 @@ public final class HalyardTableUtils {
         return ENC.encodeToString(b);
     }
 
+	private static CharSequence encode(ByteBuffer b) {
+		return StandardCharsets.ISO_8859_1.decode(ENC.encode(b));
+	}
+
 	private static Scan scan3_0(byte prefix, byte[] stopKey1, byte[] stopKey2, byte[] stopKey3) {
 		return scan(concat(prefix, false), concat(prefix, true, stopKey1, stopKey2, stopKey3));
 	}
@@ -1062,43 +1115,101 @@ public final class HalyardTableUtils {
 
     public static byte[] writeBytes(Value v) {
     	if (v instanceof IRI) {
-    		return ("<"+v.stringValue()+">").getBytes(StandardCharsets.UTF_8);
+    		ByteBuffer hash = WELL_KNOWN_IRIS.inverse().get(v);
+    		if (hash != null) {
+    			byte[] b = new byte[1 + hash.capacity()];
+    			b[0] = IRI_HASH_TYPE;
+    			// NB: do not alter original hash buffer which is shared across threads
+    			hash.duplicate().get(b, 1, hash.capacity());
+    			return b;
+    		} else {
+    			return ("<"+v.stringValue()+">").getBytes(StandardCharsets.UTF_8);
+    		}
     	} else if (v instanceof BNode) {
     		return v.toString().getBytes(StandardCharsets.UTF_8);
     	} else if (v instanceof Literal) {
 			Literal l = (Literal) v;
-			ByteWriter writer = BYTE_WRITERS.get(l.getDatatype());
-			if (writer != null) {
-				return writer.writeBytes(l);
-			} else {
+			if(l.getLanguage().isPresent()) {
 				return l.toString().getBytes(StandardCharsets.UTF_8);
+			} else {
+				ByteWriter writer = BYTE_WRITERS.get(l.getDatatype());
+				if (writer != null) {
+					return writer.writeBytes(l);
+				} else {
+					ByteBuffer hash = WELL_KNOWN_IRIS.inverse().get(l.getDatatype());
+					if (hash != null) {
+						byte[] labelBytes = l.getLabel().getBytes(StandardCharsets.UTF_8);
+						byte[] lBytes = new byte[1+labelBytes.length+4+hash.capacity()];
+						lBytes[0] = '\"';
+						System.arraycopy(labelBytes, 0, lBytes, 1, labelBytes.length);
+						int pos = 1+labelBytes.length;
+						lBytes[pos++] = '\"';
+						lBytes[pos++] = '^';
+						lBytes[pos++] = '^';
+						lBytes[pos++] = IRI_HASH_TYPE;
+		    			// NB: do not alter original hash buffer which is shared across threads
+						hash.duplicate().get(lBytes, pos, hash.capacity());
+						return lBytes;
+					} else {
+						return l.toString().getBytes(StandardCharsets.UTF_8);
+					}
+				}
 			}
 		} else {
 			throw new AssertionError(v);
 		}
     }
 
-    public static Value readValue(byte[] b, ValueFactory vf) {
-		byte type = b[0];
+    public static Value readValue(ByteBuffer b, ValueFactory vf) {
+		b.mark();
+		byte type = b.get();
 		switch(type) {
 			case IRI_TYPE:
-				return vf.createIRI(new String(b, 1, b.length-2, StandardCharsets.UTF_8));
+				b.limit(b.limit()-1); // ignore trailing '>'
+				return vf.createIRI(StandardCharsets.UTF_8.decode(b).toString());
+			case IRI_HASH_TYPE:
+				IRI iri = WELL_KNOWN_IRIS.get(b);
+				if (iri == null) {
+					throw new IllegalStateException(String.format("Unknown IRI hash: %s", encode(b)));
+				}
+				return iri;
 			case BNODE_TYPE:
-				return vf.createBNode(new String(b, 2, b.length-2, StandardCharsets.UTF_8));
+				b.get(); // skip ':'
+				return vf.createBNode(StandardCharsets.UTF_8.decode(b).toString());
 			case FULL_LITERAL_TYPE:
-				String s = new String(b, StandardCharsets.UTF_8);
-				int endOfLabel = s.lastIndexOf('\"');
-				String label = s.substring(1, endOfLabel);
-				int startOfLang = s.indexOf('@', endOfLabel+1);
-				if(startOfLang != -1) {
-					return vf.createLiteral(label, s.substring(startOfLang+1));
+				int endOfLabel = lastIndexOf(b, (byte) '\"');
+				int limit = b.limit();
+				b.limit(endOfLabel);
+				String label = StandardCharsets.UTF_8.decode(b).toString();
+				b.limit(limit);
+				b.position(endOfLabel+1);
+				byte sep = b.get();
+				if(sep == '@') { // lang tag
+					return vf.createLiteral(label, StandardCharsets.UTF_8.decode(b).toString());
 				} else {
-					int startOfDatatype = s.indexOf("^^<", endOfLabel+1);
-					return vf.createLiteral(label, vf.createIRI(s.substring(startOfDatatype+3, s.length()-1)));
+					if (sep != '^') { // not a datatype
+						throw new IllegalStateException(String.format("Literal missing datatype: %s", StandardCharsets.UTF_8.decode((ByteBuffer) b.reset())));
+					}
+					if (b.get() != '^') { // not a datatype
+						throw new IllegalStateException(String.format("Literal missing datatype: %s", StandardCharsets.UTF_8.decode((ByteBuffer) b.reset())));
+					}
+					IRI datatype = (IRI) readValue(b, vf);
+					return vf.createLiteral(label, datatype);
 				}
 			default:
 				ByteReader reader = BYTE_READERS.get(type);
-				return reader.readBytes(b, vf);
+				return reader.readBytes((ByteBuffer) b.reset(), vf);
 		}
     }
+
+	private static int lastIndexOf(ByteBuffer buf, byte b) {
+		int start = buf.position();
+		int end = buf.limit();
+		for (int i = end - 1; i >= start; i--) {
+			if (buf.get(i) == b) {
+				return i;
+			}
+		}
+		return -1;
+	}
 }

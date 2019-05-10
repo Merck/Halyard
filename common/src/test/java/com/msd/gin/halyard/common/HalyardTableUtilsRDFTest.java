@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
@@ -42,7 +43,17 @@ public class HalyardTableUtilsRDFTest {
 	@Test
 	public void testToAndFromBytes() {
 		byte[] b = HalyardTableUtils.writeBytes(expected);
-		Value actual = HalyardTableUtils.readValue(b, vf);
+		Value actual = HalyardTableUtils.readValue(ByteBuffer.wrap(b), vf);
+		assertEquals(expected, actual);
+
+		// check readValue() works on a subsequence
+		ByteBuffer extbuf = ByteBuffer.allocate(1 + b.length + 1);
+		// place b in the middle
+		extbuf.position(extbuf.position() + 1);
+		extbuf.put(b);
+		// set boundary
+		extbuf.position(1).limit(extbuf.capacity() - 1);
+		actual = HalyardTableUtils.readValue(extbuf, vf);
 		assertEquals(expected, actual);
 	}
 }
