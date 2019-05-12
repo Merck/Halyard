@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
-import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.MissingOptionException;
@@ -32,6 +31,8 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.Tool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -39,7 +40,7 @@ import org.apache.hadoop.util.Tool;
  */
 public abstract class AbstractHalyardTool implements Tool {
 
-    static final Logger LOG = Logger.getLogger(AbstractHalyardTool.class.getName());
+    static final Logger LOG = LoggerFactory.getLogger(AbstractHalyardTool.class);
 
     private Configuration conf;
     final String name, header, footer;

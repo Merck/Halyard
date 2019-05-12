@@ -17,8 +17,6 @@
 package com.msd.gin.halyard.sail;
 
 import java.util.Collection;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -33,6 +31,8 @@ import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFObject;
@@ -45,7 +45,7 @@ import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardStatsBasedStatementPatternCardinalityCalculator implements HalyardEvaluationStatistics.StatementPatternCardinalityCalculator {
-    private static final Logger LOG = Logger.getLogger(HalyardStatsBasedStatementPatternCardinalityCalculator.class.getName());
+	private static final Logger LOG = LoggerFactory.getLogger(HalyardStatsBasedStatementPatternCardinalityCalculator.class);
 
     private final ValueFactory valueFactory;
     private final SailConnection statsConnection;
@@ -94,7 +94,7 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
             } else {
                 card = triples;
             }
-            LOG.log(Level.FINE, "cardinality of {0} = {1}", new Object[]{sp.toString(), card});
+			LOG.debug("cardinality of {} = {}", sp.toString(), card);
             return card;
         } else { // stats are not present
             return null;
@@ -109,15 +109,15 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
                 if (v instanceof Literal) {
                     try {
                         long l = ((Literal) v).longValue();
-                        LOG.log(Level.FINER, "triple stats for {0} = {1}", new Object[]{subjectNode, l});
+						LOG.trace("triple stats for {} = {}", subjectNode, l);
                         return l;
                     } catch (NumberFormatException ignore) {
                     }
                 }
-                LOG.log(Level.WARNING, "Invalid statistics for:{0}", subjectNode);
+				LOG.warn("Invalid statistics for: {}", subjectNode);
             }
         }
-        LOG.log(Level.FINER, "triple stats for {0} are not available", subjectNode);
+		LOG.trace("triple stats for {} are not available", subjectNode);
         return defaultValue;
     }
 

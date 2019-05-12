@@ -37,8 +37,6 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.StringTokenizer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.activation.MimeType;
 import javax.activation.MimeTypeParseException;
@@ -74,6 +72,8 @@ import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.RDFWriterRegistry;
 import org.eclipse.rdf4j.rio.RioSetting;
 import org.eclipse.rdf4j.rio.WriterConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles HTTP requests containing SPARQL queries.
@@ -114,8 +114,9 @@ public final class HttpSparqlHandler implements HttpHandler {
     private final Properties storedQueries;
     // Writer config
     private final WriterConfig writerConfig;
+    private final boolean verbose;
     // Logger
-    private static final Logger LOGGER = Logger.getLogger(HttpSparqlHandler.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(HttpSparqlHandler.class);
 
     /**
      * @param rep              Sail repository
@@ -126,10 +127,8 @@ public final class HttpSparqlHandler implements HttpHandler {
     @SuppressWarnings("unchecked")
     public HttpSparqlHandler(SailRepository rep, Properties storedQueries, Properties writerProperties, boolean verbose) {
         this.repository = rep;
-        if (!verbose) {
-            // Verbose mode disabled --> logs with level lower than WARNING will be discarded
-            LOGGER.setLevel(Level.WARNING);
-        }
+        // Verbose mode disabled --> logs with level lower than WARNING will be discarded
+        this.verbose = verbose;
         this.storedQueries = storedQueries;
         this.writerConfig = new WriterConfig();
         if (writerProperties != null) {
@@ -176,13 +175,13 @@ public final class HttpSparqlHandler implements HttpHandler {
             StringWriter sw = new StringWriter();
             PrintWriter w = new PrintWriter(sw);
             e.printStackTrace(w);
-            LOGGER.log(Level.WARNING, sw.toString());
+            LOGGER.warn(sw.toString());
             sendResponse(exchange, HTTP_BAD_REQUEST, sw.toString());
         } catch (IOException | RuntimeException e) {
             StringWriter sw = new StringWriter();
             PrintWriter w = new PrintWriter(sw);
             e.printStackTrace(w);
-            LOGGER.log(Level.WARNING, sw.toString());
+            LOGGER.warn(sw.toString());
             sendResponse(exchange, HTTP_INTERNAL_SERVER_ERROR, sw.toString());
         }
 
@@ -357,7 +356,9 @@ public final class HttpSparqlHandler implements HttpHandler {
             acceptedMimeTypes.addAll(parseAcceptHeader(header));
         }
         if (query instanceof SailTupleQuery) {
-            LOGGER.log(Level.INFO, "Evaluating tuple query: {0}", sparqlQuery.getQuery());
+        	if (verbose) {
+        		LOGGER.info("Evaluating tuple query: {}", sparqlQuery.getQuery());
+        	}
             QueryResultFormat format = getFormat(TupleQueryResultWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
                     acceptedMimeTypes, TupleQueryResultFormat.CSV, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
@@ -367,7 +368,9 @@ public final class HttpSparqlHandler implements HttpHandler {
                 ((TupleQuery) query).evaluate(w);
             }
         } else if (query instanceof SailGraphQuery) {
-            LOGGER.log(Level.INFO, "Evaluating graph query: {0}", sparqlQuery.getQuery());
+        	if (verbose) {
+        		LOGGER.info("Evaluating graph query: {}", sparqlQuery.getQuery());
+        	}
             RDFFormat format = getFormat(RDFWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
                     acceptedMimeTypes, RDFFormat.NTRIPLES, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
@@ -377,7 +380,9 @@ public final class HttpSparqlHandler implements HttpHandler {
                 ((GraphQuery) query).evaluate(w);
             }
         } else if (query instanceof SailBooleanQuery) {
-            LOGGER.log(Level.INFO, "Evaluating boolean query: {0}", sparqlQuery.getQuery());
+        	if (verbose) {
+        		LOGGER.info("Evaluating boolean query: {}", sparqlQuery.getQuery());
+        	}
             QueryResultFormat format = getFormat(BooleanQueryResultWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
                     acceptedMimeTypes, BooleanQueryResultFormat.JSON, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
@@ -387,7 +392,9 @@ public final class HttpSparqlHandler implements HttpHandler {
                 w.write(((BooleanQuery) query).evaluate());
             }
         }
-        LOGGER.log(Level.INFO, "Request successfully processed");
+        if (verbose) {
+        	LOGGER.info("Request successfully processed");
+        }
     }
 
     /**

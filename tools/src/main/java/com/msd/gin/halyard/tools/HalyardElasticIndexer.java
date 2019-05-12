@@ -183,7 +183,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 String msg = http.getResponseMessage();
                 if (response != 200) {
                     String resp = IOUtils.toString(http.getErrorStream());
-                    LOG.warning(resp);
+                    LOG.warn(resp);
                     boolean alreadyExist = false;
                     if (response == 400) try {
                         alreadyExist = new JSONObject(resp).getJSONObject("error").getString("type").contains("exists");

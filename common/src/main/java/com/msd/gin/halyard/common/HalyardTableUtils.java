@@ -79,6 +79,8 @@ import org.eclipse.rdf4j.model.vocabulary.RDFS;
 import org.eclipse.rdf4j.model.vocabulary.SD;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
@@ -184,7 +186,9 @@ public final class HalyardTableUtils {
 		List<Class<?>> vocabs = new ArrayList<>(32);
 		Collections.addAll(vocabs, defaultVocabs);
 
+		Logger logger = LoggerFactory.getLogger(HalyardTableUtils.class);
 		for(Vocabulary vocab : ServiceLoader.load(Vocabulary.class)) {
+			logger.info("Loading vocabulary {}", vocab.getClass());
 			vocabs.add(vocab.getClass());
 		}
 
@@ -1162,27 +1166,31 @@ public final class HalyardTableUtils {
     }
 
     public static Value readValue(ByteBuffer b, ValueFactory vf) {
+    	int originalLimit = b.limit();
 		b.mark();
 		byte type = b.get();
 		switch(type) {
 			case IRI_TYPE:
-				b.limit(b.limit()-1); // ignore trailing '>'
-				return vf.createIRI(StandardCharsets.UTF_8.decode(b).toString());
+				b.limit(originalLimit-1); // ignore trailing '>'
+				IRI iri = vf.createIRI(StandardCharsets.UTF_8.decode(b).toString());
+				b.limit(originalLimit);
+				b.position(originalLimit);
+				return iri;
 			case IRI_HASH_TYPE:
-				IRI iri = WELL_KNOWN_IRIS.get(b);
+				iri = WELL_KNOWN_IRIS.get(b);
 				if (iri == null) {
 					throw new IllegalStateException(String.format("Unknown IRI hash: %s", encode(b)));
 				}
+				b.position(originalLimit);
 				return iri;
 			case BNODE_TYPE:
 				b.get(); // skip ':'
 				return vf.createBNode(StandardCharsets.UTF_8.decode(b).toString());
 			case FULL_LITERAL_TYPE:
 				int endOfLabel = lastIndexOf(b, (byte) '\"');
-				int limit = b.limit();
 				b.limit(endOfLabel);
 				String label = StandardCharsets.UTF_8.decode(b).toString();
-				b.limit(limit);
+				b.limit(originalLimit);
 				b.position(endOfLabel+1);
 				byte sep = b.get();
 				if(sep == '@') { // lang tag

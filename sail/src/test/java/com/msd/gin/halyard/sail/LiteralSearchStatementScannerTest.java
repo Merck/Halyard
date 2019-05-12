@@ -27,10 +27,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -42,6 +39,7 @@ import org.eclipse.rdf4j.sail.SailException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 
 import static org.junit.Assert.*;
 
@@ -106,7 +104,7 @@ public class LiteralSearchStatementScannerTest implements Runnable {
                 }
             }
         } catch (IOException ex) {
-            Logger.getLogger(LiteralSearchStatementScannerTest.class.getName()).log(Level.SEVERE, null, ex);
+			LoggerFactory.getLogger(LiteralSearchStatementScannerTest.class).error("Error reading from socket", ex);
         }
     }
 }

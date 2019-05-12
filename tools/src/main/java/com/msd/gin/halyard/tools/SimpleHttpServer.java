@@ -19,13 +19,13 @@ package com.msd.gin.halyard.tools;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is used to create a simple HTTP server listening on a specific port and handling requests by a
@@ -37,7 +37,7 @@ public class SimpleHttpServer {
 
     private HttpServer httpServer;
 
-    private static final Logger LOGGER = Logger.getLogger(SimpleHttpServer.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(SimpleHttpServer.class);
 
     /**
      * Instantiate a new HTTP server. Use port number 0 (zero) to let the system select a new port number.
@@ -62,7 +62,7 @@ public class SimpleHttpServer {
      */
     public void start() {
         httpServer.start();
-        LOGGER.log(Level.INFO, "Server started and is listening on port " + httpServer.getAddress().getPort());
+        LOGGER.info("Server started and is listening on port {}", httpServer.getAddress().getPort());
     }
 
     /**
@@ -72,7 +72,7 @@ public class SimpleHttpServer {
         // stop immediately
         ((ExecutorService) httpServer.getExecutor()).shutdown();
         httpServer.stop(0);
-        LOGGER.log(Level.INFO, "Server stopped");
+        LOGGER.info("Server stopped");
     }
 
     public InetSocketAddress getAddress() {

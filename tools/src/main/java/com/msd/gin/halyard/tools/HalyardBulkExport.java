@@ -16,19 +16,21 @@
  */
 package com.msd.gin.halyard.tools;
 
+import static com.msd.gin.halyard.sail.HALYARD.*;
+
 import com.yammer.metrics.core.Gauge;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
-import java.util.logging.Level;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
-
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.NullWritable;
@@ -43,7 +45,6 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
-import static com.msd.gin.halyard.sail.HALYARD.PARALLEL_SPLIT_FUNCTION;
 
 /**
  * Apache Hadoop MapReduce tool for batch exporting of SPARQL queries.
@@ -70,7 +71,7 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
             int dot = name.indexOf('.');
             final String bName = dot > 0 ? name.substring(0, dot) : name;
             context.setStatus("Execution of: " + name);
-            LOG.log(Level.INFO, "Execution of {0}:\n{1}", new Object[]{name, query});
+            LOG.info("Execution of {}:\n{}", name, query);
             Function fn = new ParallelSplitFunction(qis.getRepeatIndex());
             FunctionRegistry.getInstance().add(fn);
             try {

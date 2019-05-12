@@ -16,11 +16,13 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.yammer.metrics.core.Gauge;
+
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
@@ -55,9 +57,6 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
-
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.yammer.metrics.core.Gauge;
 
 /**
  *
@@ -127,7 +126,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
                 if (total++ % 10000l == 0) {
                     String msg = MessageFormat.format("{0} / {1} cells deleted", deleted, total);
                     output.setStatus(msg);
-                    LOG.log(Level.INFO, msg);
+                    LOG.info(msg);
                 }
             }
 

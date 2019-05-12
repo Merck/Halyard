@@ -27,7 +27,6 @@ import com.yammer.metrics.core.Gauge;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
@@ -160,7 +159,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 									}
 									if (added.incrementAndGet() % 1000l == 0) {
 										context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-										LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] { added.get(), removed.get() });
+										LOG.info("{} KeyValues added and {} removed", added.get(), removed.get());
 									}
 								}
 
@@ -176,7 +175,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 									}
 									if (removed.incrementAndGet() % 1000l == 0) {
 										context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-										LOG.log(Level.INFO, "{0} KeyValues added and {1} removed", new Object[] { added.get(), removed.get() });
+										LOG.info("{} KeyValues added and {} removed", added.get(), removed.get());
 									}
 								}
 
@@ -203,17 +202,17 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                         rep.initialize();
                         try(SailRepositoryConnection con = rep.getConnection()) {
 	                        Update upd = new HBaseUpdate(singleUpdate, con);
-	                        LOG.log(Level.INFO, "Execution of: {0}", query);
+	                        LOG.info("Execution of: {}", query);
 	                        context.setStatus(name);
 	                        upd.execute();
 	                        context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-	                        LOG.log(Level.INFO, "Query finished with {0} KeyValues added and {1} removed", new Object[] {added.get(), removed.get()});
+	                        LOG.info("Query finished with {} KeyValues added and {} removed", added.get(), removed.get());
                         }
                     } finally {
                         rep.shutDown();
                     }
                 } catch (RepositoryException | MalformedQueryException | QueryEvaluationException | RDFHandlerException ex) {
-                    LOG.log(Level.SEVERE, null, ex);
+                    LOG.error("Error running update", ex);
                     throw new IOException(ex);
                 } finally {
                     FunctionRegistry.getInstance().remove(fn);
@@ -285,15 +284,15 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                         if (updates > stages) {
                             stages = updates;
                         }
-                        LOG.log(Level.INFO, "{0} contains {1} stages of the update sequence.", new Object[]{qis.getQueryName(), updates});
+                        LOG.info("{} contains {} stages of the update sequence.", qis.getQueryName(), updates);
                     }
-                    LOG.log(Level.INFO, "Bulk Update will process {0} MapReduce stages.", stages);
+                    LOG.info("Bulk Update will process {} MapReduce stages.", stages);
                 }
                 if (job.waitForCompletion(true)) {
 					try (Admin admin = conn.getAdmin()) {
 						new LoadIncrementalHFiles(getConf()).doBulkLoad(outPath, admin, hTable, regionLocator);
 					}
-                    LOG.log(Level.INFO, "Stage #{0} of {1} completed..", new Object[]{stage, stages});
+                    LOG.info("Stage #{} of {} completed..", stage, stages);
                 } else {
                     return -1;
                 }

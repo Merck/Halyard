@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
@@ -430,7 +429,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                     parser.parse(localIn, localBaseUri);
                 } catch (Exception e) {
                     if (skipInvalid) {
-                        LOG.log(Level.WARNING, "Exception while parsing RDF", e);
+                        LOG.warn("Exception while parsing RDF", e);
                     } else {
                         throw e;
                     }
@@ -471,17 +470,17 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
         @Override
         public void warning(String msg, long lineNo, long colNo) {
-            LOG.warning(msg);
+            LOG.warn(msg);
         }
 
         @Override
         public void error(String msg, long lineNo, long colNo) {
-            LOG.severe(msg);
+            LOG.error(msg);
         }
 
         @Override
         public void fatalError(String msg, long lineNo, long colNo) {
-            LOG.severe(msg);
+            LOG.error(msg);
         }
     }
 

@@ -42,8 +42,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.BufferedMutator;
@@ -109,9 +107,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HBaseSailConnection implements SailConnection {
-    private static final Logger LOG = Logger.getLogger(HBaseSailConnection.class.getName());
+	private static final Logger LOG = LoggerFactory.getLogger(HBaseSailConnection.class);
 
     private static final int ELASTIC_RESULT_SIZE = 10000;
 
@@ -154,7 +154,7 @@ public class HBaseSailConnection implements SailConnection {
     //evaluate queries/ subqueries
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred) throws SailException {
-        LOG.log(Level.FINE, "Evaluated TupleExpr before optimizers:\n{0}", tupleExpr);
+		LOG.debug("Evaluated TupleExpr before optimizers:\n{}", tupleExpr);
         tupleExpr = tupleExpr.clone();
         if (!(tupleExpr instanceof QueryRoot)) {
             // Add a dummy root node to the tuple expressions to allow the
@@ -263,7 +263,7 @@ public class HBaseSailConnection implements SailConnection {
 			new IterativeEvaluationOptimizer().optimize(tupleExpr, dataset, bindings);
 			new HalyardFilterOptimizer().optimize(tupleExpr, dataset, bindings); // apply filter optimizer twice (before
 			new OrderLimitOptimizer().optimize(tupleExpr, dataset, bindings);
-			LOG.log(Level.FINE, "Evaluated TupleExpr after optimization:\n{0}", tupleExpr);
+			LOG.debug("Evaluated TupleExpr after optimization:\n{}", tupleExpr);
 			try {
 				// evaluate the expression against the TripleSource according to the
 				// EvaluationStrategy.
@@ -537,7 +537,7 @@ public class HBaseSailConnection implements SailConnection {
             removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix));
 			addStatement(vf.createIRI(name), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
         } catch (SailException e) {
-            LOG.log(Level.WARNING, "Namespace prefix could not be presisted due to an exception", e);
+			LOG.warn("Namespace prefix could not be presisted due to an exception", e);
         }
     }
 
@@ -548,7 +548,7 @@ public class HBaseSailConnection implements SailConnection {
         try {
             removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix));
         } catch (SailException e) {
-            LOG.log(Level.WARNING, "Namespace prefix could not be removed due to an exception", e);
+			LOG.warn("Namespace prefix could not be removed due to an exception", e);
         }
     }
 
@@ -557,7 +557,7 @@ public class HBaseSailConnection implements SailConnection {
         try {
             removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null);
         } catch (SailException e) {
-            LOG.log(Level.WARNING, "Namespaces could not be cleared due to an exception", e);
+			LOG.warn("Namespaces could not be cleared due to an exception", e);
         }
         sail.namespaces.clear();
     }
@@ -667,7 +667,7 @@ public class HBaseSailConnection implements SailConnection {
             this.contexts = contextsList.iterator();
 			this.endTime = startTime + TimeUnit.SECONDS.toMillis(sail.evaluationTimeout);
 			this.counterStartTime = startTime;
-            LOG.log(Level.FINEST, "New StatementScanner {0} {1} {2} {3}", new Object[]{subj, pred, obj, contextsList});
+			LOG.trace("New StatementScanner {} {} {} {}", subj, pred, obj, contextsList);
         }
 
         protected Result nextResult() throws IOException { //gets the next result to consider from the HBase Scan

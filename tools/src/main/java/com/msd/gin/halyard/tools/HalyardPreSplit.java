@@ -16,26 +16,31 @@
  */
 package com.msd.gin.halyard.tools;
 
+import static com.msd.gin.halyard.tools.HalyardBulkLoad.*;
+
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_CONTEXT_PROPERTY;
-import static com.msd.gin.halyard.tools.HalyardBulkLoad.OVERRIDE_CONTEXT_PROPERTY;
 import com.msd.gin.halyard.tools.HalyardBulkLoad.RioFileInputFormat;
-import static com.msd.gin.halyard.tools.HalyardBulkLoad.SKIP_INVALID_PROPERTY;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+
+import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
@@ -45,13 +50,6 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
-import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY;
-import java.util.logging.Level;
-import org.apache.commons.cli.CommandLine;
-import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.client.Admin;
-import org.apache.hadoop.hbase.client.Connection;
-import org.apache.hadoop.hbase.client.ConnectionFactory;
 
 /**
  * Apache Hadoop MapReduce Tool for calculating pre-splits of an HBase table before a large dataset bulk-load.
@@ -157,7 +155,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         try (Connection con = ConnectionFactory.createConnection(getConf())) {
             try (Admin admin = con.getAdmin()) {
                 if (admin.tableExists(TableName.valueOf(target))) {
-                    LOG.log(Level.WARNING, "Pre-split cannot modify already existing table {0}", target);
+                    LOG.warn("Pre-split cannot modify already existing table {}", target);
                     return -1;
                 }
             }
