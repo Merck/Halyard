@@ -180,27 +180,29 @@ public final class HalyardTableUtils {
 
 	private static final BiMap<ByteBuffer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(256);
 
+	private static void loadIRIs(Class<?> vocab) {
+		Set<IRI> iris = Vocabularies.getIRIs(vocab);
+		for (IRI iri : iris) {
+			ByteBuffer hash = ByteBuffer.wrap(hash32(iri.toString().getBytes(StandardCharsets.UTF_8))).asReadOnlyBuffer();
+			if (WELL_KNOWN_IRIS.putIfAbsent(hash, iri) != null) {
+				throw new AssertionError(String.format("Hash collision between %s and %s",
+						WELL_KNOWN_IRIS.get(hash), iri));
+			}
+		}
+	}
+
 	static {
 		Class<?>[] defaultVocabs = { RDF.class, RDFS.class, XMLSchema.class, SD.class, VOID.class, FOAF.class,
 				OWL.class, DC.class, DCTERMS.class, ORG.class, GEO.class };
-		List<Class<?>> vocabs = new ArrayList<>(32);
-		Collections.addAll(vocabs, defaultVocabs);
-
-		Logger logger = LoggerFactory.getLogger(HalyardTableUtils.class);
-		for(Vocabulary vocab : ServiceLoader.load(Vocabulary.class)) {
-			logger.info("Loading vocabulary {}", vocab.getClass());
-			vocabs.add(vocab.getClass());
+		for(Class<?> vocab : defaultVocabs) {
+			loadIRIs(vocab);
 		}
 
-		for(Class<?> vocab : vocabs) {
-			Set<IRI> iris = Vocabularies.getIRIs(vocab);
-			for (IRI iri : iris) {
-				ByteBuffer hash = ByteBuffer.wrap(hash32(iri.toString().getBytes(StandardCharsets.UTF_8))).asReadOnlyBuffer();
-				if (WELL_KNOWN_IRIS.putIfAbsent(hash, iri) != null) {
-					throw new AssertionError(String.format("Hash collision between %s and %s",
-							WELL_KNOWN_IRIS.get(hash), iri));
-				}
-			}
+		Logger logger = LoggerFactory.getLogger(HalyardTableUtils.class);
+		logger.info("Searching for vocabularies...");
+		for(Vocabulary vocab : ServiceLoader.load(Vocabulary.class)) {
+			logger.info("Loading vocabulary {}", vocab.getClass());
+			loadIRIs(vocab.getClass());
 		}
 	}
 
@@ -261,7 +263,6 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(BYTE_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				b.get(); // type
 				return vf.createLiteral(b.get());
 			}
 		});
@@ -277,7 +278,6 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(SHORT_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				b.get(); // type
 				return vf.createLiteral(b.getShort());
 			}
 		});
@@ -293,7 +293,6 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(INT_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				b.get(); // type
 				return vf.createLiteral(b.getInt());
 			}
 		});
@@ -309,7 +308,6 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(LONG_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				b.get(); // type
 				return vf.createLiteral(b.getLong());
 			}
 		});
@@ -325,7 +323,6 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(FLOAT_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				b.get(); // type
 				return vf.createLiteral(b.getFloat());
 			}
 		});
@@ -341,7 +338,6 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(DOUBLE_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				b.get(); // type
 				return vf.createLiteral(b.getDouble());
 			}
 		});
@@ -355,7 +351,6 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(STRING_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				b.get(); // type
 				return vf.createLiteral(StandardCharsets.UTF_8.decode(b).toString());
 			}
 		});
@@ -369,7 +364,6 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(TIME_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				b.get(); // type
 				long millis = b.getLong();
 				int tz = b.getShort();
 				GregorianCalendar c = new GregorianCalendar();
@@ -395,7 +389,6 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(DATE_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				b.get(); // type
 				long millis = b.getLong();
 				int tz = b.getShort();
 				GregorianCalendar c = new GregorianCalendar();
@@ -419,7 +412,6 @@ public final class HalyardTableUtils {
 		BYTE_READERS.put(DATETIME_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				b.get(); // type
 				long millis = b.getLong();
 				int tz = b.getShort();
 				GregorianCalendar c = new GregorianCalendar();
@@ -1122,10 +1114,10 @@ public final class HalyardTableUtils {
     	if (v instanceof IRI) {
     		ByteBuffer hash = WELL_KNOWN_IRIS.inverse().get(v);
     		if (hash != null) {
-    			byte[] b = new byte[1 + hash.capacity()];
+    			byte[] b = new byte[1 + hash.remaining()];
     			b[0] = IRI_HASH_TYPE;
     			// NB: do not alter original hash buffer which is shared across threads
-    			hash.duplicate().get(b, 1, hash.capacity());
+    			hash.duplicate().get(b, 1, hash.remaining());
     			return b;
     		} else {
     			return ("<"+v.stringValue()+">").getBytes(StandardCharsets.UTF_8);
@@ -1207,7 +1199,7 @@ public final class HalyardTableUtils {
 				}
 			default:
 				ByteReader reader = BYTE_READERS.get(type);
-				return reader.readBytes((ByteBuffer) b.reset(), vf);
+				return reader.readBytes((ByteBuffer) b, vf);
 		}
     }
 

@@ -50,13 +50,15 @@ public class HalyardTableUtilsRDFTest {
 		assertEquals(expected, actual);
 
 		// check readValue() works on a subsequence
-		ByteBuffer extbuf = ByteBuffer.allocate(1 + b.length + 1);
-		// place b in the middle
-		extbuf.position(extbuf.position() + 1);
+		ByteBuffer extbuf = ByteBuffer.allocate(3 + b.length + 7);
+		// place b somewhere in the middle
+		extbuf.position(extbuf.position() + 3);
+		extbuf.mark();
 		extbuf.put(b);
-		// set boundary
-		extbuf.position(1).limit(extbuf.capacity() - 1);
+		extbuf.limit(extbuf.position());
+		extbuf.reset();
 		actual = HalyardTableUtils.readValue(extbuf, vf);
+		assertEquals("Buffer position", extbuf.limit(), extbuf.position());
 		assertEquals(expected, actual);
 	}
 
