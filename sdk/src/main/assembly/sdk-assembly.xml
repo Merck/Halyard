@@ -28,7 +28,7 @@
             <directory>${project.basedir}/target</directory>
             <outputDirectory>lib</outputDirectory>
             <includes>
-                <include>rdf4j-repository-api*.jar</include>
+                <include>rdf4j-repository-*.jar</include>
             </includes>
         </fileSet>
     </fileSets>
