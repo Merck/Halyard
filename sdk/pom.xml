@@ -37,7 +37,7 @@
                             <artifactItems>
                                 <artifactItem>
                                     <groupId>org.eclipse.rdf4j</groupId>
-                                    <artifactId>rdf4j-repository-api</artifactId>
+                                    <artifactId>rdf4j-client</artifactId>
                                     <version>${rdf4j.version}</version>
                                     <type>jar</type>
                                 </artifactItem>
@@ -53,12 +53,12 @@
                 <version>1.8</version>
                 <executions>
                     <execution>
-                        <id>patch-sesame-repository-api</id>
+                        <id>patch-rdf4j-client</id>
                         <phase>process-classes</phase>
                         <configuration>
                             <target>
-                                <zip destfile="${project.build.directory}/rdf4j-repository-api-${rdf4j.version}.jar" update="true">
-                                    <fileset dir="src/main/patches/rdf4j-repository-api"/>
+                                <zip destfile="${project.build.directory}/rdf4j-client-${rdf4j.version}.jar" update="true">
+                                    <fileset dir="src/main/patches/rdf4j-client"/>
                                 </zip>
                             </target>
                         </configuration>
