@@ -11,12 +11,7 @@
     <dependencies>
         <dependency>
             <groupId>org.eclipse.rdf4j</groupId>
-            <artifactId>rdf4j-model</artifactId>
-            <version>${rdf4j.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.rdf4j</groupId>
-            <artifactId>rdf4j-rio-ntriples</artifactId>
+            <artifactId>rdf4j-client</artifactId>
             <version>${rdf4j.version}</version>
         </dependency>
         <dependency>
