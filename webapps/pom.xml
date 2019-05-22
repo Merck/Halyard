@@ -14,6 +14,12 @@
             <artifactId>halyard-sdk</artifactId>
             <version>${project.version}</version>
             <type>pom</type>
+            <exclusions>
+                <exclusion>
+                    <groupId>ch.qos.logback</groupId>
+                    <artifactId>logback-classic</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
     <build>
