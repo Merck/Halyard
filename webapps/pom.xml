@@ -73,7 +73,14 @@
                         <phase>package</phase>
                         <configuration>
                             <target>
+                                <unzip src="${project.build.directory}/rdf4j-server.war" dest="target/rdf4j-server-patch" overwrite="true">
+                                    <patternset>
+                                        <include name="WEB-INF/rdf4j-http-server-servlet.xml"/>
+                                    </patternset>
+                                </unzip>
+                                <replace file="target/rdf4j-server-patch/WEB-INF/rdf4j-http-server-servlet.xml" token="org.eclipse.rdf4j.repository.manager.LocalRepositoryManager" value="com.msd.gin.halyard.sail.HBaseRepositoryManager"/>
                                 <zip destfile="${project.build.directory}/rdf4j-server.war" update="true">
+                                    <fileset dir="target/rdf4j-server-patch"/>
                                     <zipfileset dir="../common/target" includes="halyard-common-${project.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="../strategy/target" includes="halyard-strategy-${project.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="../sail/target" includes="halyard-sail-${project.version}.jar" prefix="WEB-INF/lib"/>
