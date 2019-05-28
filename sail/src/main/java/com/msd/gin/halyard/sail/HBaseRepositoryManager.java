@@ -20,6 +20,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.http.client.HttpClient;
 import org.eclipse.rdf4j.http.client.HttpClientDependent;
@@ -47,25 +48,30 @@ import org.eclipse.rdf4j.repository.sparql.federation.SPARQLServiceResolver;
  *
  * @author Adam Sotona (MSD)
  */
-public class HBaseRepositoryManager extends RepositoryManager {
+public final class HBaseRepositoryManager extends RepositoryManager {
     private static final String SYSTEM_REPO_ID = "RDF4JSYSTEM";
     private volatile SharedHttpClientSessionManager client;
     private volatile SPARQLServiceResolver serviceResolver;
+    private volatile Configuration config = HBaseConfiguration.create();
 
     public HBaseRepositoryManager(Object...anyArgs) {
+    }
+
+    void overrideConfiguration(Configuration config) {
+        this.config = config;
     }
 
     @Override
     @Deprecated
     protected Repository createSystemRepository() throws RepositoryException {
-        SailRepository repo = new SailRepository(new HBaseSail(HBaseConfiguration.create(), SYSTEM_REPO_ID, true, 0, true, 180, null, null));
+        SailRepository repo = new SailRepository(new HBaseSail(config, SYSTEM_REPO_ID, true, 0, true, 180, null, null));
         repo.init();
         return repo;
     }
 
     @Override
     public URL getLocation() throws MalformedURLException {
-        return new URL("HBase://");
+        throw new MalformedURLException();
     }
 
     private SharedHttpClientSessionManager getSesameClient() {
