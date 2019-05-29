@@ -22,7 +22,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <rdf4j.version>2.4.6</rdf4j.version>
+        <rdf4j.version>2.5.2</rdf4j.version>
         <hbase.version>1.1.2</hbase.version>
         <hadoop.version>2.5.1</hadoop.version>
         <elasticsearch.version>7.0.1</elasticsearch.version>

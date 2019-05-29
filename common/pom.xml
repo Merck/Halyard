@@ -11,7 +11,7 @@
     <dependencies>
         <dependency>
             <groupId>org.eclipse.rdf4j</groupId>
-            <artifactId>rdf4j-model</artifactId>
+            <artifactId>rdf4j-client</artifactId>
             <version>${rdf4j.version}</version>
         </dependency>
         <dependency>

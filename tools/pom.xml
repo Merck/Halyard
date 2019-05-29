@@ -33,6 +33,12 @@
             <groupId>org.eclipse.rdf4j</groupId>
             <artifactId>rdf4j-console</artifactId>
             <version>${rdf4j.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>ch.qos.logback</groupId>
+                    <artifactId>logback-classic</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.elasticsearch</groupId>
@@ -84,11 +90,6 @@
             <version>${hadoop.version}</version>
             <scope>test</scope>
             <classifier>tests</classifier>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.rdf4j</groupId>
-            <artifactId>rdf4j-rio-jsonld</artifactId>
-            <version>${rdf4j.version}</version>
         </dependency>
         <dependency>
             <groupId>commons-codec</groupId>

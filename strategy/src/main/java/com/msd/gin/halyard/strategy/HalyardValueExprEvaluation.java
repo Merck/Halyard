@@ -27,8 +27,6 @@ import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
-//if URI is removed from RDF4J it should be replaceable with org.eclipse.rdf4j.model.IRI
-import org.eclipse.rdf4j.model.URI;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.datatypes.XMLDatatypeUtil;
@@ -274,7 +272,7 @@ class HalyardValueExprEvaluation {
      */
     private Value evaluate(Str node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value argValue = evaluate(node.getArg(), bindings);
-        if (argValue instanceof URI) {
+        if (argValue instanceof IRI) {
             return valueFactory.createLiteral(argValue.toString());
         } else if (argValue instanceof Literal) {
             Literal literal = (Literal) argValue;
@@ -368,9 +366,9 @@ class HalyardValueExprEvaluation {
      */
     private Value evaluate(Namespace node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value argValue = evaluate(node.getArg(), bindings);
-        if (argValue instanceof URI) {
-            URI uri = (URI) argValue;
-            return valueFactory.createURI(uri.getNamespace());
+        if (argValue instanceof IRI) {
+            IRI uri = (IRI) argValue;
+            return valueFactory.createIRI(uri.getNamespace());
         } else {
             throw new ValueExprEvaluationException();
         }
@@ -386,8 +384,8 @@ class HalyardValueExprEvaluation {
      */
     private Value evaluate(LocalName node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value argValue = evaluate(node.getArg(), bindings);
-        if (argValue instanceof URI) {
-            URI uri = (URI) argValue;
+        if (argValue instanceof IRI) {
+            IRI uri = (IRI) argValue;
             return valueFactory.createLiteral(uri.getLocalName());
         } else {
             throw new ValueExprEvaluationException();
@@ -413,7 +411,7 @@ class HalyardValueExprEvaluation {
      */
     private Value evaluate(IsURI node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value argValue = evaluate(node.getArg(), bindings);
-        return BooleanLiteral.valueOf(argValue instanceof URI);
+        return BooleanLiteral.valueOf(argValue instanceof IRI);
     }
 
     /**
@@ -594,8 +592,8 @@ class HalyardValueExprEvaluation {
     private Value evaluate(Like node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         Value val = evaluate(node.getArg(), bindings);
         String strVal = null;
-        if (val instanceof URI) {
-            strVal = ((URI) val).toString();
+        if (val instanceof IRI) {
+            strVal = ((IRI) val).toString();
         } else if (val instanceof Literal) {
             strVal = ((Literal) val).getLabel();
         }

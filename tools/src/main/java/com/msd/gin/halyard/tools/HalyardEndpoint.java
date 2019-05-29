@@ -16,15 +16,16 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.sail.HBaseSail;
-import org.apache.commons.cli.CommandLine;
-import org.eclipse.rdf4j.repository.sail.SailRepository;
-import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
-
-import java.io.*;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+
+import org.apache.commons.cli.CommandLine;
+import org.eclipse.rdf4j.repository.sail.SailRepository;
+
+import com.msd.gin.halyard.sail.HBaseSail;
 
 /**
  * @author sykorjan

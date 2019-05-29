@@ -165,9 +165,11 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 
 								@Override
 								protected void delete(KeyValue kv) throws IOException {
-									kv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), (int) kv.getRowLength(), kv.getFamilyArray(), kv.getFamilyOffset(), (int) kv.getFamilyLength(), kv.getQualifierArray(), kv.getQualifierOffset(),
-											kv.getQualifierLength(), kv.getTimestamp(), KeyValue.Type.DeleteColumn, kv.getValueArray(), kv.getValueOffset(), kv.getValueLength(), kv.getTagsArray(), kv.getTagsOffset(),
-											kv.getTagsLength());
+								    kv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), (int) kv.getRowLength(),
+								            kv.getFamilyArray(), kv.getFamilyOffset(), (int) kv.getFamilyLength(),
+								            kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength(),
+								            kv.getTimestamp(), KeyValue.Type.DeleteColumn, kv.getValueArray(), kv.getValueOffset(),
+								            kv.getValueLength(), kv.getTagsArray(), kv.getTagsOffset(), kv.getTagsLength());
 									try {
 										context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
 									} catch (InterruptedException ex) {
@@ -199,7 +201,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 					});
                     SailRepository rep = new SailRepository(sail);
                     try {
-                        rep.initialize();
+                        rep.init();
                         try(SailRepositoryConnection con = rep.getConnection()) {
 	                        Update upd = new HBaseUpdate(singleUpdate, con);
 	                        LOG.info("Execution of: {}", query);
