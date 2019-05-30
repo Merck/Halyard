@@ -77,7 +77,6 @@ public class LiteralSearchStatementScannerTest implements Runnable {
         IRI whatever = SimpleValueFactory.getInstance().createIRI("http://whatever");
 		try (SailConnection conn = hbaseSail.getConnection()) {
 			conn.addStatement(whatever, whatever, val);
-			conn.commit();
 			try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("what", HALYARD.SEARCH_TYPE), true)) {
 				assertTrue(iter.hasNext());
 			}

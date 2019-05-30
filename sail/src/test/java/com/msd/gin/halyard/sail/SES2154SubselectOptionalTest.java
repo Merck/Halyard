@@ -47,8 +47,7 @@ public class SES2154SubselectOptionalTest {
 			for (char c = 'a'; c < 'k'; c++) {
 				conn.add(vf.createIRI("http://example.com/" + c), RDF.TYPE, person);
 			}
-			conn.commit();
-			try (TupleQueryResult res = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "PREFIX : <http://example.com/>\n" + "PREFIX schema: <http://schema.org/>\n" + "\n" + "SELECT (COUNT(*) AS ?count)\n" + "WHERE {\n"
+			try (TupleQueryResult res = conn.prepareTupleQuery(QueryLanguage.SPARQL, "PREFIX : <http://example.com/>\n" + "PREFIX schema: <http://schema.org/>\n" + "\n" + "SELECT (COUNT(*) AS ?count)\n" + "WHERE {\n"
 					+ "  {\n" + "    SELECT ?person\n" + "    WHERE {\n" + "      ?person a schema:Person .\n" + "    }\n" + "    LIMIT 5\n" + "  }\n" + "  OPTIONAL {\n" + "    [] :nonexistent [] .\n" + "  }\n" + "}").evaluate()) {
 				assertEquals(5, ((Literal) res.next().getBinding("count").getValue()).intValue());
 			}

@@ -135,7 +135,6 @@ public class HalyardSummaryTest {
                     }
                 }
             }
-			conn.commit();
         }
 		sail.shutDown();
 

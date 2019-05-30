@@ -326,7 +326,6 @@ public final class HalyardStats extends AbstractHalyardTool {
             distinctLiterals = 0;
             cleanupSubset(output);
             if (sail != null) {
-				conn.commit();
 				conn.close();
 				conn = null;
 				sail.shutDown();
@@ -463,7 +462,6 @@ public final class HalyardStats extends AbstractHalyardTool {
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
             if (writer == null) {
-				conn.commit();
 				conn.close();
 				sail.shutDown();
             } else {

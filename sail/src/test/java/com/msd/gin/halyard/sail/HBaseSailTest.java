@@ -19,6 +19,7 @@ package com.msd.gin.halyard.sail;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -33,6 +34,7 @@ import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
@@ -174,7 +176,6 @@ public class HBaseSailTest {
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
             conn.addStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, vf.createIRI("http://whatever/ctx"), HALYARD.STATS_GRAPH_CONTEXT);
-            conn.commit();
             try (CloseableIteration<? extends Resource, SailException> ctxIt = conn.getContextIDs()) {
                 assertTrue(ctxIt.hasNext());
                 assertEquals("http://whatever/ctx", ctxIt.next().stringValue());
@@ -193,14 +194,11 @@ public class HBaseSailTest {
             assertEquals(0, conn.size(HALYARD.STATS_ROOT_NODE));
             IRI iri = vf.createIRI("http://whatever/");
             conn.addStatement(iri, iri, iri);
-            conn.commit();
             assertEquals(1, conn.size());
             conn.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, vf.createLiteral(567), HALYARD.STATS_GRAPH_CONTEXT);
-            conn.commit();
             assertEquals(567, conn.size());
             assertEquals(567, conn.size(HALYARD.STATS_ROOT_NODE));
             conn.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, vf.createLiteral(568), HALYARD.STATS_GRAPH_CONTEXT);
-            conn.commit();
             try {
             	conn.size();
                 fail("Expected SailException");
@@ -256,38 +254,56 @@ public class HBaseSailTest {
         HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
-        	assertFalse(conn.getNamespaces().hasNext());
+        	assertEquals(0, countNamespaces(conn));
         	conn.setNamespace("prefix", "http://whatever/namespace/");
+        	assertEquals("http://whatever/namespace/", conn.getNamespace("prefix"));
+        	assertEquals(1, countNamespaces(conn));
         }
         sail.shutDown();
         sail = new HBaseSail(hconn, "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
-	        assertTrue(conn.getNamespaces().hasNext());
+        	assertEquals(1, countNamespaces(conn));
 	        conn.removeNamespace("prefix");
+        	assertNull(conn.getNamespace("prefix"));
+        	assertEquals(0, countNamespaces(conn));
         }
         sail.shutDown();
         sail = new HBaseSail(hconn, "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
-	        assertFalse(conn.getNamespaces().hasNext());
+        	assertEquals(0, countNamespaces(conn));
 	        conn.setNamespace("prefix", "http://whatever/namespace/");
 	        conn.setNamespace("prefix", "http://whatever/namespace2/");
+        	assertEquals("http://whatever/namespace2/", conn.getNamespace("prefix"));
+        	assertEquals(1, countNamespaces(conn));
         }
         sail.shutDown();
         sail = new HBaseSail(hconn, "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
+        	assertEquals(1, countNamespaces(conn));
         	assertEquals("http://whatever/namespace2/", conn.getNamespace("prefix"));
         	conn.clearNamespaces();
+        	assertEquals(0, countNamespaces(conn));
         }
         sail.shutDown();
         sail = new HBaseSail(hconn, "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
-        	assertFalse(conn.getNamespaces().hasNext());
+        	assertEquals(0, countNamespaces(conn));
         }
         sail.shutDown();
+    }
+
+    private int countNamespaces(SailConnection conn) {
+    	int count ;
+    	try (CloseableIteration<? extends Namespace, SailException> iter = conn.getNamespaces()) {
+    		for(count=0; iter.hasNext(); iter.next()) {
+    			count++;
+    		}
+    	}
+    	return count;
     }
 
     @Test
@@ -303,7 +319,6 @@ public class HBaseSailTest {
 		try (SailConnection conn = sail.getConnection()) {
 	        conn.addStatement(subj, pred, obj, context);
 	        conn.addStatement(subj, pred, obj);
-	        conn.commit();
 	        iter = conn.getStatements(subj, pred, obj, true);
 	        assertTrue(iter.hasNext());
 	        iter.close();
@@ -332,7 +347,6 @@ public class HBaseSailTest {
         rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(subj, pred, obj);
-			conn.commit();
 		}
 		try (RepositoryConnection conn = rep.getConnection()) {
 			TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL,
@@ -355,7 +369,6 @@ public class HBaseSailTest {
 		rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(subj, pred, obj);
-			conn.commit();
 		}
 		try (RepositoryConnection conn = rep.getConnection()) {
 			GraphQuery q = conn.prepareGraphQuery(QueryLanguage.SPARQL, "construct {?s ?p ?o} where {?s ?p ?o}");
@@ -378,7 +391,6 @@ public class HBaseSailTest {
         rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(subj, pred, obj, context);
-			conn.commit();
 		}
 		try (RepositoryConnection conn = rep.getConnection()) {
 			TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL,
@@ -411,7 +423,6 @@ public class HBaseSailTest {
 					conn.add(s, p, o, graph);
 				}
 			}
-			conn.commit();
 		}
         rep.shutDown();
 
@@ -446,7 +457,6 @@ public class HBaseSailTest {
 		rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj"));
-			conn.commit();
 		}
 		rep.shutDown();
 
@@ -455,7 +465,6 @@ public class HBaseSailTest {
 		rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj"));
-			conn.commit();
 			BooleanQuery q = conn.prepareBooleanQuery(QueryLanguage.SPARQL, "ask where {" + "    ?s ?p ?o" + "  SERVICE <" + HALYARD.NAMESPACE + "whateverservice> {" + "    ?s ?p ?o" + "  }" + "}");
 			assertTrue(q.evaluate());
 		}
@@ -515,7 +524,6 @@ public class HBaseSailTest {
         sail.initialize();
         try {
 			try (SailConnection conn = sail.getConnection()) {
-				conn.commit();
 				try (CloseableIteration<? extends Statement, SailException> it = conn.getStatements(null, null, null,
 						true)) {
 					Thread.sleep(2000);
@@ -545,7 +553,6 @@ public class HBaseSailTest {
 			conn.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_" + HalyardTableUtils.encode(HalyardTableUtils.id(RDF.TYPE))), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
 	        conn.addStatement(f.createIRI("http://whatevercontext"), VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
 			conn.addStatement(f.createIRI("http://whatevercontext_property_" + HalyardTableUtils.encode(HalyardTableUtils.id(RDF.TYPE))), VOID.TRIPLES, f.createLiteral(20l), HALYARD.STATS_GRAPH_CONTEXT);
-	        conn.commit();
 		}
         assertEquals(5000.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(20.0, sail.statistics.getCardinality(q2), 0.01);
@@ -563,7 +570,6 @@ public class HBaseSailTest {
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"),
 					vf.createIRI("http://whatever/obj"));
-			conn.commit();
 		}
 		try (RepositoryConnection conn = rep.getConnection()) {
 			TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL, "select * where {" + "  bind (\"a\" as ?a)\n"
@@ -587,7 +593,6 @@ public class HBaseSailTest {
 		rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj"));
-			conn.commit();
 		}
 		try (RepositoryConnection conn = rep.getConnection()) {
 			BooleanQuery q = conn.prepareBooleanQuery(QueryLanguage.SPARQL, "ask where {" + "    ?s ?p ?o" + "  bind (\"a\" as ?a)\n" + "  SERVICE <" + HALYARD.NAMESPACE + "whateverservice2> {" + "    ?s ?p ?o" + "  }" + "}");

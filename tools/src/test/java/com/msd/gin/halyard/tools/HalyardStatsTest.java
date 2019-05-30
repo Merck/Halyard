@@ -72,7 +72,6 @@ public class HalyardStatsTest {
 					}
 				}).parse(ref, "");
 			}
-			conn.commit();
 		}
 
         File root = File.createTempFile("test_stats", "");
@@ -161,12 +160,13 @@ public class HalyardStatsTest {
 					}
 				}).parse(ref, "");
 			}
-			conn.commit();
+		}
 
-			// update stats
-			assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(), new String[] { "-s", "statsTable2", "-r", "100" }));
+		// update stats
+		assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(), new String[] { "-s", "statsTable2", "-r", "100" }));
 
-			// verify with golden file
+		// verify with golden file
+		try (SailConnection conn = sail.getConnection()) {
 			Set<Statement> statsM = new HashSet<>();
 			try (CloseableIteration<? extends Statement, SailException> it = conn.getStatements(null, null, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
 				while (it.hasNext()) {
@@ -189,13 +189,14 @@ public class HalyardStatsTest {
 					}
 				}).parse(ref, "");
 			}
-			conn.commit();
+		}
 
-			// update stats only for graph1
-			assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(), new String[] { "-s", "statsTable2", "-r", "100", "-c", "http://whatever/graph1" }));
+		// update stats only for graph1
+		assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(), new String[] { "-s", "statsTable2", "-r", "100", "-c", "http://whatever/graph1" }));
 
-			// verify with golden file
-			statsM = new HashSet<>();
+		// verify with golden file
+		try (SailConnection conn = sail.getConnection()) {
+			Set<Statement> statsM = new HashSet<>();
 			try (CloseableIteration<? extends Statement, SailException> it = conn.getStatements(null, null, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
 				while (it.hasNext()) {
 					statsM.add(it.next());
@@ -224,7 +225,6 @@ public class HalyardStatsTest {
 					}
 				}).parse(ref, "");
 			}
-			conn.commit();
 		}
 
         File root = File.createTempFile("test_stats", "");

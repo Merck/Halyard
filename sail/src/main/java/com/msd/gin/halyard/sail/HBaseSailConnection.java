@@ -16,19 +16,6 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFContext;
-import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.RDFPredicate;
-import com.msd.gin.halyard.common.RDFSubject;
-import com.msd.gin.halyard.common.Timestamped;
-import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
-import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
-import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
-import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
-import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
-import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
-
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
@@ -54,7 +41,7 @@ import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
-import org.eclipse.rdf4j.common.iteration.CloseableIteratorIteration;
+import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.EmptyIteration;
 import org.eclipse.rdf4j.common.iteration.ExceptionConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.TimeLimitIteration;
@@ -110,6 +97,19 @@ import org.json.JSONTokener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.RDFPredicate;
+import com.msd.gin.halyard.common.RDFSubject;
+import com.msd.gin.halyard.common.Timestamped;
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
+import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
+import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
+import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
+import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
+
 public class HBaseSailConnection implements SailConnection {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseSailConnection.class);
 
@@ -118,6 +118,9 @@ public class HBaseSailConnection implements SailConnection {
     private final HBaseSail sail;
 	private Table table;
 	private BufferedMutator mutator;
+	private boolean pendingUpdates;
+	private long lastTimestamp = Long.MIN_VALUE;
+	private boolean lastUpdateWasDelete;
 
     public HBaseSailConnection(HBaseSail sail) {
     	this.sail = sail;
@@ -140,7 +143,14 @@ public class HBaseSailConnection implements SailConnection {
 
     @Override
     public void close() throws SailException {
-    	commit();
+		if (mutator != null) {
+			try {
+				mutator.close();
+			} catch (IOException e) {
+				throw new SailException(e);
+			}
+		}
+
 		if (table != null) {
 			try {
 				table.close();
@@ -154,6 +164,7 @@ public class HBaseSailConnection implements SailConnection {
     //evaluate queries/ subqueries
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred) throws SailException {
+		flush();
 		LOG.debug("Evaluated TupleExpr before optimizers:\n{}", tupleExpr);
         tupleExpr = tupleExpr.clone();
         if (!(tupleExpr instanceof QueryRoot)) {
@@ -319,7 +330,8 @@ public class HBaseSailConnection implements SailConnection {
 
     @Override
     public CloseableIteration<? extends Statement, SailException> getStatements(Resource subj, IRI pred, Value obj, boolean includeInferred, Resource... contexts) throws SailException {
-        return createScanner(System.currentTimeMillis(), subj, pred, obj, contexts);
+		flush();
+		return createScanner(System.currentTimeMillis(), subj, pred, obj, contexts);
     }
 
     private StatementScanner createScanner(long startTime, Resource subj, IRI pred, Value obj, Resource...contexts) throws SailException {
@@ -378,6 +390,14 @@ public class HBaseSailConnection implements SailConnection {
 
     @Override
     public void flush() throws SailException {
+		if (pendingUpdates) {
+			try {
+				mutator.flush();
+				pendingUpdates = false;
+			} catch (IOException e) {
+				throw new SailException(e);
+			}
+		}
     }
 
     @Override
@@ -386,13 +406,6 @@ public class HBaseSailConnection implements SailConnection {
 
     @Override
     public void commit() throws SailException {
-    	if (mutator != null) {
-	    	try {
-				mutator.flush();
-			} catch (IOException e) {
-				throw new SailException(e);
-			}
-    	}
     }
 
     @Override
@@ -408,12 +421,22 @@ public class HBaseSailConnection implements SailConnection {
 		return sail.statistics;
 	}
 
-    protected long getTimeStamp(UpdateContext op) {
-        return (op instanceof Timestamped) ? ((Timestamped)op).getTimestamp() : getDefaultTimeStamp();
+	protected long getTimestamp(UpdateContext op, boolean isDelete) {
+		return (op instanceof Timestamped) ? ((Timestamped) op).getTimestamp() : getDefaultTimestamp(isDelete);
     }
 
-    protected long getDefaultTimeStamp() {
-    	return System.currentTimeMillis();
+	protected long getDefaultTimestamp(boolean isDelete) {
+		long ts = System.currentTimeMillis();
+		if (ts > lastTimestamp) {
+			lastTimestamp = ts;
+		} else {
+			if (!lastUpdateWasDelete && isDelete) {
+				lastTimestamp++; // ensure delete is ordered after any previous add
+			}
+			ts = lastTimestamp;
+		}
+		lastUpdateWasDelete = isDelete;
+		return ts;
     }
 
     @Override
@@ -423,7 +446,7 @@ public class HBaseSailConnection implements SailConnection {
 
     @Override
     public void addStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
-        long timestamp = getTimeStamp(op);
+		long timestamp = getTimestamp(op, false);
         addStatementInternal(subj, pred, obj, contexts, timestamp);
     }
 
@@ -446,6 +469,7 @@ public class HBaseSailConnection implements SailConnection {
 
 	protected void put(KeyValue kv) throws IOException {
 		getBufferedMutator().mutate(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
+		pendingUpdates = true;
     }
 
     @Override
@@ -469,7 +493,7 @@ public class HBaseSailConnection implements SailConnection {
 		// should we be defensive about nulls for subj, pre and obj? removeStatements is
 		// where you would use nulls, not here.
 
-        long timestamp = getTimeStamp(op);
+		long timestamp = getTimestamp(op, true);
 		removeStatementInternal(op, subj, pred, obj, contexts, timestamp);
     }
 
@@ -488,6 +512,7 @@ public class HBaseSailConnection implements SailConnection {
 
 	protected void delete(KeyValue kv) throws IOException {
 		getBufferedMutator().mutate(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addDeleteMarker(kv));
+		pendingUpdates = true;
     }
 
     @Override
@@ -506,7 +531,6 @@ public class HBaseSailConnection implements SailConnection {
     @Override
     public void clear(Resource... contexts) throws SailException {
         removeStatements(null, null, null, contexts); //remove all statements in the contexts.
-        commit();
     }
 
     private void clearAll() throws SailException {
@@ -520,21 +544,36 @@ public class HBaseSailConnection implements SailConnection {
 
     @Override
     public String getNamespace(String prefix) throws SailException {
-        Namespace namespace = sail.namespaces.get(prefix);
-        return (namespace == null) ? null : namespace.getName();
+        ValueFactory vf = sail.getValueFactory();
+    	try (CloseableIteration<? extends Statement, SailException> nsIter = getStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), false, new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT })) {
+    		if (nsIter.hasNext()) {
+    			IRI namespace = (IRI) nsIter.next().getSubject();
+    			return namespace.stringValue();
+    		} else {
+    			return null;
+    		}
+    	}
     }
 
     @Override
     public CloseableIteration<? extends Namespace, SailException> getNamespaces() {
-        return new CloseableIteratorIteration<>(sail.namespaces.values().iterator());
+    	CloseableIteration<? extends Statement, SailException> nsIter = getStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null, false, new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
+    	return new ConvertingIteration<Statement, Namespace, SailException>(nsIter) {
+			@Override
+			protected Namespace convert(Statement stmt)
+				throws SailException {
+                String name = stmt.getSubject().stringValue();
+                String prefix = stmt.getObject().stringValue();
+				return new SimpleNamespace(prefix, name);
+			}
+    	};
     }
 
     @Override
     public void setNamespace(String prefix, String name) throws SailException {
-        sail.namespaces.put(prefix, new SimpleNamespace(prefix, name));
         ValueFactory vf = sail.getValueFactory();
         try {
-            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix));
+            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
 			addStatement(vf.createIRI(name), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
         } catch (SailException e) {
 			LOG.warn("Namespace prefix could not be presisted due to an exception", e);
@@ -544,9 +583,8 @@ public class HBaseSailConnection implements SailConnection {
     @Override
     public void removeNamespace(String prefix) throws SailException {
         ValueFactory vf = sail.getValueFactory();
-        sail.namespaces.remove(prefix);
         try {
-            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix));
+            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
         } catch (SailException e) {
 			LOG.warn("Namespace prefix could not be removed due to an exception", e);
         }
@@ -555,11 +593,10 @@ public class HBaseSailConnection implements SailConnection {
     @Override
     public void clearNamespaces() throws SailException {
         try {
-            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null);
+            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null, new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
         } catch (SailException e) {
 			LOG.warn("Namespaces could not be cleared due to an exception", e);
         }
-        sail.namespaces.clear();
     }
 
 	private static final Map<String, List<RDFObject>> SEARCH_CACHE = new WeakHashMap<>();

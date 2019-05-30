@@ -182,7 +182,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 								}
 
 								@Override
-								protected long getDefaultTimeStamp() {
+								protected long getDefaultTimestamp(boolean delete) {
 									return defaultTimestamp;
 								}
 

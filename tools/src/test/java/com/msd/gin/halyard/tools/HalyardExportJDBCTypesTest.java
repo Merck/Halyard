@@ -67,7 +67,6 @@ public class HalyardExportJDBCTypesTest {
 				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/long"), vf.createLiteral((long) i * 10000000000l));
 				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/short"), vf.createLiteral((short) (i * 10)));
 			}
-			conn.commit();
 		}
         sail.shutDown();
     }

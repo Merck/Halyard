@@ -85,7 +85,6 @@ public class HalyardExportTest {
 					}
 				}
 			}
-			conn.commit();
 		}
         sail.shutDown();
     }

@@ -87,7 +87,6 @@ public class HBaseSailAddRemoveTest {
 		try (SailConnection conn = explicitSail.getConnection()) {
 			conn.addStatement(null, SUBJ, PRED, OBJ);
 			conn.addStatement(null, SUBJ, PRED, OBJ, CONTEXT);
-			conn.commit();
 			CloseableIteration<? extends Statement, SailException> iter;
 			iter = conn.getStatements(null, null, null, true);
 			assertTrue(iter.hasNext());
@@ -109,12 +108,10 @@ public class HBaseSailAddRemoveTest {
 			assertEquals(OBJ, st.getObject());
 			assertEquals(CONTEXT, st.getContext());
 			conn.removeStatements(subj, pred, obj, CONTEXT);
-			conn.commit();
 			iter = conn.getStatements(null, null, null, true);
 			assertTrue(iter.hasNext());
 			iter.close();
 			conn.removeStatements(subj, pred, obj);
-			conn.commit();
 			iter = conn.getStatements(null, null, null, true);
 			assertFalse(iter.hasNext());
 			iter.close();

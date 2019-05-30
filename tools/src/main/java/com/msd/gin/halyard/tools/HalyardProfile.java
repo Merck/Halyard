@@ -109,7 +109,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
 			}
 
 		}));
-        repo.initialize();
+        repo.init();
         try {
         	try(RepositoryConnection conn = repo.getConnection()) {
 	            Query q = conn.prepareQuery(QueryLanguage.SPARQL, cmd.getOptionValue('q'), null);

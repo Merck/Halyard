@@ -60,7 +60,6 @@ public class HalyardBulkUpdateTest {
 					conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj" + j));
 				}
 			}
-			conn.commit();
 		}
         sail.shutDown();
         File queries = File.createTempFile("test_update_queries", "");
@@ -175,7 +174,6 @@ public class HalyardBulkUpdateTest {
 				}
 				i++;
 			}
-			conn.commit();
 		}
         sail.shutDown();
 

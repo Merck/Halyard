@@ -44,7 +44,6 @@ public class HalyardBulkExportTest {
 			for (int i = 0; i < 1000; i++) {
 				conn.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i), vf.createLiteral("whatever NT value " + i));
 			}
-			conn.commit();
 		}
 
         File root = File.createTempFile("test_bulkExport", "");
@@ -82,7 +81,6 @@ public class HalyardBulkExportTest {
 			for (int i = 0; i < 1000; i++) {
 				conn.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i), vf.createLiteral("whatever NT value " + i));
 			}
-			conn.commit();
 		}
 
         File root = File.createTempFile("test_parallelBulkExport", "");

@@ -71,7 +71,6 @@ public class HalyardEndpointTest {
 					}
 				}
 			}
-			conn.commit();
 		}
         sail.shutDown();
     }

@@ -16,20 +16,15 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.TimestampedValueFactory;
-import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
@@ -37,12 +32,7 @@ import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
-import org.eclipse.rdf4j.common.iteration.CloseableIteration;
-import org.eclipse.rdf4j.model.Literal;
-import org.eclipse.rdf4j.model.Namespace;
-import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.vocabulary.FN;
 import org.eclipse.rdf4j.model.vocabulary.SPIF;
 import org.eclipse.rdf4j.model.vocabulary.SPIN;
@@ -60,6 +50,12 @@ import org.eclipse.rdf4j.spin.function.EvalFunction;
 import org.eclipse.rdf4j.spin.function.SelectTupleFunction;
 import org.eclipse.rdf4j.spin.function.spif.CanInvoke;
 import org.eclipse.rdf4j.spin.function.spif.ConvertSpinRDFToString;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.TimestampedValueFactory;
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 
 /**
  * HBaseSail is the RDF Storage And Inference Layer (SAIL) implementation on top of Apache HBase.
@@ -114,7 +110,6 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
 	Connection hConnection;
 	final boolean hConnectionIsShared; //whether a Connection is provided or we need to create our own
 
-    final Map<String, Namespace> namespaces = new ConcurrentHashMap<>();
 	private final Cache<String, SailFederatedService> federatedServices = CacheBuilder.newBuilder().maximumSize(100)
 			.removalListener((evt) -> ((SailFederatedService) evt.getValue()).shutdown()).build();
 
@@ -207,21 +202,16 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
 			}
     	}
 
-    	try (SailConnection conn = getConnection()) {
-            //Iterate over statements relating to namespaces and add them to the namespace map.
-            try (CloseableIteration<? extends Statement, SailException> nsIter = conn.getStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null, true)) {
-                while (nsIter.hasNext()) {
-                    Statement st = nsIter.next();
-                    if (st.getObject() instanceof Literal) {
-                        String prefix = st.getObject().stringValue();
-                        String name = st.getSubject().stringValue();
-                        namespaces.put(prefix, new SimpleNamespace(prefix, name));
-                    }
-                }
-            }
-        }
+    	try {
+			if (!create && !hConnection.getAdmin().tableExists(TableName.valueOf(tableName))) {
+				throw new SailException(String.format("Table does not exist: %s", tableName));
+			}
+		}
+		catch (IOException e) {
+			throw new SailException(e);
+		}
 
-		this.statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(this), (String service) -> {
+    	this.statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(this), (String service) -> {
 			SailFederatedService fedServ = getService(service);
 			return fedServ != null ? ((HBaseSail) fedServ.getSail()).statistics : null;
 		});

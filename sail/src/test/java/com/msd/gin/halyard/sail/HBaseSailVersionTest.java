@@ -90,7 +90,6 @@ public class HBaseSailVersionTest {
         rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(subj, pred, obj);
-			conn.commit();
 		}
 		try (RepositoryConnection conn = rep.getConnection()) {
 			TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL,
@@ -116,7 +115,6 @@ public class HBaseSailVersionTest {
         rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(subj, pred, obj);
-			conn.commit();
 		}
 		try (RepositoryConnection conn = rep.getConnection()) {
 			TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL,
@@ -183,7 +181,6 @@ public class HBaseSailVersionTest {
 
     private void update(SailRepositoryConnection con, String update) {
         con.prepareUpdate(update).execute();
-        con.commit();
     }
 
     private long selectLatest(SailRepositoryConnection con) {
@@ -260,7 +257,6 @@ public class HBaseSailVersionTest {
         IRI insertGraph = vf.createIRI("http://whatever/insertGraph");
         IRI context = vf.createIRI("http://whatever/context");
 		try (RepositoryConnection conn = rep.getConnection()) {
-			conn.begin();
 			for (Change c : changes.values()) {
 				IRI chSubj = vf.createIRI("http://whatever/change#" + i);
 				IRI delGr = vf.createIRI("http://whatever/graph#" + i + "d");
@@ -277,12 +273,10 @@ public class HBaseSailVersionTest {
 				}
 				i++;
 			}
-			conn.commit();
 		}
 
         //execute the update queries
 		try (RepositoryConnection conn = rep.getConnection()) {
-			conn.begin();
 			conn.prepareUpdate(
 						"PREFIX : <http://whatever/> " +
                         "PREFIX halyard: <http://merck.github.io/Halyard/ns#> " +
@@ -302,9 +296,7 @@ public class HBaseSailVersionTest {
                         "    (?deleteSubj ?deletePred ?deleteObj ?targetGraph) halyard:timestamp ?t ." +
                         "  }" +
                         "}").execute();
-			conn.commit();
 
-			conn.begin();
             conn.prepareUpdate(
             			"PREFIX : <http://whatever/> " +
                         "PREFIX halyard: <http://merck.github.io/Halyard/ns#> " +
@@ -324,7 +316,6 @@ public class HBaseSailVersionTest {
                         "    }" +
                         "  }" +
                         "}").execute();
-            conn.commit();
 		}
 
         //read transformed data into model

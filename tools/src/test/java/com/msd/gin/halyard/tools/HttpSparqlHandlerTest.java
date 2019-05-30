@@ -106,17 +106,14 @@ public class HttpSparqlHandlerTest {
     public static void init() throws IOException {
         // Create sail repository
         SailRepository repository = new SailRepository(new MemoryStore());
-        repository.initialize();
+        repository.init();
 
         // Create repositoryConnection to the sail repository
         try(RepositoryConnection repositoryConnection = repository.getConnection()) {
-	        repositoryConnection.begin();
-	
 	        // Add some test data
 	        repositoryConnection.add(factory.createStatement(SUBJ, PRED, OBJ, CONTEXT));
 	        repositoryConnection.add(factory.createStatement(SUBJ2, PRED2, OBJ2, CONTEXT2));
 	        repositoryConnection.add(factory.createStatement(SUBJ3, PRED3, OBJ3, CONTEXT3));
-	        repositoryConnection.commit();
         }
 
         // Provide stored query

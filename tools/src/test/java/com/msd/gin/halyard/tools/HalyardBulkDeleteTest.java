@@ -53,7 +53,6 @@ public class HalyardBulkDeleteTest {
 					conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj" + j), i == 0 ? null : vf.createIRI("http://whatever/ctx" + i));
 				}
 			}
-			conn.commit();
         }
         sail.shutDown();
         File htableDir = File.createTempFile("test_htable", "");

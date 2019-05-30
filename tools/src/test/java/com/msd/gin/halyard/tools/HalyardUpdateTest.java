@@ -68,7 +68,6 @@ public class HalyardUpdateTest {
 					conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj" + j));
 				}
 			}
-			conn.commit();
 		}
         sail.shutDown();
     }
