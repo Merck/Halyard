@@ -27,7 +27,7 @@ public class SailFederatedService implements FederatedService {
 	@Override
 	public void initialize() throws QueryEvaluationException {
 		if (!initialized) {
-			sail.initialize();
+			sail.init();
 			initialized = true;
 		}
 	}

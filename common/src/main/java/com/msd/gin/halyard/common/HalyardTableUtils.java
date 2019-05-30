@@ -136,12 +136,14 @@ public final class HalyardTableUtils {
 	private static final int PREFIXES = 3;
 	static final byte[] STOP_KEY_16 = new byte[2];
 	static final byte[] STOP_KEY_32 = new byte[4];
+	static final byte[] STOP_KEY_48 = new byte[6];
 	static final byte[] STOP_KEY_64 = new byte[8];
 	static final byte[] STOP_KEY_128 = new byte[16];
 
 	static {
 		Arrays.fill(STOP_KEY_16, (byte) 0xff); /* 0xff is 255 in decimal */
 		Arrays.fill(STOP_KEY_32, (byte) 0xff); /* 0xff is 255 in decimal */
+		Arrays.fill(STOP_KEY_48, (byte) 0xff); /* 0xff is 255 in decimal */
 		Arrays.fill(STOP_KEY_64, (byte) 0xff); /* 0xff is 255 in decimal */
 		Arrays.fill(STOP_KEY_128, (byte) 0xff); /* 0xff is 255 in decimal */
     }
@@ -152,11 +154,11 @@ public final class HalyardTableUtils {
 
 	private static class MDHolder {
 		final MessageDigest md128;
-		final MessageDigest md256;
+		final MessageDigest md160;
 
 		MDHolder() {
 			this.md128 = getMessageDigest("Skein-256-128");
-			this.md256 = getMessageDigest("Skein-256-256");
+			this.md160 = getMessageDigest("Skein-256-160");
 		}
 	}
 
@@ -994,7 +996,7 @@ public final class HalyardTableUtils {
     }
 
     public static byte[] hashUnique(byte[] key) {
-		MessageDigest md = MDS.get().md256;
+		MessageDigest md = MDS.get().md160;
         try {
             md.update(key);
             return md.digest();
@@ -1009,6 +1011,10 @@ public final class HalyardTableUtils {
 
 	static byte[] hash64(byte[] key) {
 		return digest(key, MDS.get().md128, 8);
+	}
+
+	static byte[] hash48(byte[] key) {
+		return digest(key, MDS.get().md128, 6);
 	}
 
     static byte[] hash32(byte[] key) {

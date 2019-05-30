@@ -15,8 +15,8 @@ public final class RDFContext extends RDFValue<Resource> {
 	/**
 	 * Key hash size in bytes
 	 */
-	public static final byte KEY_SIZE = 8;
-	public static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_64;
+	public static final byte KEY_SIZE = 6;
+	public static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_48;
 
 
 	private RDFContext(Resource val, byte[] ser) {
@@ -24,7 +24,7 @@ public final class RDFContext extends RDFValue<Resource> {
 	}
 
 	protected byte[] hash() {
-		return HalyardTableUtils.hash64(ser);
+		return HalyardTableUtils.hash48(ser);
 	}
 
 	byte[] getEndHash() {

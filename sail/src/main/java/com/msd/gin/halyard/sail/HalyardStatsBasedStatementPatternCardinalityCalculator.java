@@ -21,7 +21,6 @@ import java.util.Collection;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
-import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -35,9 +34,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.RDFPredicate;
-import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 
 /**
@@ -130,20 +126,6 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
         if (partitionVar == null || !partitionVar.hasValue()) {
             return defaultCardinality;
         }
-        return getTriplesCount(valueFactory.createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + HalyardTableUtils.encode(hash(partitionType, partitionVar.getValue()))), 100l);
-    }
-
-    public static byte[] hash(IRI partitionType, Value partition) {
-        byte[] hash;
-        if(VOID_EXT.SUBJECT.equals(partitionType)) {
-			hash = RDFSubject.create((Resource) partition).getHash();
-        } else if(VOID.PROPERTY.equals(partitionType)) {
-			hash = RDFPredicate.create((IRI) partition).getHash();
-        } else if(VOID_EXT.OBJECT.equals(partitionType)) {
-			hash = RDFObject.create(partition).getHash();
-        } else {
-        	throw new AssertionError(partitionType);
-        }
-        return hash;
+        return getTriplesCount(valueFactory.createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.id(partitionVar.getValue()))), 100l);
     }
 }

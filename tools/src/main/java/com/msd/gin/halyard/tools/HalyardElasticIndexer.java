@@ -16,11 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFContext;
-import com.msd.gin.halyard.common.RDFObject;
-import com.yammer.metrics.core.Gauge;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -52,6 +47,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
@@ -61,6 +57,11 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.elasticsearch.hadoop.mr.EsOutputFormat;
 import org.json.JSONObject;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFObject;
+import com.yammer.metrics.core.Gauge;
+
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
  * @author Adam Sotona (MSD)
@@ -69,7 +70,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.elastic.source";
 
-    static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
+    static final ValueFactory VF = SimpleValueFactory.getInstance();
 
     static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
 
@@ -90,7 +91,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             	lastHash = hash;
             }
 
-            for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, SVF)) {
+            for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, VF)) {
                 statements++;
             	Literal l = (Literal) st.getObject();
                 if (literals.add(l)) {
@@ -218,7 +219,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         Scan scan = HalyardTableUtils.scan(null, null);
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP literal region(s)
-            byte[] graphHash = RDFContext.create(NTriplesUtil.parseResource(cmd.getOptionValue('g'), SVF)).getHash();
+            byte[] graphHash = RDFContext.create(NTriplesUtil.parseResource(cmd.getOptionValue('g'), VF)).getHash();
             scan.setStartRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash));
             scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash, RDFObject.LITERAL_STOP_KEY));
         } else {
@@ -238,7 +239,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         job.getConfiguration().set("es.nodes", targetUrl.getHost()+":"+targetUrl.getPort());
         job.getConfiguration().set("es.resource", targetUrl.getPath());
         job.getConfiguration().set("es.mapping.id", "id");
-        job.getConfiguration().set("es.mapping.version", "version");
         job.getConfiguration().setInt("es.batch.size.bytes", 5*1024*1024);
         job.getConfiguration().setInt("es.batch.size.entries", 10000);
         job.getConfiguration().set("es.input.json", "yes");

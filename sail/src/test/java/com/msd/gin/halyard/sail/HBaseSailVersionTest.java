@@ -87,7 +87,7 @@ public class HBaseSailVersionTest {
         Value obj = vf.createLiteral("whatever");
         HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(subj, pred, obj);
 			conn.commit();
@@ -113,7 +113,7 @@ public class HBaseSailVersionTest {
         Value obj = vf.createLiteral("whatever");
         HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(subj, pred, obj);
 			conn.commit();
@@ -141,7 +141,7 @@ public class HBaseSailVersionTest {
 
 		HBaseSail sail = new HBaseSail(hconn, "timestamptable", true, 0, true, 0, null, null);
 		HBaseRepository rep = new HBaseRepository(sail);
-        rep.initialize();
+        rep.init();
         try(SailRepositoryConnection con = rep.getConnection()) {
             // insert a stmt in the past
             update(con,
@@ -253,7 +253,7 @@ public class HBaseSailVersionTest {
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(conf, "timebulkupdatetesttable", true, -1, true, 0, null, null);
 		HBaseRepository rep = new HBaseRepository(sail);
-        rep.initialize();
+        rep.init();
         int i=0;
         IRI timestamp = vf.createIRI("http://whatever/timestamp");
         IRI deleteGraph = vf.createIRI("http://whatever/deleteGraph");

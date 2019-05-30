@@ -79,7 +79,6 @@ import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.sail.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
-import com.msd.gin.halyard.sail.HalyardStatsBasedStatementPatternCardinalityCalculator;
 import com.msd.gin.halyard.sail.VOID_EXT;
 import com.yammer.metrics.core.Gauge;
 
@@ -438,7 +437,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                 if (partitionId.hasRemaining()) {
 					Value partition = HalyardTableUtils.readValue(partitionId, SVF);
                     IRI pred = SVF.createIRI(predicate);
-					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + HalyardTableUtils.encode(HalyardStatsBasedStatementPatternCardinalityCalculator.hash(pred, partition)));
+					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.id(partition)));
                     writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);
                     writeStatement(subset, RDF.TYPE, VOID.DATASET);
 					writeStatement(subset, pred, partition);

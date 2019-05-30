@@ -16,12 +16,16 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFPredicate;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.util.List;
 import java.util.Random;
+
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
@@ -53,7 +57,9 @@ import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import static org.junit.Assert.*;
+
+import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.HalyardTableUtils;
 
 /**
  *
@@ -323,7 +329,7 @@ public class HBaseSailTest {
         Value obj = vf.createLiteral("whatever");
         HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(subj, pred, obj);
 			conn.commit();
@@ -346,7 +352,7 @@ public class HBaseSailTest {
 		Value obj = vf.createLiteral("whatever");
 		HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
 		SailRepository rep = new SailRepository(sail);
-		rep.initialize();
+		rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(subj, pred, obj);
 			conn.commit();
@@ -369,7 +375,7 @@ public class HBaseSailTest {
         IRI context = vf.createIRI("http://whatever/context/");
         HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(subj, pred, obj, context);
 			conn.commit();
@@ -389,7 +395,7 @@ public class HBaseSailTest {
         ValueFactory vf = SimpleValueFactory.getInstance();
         HBaseSail sail = new HBaseSail(hconn, "whateverservice", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
         Random r = new Random(333);
         IRI pred = vf.createIRI("http://whatever/pred");
         IRI meta = vf.createIRI("http://whatever/meta");
@@ -411,7 +417,7 @@ public class HBaseSailTest {
 
         sail = new HBaseSail(hconn, "whateverparent", true, 0, true, 0, null, null);
         rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL,
 					"select * where {" + "  SERVICE <" + HALYARD.NAMESPACE + "whateverservice> {"
@@ -437,7 +443,7 @@ public class HBaseSailTest {
 		ValueFactory vf = SimpleValueFactory.getInstance();
 		HBaseSail sail = new HBaseSail(hconn, "whateverservice", true, 0, true, 0, null, null);
 		SailRepository rep = new SailRepository(sail);
-		rep.initialize();
+		rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj"));
 			conn.commit();
@@ -446,7 +452,7 @@ public class HBaseSailTest {
 
 		sail = new HBaseSail(hconn, "whateverparent", true, 0, true, 0, null, null);
 		rep = new SailRepository(sail);
-		rep.initialize();
+		rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj"));
 			conn.commit();
@@ -536,9 +542,9 @@ public class HBaseSailTest {
         assertEquals(1.0, sail.statistics.getCardinality(q4), 0.01);
 		try (SailConnection conn = sail.getConnection()) {
 	        conn.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
-			conn.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_" + HalyardTableUtils.encode(RDFPredicate.create(RDF.TYPE).getHash())), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
+			conn.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_" + HalyardTableUtils.encode(HalyardTableUtils.id(RDF.TYPE))), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
 	        conn.addStatement(f.createIRI("http://whatevercontext"), VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
-			conn.addStatement(f.createIRI("http://whatevercontext_property_" + HalyardTableUtils.encode(RDFPredicate.create(RDF.TYPE).getHash())), VOID.TRIPLES, f.createLiteral(20l), HALYARD.STATS_GRAPH_CONTEXT);
+			conn.addStatement(f.createIRI("http://whatevercontext_property_" + HalyardTableUtils.encode(HalyardTableUtils.id(RDF.TYPE))), VOID.TRIPLES, f.createLiteral(20l), HALYARD.STATS_GRAPH_CONTEXT);
 	        conn.commit();
 		}
         assertEquals(5000.0, sail.statistics.getCardinality(q1), 0.01);
@@ -553,7 +559,7 @@ public class HBaseSailTest {
         ValueFactory vf = SimpleValueFactory.getInstance();
         HBaseSail sail = new HBaseSail(hconn, "whateverservice2", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"),
 					vf.createIRI("http://whatever/obj"));
@@ -578,7 +584,7 @@ public class HBaseSailTest {
 		ValueFactory vf = SimpleValueFactory.getInstance();
 		HBaseSail sail = new HBaseSail(hconn, "whateverservice2", true, 0, true, 0, null, null);
 		SailRepository rep = new SailRepository(sail);
-		rep.initialize();
+		rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
 			conn.add(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj"));
 			conn.commit();

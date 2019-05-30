@@ -40,7 +40,7 @@ public class SES2154SubselectOptionalTest {
     public void testSES2154SubselectOptional() throws Exception {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "SES2154SubselectOptionaltable", true, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
         SimpleValueFactory vf = SimpleValueFactory.getInstance();
         IRI person = vf.createIRI("http://schema.org/Person");
 		try (RepositoryConnection conn = rep.getConnection()) {
