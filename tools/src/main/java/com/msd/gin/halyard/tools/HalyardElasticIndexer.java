@@ -27,9 +27,13 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.output.StringBuilderWriter;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
@@ -70,7 +74,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
     static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
 
         long counter = 0, exports = 0, statements = 0;
-        Literal lastLiteral;
+        byte[] lastHash = new byte[RDFObject.KEY_SIZE];
+        Set<Literal> literals;
 
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
@@ -78,21 +83,32 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 output.setStatus(MessageFormat.format("{0} st:{1} exp:{2} ", counter, statements, exports));
             }
 
+            byte[] hash = new byte[RDFObject.KEY_SIZE];
+            System.arraycopy(key.get(), key.getOffset() + 1 + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 0 : RDFContext.KEY_SIZE), hash, 0, RDFObject.KEY_SIZE);
+            if (!Arrays.equals(hash, lastHash)) {
+            	literals = new HashSet<>();
+            	lastHash = hash;
+            }
+
             for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, SVF)) {
                 statements++;
             	Literal l = (Literal) st.getObject();
-                if (!l.equals(lastLiteral)) {
-            		StringBuilder json = new StringBuilder(128);
-	                json.append("{\"id\":\"").append(HalyardTableUtils.encode(HalyardTableUtils.id(l)));
-	                json.append("\",\"label\":").append(JSONObject.quote(l.getLabel()));
-	                if(l.getLanguage().isPresent()) {
-		                json.append(",\"lang\":").append(l.getLanguage().get());
-	                } else {
-		                json.append(",\"datatype\":").append(JSONObject.quote(l.getDatatype().stringValue()));
-	                }
-	                json.append("}\n");
-	                output.write(NullWritable.get(), new Text(json.toString()));
-	                lastLiteral = l;
+                if (literals.add(l)) {
+            		try(StringBuilderWriter json = new StringBuilderWriter(128)) {
+		                json.append("{\"id\":");
+		                JSONObject.quote(HalyardTableUtils.encode(HalyardTableUtils.id(l)), json);
+		                json.append(",\"label\":");
+		                JSONObject.quote(l.getLabel(), json);
+		                if(l.getLanguage().isPresent()) {
+			                json.append(",\"lang\":");
+			                JSONObject.quote(l.getLanguage().get(), json);
+		                } else {
+			                json.append(",\"datatype\":");
+			                JSONObject.quote(l.getDatatype().stringValue(), json);
+		                }
+		                json.append("}\n");
+		                output.write(NullWritable.get(), new Text(json.toString()));
+            		}
 	                exports++;
                 }
             }
@@ -222,6 +238,9 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         job.getConfiguration().set("es.nodes", targetUrl.getHost()+":"+targetUrl.getPort());
         job.getConfiguration().set("es.resource", targetUrl.getPath());
         job.getConfiguration().set("es.mapping.id", "id");
+        job.getConfiguration().set("es.mapping.version", "version");
+        job.getConfiguration().setInt("es.batch.size.bytes", 5*1024*1024);
+        job.getConfiguration().setInt("es.batch.size.entries", 10000);
         job.getConfiguration().set("es.input.json", "yes");
         job.setOutputFormatClass(EsOutputFormat.class);
         job.setNumReduceTasks(0);

@@ -68,6 +68,10 @@ public class HalyardElasticIndexerTest {
 			for (int i = 0; i < 100; i++) {
 				conn.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i), vf.createLiteral("whatever NT value " + i), (i % 4 == 0) ? null : vf.createIRI("http://whatever/graph#" + (i % 4)));
 			}
+			// add some non-literal data
+			for (int i = 0; i < 100; i++) {
+				conn.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i), vf.createIRI("http://whatever/NTobj" + i), (i % 4 == 0) ? null : vf.createIRI("http://whatever/graph#" + (i % 4)));
+			}
 			conn.commit();
 		}
         testElasticIndexer(false, vf);
