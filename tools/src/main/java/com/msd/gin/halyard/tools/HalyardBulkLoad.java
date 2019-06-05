@@ -16,9 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HALYARD;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,6 +24,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -66,6 +65,7 @@ import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.ParseErrorListener;
 import org.eclipse.rdf4j.rio.RDFFormat;
@@ -80,6 +80,9 @@ import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 import org.eclipse.rdf4j.rio.helpers.NTriplesParserSettings;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.rio.turtle.TurtleParser;
+
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.sail.HALYARD;
 
 /**
  * Apache Hadoop MapReduce Tool for bulk loading RDF into HBase
@@ -318,15 +321,16 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         }
     }
 
-    private static final IRI NOP = SimpleValueFactory.getInstance().createIRI(":");
-    private static final Statement END_STATEMENT = SimpleValueFactory.getInstance().createStatement(NOP, NOP, NOP);
+    private static final ValueFactory VF = SimpleValueFactory.getInstance();
+    private static final IRI NOP = VF.createIRI(":");
+    private static final Statement END_STATEMENT = VF.createStatement(NOP, NOP, NOP);
 
     private static final class ParserPump extends AbstractRDFHandler implements Closeable, Runnable, ParseErrorListener {
         private final TaskAttemptContext context;
         private final Path paths[];
         private final long[] sizes, offsets;
         private final long size;
-        private final SynchronousQueue<Statement> queue = new SynchronousQueue<>();
+        private final BlockingQueue<Statement> queue = new ArrayBlockingQueue<>(8);
         private final boolean skipInvalid, verifyDataTypeValues;
         private final String defaultRdfContextPattern;
         private final boolean overrideRdfContext;
@@ -376,55 +380,55 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                 Configuration conf = context.getConfiguration();
                 for (int i=0; i<paths.length; i++) try {
                     Path file = paths[i];
-                    RDFParser parser;
-                    InputStream localIn;
-                    final String localBaseUri;
+                    final String localBaseUri = file.toString();
                     synchronized (this) {
+                        this.baseUri = localBaseUri; //synchronised parameters must be set inside a sync block
                         if (seek != null) try {
                             finishedSize += seek.getPos();
                         } catch (IOException e) {
                             //ignore
                         }
-                        close();
-                        this.baseUri = file.toString();
-                        this.offset = (int)offsets[i];
-                        this.count = maxSize > 0 && sizes[i] > maxSize ? (int)Math.ceil((double)sizes[i] / (double)maxSize) : 1;
-                        context.setStatus("Parsing " + baseUri);
-                        FileSystem fs = file.getFileSystem(conf);
-                        FSDataInputStream fileIn = fs.open(file);
-                        this.seek = fileIn;
-                        CompressionCodec codec = new CompressionCodecFactory(conf).getCodec(file);
-                        if (codec != null) {
-                            this.in = codec.createInputStream(fileIn, CodecPool.getDecompressor(codec));
-                        } else {
-                            this.in = fileIn;
-                        }
-                        parser = Rio.createParser(Rio.getParserFormatForFileName(baseUri).get());
-                        parser.setRDFHandler(this);
-                        parser.setParseErrorListener(this);
-                        parser.setStopAtFirstError(!skipInvalid);
-                        if (skipInvalid) {
-                            parser.set(BasicParserSettings.VERIFY_URI_SYNTAX, false);
-                            parser.set(BasicParserSettings.VERIFY_RELATIVE_URIS, false);
-                            parser.set(BasicParserSettings.VERIFY_LANGUAGE_TAGS, false);
-                        }
-                        parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
-                        localIn = this.in; //synchronised parameters must be copied to a local variable for use outide of sync block
-                        localBaseUri = this.baseUri;
-                        if (defaultRdfContextPattern != null || overrideRdfContext) {
-                            final IRI defaultRdfContext = defaultRdfContextPattern == null ? null : SimpleValueFactory.getInstance().createIRI(MessageFormat.format(defaultRdfContextPattern, localBaseUri, file.toUri().getPath(), file.getName()));
-                            parser.setValueFactory(new SimpleValueFactory(){
-                                @Override
-                                public Statement createStatement(Resource subject, IRI predicate, Value object) {
-                                    return super.createStatement(subject, predicate, object, defaultRdfContext);
-                                }
+                    }
+                    this.offset = (int)offsets[i];
+                    this.count = maxSize > 0 && sizes[i] > maxSize ? (int)Math.ceil((double)sizes[i] / (double)maxSize) : 1;
+                    close();
+                    context.setStatus("Parsing " + localBaseUri);
+                    FileSystem fs = file.getFileSystem(conf);
+                    FSDataInputStream fileIn = fs.open(file);
+                    CompressionCodec codec = new CompressionCodecFactory(conf).getCodec(file);
+                    final InputStream localIn;
+                    if (codec != null) {
+                    	localIn = codec.createInputStream(fileIn, CodecPool.getDecompressor(codec));
+                    } else {
+                    	localIn = fileIn;
+                    }
+                    synchronized (this) {
+                        this.seek = fileIn; //synchronised parameters must be set inside a sync block
+                        this.in = localIn; //synchronised parameters must be set inside a sync block
+                    }
+                    RDFParser parser = Rio.createParser(Rio.getParserFormatForFileName(localBaseUri).get());
+                    parser.setRDFHandler(this);
+                    parser.setParseErrorListener(this);
+                    parser.setStopAtFirstError(!skipInvalid);
+                    if (skipInvalid) {
+                        parser.set(BasicParserSettings.VERIFY_URI_SYNTAX, false);
+                        parser.set(BasicParserSettings.VERIFY_RELATIVE_URIS, false);
+                        parser.set(BasicParserSettings.VERIFY_LANGUAGE_TAGS, false);
+                    }
+                    parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
+                    if (defaultRdfContextPattern != null || overrideRdfContext) {
+                        final IRI defaultRdfContext = defaultRdfContextPattern == null ? null : VF.createIRI(MessageFormat.format(defaultRdfContextPattern, localBaseUri, file.toUri().getPath(), file.getName()));
+                        parser.setValueFactory(new SimpleValueFactory(){
+                            @Override
+                            public Statement createStatement(Resource subject, IRI predicate, Value object) {
+                                return super.createStatement(subject, predicate, object, defaultRdfContext);
+                            }
 
-                                @Override
-                                public Statement createStatement(Resource subject, IRI predicate, Value object, Resource context) {
-                                    return super.createStatement(subject, predicate, object, overrideRdfContext || context == null ? defaultRdfContext : context);
-                                }
-                            });
-                        }
+                            @Override
+                            public Statement createStatement(Resource subject, IRI predicate, Value object, Resource context) {
+                                return super.createStatement(subject, predicate, object, overrideRdfContext || context == null ? defaultRdfContext : context);
+                            }
+                        });
                     }
                     parser.parse(localIn, localBaseUri);
                 } catch (Exception e) {
@@ -455,8 +459,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         @Override
         public void handleNamespace(String prefix, String uri) throws RDFHandlerException {
             if (prefix.length() > 0) {
-                SimpleValueFactory svf = SimpleValueFactory.getInstance();
-                handleStatement(svf.createStatement(svf.createIRI(uri), HALYARD.NAMESPACE_PREFIX_PROPERTY, svf.createLiteral(prefix)));
+                handleStatement(VF.createStatement(VF.createIRI(uri), HALYARD.NAMESPACE_PREFIX_PROPERTY, VF.createLiteral(prefix)));
             }
         }
 
