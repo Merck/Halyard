@@ -105,14 +105,14 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
 
         @Override
         protected double getCardinality(StatementPattern sp) {
+            //always preffer HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
+            Var objectVar = sp.getObjectVar();
+            if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal) objectVar.getValue()).getDatatype())) {
+                return 0.0001;
+            }
             Double card = spcalc == null ? null : spcalc.getCardinality(sp, boundVars);
             if (card == null) { //fallback to default cardinality calculation
                 card = (hasValue(sp.getSubjectVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getPredicateVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getObjectVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getContextVar(), boundVars) ? 1.0 : 10.0);
-            }
-            Var objectVar = sp.getObjectVar();
-            //always preffer HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
-            if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal) objectVar.getValue()).getDatatype())) {
-                card /= 1000.0;
             }
             for (Var v : sp.getVarList()) {
                 //decrease cardinality for each priority variable present
