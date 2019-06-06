@@ -23,11 +23,11 @@ public final class RDFContext extends RDFValue<Resource> {
 		super(val, ser);
 	}
 
-	protected byte[] hash() {
-		return HalyardTableUtils.hash48(ser);
+	protected int keyHashSize() {
+		return KEY_SIZE;
 	}
 
-	byte[] getEndHash() {
+	protected int endKeyHashSize() {
 		throw new AssertionError("Context is never at end");
 	}
 }

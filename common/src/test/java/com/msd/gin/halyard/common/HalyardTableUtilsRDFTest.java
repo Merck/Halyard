@@ -66,29 +66,29 @@ public class HalyardTableUtilsRDFTest {
 	public void testRDFValue() {
 		if (expected instanceof Literal) {
 			RDFObject obj = RDFObject.create(expected);
-			assertTrue(RDFObject.isLiteral(obj.getHash()));
-			assertTrue(RDFObject.isLiteral(obj.getEndHash()));
+			assertTrue(RDFObject.isLiteral(obj.getKeyHash()));
+			assertTrue(RDFObject.isLiteral(obj.getEndKeyHash()));
 		} else if (expected instanceof IRI) {
 			RDFObject obj = RDFObject.create(expected);
-			assertFalse(RDFObject.isLiteral(obj.getHash()));
-			assertFalse(RDFObject.isLiteral(obj.getEndHash()));
+			assertFalse(RDFObject.isLiteral(obj.getKeyHash()));
+			assertFalse(RDFObject.isLiteral(obj.getEndKeyHash()));
 			RDFSubject subj = RDFSubject.create((IRI) expected);
-			subj.getHash();
-			subj.getEndHash();
+			subj.getKeyHash();
+			subj.getEndKeyHash();
 			RDFContext ctx = RDFContext.create((IRI) expected);
-			ctx.getHash();
+			ctx.getKeyHash();
 			RDFPredicate pred = RDFPredicate.create((IRI) expected);
-			pred.getHash();
-			pred.getEndHash();
+			pred.getKeyHash();
+			pred.getEndKeyHash();
 		} else if (expected instanceof Resource) {
 			RDFObject obj = RDFObject.create(expected);
-			assertFalse(RDFObject.isLiteral(obj.getHash()));
-			assertFalse(RDFObject.isLiteral(obj.getEndHash()));
+			assertFalse(RDFObject.isLiteral(obj.getKeyHash()));
+			assertFalse(RDFObject.isLiteral(obj.getEndKeyHash()));
 			RDFSubject subj = RDFSubject.create((Resource) expected);
-			subj.getHash();
-			subj.getEndHash();
+			subj.getKeyHash();
+			subj.getEndKeyHash();
 			RDFContext ctx = RDFContext.create((Resource) expected);
-			ctx.getHash();
+			ctx.getKeyHash();
 		} else {
 			throw new AssertionError();
 		}

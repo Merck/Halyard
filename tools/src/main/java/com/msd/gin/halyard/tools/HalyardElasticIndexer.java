@@ -219,7 +219,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         Scan scan = HalyardTableUtils.scan(null, null);
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP literal region(s)
-            byte[] graphHash = RDFContext.create(NTriplesUtil.parseResource(cmd.getOptionValue('g'), VF)).getHash();
+            byte[] graphHash = RDFContext.create(NTriplesUtil.parseResource(cmd.getOptionValue('g'), VF)).getKeyHash();
             scan.setStartRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash));
             scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash, RDFObject.LITERAL_STOP_KEY));
         } else {

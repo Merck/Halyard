@@ -57,7 +57,7 @@ public class HalyardTableUtilsScanTest {
     private static final String CTX1 = "http://whatever/ctx1";
     private static final String CTX2 = "http://whatever/ctx2";
 
-    @Parameters
+    @Parameters(name = "{0}, {1}, {2}, {3}")
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][] {
 

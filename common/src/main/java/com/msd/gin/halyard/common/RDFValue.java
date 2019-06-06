@@ -11,19 +11,49 @@ public abstract class RDFValue<V extends Value> {
 		return pattern == null || pattern.val.equals(value);
 	}
 
+	private static byte[] copy(byte[] src, int offset, int len) {
+		byte[] dest = new byte[len];
+		System.arraycopy(src, offset, dest, 0, len);
+		return dest;
+	}
+
 	protected RDFValue(V val, byte[] ser) {
 		this.val = val;
 		this.ser = ser;
 	}
 
-	public final byte[] getHash() {
+	private final byte[] getUniqueHash() {
 		if (hash == null) {
-			hash = hash();
+			hash = HalyardTableUtils.hashUnique(ser);
 		}
 		return hash;
 	}
 
-	protected abstract byte[] hash();
+	public byte[] getKeyHash() {
+		return copy(getUniqueHash(), 0, keyHashSize());
+	}
 
-	abstract byte[] getEndHash();
+	byte[] getEndKeyHash() {
+		return copy(getUniqueHash(), 0, endKeyHashSize());
+	}
+
+	byte[] getQualifierHash() {
+		return copy(getUniqueHash(), keyHashSize(), qualifierHashSize());
+	}
+
+	byte[] getEndQualifierHash() {
+		return copy(getUniqueHash(), endKeyHashSize(), endQualifierHashSize());
+	}
+
+	protected abstract int keyHashSize();
+
+	protected abstract int endKeyHashSize();
+
+	final int qualifierHashSize() {
+		return getUniqueHash().length - keyHashSize();
+	}
+
+	final int endQualifierHashSize() {
+		return getUniqueHash().length - endKeyHashSize();
+	}
 }

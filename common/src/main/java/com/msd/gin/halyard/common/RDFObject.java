@@ -16,6 +16,7 @@ public final class RDFObject extends RDFValue<Value> {
 	 * Key hash size in bytes
 	 */
 	public static final byte KEY_SIZE = 8;
+	public static final byte END_KEY_SIZE = 2;
 	public static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_64;
 	public static final byte[] LITERAL_STOP_KEY = new byte[] {(byte) 0x80};
 	public static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
@@ -24,12 +25,12 @@ public final class RDFObject extends RDFValue<Value> {
 		super(val, ser);
 	}
 
-	protected byte[] hash() {
-		return literalPrefix(HalyardTableUtils.hash64(ser));
+	public byte[] getKeyHash() {
+		return literalPrefix(super.getKeyHash());
 	}
 
-	byte[] getEndHash() {
-		return literalPrefix(HalyardTableUtils.hash16(ser));
+	byte[] getEndKeyHash() {
+		return literalPrefix(super.getEndKeyHash());
 	}
 
 	byte[] literalPrefix(byte[] hash) {
@@ -39,6 +40,14 @@ public final class RDFObject extends RDFValue<Value> {
 			hash[0] |= 0x80; // 1 msb
 		}
 		return hash;
+	}
+
+	protected int keyHashSize() {
+		return KEY_SIZE;
+	}
+
+	protected int endKeyHashSize() {
+		return END_KEY_SIZE;
 	}
 
 	static boolean isLiteral(byte[] hash) {
