@@ -74,7 +74,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.sail.SailException;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HALYARD;
+import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;

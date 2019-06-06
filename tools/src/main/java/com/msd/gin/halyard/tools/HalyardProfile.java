@@ -74,7 +74,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
                 if (expr instanceof QueryRoot) {
                     expr = ((QueryRoot)expr).getArg();
                 }
-                statistics.updateCardinalityMap(expr, Collections.emptySet(), cardMap);
+                statistics.updateCardinalityMap(expr, Collections.emptySet(), Collections.emptySet(), cardMap);
                 final StringBuilder buf = new StringBuilder(256);
                 buf.append(msg).append('\n');
                 expr.visit(new AbstractQueryModelVisitor<RuntimeException>() {

@@ -17,7 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HALYARD;
+import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.DEFAULT_TIMESTAMP_PROPERTY;
 import com.msd.gin.halyard.tools.TimeAwareHBaseSail.TimestampCallbackBinding;

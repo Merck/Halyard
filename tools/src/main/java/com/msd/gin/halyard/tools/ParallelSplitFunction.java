@@ -29,7 +29,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.parser.QueryParserUtil;
-import static com.msd.gin.halyard.sail.HALYARD.PARALLEL_SPLIT_FUNCTION;
+import static com.msd.gin.halyard.vocab.HALYARD.PARALLEL_SPLIT_FUNCTION;
 
 /**
  *

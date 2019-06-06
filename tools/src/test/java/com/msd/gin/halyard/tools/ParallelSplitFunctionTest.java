@@ -21,7 +21,7 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.junit.Test;
 import static org.junit.Assert.*;
-import static com.msd.gin.halyard.sail.HALYARD.PARALLEL_SPLIT_FUNCTION;
+import static com.msd.gin.halyard.vocab.HALYARD.PARALLEL_SPLIT_FUNCTION;
 
 /**
  *
