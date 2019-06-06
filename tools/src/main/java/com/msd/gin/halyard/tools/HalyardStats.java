@@ -71,9 +71,9 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HALYARD;
+import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
-import com.msd.gin.halyard.sail.VOID_EXT;
+import com.msd.gin.halyard.vocab.VOID_EXT;
 import com.yammer.metrics.core.Gauge;
 
 /**

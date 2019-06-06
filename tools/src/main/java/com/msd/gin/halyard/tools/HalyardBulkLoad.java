@@ -17,7 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HALYARD;
+import com.msd.gin.halyard.vocab.HALYARD;
 import static com.msd.gin.halyard.tools.AbstractHalyardTool.LOG;
 import java.io.Closeable;
 import java.io.IOException;

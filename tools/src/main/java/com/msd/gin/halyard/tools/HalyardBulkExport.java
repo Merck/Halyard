@@ -43,7 +43,7 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
-import static com.msd.gin.halyard.sail.HALYARD.PARALLEL_SPLIT_FUNCTION;
+import static com.msd.gin.halyard.vocab.HALYARD.PARALLEL_SPLIT_FUNCTION;
 
 /**
  * Apache Hadoop MapReduce tool for batch exporting of SPARQL queries.

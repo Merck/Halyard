@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
@@ -66,18 +67,12 @@ import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.SD;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
-import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
-import org.eclipse.rdf4j.query.IncompatibleOperationException;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
-import org.eclipse.rdf4j.query.algebra.FunctionCall;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
-import org.eclipse.rdf4j.query.algebra.ValueConstant;
-import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
@@ -92,7 +87,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.OrderLimitOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.repository.sparql.query.InsertBindingSetCursor;
 import org.eclipse.rdf4j.sail.Sail;
@@ -360,47 +354,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
         new DisjunctiveConstraintOptimizer().optimize(tupleExpr, dataset, bindings);
         new SameTermFilterOptimizer().optimize(tupleExpr, dataset, bindings);
         new QueryModelNormalizer().optimize(tupleExpr, dataset, bindings);
-        try {
-            //seach for presence of HALYARD.SEARCH_TYPE or HALYARD.PARALLEL_SPLIT_FUNCTION within the query
-            tupleExpr.visit(new AbstractQueryModelVisitor<IncompatibleOperationException>(){
-                private void checkForSearchType(Value val) {
-                    if (HALYARD.SEARCH_TYPE.equals(val) ||((val instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal)val).getDatatype()))) {
-                        throw new IncompatibleOperationException();
-                    }
-                }
-                @Override
-                public void meet(ValueConstant node) throws RuntimeException {
-                    checkForSearchType(node.getValue());
-                    super.meet(node);
-                }
-                @Override
-                public void meet(Var node) throws RuntimeException {
-                    if (node.hasValue()) {
-                        checkForSearchType(node.getValue());
-                    }
-                    super.meet(node);
-                }
-                @Override
-                public void meet(FunctionCall node) throws IncompatibleOperationException {
-                    if (HALYARD.PARALLEL_SPLIT_FUNCTION.toString().equals(node.getURI())) {
-                        throw new IncompatibleOperationException();
-                    }
-                    super.meet(node);
-                }
-                @Override
-                public void meet(BindingSetAssignment node) throws RuntimeException {
-                    for (BindingSet bs : node.getBindingSets()) {
-                        for (Binding b : bs) {
-                            checkForSearchType(b.getValue());
-                        }
-                    }
-                    super.meet(node);
-                }
-            });
-            new HalyardQueryJoinOptimizer(statistics).optimize(tupleExpr, dataset, bindings);
-        } catch (IncompatibleOperationException ioe) {
-            //skip HalyardQueryJoinOptimizer when  HALYARD.PARALLEL_SPLIT_FUNCTION or HALYARD.SEARCH_TYPE is present
-        }
+        new HalyardQueryJoinOptimizer(statistics).optimize(tupleExpr, dataset, bindings);
         // new SubSelectJoinOptimizer().optimize(tupleExpr, dataset, bindings);
         new IterativeEvaluationOptimizer().optimize(tupleExpr, dataset, bindings);
         new HalyardFilterOptimizer().optimize(tupleExpr, dataset, bindings); //apply filter optimizer twice (before and after Joins and Unions shaking)

@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import java.io.BufferedReader;
