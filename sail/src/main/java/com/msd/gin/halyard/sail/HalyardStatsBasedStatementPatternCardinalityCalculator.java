@@ -16,8 +16,11 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.msd.gin.halyard.vocab.VOID_EXT;
+import com.msd.gin.halyard.vocab.HALYARD;
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import java.util.Collection;
-
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -32,9 +35,6 @@ import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 
 /**
  *
@@ -53,11 +53,6 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
 
     @Override
     public Double getCardinality(StatementPattern sp, Collection<String> boundVars) { //get the cardinality of the Statement form VOID statistics
-        Var objectVar = sp.getObjectVar();
-        //always return 1.0 for HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
-        if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal) objectVar.getValue()).getDatatype())) {
-            return 1.0;
-        }
         final Var contextVar = sp.getContextVar();
         final IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI) contextVar.getValue();
         final long triples = getTriplesCount(graphNode, -1l);

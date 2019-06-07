@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.msd.gin.halyard.vocab.HALYARD;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -202,11 +203,5 @@ public class HBaseSailConfigTest {
         g.add(SimpleValueFactory.getInstance().createIRI("http://node"), HALYARD.EVALUATION_TIMEOUT_PROPERTY, SimpleValueFactory.getInstance().createLiteral("not a number"));
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.parse(g, null);
-    }
-
-    @Test
-    public void testInstantiateConstants() {
-        new HALYARD();
-        new VOID_EXT();
     }
 }

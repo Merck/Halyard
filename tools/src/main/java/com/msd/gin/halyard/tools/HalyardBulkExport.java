@@ -16,8 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import static com.msd.gin.halyard.sail.HALYARD.*;
-
 import com.yammer.metrics.core.Gauge;
 
 import java.io.File;
@@ -45,6 +43,7 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+import static com.msd.gin.halyard.vocab.HALYARD.PARALLEL_SPLIT_FUNCTION;
 
 /**
  * Apache Hadoop MapReduce tool for batch exporting of SPARQL queries.

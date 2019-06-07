@@ -16,17 +16,11 @@
  */
 package com.msd.gin.halyard.sail;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
+import com.msd.gin.halyard.vocab.HALYARD;
+import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.HalyardTableUtils;
 import java.util.List;
 import java.util.Random;
-
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
@@ -59,9 +53,7 @@ import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.HalyardTableUtils;
+import static org.junit.Assert.*;
 
 /**
  *

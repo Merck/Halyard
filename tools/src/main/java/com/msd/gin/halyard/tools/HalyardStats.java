@@ -77,9 +77,9 @@ import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
-import com.msd.gin.halyard.sail.HALYARD;
+import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
-import com.msd.gin.halyard.sail.VOID_EXT;
+import com.msd.gin.halyard.vocab.VOID_EXT;
 import com.yammer.metrics.core.Gauge;
 
 /**

@@ -17,9 +17,9 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.sail.HALYARD;
+import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
-import com.msd.gin.halyard.sail.VOID_EXT;
+import com.msd.gin.halyard.vocab.VOID_EXT;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;

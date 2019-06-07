@@ -1,6 +1,6 @@
 package com.msd.gin.halyard.function;
 
-import static com.msd.gin.halyard.sail.HALYARD.TIMESTAMP_PROPERTY;
+import static com.msd.gin.halyard.vocab.HALYARD.TIMESTAMP_PROPERTY;
 
 import java.util.Collections;
 import java.util.Date;

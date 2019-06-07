@@ -77,7 +77,7 @@ import org.eclipse.rdf4j.sail.SailException;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
-import com.msd.gin.halyard.sail.HALYARD;
+import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.yammer.metrics.core.Gauge;
 
@@ -506,7 +506,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         TableMapReduceUtil.initCredentials(job);
 
         Scan scan = HalyardTableUtils.scan(new byte[]{HalyardTableUtils.POS_PREFIX}, new byte[]{HalyardTableUtils.POS_PREFIX + 1});
-        scan.setBatch(100);
+
         TableMapReduceUtil.initTableMapperJob(source,
                 scan,
                 SummaryMapper.class,

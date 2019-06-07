@@ -1,6 +1,6 @@
 package com.msd.gin.halyard.repository;
 
-import com.msd.gin.halyard.sail.HALYARD;
+import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.sail.TimestampedUpdateContext;
 
 import java.io.IOException;

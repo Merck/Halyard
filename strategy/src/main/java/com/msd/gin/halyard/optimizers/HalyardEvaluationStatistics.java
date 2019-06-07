@@ -16,12 +16,13 @@
  */
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.vocab.HALYARD;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
@@ -69,9 +70,9 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
     Set<String> lastBoundVars = null;
     Map<TupleExpr, Double> lastMap = null;
 
-    public synchronized void updateCardinalityMap(TupleExpr expr, Set<String> boundVars, Map<TupleExpr, Double> mapToUpdate) {
+    public synchronized void updateCardinalityMap(TupleExpr expr, Set<String> boundVars, Set<String> priorityVars, Map<TupleExpr, Double> mapToUpdate) {
         if (this.lastBoundVars != boundVars || this.lastMap != mapToUpdate || lastBoundCC == null) {
-            lastBoundCC = new HalyardCardinalityCalcualtor(boundVars, mapToUpdate);
+            lastBoundCC = new HalyardCardinalityCalcualtor(boundVars, priorityVars, mapToUpdate);
             lastBoundVars = boundVars;
             lastMap = mapToUpdate;
         }
@@ -80,7 +81,7 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
 
     public synchronized double getCardinality(TupleExpr expr, final Set<String> boundVariables) {
         if (cc == null) {
-            cc = new HalyardCardinalityCalcualtor(boundVariables, null);
+            cc = new HalyardCardinalityCalcualtor(boundVariables, Collections.emptySet(), null);
         }
         expr.visit(cc);
         return cc.getCardinality();
@@ -88,24 +89,35 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
 
     @Override
     protected CardinalityCalculator createCardinalityCalculator() {
-        return new HalyardCardinalityCalcualtor(Collections.emptySet(), null);
+        return new HalyardCardinalityCalcualtor(Collections.emptySet(), Collections.emptySet(), null);
     }
 
     private class HalyardCardinalityCalcualtor extends CardinalityCalculator {
 
         private Set<String> boundVars;
+        private final Set<String> priorityVariables;
         private final Map<TupleExpr, Double> mapToUpdate;
 
-        public HalyardCardinalityCalcualtor(Set<String> boundVariables, Map<TupleExpr, Double> mapToUpdate) {
+        public HalyardCardinalityCalcualtor(Set<String> boundVariables, Set<String> priorityVariables, Map<TupleExpr, Double> mapToUpdate) {
             this.boundVars = boundVariables;
+            this.priorityVariables = priorityVariables;
             this.mapToUpdate = mapToUpdate;
         }
 
         @Override
         protected double getCardinality(StatementPattern sp) {
+            //always preffer HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
+            Var objectVar = sp.getObjectVar();
+            if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal) objectVar.getValue()).getDatatype())) {
+                return 0.0001;
+            }
             Double card = spcalc == null ? null : spcalc.getCardinality(sp, boundVars);
             if (card == null) { //fallback to default cardinality calculation
                 card = (hasValue(sp.getSubjectVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getPredicateVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getObjectVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getContextVar(), boundVars) ? 1.0 : 10.0);
+            }
+            for (Var v : sp.getVarList()) {
+                //decrease cardinality for each priority variable present
+                if (v != null && priorityVariables.contains(v.getName())) card /= 1000.0;
             }
             return card;
         }
@@ -223,7 +235,7 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
             if (srvStats != null) {
                 Double servCard = null;
                 if (mapToUpdate != null) {
-                    srvStats.updateCardinalityMap(node.getServiceExpr(), boundVars, mapToUpdate);
+                    srvStats.updateCardinalityMap(node.getServiceExpr(), boundVars, priorityVariables, mapToUpdate);
                     servCard = mapToUpdate.get(node.getServiceExpr());
                 }
                 cardinality = servCard != null ? servCard : srvStats.getCardinality(node.getServiceExpr());
