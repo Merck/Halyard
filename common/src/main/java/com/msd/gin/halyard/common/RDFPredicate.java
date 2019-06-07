@@ -7,20 +7,19 @@ public final class RDFPredicate extends RDFValue<IRI> {
 		if(pred == null) {
 			return null;
 		}
-		byte[] b = HalyardTableUtils.writeBytes(pred);
-		return new RDFPredicate(pred, b);
+		return new RDFPredicate(pred);
 	}
 
 	/**
 	 * Key hash size in bytes
 	 */
-	public static final byte KEY_SIZE = 4;
-	public static final byte END_KEY_SIZE = 2;
+	public static final int KEY_SIZE = 4;
+	public static final int END_KEY_SIZE = 2;
 	public static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_32;
 	public static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
 
-	private RDFPredicate(IRI val, byte[] ser) {
-		super(val, ser);
+	private RDFPredicate(IRI val) {
+		super(val);
 	}
 
 	protected int keyHashSize() {

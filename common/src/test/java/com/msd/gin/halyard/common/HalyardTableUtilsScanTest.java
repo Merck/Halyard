@@ -34,6 +34,7 @@ import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -50,8 +51,8 @@ public class HalyardTableUtilsScanTest {
 
     private static final String SUBJ1 = "http://whatever/subj1";
     private static final String SUBJ2 = "http://whatever/subj2";
-    private static final String PRED1 = "http://whatever/pred1";
-    private static final String PRED2 = "http://whatever/pred2";
+    private static final String PRED1 = RDF.TYPE.stringValue();
+    private static final String PRED2 = "http://whatever/pred";
     private static final String EXPL1 = "whatever explicit value1";
     private static final String EXPL2 = "whatever explicit value2";
     private static final String CTX1 = "http://whatever/ctx1";

@@ -7,22 +7,19 @@ public final class RDFSubject extends RDFValue<Resource> {
 		if(subj == null) {
 			return null;
 		}
-		byte[] b = HalyardTableUtils.writeBytes(subj);
-		return new RDFSubject(subj, b);
+		return new RDFSubject(subj);
 	}
-
 
 	/**
 	 * Key hash size in bytes
 	 */
-	public static final byte KEY_SIZE = 8;
-	public static final byte END_KEY_SIZE = 8;
+	public static final int KEY_SIZE = 8;
+	public static final int END_KEY_SIZE = 8;
 	public static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_64;
 	public static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_64;
 
-
-	private RDFSubject(Resource val, byte[] ser) {
-		super(val, ser);
+	private RDFSubject(Resource val) {
+		super(val);
 	}
 
 	protected int keyHashSize() {

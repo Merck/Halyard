@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.common;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -66,6 +67,14 @@ public class HalyardTableUtilsTest {
     public void testGetTheSameTableAgain() throws Exception {
         table.close();
         table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, 1);
+    }
+
+    @Test
+    public void testIdIsUnique() {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        assertNotEquals(
+        	HalyardTableUtils.id(vf.createLiteral("1", vf.createIRI("local:type1"))),
+        	HalyardTableUtils.id(vf.createLiteral("1", vf.createIRI("local:type2"))));
     }
 
     @Test

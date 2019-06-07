@@ -4,7 +4,7 @@ import org.eclipse.rdf4j.model.Value;
 
 public abstract class RDFValue<V extends Value> {
 	final V val;
-	final byte[] ser;
+	private byte[] ser;
 	private byte[] hash;
 
 	public static <V extends Value> boolean matches(V value, RDFValue<V> pattern) {
@@ -17,31 +17,37 @@ public abstract class RDFValue<V extends Value> {
 		return dest;
 	}
 
-	protected RDFValue(V val, byte[] ser) {
+	protected RDFValue(V val) {
 		this.val = val;
-		this.ser = ser;
+	}
+
+	public final byte[] getSerializedForm() {
+		if (ser == null) {
+			ser = HalyardTableUtils.writeBytes(val);
+		}
+		return ser;
 	}
 
 	private final byte[] getUniqueHash() {
 		if (hash == null) {
-			hash = HalyardTableUtils.hashUnique(ser);
+			hash = HalyardTableUtils.id(val);
 		}
 		return hash;
 	}
 
-	public byte[] getKeyHash() {
+	public final byte[] getKeyHash() {
 		return copy(getUniqueHash(), 0, keyHashSize());
 	}
 
-	byte[] getEndKeyHash() {
+	final byte[] getEndKeyHash() {
 		return copy(getUniqueHash(), 0, endKeyHashSize());
 	}
 
-	byte[] getQualifierHash() {
+	final byte[] getQualifierHash() {
 		return copy(getUniqueHash(), keyHashSize(), qualifierHashSize());
 	}
 
-	byte[] getEndQualifierHash() {
+	final byte[] getEndQualifierHash() {
 		return copy(getUniqueHash(), endKeyHashSize(), endQualifierHashSize());
 	}
 

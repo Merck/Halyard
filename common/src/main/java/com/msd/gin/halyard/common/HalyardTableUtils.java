@@ -131,6 +131,8 @@ public final class HalyardTableUtils {
     public static final byte COSP_PREFIX = 5;
 
 	private static final int PREFIXES = 3;
+	private static final int ID_SIZE = 20;
+
 	static final byte[] STOP_KEY_16 = new byte[2];
 	static final byte[] STOP_KEY_32 = new byte[4];
 	static final byte[] STOP_KEY_48 = new byte[6];
@@ -144,7 +146,10 @@ public final class HalyardTableUtils {
 		Arrays.fill(STOP_KEY_64, (byte) 0xff); /* 0xff is 255 in decimal */
 		Arrays.fill(STOP_KEY_128, (byte) 0xff); /* 0xff is 255 in decimal */
     }
-    private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
+
+	public static final byte[] LITERAL_STOP_KEY = new byte[] {(byte) 0x80};
+
+	private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
     private static final String REGION_MAX_FILESIZE = "10000000000";
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
@@ -167,6 +172,8 @@ public final class HalyardTableUtils {
 	}
 
 	private static final BiMap<ByteBuffer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(256);
+	private static final Map<ByteBuffer, IRI> WELL_KNOWN_IRI_IDS = new HashMap<>(256);
+	private static final byte WELL_KNOWN_IRI_MARKER = (byte) ('#' | 0x80);  // marker must be negative (msb set) so it is distinguishable from a length (>=0)
 
 	private static void loadIRIs(Class<?> vocab) {
 		Set<IRI> iris = Vocabularies.getIRIs(vocab);
@@ -175,6 +182,12 @@ public final class HalyardTableUtils {
 			if (WELL_KNOWN_IRIS.putIfAbsent(hash, iri) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
 						WELL_KNOWN_IRIS.get(hash), iri));
+			}
+
+			ByteBuffer id = ByteBuffer.wrap(id(iri)).asReadOnlyBuffer();
+			if (WELL_KNOWN_IRI_IDS.putIfAbsent(id, iri) != null) {
+				throw new AssertionError(String.format("Hash collision between %s and %s",
+						WELL_KNOWN_IRI_IDS.get(id), iri));
 			}
 		}
 	}
@@ -593,13 +606,13 @@ public final class HalyardTableUtils {
 		timestamp = toHalyardTimestamp(timestamp, !delete);
 
         //generate HBase key value pairs from: row, family, qualifier, value. Permutations of SPO (and if needed CSPO) are all stored. Values are actually empty.
-		kv[0] = new KeyValue(row(SPO_PREFIX, sb, pb, ob, cb), CF_NAME, qualifier(SPO_PREFIX, sb, pb, ob, cb), timestamp, type, value(SPO_PREFIX, sb.ser, pb.ser, ob.ser, cb != null ? cb.ser : null));
-		kv[1] = new KeyValue(row(POS_PREFIX, pb, ob, sb, cb), CF_NAME, qualifier(POS_PREFIX, pb, ob, sb, cb), timestamp, type, value(POS_PREFIX, pb.ser, ob.ser, sb.ser, cb != null ? cb.ser : null));
-		kv[2] = new KeyValue(row(OSP_PREFIX, ob, sb, pb, cb), CF_NAME, qualifier(OSP_PREFIX, ob, sb, pb, cb), timestamp, type, value(OSP_PREFIX, ob.ser, sb.ser, pb.ser, cb != null ? cb.ser : null));
+		kv[0] = new KeyValue(row(SPO_PREFIX, sb, pb, ob, cb), CF_NAME, qualifier(SPO_PREFIX, sb, pb, ob, cb), timestamp, type, value(SPO_PREFIX, sb, pb, ob, cb));
+		kv[1] = new KeyValue(row(POS_PREFIX, pb, ob, sb, cb), CF_NAME, qualifier(POS_PREFIX, pb, ob, sb, cb), timestamp, type, value(POS_PREFIX, pb, ob, sb, cb));
+		kv[2] = new KeyValue(row(OSP_PREFIX, ob, sb, pb, cb), CF_NAME, qualifier(OSP_PREFIX, ob, sb, pb, cb), timestamp, type, value(OSP_PREFIX, ob, sb, pb, cb));
         if (context != null) {
-			kv[3] = new KeyValue(row(CSPO_PREFIX, cb, sb, pb, ob), CF_NAME, qualifier(CSPO_PREFIX, cb, sb, pb, ob), timestamp, type, value(CSPO_PREFIX, cb.ser, sb.ser, pb.ser, ob.ser));
-			kv[4] = new KeyValue(row(CPOS_PREFIX, cb, pb, ob, sb), CF_NAME, qualifier(CPOS_PREFIX, cb, pb, ob, sb), timestamp, type, value(CPOS_PREFIX, cb.ser, pb.ser, ob.ser, sb.ser));
-			kv[5] = new KeyValue(row(COSP_PREFIX, cb, ob, sb, pb), CF_NAME, qualifier(COSP_PREFIX, cb, ob, sb, pb), timestamp, type, value(COSP_PREFIX, cb.ser, ob.ser, sb.ser, pb.ser));
+			kv[3] = new KeyValue(row(CSPO_PREFIX, cb, sb, pb, ob), CF_NAME, qualifier(CSPO_PREFIX, cb, sb, pb, ob), timestamp, type, value(CSPO_PREFIX, cb, sb, pb, ob));
+			kv[4] = new KeyValue(row(CPOS_PREFIX, cb, pb, ob, sb), CF_NAME, qualifier(CPOS_PREFIX, cb, pb, ob, sb), timestamp, type, value(CPOS_PREFIX, cb, pb, ob, sb));
+			kv[5] = new KeyValue(row(COSP_PREFIX, cb, ob, sb, pb), CF_NAME, qualifier(COSP_PREFIX, cb, ob, sb, pb), timestamp, type, value(COSP_PREFIX, cb, ob, sb, pb));
         }
         return kv;
     }
@@ -676,57 +689,57 @@ public final class HalyardTableUtils {
         return cq.array();
     }
 
-	private static byte[] value(byte prefix, byte[] v1, byte[] v2, byte[] v3, byte[] v4) {
+	private static byte[] value(byte prefix, RDFValue<?> v1, RDFValue<?> v2, RDFValue<?> v3, RDFValue<?> v4) {
 		ByteBuffer cv;
 		switch (prefix) {
 			case SPO_PREFIX:
-				cv = ByteBuffer.allocate(2 + v1.length + 2 + v2.length + 4 + v3.length + (v4 != null ? v4.length : 0));
-				cv.putShort((short) v1.length).put(v1);
-				cv.putShort((short) v2.length).put(v2);
-				cv.putInt(v3.length).put(v3);
+				cv = ByteBuffer.allocate(len(v1, 2) + len(v2, 2) + len(v3, 4) + (v4 != null ? len(v4, 0) : 0));
+				putShortRDFValue(cv, v1);
+				putShortRDFValue(cv, v2);
+				putIntRDFValue(cv, v3);
 				if (v4 != null) {
-					cv.put(v4);
+					putLastRDFValue(cv, v4);
 				}
 				break;
 			case POS_PREFIX:
-				cv = ByteBuffer.allocate(2 + v1.length + 4 + v2.length + 2 + v3.length + (v4 != null ? v4.length : 0));
-				cv.putShort((short) v1.length).put(v1);
-				cv.putInt(v2.length).put(v2);
-				cv.putShort((short) v3.length).put(v3);
+				cv = ByteBuffer.allocate(len(v1, 2) + len(v2, 4) + len(v3, 2) + (v4 != null ? len(v4, 0) : 0));
+				putShortRDFValue(cv, v1);
+				putIntRDFValue(cv, v2);
+				putShortRDFValue(cv, v3);
 				if (v4 != null) {
-					cv.put(v4);
+					putLastRDFValue(cv, v4);
 				}
 				break;
 			case OSP_PREFIX:
-				cv = ByteBuffer.allocate(4 + v1.length + 2 + v2.length + 2 + v3.length + (v4 != null ? v4.length : 0));
-				cv.putInt(v1.length).put(v1);
-				cv.putShort((short) v2.length).put(v2);
-				cv.putShort((short) v3.length).put(v3);
+				cv = ByteBuffer.allocate(len(v1, 4) + len(v2, 2) + len(v3, 2) + (v4 != null ? len(v4, 0) : 0));
+				putIntRDFValue(cv, v1);
+				putShortRDFValue(cv, v2);
+				putShortRDFValue(cv, v3);
 				if (v4 != null) {
-					cv.put(v4);
+					putLastRDFValue(cv, v4);
 				}
 				break;
 
 			case CSPO_PREFIX:
-				cv = ByteBuffer.allocate(2 + v1.length + 2 + v2.length + 2 + v3.length + v4.length);
-				cv.putShort((short) v1.length).put(v1);
-				cv.putShort((short) v2.length).put(v2);
-				cv.putShort((short) v3.length).put(v3);
-				cv.put(v4);
+				cv = ByteBuffer.allocate(len(v1, 2) + len(v2, 2) + len(v3, 2) + len(v4, 0));
+				putShortRDFValue(cv, v1);
+				putShortRDFValue(cv, v2);
+				putShortRDFValue(cv, v3);
+				putLastRDFValue(cv, v4);
 				break;
 			case CPOS_PREFIX:
-				cv = ByteBuffer.allocate(2 + v1.length + 2 + v2.length + 4 + v3.length + v4.length);
-				cv.putShort((short) v1.length).put(v1);
-				cv.putShort((short) v2.length).put(v2);
-				cv.putInt(v3.length).put(v3);
-				cv.put(v4);
+				cv = ByteBuffer.allocate(len(v1, 2) + len(v2, 2) + len(v3, 4) + len(v4, 0));
+				putShortRDFValue(cv, v1);
+				putShortRDFValue(cv, v2);
+				putIntRDFValue(cv, v3);
+				putLastRDFValue(cv, v4);
 				break;
 			case COSP_PREFIX:
-				cv = ByteBuffer.allocate(2 + v1.length + 4 + v2.length + 2 + v3.length + v4.length);
-				cv.putShort((short) v1.length).put(v1);
-				cv.putInt(v2.length).put(v2);
-				cv.putShort((short) v3.length).put(v3);
-				cv.put(v4);
+				cv = ByteBuffer.allocate(len(v1, 2) + len(v2, 4) + len(v3, 2) + len(v4, 0));
+				putShortRDFValue(cv, v1);
+				putIntRDFValue(cv, v2);
+				putShortRDFValue(cv, v3);
+				putLastRDFValue(cv, v4);
 				break;
 			default:
 				throw new AssertionError("Invalid prefix: " + prefix);
@@ -734,7 +747,42 @@ public final class HalyardTableUtils {
 		return cv.array();
 	}
 
-    /**
+	private static int len(RDFValue<?> v, int sizeLen) {
+		if (WELL_KNOWN_IRIS.containsValue(v.val)) {
+			return 1;
+		} else {
+			return sizeLen + v.getSerializedForm().length;
+		}
+	}
+
+	private static void putShortRDFValue(ByteBuffer cv, RDFValue<?> v) {
+		if (WELL_KNOWN_IRIS.containsValue(v.val)) {
+			cv.put(WELL_KNOWN_IRI_MARKER);
+		} else {
+			byte[] ser = v.getSerializedForm();
+			cv.putShort((short) ser.length).put(ser);
+		}
+	}
+
+	private static void putIntRDFValue(ByteBuffer cv, RDFValue<?> v) {
+		if (WELL_KNOWN_IRIS.containsValue(v.val)) {
+			cv.put(WELL_KNOWN_IRI_MARKER);
+		} else {
+			byte[] ser = v.getSerializedForm();
+			cv.putInt(ser.length).put(ser);
+		}
+	}
+
+	private static void putLastRDFValue(ByteBuffer cv, RDFValue<?> v) {
+		if (WELL_KNOWN_IRIS.containsValue(v.val)) {
+			cv.put(WELL_KNOWN_IRI_MARKER);
+		} else {
+			byte[] ser = v.getSerializedForm();
+			cv.put(ser);
+		}
+	}
+
+	/**
 	 * Timestamp is shifted one bit left and the last bit is used to prioritize
 	 * between inserts and deletes of the same time to avoid HBase ambiguity inserts
 	 * are considered always later after deletes on a timeline.
@@ -871,48 +919,49 @@ public final class HalyardTableUtils {
 	 */
     public static Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, Cell cell, ValueFactory vf) {
     	ByteBuffer key = ByteBuffer.wrap(cell.getRowArray(), cell.getRowOffset(), cell.getRowLength());
-    	byte prefix = key.get();
+        ByteBuffer cn = ByteBuffer.wrap(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
         ByteBuffer cv = ByteBuffer.wrap(cell.getValueArray(), cell.getValueOffset(), cell.getValueLength());
         Resource s;
         IRI p;
         Value o;
         Resource c;
+    	byte prefix = key.get();
         switch(prefix) {
         	case SPO_PREFIX:
-        		s = parseValue(subj, cv, cv.getShort(), vf);
-        		p = parseValue(pred, cv, cv.getShort(), vf);
-        		o = parseValue(obj, cv, cv.getInt(), vf);
-        		c = parseValue(ctx, cv, cv.remaining(), vf);
+        		s = parseShortRDFValue(subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
+        		p = parseShortRDFValue(pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
+        		o = parseIntRDFValue(obj, key, cn, cv, RDFObject.END_KEY_SIZE, vf);
+        		c = parseLastRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
                 break;
         	case POS_PREFIX:
-        		p = parseValue(pred, cv, cv.getShort(), vf);
-        		o = parseValue(obj, cv, cv.getInt(), vf);
-        		s = parseValue(subj, cv, cv.getShort(), vf);
-        		c = parseValue(ctx, cv, cv.remaining(), vf);
+        		p = parseShortRDFValue(pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
+        		o = parseIntRDFValue(obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
+        		s = parseShortRDFValue(subj, key, cn, cv, RDFSubject.END_KEY_SIZE, vf);
+        		c = parseLastRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
                 break;
         	case OSP_PREFIX:
-        		o = parseValue(obj, cv, cv.getInt(), vf);
-        		s = parseValue(subj, cv, cv.getShort(), vf);
-        		p = parseValue(pred, cv, cv.getShort(), vf);
-        		c = parseValue(ctx, cv, cv.remaining(), vf);
+        		o = parseIntRDFValue(obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
+        		s = parseShortRDFValue(subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
+        		p = parseShortRDFValue(pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, vf);
+        		c = parseLastRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
                 break;
         	case CSPO_PREFIX:
-        		c = parseValue(ctx, cv, cv.getShort(), vf);
-        		s = parseValue(subj, cv, cv.getShort(), vf);
-        		p = parseValue(pred, cv, cv.getShort(), vf);
-        		o = parseValue(obj, cv, cv.remaining(), vf);
+        		c = parseShortRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
+        		s = parseShortRDFValue(subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
+        		p = parseShortRDFValue(pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
+        		o = parseLastRDFValue(obj, key, cn, cv, RDFObject.END_KEY_SIZE, vf);
                 break;
         	case CPOS_PREFIX:
-        		c = parseValue(ctx, cv, cv.getShort(), vf);
-        		p = parseValue(pred, cv, cv.getShort(), vf);
-        		o = parseValue(obj, cv, cv.getInt(), vf);
-        		s = parseValue(subj, cv, cv.remaining(), vf);
+        		c = parseShortRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
+        		p = parseShortRDFValue(pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
+        		o = parseIntRDFValue(obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
+        		s = parseLastRDFValue(subj, key, cn, cv, RDFSubject.END_KEY_SIZE, vf);
                 break;
         	case COSP_PREFIX:
-        		c = parseValue(ctx, cv, cv.getShort(), vf);
-        		o = parseValue(obj, cv, cv.getInt(), vf);
-        		s = parseValue(subj, cv, cv.getShort(), vf);
-        		p = parseValue(pred, cv, cv.remaining(), vf);
+        		c = parseShortRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
+        		o = parseIntRDFValue(obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
+        		s = parseShortRDFValue(subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
+        		p = parseLastRDFValue(pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, vf);
                 break;
             default:
             	throw new AssertionError("Invalid prefix: "+prefix);
@@ -930,23 +979,86 @@ public final class HalyardTableUtils {
 		return stmt;
     }
 
-	@SuppressWarnings("unchecked")
-	private static <V extends Value> V parseValue(RDFValue<V> pattern, ByteBuffer cq, int len, ValueFactory vf) {
+    private static <V extends Value> V parseShortRDFValue(RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf) {
+    	byte marker = cv.get(cv.position()); // peek
+    	int len;
+    	if (marker == WELL_KNOWN_IRI_MARKER) {
+    		len = cv.get();
+    	} else {
+    		len = cv.getShort();
+    	}
+   		return parseRDFValue(pattern, key, cn, cv, keySize, ID_SIZE, len, vf);
+    }
+
+    private static <V extends Value> V parseIntRDFValue(RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf) {
+    	byte marker = cv.get(cv.position()); // peek
+    	int len;
+    	if (marker == WELL_KNOWN_IRI_MARKER) {
+    		len = cv.get();
+    	} else {
+    		len = cv.getInt();
+    	}
+   		return parseRDFValue(pattern, key, cn, cv, keySize, ID_SIZE, len, vf);
+    }
+
+    private static <V extends Value> V parseLastRDFValue(RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf) {
+    	byte marker = cv.hasRemaining() ? cv.get(cv.position()) : 0; // peek
+    	int len;
+    	if (marker == WELL_KNOWN_IRI_MARKER) {
+    		len = cv.get();
+    	} else {
+    		len = cv.remaining();
+    	}
+   		return parseRDFValue(pattern, key, cn, cv, keySize, ID_SIZE, len, vf);
+    }
+
+    @SuppressWarnings("unchecked")
+	private static <V extends Value> V parseRDFValue(RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, int idSize, int len, ValueFactory vf) {
     	if(pattern != null) {
-			cq.position(cq.position()+len);
+    		skipId(key, cn, keySize, idSize);
+    		if (len > 0) {
+    			cv.position(cv.position() + len);
+    		}
 			return pattern.val;
+    	} else if(len == WELL_KNOWN_IRI_MARKER) {
+			ByteBuffer id = parseId(key, cn, keySize, idSize);
+			IRI iri = WELL_KNOWN_IRI_IDS.get(id);
+			if (iri == null) {
+				throw new IllegalStateException(String.format("Unknown IRI hash: %s", encode(id)));
+			}
+			return (V) iri;
 		} else if(len > 0) {
-			int limit = cq.limit();
-			cq.limit(cq.position() + len);
-			V value = (V) readValue(cq, vf);
-			cq.limit(limit);
+			skipId(key, cn, keySize, idSize);
+			int limit = cv.limit();
+			cv.limit(cv.position() + len);
+			V value = (V) readValue(cv, vf);
+			cv.limit(limit);
 			return value;
-		} else {
+		} else if(len == 0) {
 			return null;
+		} else {
+			throw new AssertionError(String.format("Invalid RDF value length: %d", len));
 		}
     }
 
-    /**
+	private static ByteBuffer parseId(ByteBuffer key, ByteBuffer cn, int keySize, int idSize) {
+		ByteBuffer id = ByteBuffer.allocate(idSize);
+		int keyLimit = key.limit();
+		int cnLimit = cn.limit();
+		key.limit(key.position() + keySize);
+		cn.limit(cn.position() + idSize - keySize);
+		id.put(key).put(cn).flip();
+		key.limit(keyLimit);
+		cn.limit(cnLimit);
+		return id;
+	}
+
+	private static void skipId(ByteBuffer key, ByteBuffer cn, int keySize, int idSize) {
+		key.position(key.position() + keySize);
+		cn.position(cn.position() + idSize - keySize);
+	}
+
+	/**
      * Helper method constructing a custom HBase Scan from given arguments
      * @param startRow start row key byte array
      * @param stopRow stop row key byte array
@@ -1024,13 +1136,27 @@ public final class HalyardTableUtils {
     }
 
 	public static byte[] id(Value v) {
-		return hashUnique(writeBytes(v));
+		byte[] hash = hashUnique(v.toString().getBytes(StandardCharsets.UTF_8));
+		// literal prefix
+		if (v instanceof Literal) {
+			hash[0] &= 0x7F; // 0 msb
+		} else {
+			hash[0] |= 0x80; // 1 msb
+		}
+		return hash;
+	}
+
+	static boolean isLiteral(byte[] hash) {
+		return (hash[0] & 0x80) == 0;
 	}
 
     public static String encode(byte b[]) {
         return ENC.encodeToString(b);
     }
 
+	/**
+	 * NB: this alters the buffer.
+	 */
 	private static CharSequence encode(ByteBuffer b) {
 		return StandardCharsets.ISO_8859_1.decode(ENC.encode(b));
 	}

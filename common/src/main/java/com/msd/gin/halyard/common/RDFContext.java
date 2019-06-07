@@ -7,20 +7,17 @@ public final class RDFContext extends RDFValue<Resource> {
 		if(ctx == null) {
 			return null;
 		}
-		byte[] b = HalyardTableUtils.writeBytes(ctx);
-		return new RDFContext(ctx, b);
+		return new RDFContext(ctx);
 	}
-
 
 	/**
 	 * Key hash size in bytes
 	 */
-	public static final byte KEY_SIZE = 6;
+	public static final int KEY_SIZE = 6;
 	public static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_48;
 
-
-	private RDFContext(Resource val, byte[] ser) {
-		super(val, ser);
+	private RDFContext(Resource val) {
+		super(val);
 	}
 
 	protected int keyHashSize() {

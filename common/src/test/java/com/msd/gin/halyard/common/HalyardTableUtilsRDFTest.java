@@ -64,33 +64,46 @@ public class HalyardTableUtilsRDFTest {
 
 	@Test
 	public void testRDFValue() {
+		byte[] id = HalyardTableUtils.id(expected);
 		if (expected instanceof Literal) {
+			assertTrue(HalyardTableUtils.isLiteral(id));
 			RDFObject obj = RDFObject.create(expected);
-			assertTrue(RDFObject.isLiteral(obj.getKeyHash()));
-			assertTrue(RDFObject.isLiteral(obj.getEndKeyHash()));
-		} else if (expected instanceof IRI) {
-			RDFObject obj = RDFObject.create(expected);
-			assertFalse(RDFObject.isLiteral(obj.getKeyHash()));
-			assertFalse(RDFObject.isLiteral(obj.getEndKeyHash()));
-			RDFSubject subj = RDFSubject.create((IRI) expected);
-			subj.getKeyHash();
-			subj.getEndKeyHash();
-			RDFContext ctx = RDFContext.create((IRI) expected);
-			ctx.getKeyHash();
-			RDFPredicate pred = RDFPredicate.create((IRI) expected);
-			pred.getKeyHash();
-			pred.getEndKeyHash();
-		} else if (expected instanceof Resource) {
-			RDFObject obj = RDFObject.create(expected);
-			assertFalse(RDFObject.isLiteral(obj.getKeyHash()));
-			assertFalse(RDFObject.isLiteral(obj.getEndKeyHash()));
-			RDFSubject subj = RDFSubject.create((Resource) expected);
-			subj.getKeyHash();
-			subj.getEndKeyHash();
-			RDFContext ctx = RDFContext.create((Resource) expected);
-			ctx.getKeyHash();
+			assertRDFValueHashes(id, obj);
 		} else {
-			throw new AssertionError();
+			assertFalse(HalyardTableUtils.isLiteral(id));
+			if (expected instanceof IRI) {
+				RDFObject obj = RDFObject.create(expected);
+				assertRDFValueHashes(id, obj);
+				RDFSubject subj = RDFSubject.create((IRI) expected);
+				assertRDFValueHashes(id, subj);
+				RDFContext ctx = RDFContext.create((IRI) expected);
+				assertRDFValueHashes(id, ctx);
+				RDFPredicate pred = RDFPredicate.create((IRI) expected);
+				assertRDFValueHashes(id, pred);
+			} else if (expected instanceof Resource) {
+				RDFObject obj = RDFObject.create(expected);
+				assertRDFValueHashes(id, obj);
+				RDFSubject subj = RDFSubject.create((Resource) expected);
+				assertRDFValueHashes(id, subj);
+				RDFContext ctx = RDFContext.create((Resource) expected);
+				assertRDFValueHashes(id, ctx);
+			} else {
+				throw new AssertionError();
+			}
 		}
+	}
+
+	private static void assertRDFValueHashes(byte[] id, RDFValue<?> v) {
+		assertArrayEquals(id, concat(v.getKeyHash(), v.getQualifierHash()));
+		if(!(v instanceof RDFContext)) {
+			assertArrayEquals(id, concat(v.getEndKeyHash(), v.getEndQualifierHash()));
+		}
+	}
+
+	private static byte[] concat(byte[] b1, byte[] b2) {
+		byte[] arr = new byte[b1.length+b2.length];
+		System.arraycopy(b1, 0, arr, 0, b1.length);
+		System.arraycopy(b2, 0, arr, b1.length, b2.length);
+		return arr;
 	}
 }
