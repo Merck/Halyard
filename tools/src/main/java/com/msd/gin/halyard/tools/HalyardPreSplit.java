@@ -143,7 +143,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
                 + "Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.",
             "Example: halyard presplit -s hdfs://my_RDF_files -t mydataset"
         );
-        addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are searched for the supported files recurrently", true, true);
+        addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, optional HBase namespace of the target table must already exist", true, true);
         addOption("i", "skip-invalid", null, "Optionally skip invalid source files and parsing errors", false, false);
         addOption("g", "default-named-graph", "named_graph", "Optionally specify default target named graph", false, true);
