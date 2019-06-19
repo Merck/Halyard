@@ -16,11 +16,8 @@
  */
 package com.msd.gin.halyard.common;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
-import com.google.common.hash.Hashing;
-
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -31,6 +28,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -65,6 +63,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
@@ -83,6 +82,10 @@ import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+import com.google.common.hash.Hashing;
 
 /**
  * Core Halyard utility class performing RDF to HBase mappings and base HBase table and key management. The methods of this class define how
@@ -161,21 +164,66 @@ public final class HalyardTableUtils {
         }
     };
 
-	private static final DatatypeFactory DATATYPE_FACTORY;
-	static {
-		try {
-			DATATYPE_FACTORY = DatatypeFactory.newInstance();
+    private static final byte[] PEARSON_HASH_TABLE = {
+		// 0-255 shuffled in any (random) order suffices
+		39,(byte)158,(byte)178,(byte)187,(byte)131,(byte)136,1,49,50,17,(byte)141,91,47,(byte)129,60,99,
+		(byte)237,18,(byte)253,(byte)225,8,(byte)208,(byte)172,(byte)244,(byte)255,126,101,79,(byte)145,(byte)235,(byte)228,121,
+		123,(byte)251,67,(byte)250,(byte)161,0,107,97,(byte)241,111,(byte)181,82,(byte)249,33,69,55,
+		(byte)197,96,(byte)210,45,16,(byte)227,(byte)248,(byte)202,51,(byte)152,(byte)252,125,81,(byte)206,(byte)215,(byte)186,
+		90,(byte)168,(byte)156,(byte)203,(byte)177,120,2,(byte)190,(byte)188,7,100,(byte)185,(byte)174,(byte)243,(byte)162,10,
+		(byte)154,35,86,(byte)171,105,34,38,(byte)200,(byte)147,58,77,118,(byte)173,(byte)246, 76,(byte)254,
+		3,14,(byte)204,72,21,41,56,66,28,(byte)193,40,(byte)217,25,54,(byte)179,117,
+		(byte)189,(byte)205,(byte)199,(byte)128,(byte)176,19,(byte)211,(byte)236,127,(byte)192,(byte)231,70,(byte)233,88,(byte)146,44,
+		98,6,85,(byte)150,36,23,112,(byte)164,(byte)135,(byte)207,(byte)169,5,26,64,(byte)165,(byte)219,
+		(byte)183,(byte)201,22,83,13,(byte)214,116,109,(byte)159,32,95,(byte)226,(byte)140,(byte)220, 57, 12,
+		59,(byte)153,29,9,(byte)213,(byte)167,84,93,30,46,94,75,(byte)151,114,73,(byte)222,
+		(byte)238,87,(byte)240,(byte)155,(byte)180,(byte)170,(byte)242,(byte)212,(byte)191,(byte)163,78,(byte)218,(byte)137,(byte)194,(byte)175,110,
+		61,20,68,89,(byte)130,63,52,102,24,(byte)229,(byte)132,(byte)245,80,(byte)216,(byte)195,115,
+		(byte)133,(byte)232,(byte)196,(byte)144,(byte)198,124,53,4,108,74,(byte)223,(byte)234,(byte)134,(byte)230,(byte)157,(byte)139,
+		43,119,(byte)224,71,122,(byte)142,42,(byte)160,104,48,(byte)247,103,15,11,(byte)138,(byte)239,
+		(byte)221, 31,(byte)209,(byte)182,(byte)143,92,(byte)149,(byte)184,(byte)148,62,113,65,37,27,106,(byte)166
+	};
+
+	private static byte[] hash16(byte[] key) {
+		byte h1 = PEARSON_HASH_TABLE[(key[0] & 0xFF) % 256];
+		byte h2 = PEARSON_HASH_TABLE[(key[key.length-1] & 0xFF) % 256];
+		for(int j = 1; j < key.length; j++) {
+			h1 = PEARSON_HASH_TABLE[(h1 & 0xFF) ^ (key[j] & 0xFF)];
+			h2 = PEARSON_HASH_TABLE[(h2 & 0xFF) ^ (key[key.length - 1 - j] & 0xFF)];
 		}
-		catch (DatatypeConfigurationException e) {
-			throw new AssertionError(e);
-		}
-	}
+		return new byte[] {h1, h2};
+    }
+
+    private static byte[] hash32(byte[] key) {
+    	return Hashing.murmur3_32().hashBytes(key).asBytes();
+    }
+
+    public static byte[] hashUnique(byte[] key) {
+		MessageDigest md = MD.get();
+        try {
+            md.update(key);
+            return md.digest();
+        } finally {
+            md.reset();
+        }
+    }
 
 	private static final BiMap<ByteBuffer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(256);
 	private static final Map<ByteBuffer, IRI> WELL_KNOWN_IRI_IDS = new HashMap<>(256);
+	private static final BiMap<ByteBuffer, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);
 	private static final byte WELL_KNOWN_IRI_MARKER = (byte) ('#' | 0x80);  // marker must be negative (msb set) so it is distinguishable from a length (>=0)
 
-	private static void loadIRIs(Class<?> vocab) {
+	private static void loadNamespacesAndIRIs(Class<?> vocab) {
+		Set<Namespace> namespaces = getNamespace(vocab);
+		for (Namespace namespace : namespaces) {
+			String name = namespace.getName();
+			ByteBuffer hash = ByteBuffer.wrap(hash16(name.getBytes(StandardCharsets.UTF_8)));
+			if (WELL_KNOWN_NAMESPACES.putIfAbsent(hash, name) != null) {
+				throw new AssertionError(String.format("Hash collision between %s and %s",
+						WELL_KNOWN_NAMESPACES.get(hash), name));
+			}
+		}
+
 		Set<IRI> iris = Vocabularies.getIRIs(vocab);
 		for (IRI iri : iris) {
 			ByteBuffer hash = ByteBuffer.wrap(hash32(iri.toString().getBytes(StandardCharsets.UTF_8))).asReadOnlyBuffer();
@@ -192,18 +240,42 @@ public final class HalyardTableUtils {
 		}
 	}
 
+	private static Set<Namespace> getNamespace(Class<?> vocabulary) {
+		Set<Namespace> namespaces = new HashSet<>();
+		for (Field f : vocabulary.getFields()) {
+			if (f.getType() == Namespace.class) {
+				try {
+					namespaces.add((Namespace) f.get(null));
+				} catch (IllegalAccessException ex) {
+					throw new AssertionError(ex);
+				}
+			}
+		}
+		return namespaces;
+	}
+
 	static {
 		Class<?>[] defaultVocabs = { RDF.class, RDFS.class, XMLSchema.class, SD.class, VOID.class, FOAF.class,
 				OWL.class, DC.class, DCTERMS.class, ORG.class, GEO.class };
 		for(Class<?> vocab : defaultVocabs) {
-			loadIRIs(vocab);
+			loadNamespacesAndIRIs(vocab);
 		}
 
 		Logger logger = LoggerFactory.getLogger(HalyardTableUtils.class);
 		logger.info("Searching for vocabularies...");
 		for(Vocabulary vocab : ServiceLoader.load(Vocabulary.class)) {
 			logger.info("Loading vocabulary {}", vocab.getClass());
-			loadIRIs(vocab.getClass());
+			loadNamespacesAndIRIs(vocab.getClass());
+		}
+	}
+
+	private static final DatatypeFactory DATATYPE_FACTORY;
+	static {
+		try {
+			DATATYPE_FACTORY = DatatypeFactory.newInstance();
+		}
+		catch (DatatypeConfigurationException e) {
+			throw new AssertionError(e);
 		}
 	}
 
@@ -215,13 +287,15 @@ public final class HalyardTableUtils {
 		Literal readBytes(ByteBuffer b, ValueFactory vf);
 	}
 
-	private static final Map<IRI, ByteWriter> BYTE_WRITERS = new HashMap<>();
-	private static final Map<Byte, ByteReader> BYTE_READERS = new HashMap<>();
+	private static final Map<IRI, ByteWriter> BYTE_WRITERS = new HashMap<>(32);
+	private static final Map<Byte, ByteReader> BYTE_READERS = new HashMap<>(32);
 
 	private static final byte IRI_TYPE = '<';
 	private static final byte IRI_HASH_TYPE = '#';
+	private static final byte NAMESPACE_HASH_TYPE = ':';
 	private static final byte BNODE_TYPE = '_';
 	private static final byte FULL_LITERAL_TYPE = '\"';
+	private static final byte LANGUAGE_TYPE = '@';
 	private static final byte FALSE_TYPE = '0';
 	private static final byte TRUE_TYPE = '1';
 	private static final byte BYTE_TYPE = 'b';
@@ -1121,20 +1195,6 @@ public final class HalyardTableUtils {
                 .setValue(HTableDescriptor.SPLIT_POLICY, REGION_SPLIT_POLICY);
     }
 
-    public static byte[] hashUnique(byte[] key) {
-		MessageDigest md = MD.get();
-        try {
-            md.update(key);
-            return md.digest();
-        } finally {
-            md.reset();
-        }
-    }
-
-    static byte[] hash32(byte[] key) {
-    	return Hashing.murmur3_32().hashBytes(key).asBytes();
-    }
-
 	public static byte[] id(Value v) {
 		byte[] hash = hashUnique(v.toString().getBytes(StandardCharsets.UTF_8));
 		// literal prefix
@@ -1158,7 +1218,7 @@ public final class HalyardTableUtils {
 	 * NB: this alters the buffer.
 	 */
 	private static CharSequence encode(ByteBuffer b) {
-		return StandardCharsets.ISO_8859_1.decode(ENC.encode(b));
+		return StandardCharsets.UTF_8.decode(ENC.encode(b));
 	}
 
 	private static Scan scan3_0(byte prefix, byte[] stopKey1, byte[] stopKey2, byte[] stopKey3) {
@@ -1207,7 +1267,19 @@ public final class HalyardTableUtils {
     			hash.duplicate().get(b, 1, hash.remaining());
     			return b;
     		} else {
-    			return ("<"+v.stringValue()+">").getBytes(StandardCharsets.UTF_8);
+    			IRI iri = (IRI) v;
+    			hash = WELL_KNOWN_NAMESPACES.inverse().get(iri.getNamespace());
+    			if (hash != null) {
+    				byte[] localBytes = iri.getLocalName().getBytes(StandardCharsets.UTF_8);
+    				byte[] b = new byte[1 + hash.remaining() + localBytes.length];
+    				b[0] = NAMESPACE_HASH_TYPE;
+        			// NB: do not alter original hash buffer which is shared across threads
+        			hash.duplicate().get(b, 1, hash.remaining());
+        			System.arraycopy(localBytes, 0, b, b.length-localBytes.length, localBytes.length);
+        			return b;
+    			} else {
+    				return ("<"+v.stringValue()+">").getBytes(StandardCharsets.UTF_8);
+    			}
     		}
     	} else if (v instanceof BNode) {
     		return v.toString().getBytes(StandardCharsets.UTF_8);
@@ -1220,23 +1292,15 @@ public final class HalyardTableUtils {
 				if (writer != null) {
 					return writer.writeBytes(l);
 				} else {
-					ByteBuffer hash = WELL_KNOWN_IRIS.inverse().get(l.getDatatype());
-					if (hash != null) {
-						byte[] labelBytes = l.getLabel().getBytes(StandardCharsets.UTF_8);
-						byte[] lBytes = new byte[1+labelBytes.length+4+hash.capacity()];
-						lBytes[0] = '\"';
-						System.arraycopy(labelBytes, 0, lBytes, 1, labelBytes.length);
-						int pos = 1+labelBytes.length;
-						lBytes[pos++] = '\"';
-						lBytes[pos++] = '^';
-						lBytes[pos++] = '^';
-						lBytes[pos++] = IRI_HASH_TYPE;
-		    			// NB: do not alter original hash buffer which is shared across threads
-						hash.duplicate().get(lBytes, pos, hash.capacity());
-						return lBytes;
-					} else {
-						return l.toString().getBytes(StandardCharsets.UTF_8);
-					}
+					byte[] labelBytes = l.getLabel().getBytes(StandardCharsets.UTF_8);
+					byte[] datatypeBytes = writeBytes(l.getDatatype());
+					byte[] lBytes = new byte[1+labelBytes.length+1+datatypeBytes.length];
+					lBytes[0] = '\"';
+					System.arraycopy(labelBytes, 0, lBytes, 1, labelBytes.length);
+					int pos = 1+labelBytes.length;
+					lBytes[pos++] = '\"';
+					System.arraycopy(datatypeBytes, 0, lBytes, lBytes.length-datatypeBytes.length, datatypeBytes.length);
+					return lBytes;
 				}
 			}
 		} else {
@@ -1262,6 +1326,15 @@ public final class HalyardTableUtils {
 				}
 				b.position(originalLimit);
 				return iri;
+			case NAMESPACE_HASH_TYPE:
+				b.limit(b.position()+2); // 16-byte hash
+				String namespace = WELL_KNOWN_NAMESPACES.get(b);
+				if (namespace == null) {
+					throw new IllegalStateException(String.format("Unknown namespace hash: %s", encode(b)));
+				}
+				b.limit(originalLimit);
+				b.position(b.position()+2);
+				return vf.createIRI(namespace, StandardCharsets.UTF_8.decode(b).toString());
 			case BNODE_TYPE:
 				b.get(); // skip ':'
 				return vf.createBNode(StandardCharsets.UTF_8.decode(b).toString());
@@ -1271,16 +1344,11 @@ public final class HalyardTableUtils {
 				String label = StandardCharsets.UTF_8.decode(b).toString();
 				b.limit(originalLimit);
 				b.position(endOfLabel+1);
-				byte sep = b.get();
-				if(sep == '@') { // lang tag
+				byte sep = b.get(endOfLabel+1); // peak
+				if(sep == LANGUAGE_TYPE) { // lang tag
+					b.position(b.position()+1);
 					return vf.createLiteral(label, StandardCharsets.UTF_8.decode(b).toString());
 				} else {
-					if (sep != '^') { // not a datatype
-						throw new IllegalStateException(String.format("Literal missing datatype: %s", StandardCharsets.UTF_8.decode((ByteBuffer) b.reset())));
-					}
-					if (b.get() != '^') { // not a datatype
-						throw new IllegalStateException(String.format("Literal missing datatype: %s", StandardCharsets.UTF_8.decode((ByteBuffer) b.reset())));
-					}
 					IRI datatype = (IRI) readValue(b, vf);
 					return vf.createLiteral(label, datatype);
 				}

@@ -32,7 +32,8 @@ public class HalyardTableUtilsRDFTest {
 				{ vf.createLiteral(true) }, { vf.createLiteral((byte) 6) }, { vf.createLiteral((short) 7843) }, { vf.createLiteral(34) }, { vf.createLiteral(87.232) },
 				{ vf.createLiteral(74234l) }, { vf.createLiteral(4.809f) },
 				{ vf.createLiteral(BigInteger.valueOf(96)) }, { vf.createLiteral(BigDecimal.valueOf(856.03)) },
-				{ vf.createIRI(RDF.NAMESPACE) }, { vf.createLiteral(new Date()) }, { vf.createLiteral("13:03:22.000", XMLSchema.TIME) },
+				{ vf.createIRI(RDF.NAMESPACE) }, { vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)) },
+				{ vf.createLiteral(new Date()) }, { vf.createLiteral("13:03:22.000", XMLSchema.TIME) },
 				{ vf.createLiteral("1980-02-14", XMLSchema.DATE)},
 				{ vf.createLiteral("foo", vf.createIRI("urn:bar:1"))}, { vf.createLiteral("foo", "en-gb") }});
 	}
