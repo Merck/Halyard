@@ -30,7 +30,16 @@ public abstract class RDFValue<V extends Value> {
 
 	private final byte[] getUniqueHash() {
 		if (hash == null) {
-			hash = HalyardTableUtils.id(val);
+			if (val instanceof Identifiable) {
+				Identifiable idVal = (Identifiable) val;
+				hash = idVal.getId();
+				if (hash == null) {
+					hash = HalyardTableUtils.id(val);
+					idVal.setId(hash);
+				}
+			} else {
+				hash = HalyardTableUtils.id(val);
+			}
 		}
 		return hash;
 	}

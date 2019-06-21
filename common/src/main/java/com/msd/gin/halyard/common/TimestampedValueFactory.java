@@ -1,11 +1,5 @@
 package com.msd.gin.halyard.common;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.util.Optional;
-
-import javax.xml.datatype.XMLGregorianCalendar;
-
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -152,167 +146,45 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 		}
 	}
 
-	static final class StatementIRI implements IRI, StatementValue {
+	static final class StatementIRI extends IdentifiableIRI implements StatementValue {
 		private static final long serialVersionUID = 3191250345781815876L;
-		private final IRI iri;
 		private final Statement stmt;
 
 		StatementIRI(IRI iri, Statement stmt) {
-			this.iri = iri;
+			super(iri);
 			this.stmt = stmt;
 		}
 
 		public Statement getStatement() {
 			return stmt;
 		}
-
-		@Override
-		public String getLocalName() {
-			return iri.getLocalName();
-		}
-
-		@Override
-		public String getNamespace() {
-			return iri.getNamespace();
-		}
-
-		@Override
-		public String stringValue() {
-			return iri.stringValue();
-		}
-
-		public String toString() {
-			return iri.toString();
-		}
-
-		public int hashCode() {
-			return iri.hashCode();
-		}
-
-		public boolean equals(Object o) {
-			return iri.equals(o);
-		}
 	}
 
-	static final class StatementBNode implements BNode, StatementValue {
+	static final class StatementBNode extends IdentifiableBNode implements StatementValue {
 		private static final long serialVersionUID = 2844469156112345508L;
-		private final BNode bnode;
 		private final Statement stmt;
 
-		StatementBNode(BNode iri, Statement stmt) {
-			this.bnode = iri;
+		StatementBNode(BNode bnode, Statement stmt) {
+			super(bnode);
 			this.stmt = stmt;
 		}
 
 		public Statement getStatement() {
 			return stmt;
 		}
-
-		@Override
-		public String getID() {
-			return bnode.getID();
-		}
-
-		@Override
-		public String stringValue() {
-			return bnode.stringValue();
-		}
-
-		public String toString() {
-			return bnode.toString();
-		}
-
-		public int hashCode() {
-			return bnode.hashCode();
-		}
-
-		public boolean equals(Object o) {
-			return bnode.equals(o);
-		}
 	}
 
-	static final class StatementLiteral implements Literal, StatementValue {
+	static final class StatementLiteral extends IdentifiableLiteral implements StatementValue {
 		private static final long serialVersionUID = 8851736583549871759L;
-		private final Literal literal;
 		private final Statement stmt;
 
 		StatementLiteral(Literal literal, Statement stmt) {
-			this.literal = literal;
+			super(literal);
 			this.stmt = stmt;
 		}
 
 		public Statement getStatement() {
 			return stmt;
-		}
-
-		@Override
-		public String getLabel() {
-			return literal.getLabel();
-		}
-
-		public Optional<String> getLanguage() {
-			return literal.getLanguage();
-		}
-
-		public IRI getDatatype() {
-			return literal.getDatatype();
-		}
-
-		public byte byteValue() {
-			return literal.byteValue();
-		}
-
-		public short shortValue() {
-			return literal.shortValue();
-		}
-
-		public int intValue() {
-			return literal.intValue();
-		}
-
-		public long longValue() {
-			return literal.longValue();
-		}
-
-		public BigInteger integerValue() {
-			return literal.integerValue();
-		}
-
-		public BigDecimal decimalValue() {
-			return literal.decimalValue();
-		}
-
-		public float floatValue() {
-			return literal.floatValue();
-		}
-
-		public double doubleValue() {
-			return literal.doubleValue();
-		}
-
-		public boolean booleanValue() {
-			return literal.booleanValue();
-		}
-
-		public XMLGregorianCalendar calendarValue() {
-			return literal.calendarValue();
-		}
-
-		@Override
-		public String stringValue() {
-			return literal.stringValue();
-		}
-
-		public String toString() {
-			return literal.toString();
-		}
-
-		public int hashCode() {
-			return literal.hashCode();
-		}
-
-		public boolean equals(Object o) {
-			return literal.equals(o);
 		}
 	}
 }
