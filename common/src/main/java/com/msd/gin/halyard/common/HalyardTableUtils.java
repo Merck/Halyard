@@ -226,16 +226,19 @@ public final class HalyardTableUtils {
 
 		Set<IRI> iris = Vocabularies.getIRIs(vocab);
 		for (IRI iri : iris) {
-			ByteBuffer hash = ByteBuffer.wrap(hash32(iri.toString().getBytes(StandardCharsets.UTF_8))).asReadOnlyBuffer();
-			if (WELL_KNOWN_IRIS.putIfAbsent(hash, iri) != null) {
+			byte[] id = id(iri);
+			IdentifiableIRI idIri = new IdentifiableIRI(id, iri);
+
+			ByteBuffer idbb = ByteBuffer.wrap(id).asReadOnlyBuffer();
+			if (WELL_KNOWN_IRI_IDS.putIfAbsent(idbb, idIri) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
-						WELL_KNOWN_IRIS.get(hash), iri));
+						WELL_KNOWN_IRI_IDS.get(idbb), idIri));
 			}
 
-			ByteBuffer id = ByteBuffer.wrap(id(iri)).asReadOnlyBuffer();
-			if (WELL_KNOWN_IRI_IDS.putIfAbsent(id, iri) != null) {
+			ByteBuffer hash = ByteBuffer.wrap(hash32(idIri.toString().getBytes(StandardCharsets.UTF_8))).asReadOnlyBuffer();
+			if (WELL_KNOWN_IRIS.putIfAbsent(hash, idIri) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
-						WELL_KNOWN_IRI_IDS.get(id), iri));
+						WELL_KNOWN_IRIS.get(hash), idIri));
 			}
 		}
 	}
@@ -1102,11 +1105,14 @@ public final class HalyardTableUtils {
 			}
 			return (V) iri;
 		} else if(len > 0) {
-			skipId(key, cn, keySize, idSize);
+			ByteBuffer id = parseId(key, cn, keySize, idSize);
 			int limit = cv.limit();
 			cv.limit(cv.position() + len);
 			V value = (V) readValue(cv, vf);
 			cv.limit(limit);
+			if (value instanceof Identifiable) {
+				((Identifiable)value).setId(id.array());
+			}
 			return value;
 		} else if(len == 0) {
 			return null;
@@ -1196,12 +1202,28 @@ public final class HalyardTableUtils {
     }
 
 	public static byte[] id(Value v) {
-		byte[] hash = hashUnique(v.toString().getBytes(StandardCharsets.UTF_8));
-		// literal prefix
-		if (v instanceof Literal) {
-			hash[0] &= 0x7F; // 0 msb
-		} else {
-			hash[0] |= 0x80; // 1 msb
+		byte[] hash = null;
+		Identifiable idValue = null;
+		boolean hasHash = false;
+
+		if (v instanceof Identifiable) {
+			idValue = (Identifiable) v;
+			hash = idValue.getId();
+			hasHash = (hash != null);
+		}
+
+		if (hash == null) {
+			hash = hashUnique(v.toString().getBytes(StandardCharsets.UTF_8));
+			// literal prefix
+			if (v instanceof Literal) {
+				hash[0] &= 0x7F; // 0 msb
+			} else {
+				hash[0] |= 0x80; // 1 msb
+			}
+		}
+
+		if (idValue != null && !hasHash) {
+			idValue.setId(hash);
 		}
 		return hash;
 	}
