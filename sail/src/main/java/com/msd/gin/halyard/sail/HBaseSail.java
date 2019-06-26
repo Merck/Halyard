@@ -687,8 +687,9 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                                             for (int i=0; i<hitsArr.length(); i++) {
                                                 objectHashesList.add(Hex.decodeHex(hitsArr.getJSONObject(i).getString("_id").toCharArray()));
                                             }
-                                            if (strict && hitsObj.getJSONObject("total").getInt("value") != hitsArr.length()) {
-                                                throw new IOException("ElasticSearch query '" + literalSearchQuery + "' returned only " + hitsArr.length() + " of " + hitsObj.getJSONObject("total").getInt("value") + " expected hits");
+                                            if (strict) {
+                                                int total = hitsObj.get("total") instanceof JSONObject ? hitsObj.getJSONObject("total").getInt("value") : hitsObj.getInt("total");
+                                                if (total != hitsArr.length()) throw new IOException("ElasticSearch query '" + literalSearchQuery + "' returned only " + hitsArr.length() + " of " + hitsObj.getJSONObject("total").getInt("value") + " expected hits");
                                             }
                                         }
                                         SEARCH_CACHE.put(literalSearchQuery + (strict ? 1 : 0), objectHashesList);
