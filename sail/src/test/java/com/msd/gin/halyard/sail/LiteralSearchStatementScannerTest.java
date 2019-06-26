@@ -84,7 +84,7 @@ public class LiteralSearchStatementScannerTest implements Runnable {
     }
 
     @Test
-    public void statementLiteralSearchAllTest1() throws Exception {
+    public void statementLiteralSearchAllTest() throws Exception {
         response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\n\r\n{\"hits\":{\"total\":{\"value\":1},\"hits\":[{\"_id\":\"" + idHash + "\"}]}}";
         Thread t = new Thread(this);
         t.setDaemon(true);
@@ -93,18 +93,6 @@ public class LiteralSearchStatementScannerTest implements Runnable {
         t.join(10000);
         //test cache
         assertTrue(hbaseSail.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("what", HALYARD.SEARCH_ALL_TYPE),  true).hasNext());
-    }
-
-    @Test
-    public void statementLiteralSearchAllTest2() throws Exception {
-        response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\n\r\n{\"hits\":{\"total\":1,\"hits\":[{\"_id\":\"" + idHash + "\"}]}}";
-        Thread t = new Thread(this);
-        t.setDaemon(true);
-        t.start();
-        assertTrue(hbaseSail.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("hat", HALYARD.SEARCH_ALL_TYPE),  true).hasNext());
-        t.join(10000);
-        //test cache
-        assertTrue(hbaseSail.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("hat", HALYARD.SEARCH_ALL_TYPE),  true).hasNext());
     }
 
     @Test(expected = SailException.class)
