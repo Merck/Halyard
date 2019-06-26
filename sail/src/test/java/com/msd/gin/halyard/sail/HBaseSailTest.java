@@ -390,12 +390,10 @@ public class HBaseSailTest {
         TupleExpr q2 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {graph <http://whatevercontext> {?s a ?o}}", "http://whatever/").getTupleExpr();
         TupleExpr q3 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s <http://whatever/> ?o}", "http://whatever/").getTupleExpr();
         TupleExpr q4 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s ?p \"whatever\"^^<" + HALYARD.SEARCH_TYPE.stringValue() + ">}", "http://whatever/").getTupleExpr();
-        TupleExpr q5 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s ?p \"whatever\"^^<" + HALYARD.SEARCH_ALL_TYPE.stringValue() + ">}", "http://whatever/").getTupleExpr();
         assertEquals(100.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q2), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);
         assertEquals(0.0001, sail.statistics.getCardinality(q4), 0.00001);
-        assertEquals(0.0001, sail.statistics.getCardinality(q5), 0.00001);
         sail.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
         sail.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_" + HalyardTableUtils.encode(HalyardTableUtils.hashKey(RDF.TYPE))), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
         sail.addStatement(f.createIRI("http://whatevercontext"), VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
@@ -405,7 +403,6 @@ public class HBaseSailTest {
         assertEquals(20.0, sail.statistics.getCardinality(q2), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);
         assertEquals(0.0001, sail.statistics.getCardinality(q4), 0.00001);
-        assertEquals(0.0001, sail.statistics.getCardinality(q5), 0.00001);
         sail.shutDown();
     }
 
