@@ -395,7 +395,7 @@ Halyard only cooperates with ElasticSearch indexes loaded by [Halyard ElasticSea
 Only dataset configured with reference to the ElasticSearch index cooperates with the index to search for literals. Please follow instructions at [Create repository](#Create_repository) section above in this document.
 
 ### Custom search data type usage
-Custom data type <a id="search" href="http://merck.github.io/Halyard/ns#search">`halyard:search`</a> is used to pass the value as a query string to Elastic Search index (when configured). The value is replaced with all matching values retrieved from Elastic Search index during SPARQL query, during direct API repository operations, or during RDF4J Workbench exploration of the datasets. 
+Custom data types <a id="search" href="http://merck.github.io/Halyard/ns#search">`halyard:search`</a> and <a id="search" href="http://merck.github.io/Halyard/ns#searchAll">`halyard:searchAll`</a> are used to pass the value as a query string to Elastic Search index (when configured). The value is replaced with matching values (resp. strictly all matching values) retrieved from Elastic Search index during SPARQL query, during direct API repository operations, or during RDF4J Workbench exploration of the datasets. 
 
 For example `"(search~1 algorithm~1) AND (grant ingersoll)"^^halyard:search` will execute a fuzzy search over all indexed literals for the terms “search algorithm” and “grant ingersoll”. And it will pass relevant literals back to the statement evaluation where used in SPARQL query or RDF4J API or in Explorer. 
 

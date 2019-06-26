@@ -428,8 +428,11 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     }
 
     private StatementScanner createScanner(long startTime, Resource subj, IRI pred, Value obj, Resource...contexts) throws SailException {
-        if ((obj instanceof Literal) && (HALYARD.SEARCH_TYPE.equals(((Literal)obj).getDatatype()))) {
-            return new LiteralSearchStatementScanner(startTime, subj, pred, obj.stringValue(), contexts);
+        IRI dt = obj instanceof Literal ? ((Literal)obj).getDatatype() : null;
+        if (HALYARD.SEARCH_TYPE.equals(dt)) {
+            return new LiteralSearchStatementScanner(startTime, subj, pred, obj.stringValue(), false, contexts);
+        } else if (HALYARD.SEARCH_ALL_TYPE.equals(dt)) {
+            return new LiteralSearchStatementScanner(startTime, subj, pred, obj.stringValue(), true, contexts);
         } else {
             return new StatementScanner(startTime, subj, pred, obj, contexts);
         }
@@ -654,13 +657,15 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
 
         Iterator<byte[]> objectHashes = null;
         private final String literalSearchQuery;
+        private final boolean strict;
 
-        public LiteralSearchStatementScanner(long startTime, Resource subj, IRI pred, String literalSearchQuery, Resource... contexts) throws SailException {
+        public LiteralSearchStatementScanner(long startTime, Resource subj, IRI pred, String literalSearchQuery, boolean strict, Resource... contexts) throws SailException {
             super(startTime, subj, pred, null, contexts);
             if (elasticIndexURL == null || elasticIndexURL.length() == 0) {
                 throw new SailException("ElasticSearch Index URL is not properly configured.");
             }
             this.literalSearchQuery = literalSearchQuery;
+            this.strict = strict;
         }
 
         @Override
@@ -669,7 +674,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                 if (objHash == null) {
                     if (objectHashes == null) { //perform ES query and parse results
                         synchronized (SEARCH_CACHE) {
-                            List<byte[]> objectHashesList = SEARCH_CACHE.get(literalSearchQuery);
+                            List<byte[]> objectHashesList = SEARCH_CACHE.get(literalSearchQuery + (strict ? 1 : 0));
                             if (objectHashesList == null) {
                                 objectHashesList = new ArrayList<>();
                                 HttpURLConnection http = (HttpURLConnection)(new URL(elasticIndexURL + "/_search").openConnection());
@@ -679,20 +684,29 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
                                     http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
                                     http.connect();
                                     try (PrintStream out = new PrintStream(http.getOutputStream(), true, "UTF-8")) {
-                                        out.print("{\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"_source\":false,\"stored_fields\":\"_id\",\"size\":" + ELASTIC_RESULT_SIZE + "}");
+                                        out.print("{\"track_total_hits\": " + strict + ",\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"_source\":false,\"stored_fields\":\"_id\",\"size\":" + ELASTIC_RESULT_SIZE + "}");
                                     }
                                     int response = http.getResponseCode();
                                     String msg = http.getResponseMessage();
                                     if (response != 200) {
-                                        LOG.info("ElasticSearch error response: " + msg + " on query: " + literalSearchQuery);
+                                        msg = "ElasticSearch error response: " + msg + " on query: " + literalSearchQuery;
+                                        if (strict) {
+                                            throw new IOException(msg);
+                                        } else {
+                                            LOG.log(Level.WARNING, msg);
+                                        }
                                     } else {
                                         try (InputStreamReader isr = new InputStreamReader(http.getInputStream(), "UTF-8")) {
-                                            JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
-                                            for (int i=0; i<hits.length(); i++) {
-                                                objectHashesList.add(Hex.decodeHex(hits.getJSONObject(i).getString("_id").toCharArray()));
+                                            JSONObject hitsObj = new JSONObject(new JSONTokener(isr)).getJSONObject("hits");
+                                            JSONArray hitsArr = hitsObj.getJSONArray("hits");
+                                            for (int i=0; i<hitsArr.length(); i++) {
+                                                objectHashesList.add(Hex.decodeHex(hitsArr.getJSONObject(i).getString("_id").toCharArray()));
+                                            }
+                                            if (strict && hitsObj.getJSONObject("total").getInt("value") != hitsArr.length()) {
+                                                throw new IOException("ElasticSearch query '" + literalSearchQuery + "' returned only " + hitsArr.length() + " of " + hitsObj.getJSONObject("total").getInt("value") + " expected hits");
                                             }
                                         }
-                                        SEARCH_CACHE.put(new String(literalSearchQuery), objectHashesList);
+                                        SEARCH_CACHE.put(literalSearchQuery + (strict ? 1 : 0), objectHashesList);
                                     }
                                 } catch (JSONException | DecoderException ex) {
                                     throw new IOException(ex);

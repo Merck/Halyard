@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
@@ -105,10 +106,11 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
 
         @Override
         protected double getCardinality(StatementPattern sp) {
-            //always preffer HALYARD.SEARCH_TYPE object literals to move such statements higher in the joins tree
+            //always preffer HALYARD.SEARCH_TYPE and HALYARD.SEARCH_ALL_TYPE object literals to move such statements higher in the joins tree
             Var objectVar = sp.getObjectVar();
-            if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal) objectVar.getValue()).getDatatype())) {
-                return 0.0001;
+            if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal)) {
+                IRI dt = ((Literal) objectVar.getValue()).getDatatype();
+                if (HALYARD.SEARCH_TYPE.equals(dt) || HALYARD.SEARCH_ALL_TYPE.equals(dt)) return 0.0001;
             }
             Double card = spcalc == null ? null : spcalc.getCardinality(sp, boundVars);
             if (card == null) { //fallback to default cardinality calculation
