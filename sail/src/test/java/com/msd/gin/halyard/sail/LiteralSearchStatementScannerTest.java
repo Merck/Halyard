@@ -34,9 +34,7 @@ import org.apache.commons.io.IOUtils;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.eclipse.rdf4j.sail.SailException;
 import org.junit.AfterClass;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -50,7 +48,6 @@ public class LiteralSearchStatementScannerTest implements Runnable {
     static HBaseSail hbaseSail;
     static ServerSocket server;
     static String response;
-    static String idHash;
 
 
     @BeforeClass
@@ -58,11 +55,6 @@ public class LiteralSearchStatementScannerTest implements Runnable {
         server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
         hbaseSail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "testLiteralSearch", true, 0, true, 0, "http://" + InetAddress.getLoopbackAddress().getHostAddress() + ":" + server.getLocalPort(), null);
         hbaseSail.initialize();
-        IRI whatever = SimpleValueFactory.getInstance().createIRI("http://whatever");
-        Literal val = SimpleValueFactory.getInstance().createLiteral("Whatever Text");
-        hbaseSail.addStatement(whatever, whatever, val);
-        hbaseSail.commit();
-        idHash = Hex.encodeHexString(HalyardTableUtils.hashKey(val));
     }
 
     @AfterClass
@@ -73,53 +65,15 @@ public class LiteralSearchStatementScannerTest implements Runnable {
 
     @Test
     public void statementLiteralSearchTest() throws Exception {
-        response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + idHash + "\"}]}}";
+        Literal val = SimpleValueFactory.getInstance().createLiteral("Whatever Text");
+        response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: 30\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + Hex.encodeHexString(HalyardTableUtils.hashKey(val)) + "\"}]}}";
         Thread t = new Thread(this);
         t.setDaemon(true);
         t.start();
+        IRI whatever = SimpleValueFactory.getInstance().createIRI("http://whatever");
+        hbaseSail.addStatement(whatever, whatever, val);
+        hbaseSail.commit();
         assertTrue(hbaseSail.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("what", HALYARD.SEARCH_TYPE),  true).hasNext());
-        t.join(10000);
-        //test cache
-        assertTrue(hbaseSail.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("what", HALYARD.SEARCH_TYPE),  true).hasNext());
-    }
-
-    @Test
-    public void statementLiteralSearchAllTest() throws Exception {
-        response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\n\r\n{\"hits\":{\"total\":{\"value\":1},\"hits\":[{\"_id\":\"" + idHash + "\"}]}}";
-        Thread t = new Thread(this);
-        t.setDaemon(true);
-        t.start();
-        assertTrue(hbaseSail.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("what", HALYARD.SEARCH_ALL_TYPE),  true).hasNext());
-        t.join(10000);
-        //test cache
-        assertTrue(hbaseSail.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("what", HALYARD.SEARCH_ALL_TYPE),  true).hasNext());
-    }
-
-    @Test(expected = SailException.class)
-    public void statementLiteralSearchAllIncompleteTest() throws Exception {
-        response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\n\r\n{\"hits\":{\"total\":{\"value\":2},\"hits\":[{\"_id\":\"" + idHash + "\"}]}}";
-        Thread t = new Thread(this);
-        t.setDaemon(true);
-        t.start();
-        hbaseSail.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("wha", HALYARD.SEARCH_ALL_TYPE),  true).hasNext();
-    }
-
-    @Test
-    public void statementLiteralSearchErrorTest() throws Exception {
-        response = "HTTP/1.1 404 Not found!\n\r";
-        Thread t = new Thread(this);
-        t.setDaemon(true);
-        t.start();
-        assertFalse(hbaseSail.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("error", HALYARD.SEARCH_TYPE),  true).hasNext());
-    }
-
-    @Test(expected = SailException.class)
-    public void statementLiteralSearchAllErrorTest() throws Exception {
-        response = "HTTP/1.1 404 Not found!\n\r";
-        Thread t = new Thread(this);
-        t.setDaemon(true);
-        t.start();
-        hbaseSail.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("error2", HALYARD.SEARCH_ALL_TYPE),  true).hasNext();
     }
 
     @Override

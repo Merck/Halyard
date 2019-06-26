@@ -51,7 +51,6 @@ public class HalyardEvaluationStatisticsTest {
             {"select * where {?a ?b ?c; a ?e}",     1.0E2, new String[]{"b", "e", "c"}},
             {"select * where {{?a a \"1\". optional {?a a ?b}} union {?a a \"2\"}}", 1010.0, null},
             {"select * where {?s a \"1\"^^<" + HALYARD.SEARCH_TYPE + ">}",           1.0E-4,   new String[]{"s"}},
-            {"select * where {?s a \"1\"^^<" + HALYARD.SEARCH_ALL_TYPE + ">}",           1.0E-4,   new String[]{"s"}},
         });
     }
 

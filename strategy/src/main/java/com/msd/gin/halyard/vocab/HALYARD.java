@@ -55,8 +55,6 @@ public final class HALYARD {
 
     public final static IRI SEARCH_TYPE = SVF.createIRI(NAMESPACE, "search");
 
-    public final static IRI SEARCH_ALL_TYPE = SVF.createIRI(NAMESPACE, "searchAll");
-
     public final static IRI PARALLEL_SPLIT_FUNCTION = SVF.createIRI(NAMESPACE, "forkAndFilterBy");
 
 }

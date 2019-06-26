@@ -39,11 +39,7 @@ Custom SPARQL function used in [Halyard Bulk Update](tools#Halyard_Bulk_Update) 
 
 ### <a id="search" href="http://merck.github.io/Halyard/ns#search">`halyard:search`</a>
 
-Custom data type passing the value as a query string to Elastic Search index (when configured). The value is replaced with matching values retrieved from Elastic Search index during SPARQL query, during direct API repository operations, or during RDF4J Workbench exploration of the datasets. Incomplete results or error responses from Elasticsearch are silently ignored. 
-
-### <a id="searchAll" href="http://merck.github.io/Halyard/ns#searchAll">`halyard:searchAll`</a>
-
-Custom data type passing the value as a query string to Elastic Search index (when configured). The value is replaced with all matching values retrieved from Elastic Search index during SPARQL query, during direct API repository operations, or during RDF4J Workbench exploration of the datasets. Incomplete results or error response from Elasticsearch cause exception. 
+Custom data type passing the value as a query string to Elastic Search index (when configured). The value is replaced with all matching values retrieved from Elastic Search index during SPARQL query, during direct API repository operations, or during RDF4J Workbench exploration of the datasets.  
 
 ## SAIL configuration predicates
 
