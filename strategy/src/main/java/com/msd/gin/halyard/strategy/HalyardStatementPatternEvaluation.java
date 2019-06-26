@@ -17,7 +17,6 @@
 package com.msd.gin.halyard.strategy;
 
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
-import com.msd.gin.halyard.vocab.HALYARD;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -57,6 +56,7 @@ import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 final class HalyardStatementPatternEvaluation {
 
     private static final int THREADS = 50;
+    private static final IRI SEARCH_TYPE = SimpleValueFactory.getInstance().createIRI("http://merck.github.io/Halyard/ns#search");
 
     /**
      * A holder for the BindingSetPipe and the iterator over a tree of query sub-parts
@@ -490,7 +490,7 @@ final class HalyardStatementPatternEvaluation {
                 if (objVar != null && !objVar.isConstant()) {
                     Value val = result.getValue(objVar.getName());
                     // override Halyard search type object literals with real object value from the statement
-                    if (!result.hasBinding(objVar.getName()) || ((val instanceof Literal) && (HALYARD.SEARCH_TYPE.equals(((Literal)val).getDatatype()) || HALYARD.SEARCH_ALL_TYPE.equals(((Literal)val).getDatatype())))) {
+                    if (!result.hasBinding(objVar.getName()) || ((val instanceof Literal) && SEARCH_TYPE.equals(((Literal)val).getDatatype()))) {
                         result.setBinding(objVar.getName(), st.getObject());
                     }
                 }
