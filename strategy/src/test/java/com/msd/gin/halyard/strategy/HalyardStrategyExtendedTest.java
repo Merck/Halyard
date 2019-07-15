@@ -26,7 +26,6 @@ import org.eclipse.rdf4j.model.vocabulary.SESAME;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQueryResult;
-import org.eclipse.rdf4j.query.parser.sparql.SPARQLParser;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
