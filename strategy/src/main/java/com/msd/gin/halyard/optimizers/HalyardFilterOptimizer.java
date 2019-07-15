@@ -21,7 +21,6 @@ import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.FilterOptimizer;
-import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
 
 /**
  *
@@ -36,7 +35,7 @@ public final class HalyardFilterOptimizer extends FilterOptimizer {
                 super.meet(filter);
                 filter.visit(new FilterOptimizer.FilterRelocator(filter) {
                     {
-                        filterVars.retainAll(VarNameCollector.process(filter.getArg()));
+                        filterVars.retainAll(filter.getArg().getBindingNames());
                     }
                 });
             }

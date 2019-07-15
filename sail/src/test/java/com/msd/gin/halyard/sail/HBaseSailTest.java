@@ -21,6 +21,7 @@ import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import java.util.List;
 import java.util.Random;
+import static junit.framework.TestCase.assertTrue;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.Admin;
@@ -425,6 +426,17 @@ public class HBaseSailTest {
         TupleQueryResult res = q.evaluate();
         assertTrue(res.hasNext());
         assertNotNull(res.next().getValue("a"));
+        rep.shutDown();
+    }
+
+    @Test
+    public void testBindWithFilter() throws Exception {
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "empty", true, 0, true, 0, null, null);
+        SailRepository rep = new SailRepository(sail);
+        rep.initialize();
+        TupleQueryResult res = rep.getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "SELECT ?x WHERE {BIND (\"x\" AS ?x)\n  FILTER (?x = \"x\")}").evaluate();
+        assertTrue(res.hasNext());
+        assertEquals("x", res.next().getBinding("x").getValue().stringValue());
         rep.shutDown();
     }
 }

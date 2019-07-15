@@ -19,6 +19,7 @@ package com.msd.gin.halyard.optimizers;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.FilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.parser.sparql.SPARQLParser;
 import static org.junit.Assert.assertEquals;
@@ -45,5 +46,13 @@ public class HalyardFilterOptimizerTest {
                 assertEquals(expr.toString(), "StatementPattern", node.getArg().getSignature());
             }
         });
+    }
+
+    @Test
+    public void testKeepBindWithFilter() {
+        TupleExpr expr = new SPARQLParser().parseQuery("SELECT ?x\nWHERE {BIND (\"x\" AS ?x) FILTER (?x = \"x\")}", "http://baseuri/").getTupleExpr();
+        TupleExpr clone = expr.clone();
+        new HalyardFilterOptimizer().optimize(clone, null, null);
+        assertEquals(expr, clone);
     }
 }
