@@ -22,9 +22,13 @@ import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.BiFunction;
+import org.apache.commons.io.FileUtils;
 
 /**
  * @author sykorjan
@@ -65,7 +69,8 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
         addOption("t", "timeout", "evaluation_timeout", "Timeout in seconds for each query evaluation (default is " +
                 "unlimited timeout)", false, true);
         addOption("q", "stored-queries", "property_file", "Optional property file with pre-defined stored queries. " +
-                "Each property name will be mapped to URL path and each property value represents SPARQL query template. " +
+                "Each property name will be mapped to URL path and each property value represents SPARQL query template " +
+                "or @<path> to the file with the query template. " +
                 "Query template may contain custom tokens that will be replaced by corresponding request parameter value. " +
                 "For example stored queries property file containing: \"my_describe_query=describe <{{my_parameter}}>\" " +
                 "will resolve and execute request to /my_describe_query?my_parameter=http%3A%2F%2Fwhatever%2F as " +
@@ -113,9 +118,17 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                 connection.begin();
                 Properties storedQueries = new Properties();
                 if (cmd.hasOption('q')) {
-                    try (FileInputStream in = new FileInputStream(cmd.getOptionValue('q'))) {
+                    String qf = cmd.getOptionValue('q');
+                    try (FileInputStream in = new FileInputStream(qf)) {
                         storedQueries.load(in);
                     }
+                    storedQueries.replaceAll((Object key, Object value) -> {
+                        try {
+                            return value.toString().startsWith("@") ? FileUtils.readFileToString(Paths.get(qf).resolveSibling(value.toString().substring(1)).toFile(), StandardCharsets.UTF_8) : value;
+                        } catch (IOException ex) {
+                            throw new RuntimeException(ex);
+                        }
+                    });
                 }
                 Properties writerConfig = new Properties();
                 if (cmd.hasOption('w')) {
