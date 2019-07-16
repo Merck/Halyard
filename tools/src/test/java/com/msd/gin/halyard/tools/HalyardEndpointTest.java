@@ -144,6 +144,23 @@ public class HalyardEndpointTest {
         assertTrue(Files.lines(path).count() >= 10);
     }
 
+    @Test
+    public void testStoredQueries() throws Exception {
+        File queries = new File(this.getClass().getResource("test.properties").getPath());
+        File script = new File(this.getClass().getResource("testScript2.sh").getPath());
+        script.setExecutable(true);
+        Path path = Paths.get(ROOT + name.getMethodName());
+        runEndpoint("-s", TABLE, "-q", queries.getPath(), "--verbose", script.getPath(), path.toString());
+        assertTrue(Files.exists(path));
+        assertTrue(Files.lines(path).count() >= 20);
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void testStoredQueriesMissingFile() throws Exception {
+        File queries = new File(this.getClass().getResource("testFail.properties").getPath());
+        runEndpoint("-s", TABLE, "-q", queries.getPath(), "--verbose");
+    }
+
     /**
      * Run HalyardEndpoint tool with provided arguments via Hadoop ToolRunner
      *
