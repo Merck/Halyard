@@ -165,4 +165,22 @@ public class HalyardStrategyExtendedTest {
         TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, "PREFIX sesame: <" + SESAME.NAMESPACE + ">\nSELECT (COUNT(*) AS ?count)\n" + "FROM sesame:nil WHERE {?s ?p ?o}").evaluate();
         assertEquals(1, ((Literal) res.next().getBinding("count").getValue()).intValue());
     }
+
+    @Test
+    public void testEmptyOptional() throws Exception {
+        String q = "SELECT * WHERE {" +
+            "  OPTIONAL {<https://nonexisting> <https://nonexisting> <https://nonexisting> .}" +
+            "}";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+    }
+
+    @Test
+    public void testEmptyOptionalSubselect() throws Exception {
+        String q = "SELECT * WHERE {" +
+            "  OPTIONAL { SELECT * WHERE {<https://nonexisting> <https://nonexisting> <https://nonexisting> .}}" +
+            "}";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+    }
 }
