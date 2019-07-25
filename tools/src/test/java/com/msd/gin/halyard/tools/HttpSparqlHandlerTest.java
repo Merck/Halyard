@@ -339,6 +339,22 @@ public class HttpSparqlHandlerTest {
     }
 
     /**
+     * Invoke stored query operation with missing parameter
+     */
+    @Test
+    public void testStoredQueryMissingParam() throws IOException {
+        String GET_URL = SERVER_URL + "/test_path?test_parameter1=" + URLEncoder.encode(SUBJ.stringValue(), CHARSET);
+        URL url = new URL(GET_URL);
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("GET");
+        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, urlConnection.getResponseCode());
+        try (InputStream in  = urlConnection.getErrorStream()) {
+            assertTrue(IOUtils.toString(in).contains("test_parameter2"));
+        }
+    }
+
+    /**
      * Invoke correct query operation via URL-encoded POST
      */
     @Test
