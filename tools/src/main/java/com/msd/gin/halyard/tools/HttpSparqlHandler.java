@@ -331,7 +331,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         }
         List<String> acceptedMimeTypes = new ArrayList<>();
         List<String> acceptHeaders = exchange.getRequestHeaders().get("Accept");
-        for (String header : acceptHeaders) {
+        if (acceptHeaders != null) for (String header : acceptHeaders) {
             acceptedMimeTypes.addAll(parseAcceptHeader(header));
         }
         if (query instanceof SailTupleQuery) {

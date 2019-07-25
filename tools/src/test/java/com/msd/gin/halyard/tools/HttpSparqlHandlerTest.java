@@ -305,6 +305,18 @@ public class HttpSparqlHandlerTest {
     }
 
     /**
+     * Invoke query without Accept header
+     */
+    @Test
+    public void testMissingAccept() throws IOException {
+        String GET_URL = SERVER_URL + "?query=ASK%20%7B%7D";
+        URL url = new URL(GET_URL);
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("GET");
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+    }
+
+    /**
      * Invoke correct query operation via URL-encoded POST
      */
     @Test
