@@ -40,6 +40,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringUtils;
 import org.eclipse.rdf4j.rio.RDFWriter;
@@ -59,6 +61,7 @@ public final class HttpSparqlHandler implements HttpHandler {
     private static final String AND_DELIMITER = "&";
     private static final String CHARSET = StandardCharsets.UTF_8.name();
     private static final ValueFactory SVF = SimpleValueFactory.getInstance();
+    private static final Pattern UNRESOLVED_PARAMETERS = Pattern.compile("\\{\\{(\\w+)\\}\\}");
 
 
     // Query parameter prefixes
@@ -262,8 +265,14 @@ public final class HttpSparqlHandler implements HttpHandler {
             throw new IllegalArgumentException("Request method has to be only either GET or POST");
         }
 
-        if (sparqlQuery.getQuery() == null || sparqlQuery.getQuery().length() <= 0) {
+        String query = sparqlQuery.getQuery();
+        if (query == null || query.length() <= 0) {
             throw new IllegalArgumentException("Missing parameter query");
+        }
+
+        Matcher m = UNRESOLVED_PARAMETERS.matcher(query);
+        if (m.find()) {
+            throw new IllegalArgumentException("Missing query parameter: " + m.group(1));
         }
 
         if (queryCount > 1) {
