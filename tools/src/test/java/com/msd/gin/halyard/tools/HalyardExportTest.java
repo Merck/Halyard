@@ -38,6 +38,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.ToolRunner;
+import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -157,6 +158,20 @@ public class HalyardExportTest {
     public void testExport_TTL_BZ2() throws Exception {
         runExport("-s", TABLE, "-q", GRAPH_QUERY, "-t", ROOT + name.getMethodName() +".ttl.bz2");
         assertEquals(1000, getTriplesCount(ROOT + name.getMethodName() +".ttl.bz2", CompressorStreamFactory.BZIP2, RDFFormat.TURTLE));
+    }
+
+    @Test
+    public void testExport_NamedGraph() throws Exception {
+        String uri = ROOT + name.getMethodName() +".trig";
+        runExport("-s", TABLE, "-q", "construct {?s a <http://merck.github.io/Halyard/ns#NamedGraph>; ?p ?o} where {?s ?p ?o}", "-t", uri);
+        try (InputStream in = FileSystem.get(URI.create(uri), HBaseServerTestInstance.getInstanceConfig()).open(new Path(uri))) {
+            Model m = Rio.parse(in, uri, RDFFormat.TRIG);
+            assertEquals(10, m.contexts().size());
+            assertEquals(1000, m.size());
+            for (Statement s : m) {
+                assertEquals(s.getSubject(), s.getContext());
+            }
+        }
     }
 
     @Test

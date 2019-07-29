@@ -75,6 +75,10 @@ import org.eclipse.rdf4j.rio.RDFWriterRegistry;
 import org.eclipse.rdf4j.rio.Rio;
 
 import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.vocab.HALYARD;
+import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
 
 /**
  * Command line tool to run SPARQL queries and export the results into various target systems. This class could be extended or modified to add new types of
@@ -278,8 +282,17 @@ public final class HalyardExport extends AbstractHalyardTool {
                 for (Map.Entry<String, String> me : queryResult.getNamespaces().entrySet()) {
                     writer.handleNamespace(me.getKey(), me.getValue());
                 }
+                Resource namedGraph = null;
                 while (queryResult.hasNext()) {
-                    writer.handleStatement(queryResult.next());
+                    org.eclipse.rdf4j.model.Statement s = queryResult.next();
+                    if (HALYARD.EXPORT_CONSTRUCT_NAMED_GRAPH_CLASS.equals(s.getObject()) && RDF.TYPE.equals(s.getPredicate())) {
+                        namedGraph = s.getSubject();
+                    } else {
+                        if (namedGraph != null) {
+                            s = SimpleValueFactory.getInstance().createStatement(s.getSubject(), s.getPredicate(), s.getObject(), namedGraph);
+                        }
+                        writer.handleStatement(s);
+                    }
                     tick();
                 }
                 writer.endRDF();

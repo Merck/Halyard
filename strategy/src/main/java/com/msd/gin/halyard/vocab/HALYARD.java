@@ -57,4 +57,6 @@ public final class HALYARD {
 
     public final static IRI PARALLEL_SPLIT_FUNCTION = SVF.createIRI(NAMESPACE, "forkAndFilterBy");
 
+    public final static IRI EXPORT_CONSTRUCT_NAMED_GRAPH_CLASS = SVF.createIRI(NAMESPACE, "NamedGraph");
+
 }

@@ -41,6 +41,12 @@ Custom SPARQL function used in [Halyard Bulk Update](tools#Halyard_Bulk_Update) 
 
 Custom data type passing the value as a query string to Elastic Search index (when configured). The value is replaced with all matching values retrieved from Elastic Search index during SPARQL query, during direct API repository operations, or during RDF4J Workbench exploration of the datasets.  
 
+## Custom Classes
+
+### <a id="NamedGraph" href="http://merck.github.io/Halyard/ns#NamedGraph">`halyard:NamedGraph`</a>
+
+Custom class to define named graph in SPARQL Construct in Halyard Export and BulkExport. Statement `<namedGraph> a halyard:NamedGraph .` must be declared as the first statement in SPARQL Construct query in Halyard Export or BulkExport, and all following statements will be constructed with the given `<namedGraph>`. Statement `<namedGraph> a halyard:NamedGraph .` itself is NOT part of the export. This is a temporary workaround until RDF4J adopts SPARQL 1.2 proposed syntax enhancement `construct { graph <namedGraph> {...}}`   
+
 ## SAIL configuration predicates
 
 ### <a id="tableName" href="http://merck.github.io/Halyard/ns#tableName">`halyard:tableName`</a>
