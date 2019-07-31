@@ -61,5 +61,6 @@ Halyard is expected to run on an Apache Hadoop cluster node with configured Apac
 * [Inside Halyard: 5. SPARQL Federation without border controls](https://www.linkedin.com/pulse/inside-halyard-5-sparql-federation-without-border-controls-sotona)
 * [Inside Halyard: 6. Statistics-based acceleration of SPARQL queries](https://www.linkedin.com/pulse/inside-halyard-6-statistics-based-acceleration-sparql-adam-sotona)
 * [Sailing Halyard Over Three Major Clouds](https://www.linkedin.com/pulse/sailing-halyard-over-three-major-clouds-adam-sotona/)
+* [Halyard Tips&Tricks - Dynamically Scaled Cloud Cluster Disk Space Issue](https://www.linkedin.com/pulse/halyard-tipstricks-dynamically-scaled-cloud-cluster-adam-sotona)
 
 </div>
