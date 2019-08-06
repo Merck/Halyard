@@ -36,6 +36,7 @@ import javax.activation.MimeType;
 import javax.activation.MimeTypeParseException;
 import java.io.*;
 import java.net.URLDecoder;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.logging.Level;
@@ -404,7 +405,8 @@ public final class HttpSparqlHandler implements HttpHandler {
         if (path != null) {
             Optional<FF> o = reg.getFileFormatForFileName(path);
             if (o.isPresent()) {
-                h.set("Content-Type", o.get().getDefaultMIMEType());
+                Charset chs = o.get().getCharset();
+                h.set("Content-Type", o.get().getDefaultMIMEType() + (chs == null ? "" : ("; charset=" + chs.name())));
                 return o.get();
             }
         }
@@ -412,7 +414,8 @@ public final class HttpSparqlHandler implements HttpHandler {
             for (String mimeType : mimeTypes) {
                 Optional<FF> o = reg.getFileFormatForMIMEType(mimeType);
                 if (o.isPresent()) {
-                    h.set("Content-Type", mimeType);
+                    Charset chs = o.get().getCharset();
+                    h.set("Content-Type", mimeType + (chs == null ? "" : ("; charset=" + chs.name())));
                     return o.get();
                 }
             }
