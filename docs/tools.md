@@ -655,7 +655,7 @@ RDF4J Server is a service server that provides a SPARQL endpoint for each manage
 
 More details about the RDF4J REST Protocol are described [here](http://docs.rdf4j.org/rest-api).
 
-### RDF4J Workbench
+#### RDF4J Workbench
 
 ![RDF4J Workbench](img/workbench.png)
 
