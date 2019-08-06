@@ -71,7 +71,7 @@ public class HttpSparqlHandlerTest {
     private static final String TSV_CONTENT = "text/tab-separated-values";
     private static final String CSV_CONTENT = "text/csv";
     private static final String TURTLE_CONTENT = "text/turtle";
-
+    private static final String CHARSER_SUFFIX = "; charset=" + CHARSET;
     // test data
     private static final ValueFactory factory = SimpleValueFactory.getInstance();
     private static final Resource SUBJ = factory.createIRI("http://ginger/subject/");
@@ -300,7 +300,7 @@ public class HttpSparqlHandlerTest {
         urlConnection.setRequestMethod("GET");
         urlConnection.setRequestProperty("Accept", XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        assertEquals(XML_CONTENT + CHARSER_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
@@ -331,7 +331,7 @@ public class HttpSparqlHandlerTest {
         out.write("query=ASK%20%7B%7D");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        assertEquals(XML_CONTENT + CHARSER_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
@@ -346,7 +346,7 @@ public class HttpSparqlHandlerTest {
         urlConnection.setRequestMethod("GET");
         urlConnection.setRequestProperty("Accept", XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        assertEquals(XML_CONTENT + CHARSER_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
@@ -381,7 +381,7 @@ public class HttpSparqlHandlerTest {
         out.write("test_parameter1=" + URLEncoder.encode(SUBJ.stringValue(), CHARSET) + "&test_parameter2=" + URLEncoder.encode(PRED.stringValue(), CHARSET));
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        assertEquals(XML_CONTENT + CHARSER_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
@@ -395,7 +395,7 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setRequestMethod("GET");
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(JSON_CONTENT, urlConnection.getContentType());
+        assertEquals(JSON_CONTENT + CHARSER_SUFFIX, urlConnection.getContentType());
     }
 
     /**
@@ -413,7 +413,7 @@ public class HttpSparqlHandlerTest {
         out.write("ASK {}");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        assertEquals(XML_CONTENT + CHARSER_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
@@ -432,7 +432,7 @@ public class HttpSparqlHandlerTest {
         out.write("SELECT (1 AS ?value) {}");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT, JSON_CONTENT, TSV_CONTENT, CSV_CONTENT);
+        List<String> validResponseContent = Arrays.asList(XML_CONTENT + CHARSER_SUFFIX, JSON_CONTENT + CHARSER_SUFFIX, TSV_CONTENT + CHARSER_SUFFIX, CSV_CONTENT + CHARSER_SUFFIX);
         assertTrue(validResponseContent.contains(urlConnection.getContentType()));
     }
 
@@ -451,7 +451,7 @@ public class HttpSparqlHandlerTest {
         out.write("prefix w: <http://whatever/> construct {w:a w:b 1.} where {}");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(JSONLD_CONTENT, urlConnection.getContentType());
+        assertEquals(JSONLD_CONTENT + CHARSER_SUFFIX, urlConnection.getContentType());
         boolean w = false, wa = false, wb = false;
         for (String line : IOUtils.readLines(urlConnection.getInputStream())) {
             w |= line.contains("\"w\"");
@@ -520,7 +520,7 @@ public class HttpSparqlHandlerTest {
                         "WHERE { ?x ?y ?z  GRAPH ?g { ?s ?p ?o } }");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        assertEquals(XML_CONTENT + CHARSER_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
     }
 
@@ -546,7 +546,7 @@ public class HttpSparqlHandlerTest {
         );
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        assertEquals(XML_CONTENT + CHARSER_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
     }
 
@@ -565,7 +565,7 @@ public class HttpSparqlHandlerTest {
         urlConnection.setRequestMethod("GET");
         urlConnection.setRequestProperty("Accept", XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT, urlConnection.getContentType());
+        assertEquals(XML_CONTENT + CHARSER_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
     }
 
@@ -580,7 +580,7 @@ public class HttpSparqlHandlerTest {
         urlConnection.setRequestMethod("GET");
         urlConnection.setRequestProperty("Accept", "application/turtle;q=0.7, text/turtle;q=0.3, */*;q=0.8");
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(TURTLE_CONTENT, urlConnection.getContentType());
+        assertEquals(TURTLE_CONTENT + CHARSER_SUFFIX, urlConnection.getContentType());
     }
 
     /**
