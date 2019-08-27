@@ -64,5 +64,6 @@ Halyard is expected to run on an Apache Hadoop cluster node with configured Apac
 * [Halyard Tips&Tricks - Dynamically Scaled Cloud Cluster Disk Space Issue](https://www.linkedin.com/pulse/halyard-tipstricks-dynamically-scaled-cloud-cluster-adam-sotona)
 * [Halyard Tips&Tricks - Heavy Load-balanced SPARQL Endpoint](https://www.linkedin.com/pulse/halyard-tipstricks-heavy-load-balanced-sparql-endpoint-adam-sotona)
 * [Halyard Tips&Tricks - Advanced Literal Search Techniques](https://www.linkedin.com/pulse/halyard-tipstricks-advanced-literal-search-adam-sotona)
+* [Halyard Tips&Tricks - Jenkins as a Job Orchestrator](https://www.linkedin.com/pulse/halyard-tipstricks-jenkins-job-orchestrator-adam-sotona)
 
 </div>
