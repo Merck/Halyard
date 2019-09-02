@@ -78,9 +78,9 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
         expr.visit(lastBoundCC);
     }
 
-    public synchronized double getCardinality(TupleExpr expr, final Set<String> boundVariables) {
+    public synchronized double getCardinality(TupleExpr expr, final Set<String> boundVariables, final Set<String> priorityVariables) {
         if (cc == null) {
-            cc = new HalyardCardinalityCalcualtor(boundVariables, Collections.emptySet(), null);
+            cc = new HalyardCardinalityCalcualtor(boundVariables, priorityVariables, null);
         }
         expr.visit(cc);
         return cc.getCardinality();
@@ -116,7 +116,7 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
             }
             for (Var v : sp.getVarList()) {
                 //decrease cardinality for each priority variable present
-                if (v != null && priorityVariables.contains(v.getName())) card /= 1000.0;
+                if (v != null && priorityVariables.contains(v.getName())) card /= 1000000.0;
             }
             return card;
         }
