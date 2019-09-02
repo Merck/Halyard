@@ -24,9 +24,7 @@ import java.util.Set;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.IncompatibleOperationException;
-import org.eclipse.rdf4j.query.algebra.Extension;
 import org.eclipse.rdf4j.query.algebra.FunctionCall;
-import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
@@ -58,46 +56,13 @@ public final class HalyardQueryJoinOptimizer extends QueryJoinOptimizer {
             }
         });
         tupleExpr.visit(new QueryJoinOptimizer.JoinVisitor() {
-            private Set<String> priorityBounds = new HashSet<>();
-
             @Override
             protected double getTupleExprCardinality(TupleExpr tupleExpr, Map<TupleExpr, Double> cardinalityMap, Map<TupleExpr, List<Var>> varsMap, Map<Var, Integer> varFreqMap, Set<String> boundVars) {
                 //treat all bindings mentioned in HALYARD.PARALLEL_SPLIT_FUNCTION as bound to preffer them in optimization
                 boundVars.addAll(parallelSplitBounds);
-                boundVars.addAll(priorityBounds);
                 ((HalyardEvaluationStatistics) statistics).updateCardinalityMap(tupleExpr, boundVars, parallelSplitBounds, cardinalityMap);
                 return super.getTupleExprCardinality(tupleExpr, cardinalityMap, varsMap, varFreqMap, boundVars); //To change body of generated methods, choose Tools | Templates.
             }
-
-            @Override
-            public void meet(Join node) {
-                Set<String> origPriorityBounds = priorityBounds;
-                try {
-                    priorityBounds = new HashSet<>(priorityBounds);
-                    super.meet(node);
-                } finally {
-                    priorityBounds = origPriorityBounds;
-                }
-            }
-
-            @Override
-            protected List<Extension> getExtensions(List<TupleExpr> expressions) {
-                List<Extension> exts = super.getExtensions(expressions);
-                for (Extension ext : exts) {
-                    priorityBounds.addAll(ext.getBindingNames());
-                }
-                return exts;
-            }
-
-            @Override
-            protected List<TupleExpr> getSubSelects(List<TupleExpr> expressions) {
-                List<TupleExpr> subs = super.getSubSelects(expressions);
-                for (TupleExpr sub : subs) {
-                    priorityBounds.addAll(sub.getBindingNames());
-                }
-                return subs;
-            }
-
         });
     }
 }
