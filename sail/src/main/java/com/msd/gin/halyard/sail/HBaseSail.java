@@ -252,7 +252,7 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
     @Override
     public void shutdown() throws QueryEvaluationException {
         try {
-            table.close(); //close the HTable
+            if (table != null) table.close(); //close the HTable
             table = null;
         } catch (IOException ex) {
             throw new SailException(ex);
