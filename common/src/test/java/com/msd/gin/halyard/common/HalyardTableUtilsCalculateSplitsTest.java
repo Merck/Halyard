@@ -18,13 +18,13 @@ package com.msd.gin.halyard.common;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+
 import org.apache.commons.codec.binary.Hex;
-import static org.junit.Assert.*;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+
+import static org.junit.Assert.*;
 
 /**
  *
@@ -36,24 +36,28 @@ public class HalyardTableUtilsCalculateSplitsTest {
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][] {
-            {0, new String[]{"01", "02", "03", "04", "05"}},
-            {1, new String[]{"008000", "01", "018000", "02", "028000", "03", "04", "05"}},
-            {2, new String[]{"004000", "008000", "00c000", "01", "014000", "018000", "01c000", "02", "024000", "028000", "02c000", "03", "04", "05"}},
+				{ 0, true, new String[] { "01", "02", "03", "04", "05" } },
+				{ 1, true, new String[] { "00c000", "01", "01c000", "02", "028000", "03", "04", "05" } },
+				{ 2, true, new String[] { "00a000", "00c000", "00e000", "01", "01a000", "01c000", "01e000", "02", "024000", "028000", "02c000", "03", "04", "05" } },
+				{ 0, false, new String[] { "01", "02" } },
+				{ 1, false, new String[] { "00c000", "01", "01c000", "02", "028000" } },
+				{ 2, false, new String[] { "00a000", "00c000", "00e000", "01", "01a000", "01c000", "01e000", "02", "024000", "028000", "02c000" } },
         });
     }
 
     private final int splits;
+	private final boolean quads;
     private final String[] expected;
 
-    public HalyardTableUtilsCalculateSplitsTest(int splits, String[] expected) {
+	public HalyardTableUtilsCalculateSplitsTest(int splits, boolean quads, String[] expected) {
         this.splits = splits;
+		this.quads = quads;
         this.expected = expected;
     }
 
     @Test
     public void testCalculateSplits() {
-        Map<String, Integer> cMap = new HashMap<>();
-        byte bb[][] = HalyardTableUtils.calculateSplits(splits);
+		byte bb[][] = HalyardTableUtils.calculateSplits(splits, quads);
         if (expected == null) {
             assertNull(bb);
         } else {

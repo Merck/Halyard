@@ -174,12 +174,12 @@ public class HalyardTableUtilsTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void testNegativeSplitBits() {
-        HalyardTableUtils.calculateSplits(-1);
+		HalyardTableUtils.calculateSplits(-1, true);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testTooBigSplitBits() {
-        HalyardTableUtils.calculateSplits(17);
+		HalyardTableUtils.calculateSplits(17, true);
     }
 
     @Test

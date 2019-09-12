@@ -150,7 +150,8 @@ public final class HalyardTableUtils {
 		Arrays.fill(STOP_KEY_128, (byte) 0xff); /* 0xff is 255 in decimal */
     }
 
-	public static final byte[] LITERAL_STOP_KEY = new byte[] {(byte) 0x80};
+	private static final byte NON_LITERAL_FLAG = (byte) 0x80;
+	public static final byte[] LITERAL_STOP_KEY = new byte[] { NON_LITERAL_FLAG };
 
 	private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
@@ -535,9 +536,12 @@ public final class HalyardTableUtils {
 	 * @throws IOException throws IOException in case of any HBase IO problems
 	 * @return the org.apache.hadoop.hbase.client.Table
 	 */
-	public static Table getTable(Configuration config, String tableName, boolean create, int splitBits)
+	public static Table getTable(Configuration config, String tableName, boolean create, int splitBits) throws IOException {
+		return getTable(config, tableName, create, splitBits, true);
+	}
+	public static Table getTable(Configuration config, String tableName, boolean create, int splitBits, boolean quads)
 			throws IOException {
-		return getTable(getConnection(config), tableName, create, splitBits);
+		return getTable(getConnection(config), tableName, create, splitBits, quads);
 	}
 
 	/**
@@ -553,7 +557,10 @@ public final class HalyardTableUtils {
 	 * @return the org.apache.hadoop.hbase.client.Table
 	 */
 	public static Table getTable(Connection conn, String tableName, boolean create, int splitBits) throws IOException {
-		return getTable(conn, tableName, create, splitBits < 0 ? null : calculateSplits(splitBits));
+		return getTable(conn, tableName, create, splitBits, true);
+	}
+	public static Table getTable(Connection conn, String tableName, boolean create, int splitBits, boolean quads) throws IOException {
+		return getTable(conn, tableName, create, splitBits < 0 ? null : calculateSplits(splitBits, quads));
     }
 
     /**
@@ -619,38 +626,67 @@ public final class HalyardTableUtils {
     /**
 	 * Calculates the split keys (one for each permutation of the CSPO HBase Key prefix).
 	 * 
-	 * @param splitBits must be between 0 and 16, larger values result in more keys.
+	 * @param splitBits must be between 0 and 15, larger values result in more keys.
 	 * @return An array of keys represented as {@code byte[]}s
 	 */
-    static byte[][] calculateSplits(int splitBits) {
+	static byte[][] calculateSplits(int splitBits, boolean quads) {
         TreeSet<byte[]> splitKeys = new TreeSet<>(Bytes.BYTES_COMPARATOR);
         //basic presplits
         splitKeys.add(new byte[]{POS_PREFIX});
         splitKeys.add(new byte[]{OSP_PREFIX});
-        splitKeys.add(new byte[]{CSPO_PREFIX});
-        splitKeys.add(new byte[]{CPOS_PREFIX});
-        splitKeys.add(new byte[]{COSP_PREFIX});
+		if (quads) {
+			splitKeys.add(new byte[] { CSPO_PREFIX });
+			splitKeys.add(new byte[] { CPOS_PREFIX });
+			splitKeys.add(new byte[] { COSP_PREFIX });
+		}
         //common presplits
-        addSplits(splitKeys, new byte[]{SPO_PREFIX}, splitBits);
-        addSplits(splitKeys, new byte[]{POS_PREFIX}, splitBits);
+		addSplitsNoLiterals(splitKeys, new byte[] { SPO_PREFIX }, splitBits);
+		addSplitsNoLiterals(splitKeys, new byte[] { POS_PREFIX }, splitBits);
         addSplits(splitKeys, new byte[]{OSP_PREFIX}, splitBits);
         return splitKeys.toArray(new byte[splitKeys.size()][]);
     }
 
     /**
-     * Generate the split key and add it to the collection
-     * @param splitKeys the {@code TreeSet} to add the collection to.
-     * @param prefix the prefix to calculate the key for
-     * @param splitBits between 0 and 16, larger values generate smaller split steps
-     */
-    private static void addSplits(TreeSet<byte[]> splitKeys, byte[] prefix, int splitBits) {
-        if (splitBits == 0) return;
-        if (splitBits < 0 || splitBits > 16) throw new IllegalArgumentException("Illegal nunmber of split bits");
+	 * Generate the split key and add it to the collection.
+	 * 
+	 * @param splitKeys the {@code TreeSet} to add the collection to.
+	 * @param prefix the prefix to calculate the key for
+	 * @param splitBits between 0 and 16, larger values generate smaller split steps
+	 */
+	private static void addSplits(TreeSet<byte[]> splitKeys, byte[] prefix, int splitBits) {
+		if (splitBits == 0) {
+			return;
+		}
+		if (splitBits < 0 || splitBits > 16) {
+			throw new IllegalArgumentException("Illegal nunmber of split bits");
+		}
 
-        final int splitStep = 1 << (16 - splitBits); //1 splitBit gives a split step of 32768, 8 splitBits gives a split step of 256
-        for (int i = splitStep; i <= 0xFFFF; i += splitStep) { // 0xFFFF is 65535 so a split step of 32768 will give 2 iterations, larger split bits give more iterations
+		final int splitStep = 1 << (16 - splitBits); // 1 splitBit gives a split step of 32768, 8 splitBits gives a split step of 256
+		for (int i = splitStep; i <= 0xFFFF; i += splitStep) { // 0xFFFF is 65535 so a split step of 32768 will give 2 iterations, larger split bits give more iterations
+			byte bb[] = Arrays.copyOf(prefix, prefix.length + 2);
+			bb[prefix.length] = (byte) ((i >> 8) & 0xff); // 0xff = 255.
+			bb[prefix.length + 1] = (byte) (i & 0xff);
+			splitKeys.add(bb);
+		}
+	}
+
+	/**
+	 * Generate the split key (for non-literals) and add it to the collection.
+	 * 
+	 * @param splitKeys the {@code TreeSet} to add the collection to.
+	 * @param prefix the prefix to calculate the key for
+	 * @param splitBits between 0 and 15, larger values generate smaller split steps
+	 */
+	private static void addSplitsNoLiterals(TreeSet<byte[]> splitKeys, byte[] prefix, int splitBits) {
+        if (splitBits == 0) return;
+		if (splitBits < 0 || splitBits > 15) {
+			throw new IllegalArgumentException("Illegal nunmber of split bits");
+		}
+
+		final int splitStep = 1 << (15 - splitBits); // 1 splitBit gives a split step of 16384, 8 splitBits gives a split step of 128
+		for (int i = splitStep; i <= 0x7FFF; i += splitStep) { // 0x7FFF is 32767 so a split step of 16384 will give 2 iterations, larger split bits give more iterations
             byte bb[] = Arrays.copyOf(prefix, prefix.length + 2);
-            bb[prefix.length] = (byte)((i >> 8) & 0xff); //0xff = 255.
+			bb[prefix.length] = (byte) (0x80 + ((i >> 8) & 0xff)); // 0xff = 255.
             bb[prefix.length + 1] = (byte)(i & 0xff);
             splitKeys.add(bb);
         }
@@ -1218,7 +1254,7 @@ public final class HalyardTableUtils {
 			if (v instanceof Literal) {
 				hash[0] &= 0x7F; // 0 msb
 			} else {
-				hash[0] |= 0x80; // 1 msb
+				hash[0] |= NON_LITERAL_FLAG; // 1 msb
 			}
 		}
 
@@ -1229,7 +1265,7 @@ public final class HalyardTableUtils {
 	}
 
 	static boolean isLiteral(byte[] hash) {
-		return (hash[0] & 0x80) == 0;
+		return (hash[0] & NON_LITERAL_FLAG) == 0;
 	}
 
     public static String encode(byte b[]) {
