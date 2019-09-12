@@ -48,7 +48,6 @@ import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
@@ -60,6 +59,7 @@ import org.json.JSONObject;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.TimestampedValueFactory;
 import com.yammer.metrics.core.Gauge;
 
 /**
@@ -70,7 +70,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.elastic.source";
 
-    static final ValueFactory VF = SimpleValueFactory.getInstance();
+    static final ValueFactory VF = TimestampedValueFactory.getInstance();
 
     static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
 
