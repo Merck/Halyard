@@ -37,37 +37,46 @@ public class HalyardEvaluationStatisticsTest {
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][] {
-            {"select * where {?s a ?o}",            1.0E2, null},
-            {"select * where {?s ?p ?o}",           1.0E3, null},
-            {"select * where {?s a \"1\"}",         1.0E1, null},
-            {"select * where {?a ?b ?c; ?d ?e}",    1.0E8, null},
-            {"select * where {?a a ?c; ?d ?e}",     1.0E6, null},
-            {"select * where {?a ?b ?c; a ?e}",     1.0E7, null},
-            {"select * where {?s a ?o}",            1.0E1, new String[]{"o"}},
-            {"select * where {?s ?p ?o}",           1.0E1, new String[]{"s", "o"}},
-            {"select * where {?s a \"1\"}",         1.0,   new String[]{"s"}},
-            {"select * where {?a ?b ?c; ?d ?e}",    1.0E4, new String[]{"b", "c"}},
-            {"select * where {?a a ?c; ?d ?e}",     1.0E3, new String[]{"d", "c"}},
-            {"select * where {?a ?b ?c; a ?e}",     1.0E2, new String[]{"b", "e", "c"}},
-            {"select * where {{?a a \"1\". optional {?a a ?b}} union {?a a \"2\"}}", 1010.0, null},
-            {"select * where {?s a \"1\"^^<" + HALYARD.SEARCH_TYPE + ">}",           1.0E-4,   new String[]{"s"}},
+            {"select * where {?s a ?o}",            1.0E2, null, null},
+            {"select * where {?s ?p ?o}",           1.0E3, null, null},
+            {"select * where {?s a \"1\"}",         1.0E1, null, null},
+            {"select * where {?a ?b ?c; ?d ?e}",    1.0E8, null, null},
+            {"select * where {?a a ?c; ?d ?e}",     1.0E6, null, null},
+            {"select * where {?a ?b ?c; a ?e}",     1.0E7, null, null},
+            {"select * where {?s a ?o}",            1.0E1, new String[]{"o"}, null},
+            {"select * where {?s ?p ?o}",           1.0E1, new String[]{"s", "o"}, null},
+            {"select * where {?s a \"1\"}",         1.0,   new String[]{"s"}, null},
+            {"select * where {?a ?b ?c; ?d ?e}",    1.0E4, new String[]{"b", "c"}, null},
+            {"select * where {?a a ?c; ?d ?e}",     1.0E3, new String[]{"d", "c"}, null},
+            {"select * where {?a ?b ?c; a ?e}",     1.0E2, new String[]{"b", "e", "c"}, null},
+            {"select * where {{?a a \"1\". optional {?a a ?b}} union {?a a \"2\"}}", 1010.0, null, null},
+            {"select * where {?s a \"1\"^^<" + HALYARD.SEARCH_TYPE + ">}",           1.0E-4,   new String[]{"s"}, null},
+            {"select * where {?a ?b ?c}",           1.0E-4, new String[]{"a"}, new String[]{"a"}},
+            {"select * where {?a ?b ?c}",           1.0E-11, new String[]{"a", "b"}, new String[]{"a", "b"}},
+            {"select * where {?a ?b ?c}",           1.0E-18, new String[]{"a", "b" , "c"}, new String[]{"a", "b", "c"}},
+            {"select * where {?a ?b ?c}",           1.0E-3, null, new String[]{"a"}},
+            {"select * where {?a ?b ?c}",           1.0E-9, null, new String[]{"a", "b"}},
         });
     }
 
     private final String query;
     private final double cardinality;
     private final Set<String> boundVars = new HashSet<>();
+    private final Set<String> priorityVars = new HashSet<>();
 
-    public HalyardEvaluationStatisticsTest(String query, double cardinality, String[] boundVars) {
+    public HalyardEvaluationStatisticsTest(String query, double cardinality, String[] boundVars, String[] priorityVars) {
         this.query = query;
         this.cardinality = cardinality;
         if (boundVars != null) {
             this.boundVars.addAll(Arrays.asList(boundVars));
         }
+        if (priorityVars != null) {
+            this.priorityVars.addAll(Arrays.asList(priorityVars));
+        }
     }
 
     @Test
     public void testCardinality() {
-        Assert.assertEquals(query, cardinality, new HalyardEvaluationStatistics(null, null).getCardinality(new SPARQLParser().parseQuery(query, "http://baseuri/").getTupleExpr(), boundVars), cardinality/1000000.0);
+        Assert.assertEquals(query, cardinality, new HalyardEvaluationStatistics(null, null).getCardinality(new SPARQLParser().parseQuery(query, "http://baseuri/").getTupleExpr(), boundVars, priorityVars), cardinality/1000000.0);
     }
 }

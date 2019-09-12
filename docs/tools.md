@@ -591,10 +591,11 @@ the custom command.
                                           unlimited timeout)
  -q,--stored-queries <property_file>      Optional property file with pre-defined stored queries.
                                           Each property name will be mapped to URL path and each
-                                          property value represents SPARQL query template. Query
-                                          template may contain custom tokens that will be replaced
-                                          by corresponding request parameter value. For example
-                                          stored queries property file containing:
+                                          property value represents SPARQL query template or @<path>
+                                          to the file with the query template. Query template may
+                                          contain custom tokens that will be replaced by
+                                          corresponding request parameter value. For example stored
+                                          queries property file containing:
                                           "my_describe_query=describe <{{my_parameter}}>" will
                                           resolve and execute request to
                                           /my_describe_query?my_parameter=http%3A%2F%2Fwhatever%2F
@@ -654,7 +655,7 @@ RDF4J Server is a service server that provides a SPARQL endpoint for each manage
 
 More details about the RDF4J REST Protocol are described [here](http://docs.rdf4j.org/rest-api).
 
-### RDF4J Workbench
+#### RDF4J Workbench
 
 ![RDF4J Workbench](img/workbench.png)
 

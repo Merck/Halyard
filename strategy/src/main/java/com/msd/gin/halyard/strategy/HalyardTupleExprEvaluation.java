@@ -850,7 +850,7 @@ final class HalyardTupleExprEvaluation {
                         @Override
                         public boolean push(BindingSet rightBindings) throws InterruptedException {
                             if (rightBindings == null) {
-                                if (failed && leftBindings.size() > 0) {
+                                if (failed) {
                                     // Join failed, return left arg's bindings
                                     parent.push(leftBindings);
                                 }

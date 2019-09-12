@@ -31,7 +31,7 @@ import static org.junit.Assert.*;
  */
 public class HalyardQueryJoinOptimizerTest {
 
- //   @Test
+    @Test
     public void testQueryJoinOptimizer() {
         final TupleExpr expr = new SPARQLParser().parseQuery("select * where {?a ?b ?c, \"1\".}", "http://baseuri/").getTupleExpr();
         new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(null, null)).optimize(expr, null, null);
@@ -53,6 +53,20 @@ public class HalyardQueryJoinOptimizerTest {
             public void meet(Join node) throws RuntimeException {
                 assertEquals(expr.toString(), "d", ((StatementPattern)node.getLeftArg()).getObjectVar().getName());
                 assertTrue(expr.toString(), ((StatementPattern)node.getRightArg()).getObjectVar().hasValue());
+            }
+        });
+    }
+
+    @Test
+    public void testQueryJoinOptimizarWithBind() {
+        final TupleExpr expr = new SPARQLParser().parseQuery("SELECT * WHERE { BIND (<http://whatever/> AS ?b)  ?a <http://whatever/> ?b , \"whatever\".}", "http://baseuri/").getTupleExpr();
+        new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(null, null)).optimize(expr, null, null);
+        expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
+            @Override
+            public void meet(Join node) throws RuntimeException {
+                if (node.getLeftArg() instanceof StatementPattern) {
+                    assertEquals(expr.toString(), "b", ((StatementPattern)node.getLeftArg()).getObjectVar().getName());
+                }
             }
         });
     }

@@ -592,4 +592,19 @@ public class HBaseSailTest {
 		}
 		rep.shutDown();
 	}
+
+    @Test
+    public void testBindWithFilter() throws Exception {
+        HBaseSail sail = new HBaseSail(hconn, "empty", true, 0, true, 0, null, null);
+        SailRepository rep = new SailRepository(sail);
+        rep.init();
+		try (RepositoryConnection conn = rep.getConnection()) {
+			TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL, "SELECT ?x WHERE {BIND (\"x\" AS ?x)\n  FILTER (?x = \"x\")}");
+			try (TupleQueryResult res = q.evaluate()) {
+				assertTrue(res.hasNext());
+				assertEquals("x", res.next().getBinding("x").getValue().stringValue());
+			}
+		}
+        rep.shutDown();
+    }
 }

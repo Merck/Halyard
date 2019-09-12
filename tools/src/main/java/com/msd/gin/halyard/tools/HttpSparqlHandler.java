@@ -28,6 +28,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +38,8 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.activation.MimeType;
 import javax.activation.MimeTypeParseException;
@@ -88,6 +91,7 @@ public final class HttpSparqlHandler implements HttpHandler {
     private static final String AND_DELIMITER = "&";
     private static final String CHARSET = StandardCharsets.UTF_8.name();
     private static final ValueFactory SVF = SimpleValueFactory.getInstance();
+    private static final Pattern UNRESOLVED_PARAMETERS = Pattern.compile("\\{\\{(\\w+)\\}\\}");
 
 
     // Query parameter prefixes
@@ -292,8 +296,14 @@ public final class HttpSparqlHandler implements HttpHandler {
             throw new IllegalArgumentException("Request method has to be only either GET or POST");
         }
 
-        if (sparqlQuery.getQuery() == null || sparqlQuery.getQuery().length() <= 0) {
+        String query = sparqlQuery.getQuery();
+        if (query == null || query.length() <= 0) {
             throw new IllegalArgumentException("Missing parameter query");
+        }
+
+        Matcher m = UNRESOLVED_PARAMETERS.matcher(query);
+        if (m.find()) {
+            throw new IllegalArgumentException("Missing query parameter: " + m.group(1));
         }
 
         if (queryCount > 1) {
@@ -352,7 +362,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         }
         List<String> acceptedMimeTypes = new ArrayList<>();
         List<String> acceptHeaders = exchange.getRequestHeaders().get("Accept");
-        for (String header : acceptHeaders) {
+        if (acceptHeaders != null) for (String header : acceptHeaders) {
             acceptedMimeTypes.addAll(parseAcceptHeader(header));
         }
         if (query instanceof SailTupleQuery) {
@@ -433,7 +443,8 @@ public final class HttpSparqlHandler implements HttpHandler {
         if (path != null) {
             Optional<FF> o = reg.getFileFormatForFileName(path);
             if (o.isPresent()) {
-                h.set("Content-Type", o.get().getDefaultMIMEType());
+                Charset chs = o.get().getCharset();
+                h.set("Content-Type", o.get().getDefaultMIMEType() + (chs == null ? "" : ("; charset=" + chs.name())));
                 return o.get();
             }
         }
@@ -441,7 +452,8 @@ public final class HttpSparqlHandler implements HttpHandler {
             for (String mimeType : mimeTypes) {
                 Optional<FF> o = reg.getFileFormatForMIMEType(mimeType);
                 if (o.isPresent()) {
-                    h.set("Content-Type", mimeType);
+                    Charset chs = o.get().getCharset();
+                    h.set("Content-Type", mimeType + (chs == null ? "" : ("; charset=" + chs.name())));
                     return o.get();
                 }
             }
