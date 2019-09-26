@@ -436,7 +436,7 @@ public class HBaseSailConnection implements SailConnection {
 	}
 
 	protected void delete(KeyValue kv) throws IOException {
-		getBufferedMutator().mutate(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).addDeleteMarker(kv));
+		getBufferedMutator().mutate(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).add(kv));
 		pendingUpdates = true;
     }
 
@@ -641,7 +641,7 @@ public class HBaseSailConnection implements SailConnection {
                     	ctx = RDFContext.create(contexts.next());
                     	Scan scan = HalyardTableUtils.scan(subj, pred, obj, ctx);
 						scan.setTimeRange(sail.minTimestamp, sail.maxTimestamp);
-						scan.setMaxVersions(sail.maxVersions);
+						scan.readVersions(sail.maxVersions);
                         rs = table.getScanner(scan);
                     } else {
                         return null;

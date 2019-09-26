@@ -318,7 +318,7 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
 		long time = System.currentTimeMillis();
 		if (readOnlyTimestamp + STATUS_CACHING_TIMEOUT < time) {
 			try (Table table = getTable()) {
-        		readOnly = table.getTableDescriptor().isReadOnly();
+				readOnly = table.getDescriptor().isReadOnly();
 				readOnlyTimestamp = time;
 	        } catch (IOException ex) {
 	            throw new SailException(ex);

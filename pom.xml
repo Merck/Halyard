@@ -23,9 +23,10 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <rdf4j.version>3.0.0</rdf4j.version>
-        <hbase.version>1.1.2</hbase.version>
-        <hadoop.version>2.5.1</hadoop.version>
-        <elasticsearch.version>7.0.1</elasticsearch.version>
+        <hbase.version>2.1.6</hbase.version>
+        <hadoop.version>3.0.3</hadoop.version>
+        <jersey.version>2.25.1</jersey.version>
+        <elasticsearch.version>7.3.2</elasticsearch.version>
     </properties>
     <modules>
         <module>common</module>
@@ -83,7 +84,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.7.6.201602180812</version>
+                <version>0.8.4</version>
                 <configuration>
                     <includes>
                         <include>com/msd/gin/halyard/**</include>
@@ -175,6 +176,111 @@
             </plugins>
         </pluginManagement>
     </build>
+    <dependencyManagement>
+    	<dependencies>
+	        <dependency>
+	            <groupId>org.apache.hadoop</groupId>
+	            <artifactId>hadoop-annotations</artifactId>
+	            <version>${hadoop.version}</version>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.apache.hadoop</groupId>
+	            <artifactId>hadoop-auth</artifactId>
+	            <version>${hadoop.version}</version>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.apache.hadoop</groupId>
+	            <artifactId>hadoop-common</artifactId>
+	            <version>${hadoop.version}</version>
+            </dependency>
+	        <dependency>
+	            <groupId>org.apache.hadoop</groupId>
+	            <artifactId>hadoop-common</artifactId>
+	            <version>${hadoop.version}</version>
+	            <classifier>tests</classifier>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.apache.hadoop</groupId>
+	            <artifactId>hadoop-distcp</artifactId>
+	            <version>${hadoop.version}</version>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.apache.hadoop</groupId>
+	            <artifactId>hadoop-hdfs</artifactId>
+	            <version>${hadoop.version}</version>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.apache.hadoop</groupId>
+	            <artifactId>hadoop-mapreduce-client-core</artifactId>
+	            <version>${hadoop.version}</version>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.apache.hadoop</groupId>
+	            <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
+	            <version>${hadoop.version}</version>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.apache.hadoop</groupId>
+	            <artifactId>hadoop-yarn-server-tests</artifactId>
+	            <version>${hadoop.version}</version>
+	            <classifier>tests</classifier>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.apache.hbase</groupId>
+	            <artifactId>hbase-http</artifactId>
+	            <version>${hbase.version}</version>
+	            <exclusions>
+		            <exclusion>
+			            <groupId>org.glassfish.jersey.core</groupId>
+			            <artifactId>jersey-server</artifactId>
+		            </exclusion>
+		            <exclusion>
+			            <groupId>org.glassfish.jersey.containers</groupId>
+			            <artifactId>jersey-container-servlet-core</artifactId>
+		            </exclusion>
+		            <exclusion>
+			            <groupId>org.eclipse.jetty</groupId>
+			            <artifactId>jetty-http</artifactId>
+		            </exclusion>
+		            <exclusion>
+			            <groupId>org.eclipse.jetty</groupId>
+			            <artifactId>jetty-security</artifactId>
+		            </exclusion>
+		            <exclusion>
+			            <groupId>org.eclipse.jetty</groupId>
+			            <artifactId>jetty-server</artifactId>
+		            </exclusion>
+		            <exclusion>
+			            <groupId>org.eclipse.jetty</groupId>
+			            <artifactId>jetty-servlet</artifactId>
+		            </exclusion>
+		            <exclusion>
+			            <groupId>org.eclipse.jetty</groupId>
+			            <artifactId>jetty-webapp</artifactId>
+		            </exclusion>
+	            </exclusions>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.apache.hbase</groupId>
+	            <artifactId>hbase-server</artifactId>
+	            <version>${hbase.version}</version>
+	            <exclusions>
+		            <exclusion>
+			            <groupId>org.eclipse.jetty</groupId>
+			            <artifactId>jetty-server</artifactId>
+		            </exclusion>
+		            <exclusion>
+			            <groupId>org.eclipse.jetty</groupId>
+			            <artifactId>jetty-servlet</artifactId>
+		            </exclusion>
+		            <exclusion>
+			            <groupId>org.eclipse.jetty</groupId>
+			            <artifactId>jetty-webapp</artifactId>
+		            </exclusion>
+	            </exclusions>
+	        </dependency>
+    	</dependencies>
+    </dependencyManagement>
     <profiles>
     	<profile>
     		<id>windows</id>

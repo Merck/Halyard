@@ -515,7 +515,7 @@ public final class HalyardExport extends AbstractHalyardTool {
             }
             try {
                 SailRepository rep = new SailRepository(new HBaseSail(conf, source, false, 0, true, 0, elasticIndexURL, null));
-                rep.initialize();
+                rep.init();
                 try {
                     writer.initTimer();
                     log.logStatus("Query execution started");

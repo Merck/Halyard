@@ -16,6 +16,9 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.vocab.HALYARD;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,8 +46,8 @@ import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
-import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.tool.LoadIncrementalHFiles;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -79,9 +82,6 @@ import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 import org.eclipse.rdf4j.rio.helpers.NTriplesParserSettings;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.rio.turtle.TurtleParser;
-
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.vocab.HALYARD;
 
 /**
  * Apache Hadoop MapReduce Tool for bulk loading RDF into HBase
@@ -167,10 +167,10 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                         try {
                             return super.parseURI();
                         } catch (RuntimeException e) {
-                            if (getParserConfig().get(NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES)) {
+                            if (getParserConfig().get(NTriplesParserSettings.FAIL_ON_INVALID_LINES)) {
                                 throw e;
                             } else {
-                                reportError(e, NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES);
+                                reportError(e, NTriplesParserSettings.FAIL_ON_INVALID_LINES);
                                 return null;
                             }
                         }
@@ -180,10 +180,10 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                         try {
                             return super.createLiteral(label, lang, datatype, lineNo, columnNo);
                         } catch (RuntimeException e) {
-                            if (getParserConfig().get(NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES)) {
+                            if (getParserConfig().get(NTriplesParserSettings.FAIL_ON_INVALID_LINES)) {
                                 throw e;
                             } else {
-                                reportError(e, NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES);
+                                reportError(e, NTriplesParserSettings.FAIL_ON_INVALID_LINES);
                                 return super.createLiteral(label, null, null, lineNo, columnNo);
                             }
                         }
@@ -543,7 +543,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         getConf().setBoolean(OVERRIDE_CONTEXT_PROPERTY, cmd.hasOption('o'));
         getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, Long.parseLong(cmd.getOptionValue('e', String.valueOf(System.currentTimeMillis()))));
         if (cmd.hasOption('m')) getConf().setLong("mapreduce.input.fileinputformat.split.maxsize", Long.parseLong(cmd.getOptionValue('m')));
-        TableMapReduceUtil.addDependencyJars(getConf(),
+        TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                 NTriplesUtil.class,
                 Rio.class,
                 AbstractRDFHandler.class,
@@ -561,7 +561,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 		Connection conn = HalyardTableUtils.getConnection(getConf());
 		try (Table hTable = HalyardTableUtils.getTable(conn, target, true, getConf().getInt(SPLIT_BITS_PROPERTY, 3))) {
 			RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());
-			HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), regionLocator);
+			HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), regionLocator);
             FileInputFormat.setInputDirRecursive(job, true);
             FileInputFormat.setInputPaths(job, source);
             FileOutputFormat.setOutputPath(job, new Path(workdir));

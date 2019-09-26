@@ -28,11 +28,13 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.ColumnFamilyDescriptor;
+import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.TableDescriptor;
+import org.apache.hadoop.hbase.client.TableDescriptorBuilder;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -127,8 +129,8 @@ public class HBaseSailVersionTest {
     public void testModify() throws Exception {
 		TableName htableName = TableName.valueOf("timestamptable");
 		try (Admin admin = hconn.getAdmin()) {
-			HTableDescriptor td = new HTableDescriptor(htableName);
-			td.addFamily(new HColumnDescriptor("e".getBytes()).setMaxVersions(5));
+			ColumnFamilyDescriptor cd = ColumnFamilyDescriptorBuilder.newBuilder("e".getBytes()).setMaxVersions(5).build();
+			TableDescriptor td = TableDescriptorBuilder.newBuilder(htableName).setColumnFamily(cd).build();
 			admin.createTable(td, null);
         }
 

@@ -16,6 +16,15 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.RDFPredicate;
+import com.msd.gin.halyard.common.RDFSubject;
+import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.vocab.HALYARD;
+import com.msd.gin.halyard.vocab.VOID_EXT;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -39,9 +48,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.MultiRowRangeFilter;
 import org.apache.hadoop.hbase.filter.MultiRowRangeFilter.RowRange;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
@@ -54,7 +63,6 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
@@ -71,16 +79,6 @@ import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.eclipse.rdf4j.sail.SailConnection;
-
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFContext;
-import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.RDFPredicate;
-import com.msd.gin.halyard.common.RDFSubject;
-import com.msd.gin.halyard.vocab.HALYARD;
-import com.msd.gin.halyard.sail.HBaseSail;
-import com.msd.gin.halyard.vocab.VOID_EXT;
-import com.yammer.metrics.core.Gauge;
 
 /**
  * MapReduce tool providing statistics about a Halyard dataset. Statistics about a dataset are reported in RDF using the VOID ontology. These statistics can be useful
@@ -494,18 +492,15 @@ public final class HalyardStats extends AbstractHalyardTool {
         String targetGraph = cmd.getOptionValue('g');
         String graphContext = cmd.getOptionValue('c');
         String thresh = cmd.getOptionValue('r');
-        TableMapReduceUtil.addDependencyJars(getConf(),
-               HalyardExport.class,
+        TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                NTriplesUtil.class,
                Rio.class,
                AbstractRDFHandler.class,
                RDFFormat.class,
                RDFParser.class,
-               HTable.class,
+               Table.class,
                HBaseConfiguration.class,
-               AuthenticationProtos.class,
-               Trace.class,
-               Gauge.class);
+               AuthenticationProtos.class);
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardStats " + source + (target == null ? " update" : " -> " + target));
         job.getConfiguration().set(SOURCE, source);

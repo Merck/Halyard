@@ -23,6 +23,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Table;
@@ -76,8 +78,8 @@ public class HBaseSailHashConflictTest {
     public static void setup() throws Exception {
 		try (Table table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", true, 0)) {
             long timestamp = System.currentTimeMillis();
-            KeyValue triple[] = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp);
-            KeyValue conflicts[][] = new KeyValue[][] {
+			Cell triple[] = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp);
+			Cell conflicts[][] = new Cell[][] {
                 HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null, false, timestamp),
                 HalyardTableUtils.toKeyValues(SUBJ, CONF,  OBJ, null, false, timestamp),
                 HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null, false, timestamp),
@@ -88,10 +90,10 @@ public class HBaseSailHashConflictTest {
             };
 			List<Put> puts = new ArrayList<>();
             for (int i=0; i<triple.length; i++) {
-                KeyValue kv = triple[i];
+				Cell kv = triple[i];
 				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
                 for (int j=0; j<conflicts.length; j++) {
-                    KeyValue xkv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(),
+					Cell xkv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(),
                             kv.getFamilyArray(), kv.getFamilyOffset(), kv.getFamilyLength(),
                             conflicts[j][i].getQualifierArray(), conflicts[j][i].getQualifierOffset(), conflicts[j][i].getQualifierLength(),
                             kv.getTimestamp(), KeyValue.Type.Put,

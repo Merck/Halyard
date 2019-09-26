@@ -163,7 +163,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         getConf().setBoolean(SKIP_INVALID_PROPERTY, cmd.hasOption('i'));
         if (cmd.hasOption('g')) getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
         getConf().setBoolean(OVERRIDE_CONTEXT_PROPERTY, cmd.hasOption('o'));
-        TableMapReduceUtil.addDependencyJars(getConf(),
+        TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                 NTriplesUtil.class,
                 Rio.class,
                 AbstractRDFHandler.class,

@@ -44,7 +44,7 @@ public final class HalyardUpdate extends AbstractHalyardTool {
 
     public int run(CommandLine cmd) throws Exception {
 		SailRepository rep = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('i'), null));
-        rep.initialize();
+        rep.init();
         try {
         	try(RepositoryConnection conn = rep.getConnection()) {
 	            Update u = conn.prepareUpdate(QueryLanguage.SPARQL, cmd.getOptionValue('q'));

@@ -1,11 +1,9 @@
 package com.msd.gin.halyard.common;
 
-import static org.junit.Assert.assertEquals;
-
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.Cell;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -15,6 +13,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+
+import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class HalyardTableUtilsKeyValueTest {
@@ -75,8 +75,8 @@ public class HalyardTableUtilsKeyValueTest {
 	public void testKeyValues() {
 		Resource ctx = c != null ? c.val : null;
 		Statement expected = vf.createStatement(s.val, p.val, o.val, ctx);
-		KeyValue[] kvs = HalyardTableUtils.toKeyValues(s.val, p.val, o.val, ctx, false, 0);
-		for(KeyValue kv : kvs) {
+		Cell[] kvs = HalyardTableUtils.toKeyValues(s.val, p.val, o.val, ctx, false, 0);
+		for(Cell kv : kvs) {
 			Statement stmt = HalyardTableUtils.parseStatement(s, p, o, c != null ? c : null, kv, vf);
 			assertEquals("spoc", expected, stmt);
 			stmt = HalyardTableUtils.parseStatement(null, p, o, c != null ? c : null, kv, vf);

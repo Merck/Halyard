@@ -91,7 +91,7 @@ public class HalyardBulkLoadTest {
 
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
         assertCount(rep, "select (count(*) as ?c) where {?s ?p ?o}", 1000);
         assertCount(rep, "select (count(*) as ?c) where {graph ?g{?s ?p ?o}}", 0);
         rep.shutDown();
@@ -105,7 +105,7 @@ public class HalyardBulkLoadTest {
 
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
         assertCount(rep, "select (count(*) as ?c) where {graph <http://whatever/graph>{?s ?p ?o}}", 100);
         rep.shutDown();
 
@@ -118,7 +118,7 @@ public class HalyardBulkLoadTest {
 
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
         assertCount(rep, "select (count(*) as ?c) where {graph <"+ file1.toURI().toString() + ">{?s ?p ?o}}", 800);
         assertCount(rep, "select (count(*) as ?c) where {graph <"+ file2.toURI().toString() + ">{?s ?p ?o}}", 100);
         assertCount(rep, "select (count(*) as ?c) where {graph <"+ file3.toURI().toString() + ">{?s ?p ?o}}", 0);
@@ -133,7 +133,7 @@ public class HalyardBulkLoadTest {
 
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         rep = new SailRepository(sail);
-        rep.initialize();
+        rep.init();
         assertCount(rep, "select (count(*) as ?c) where {graph <http://what"+ file1.toURI().getPath() + ">{?s ?p ?o}}", 800);
         assertCount(rep, "select (count(*) as ?c) where {graph <http://what"+ file2.toURI().getPath() + ">{?s ?p ?o}}", 100);
         assertCount(rep, "select (count(*) as ?c) where {graph <http://what"+ file3.toURI().getPath() + ">{?s ?p ?o}}", 100);

@@ -16,6 +16,12 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFPredicate;
+import com.msd.gin.halyard.common.RDFSubject;
+import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.vocab.HALYARD;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -40,7 +46,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
@@ -54,7 +59,6 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -73,13 +77,6 @@ import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
-
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFPredicate;
-import com.msd.gin.halyard.common.RDFSubject;
-import com.msd.gin.halyard.vocab.HALYARD;
-import com.msd.gin.halyard.sail.HBaseSail;
-import com.yammer.metrics.core.Gauge;
 
 /**
  * MapReduce tool providing summary of a Halyard dataset.
@@ -485,17 +482,14 @@ public final class HalyardSummary extends AbstractHalyardTool {
     public int run(CommandLine cmd) throws Exception {
         String source = cmd.getOptionValue('s');
         String target = cmd.getOptionValue('t');
-        TableMapReduceUtil.addDependencyJars(getConf(),
-               HalyardExport.class,
+        TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                Rio.class,
                AbstractRDFHandler.class,
                RDFFormat.class,
                RDFParser.class,
-               HTable.class,
+               Table.class,
                HBaseConfiguration.class,
-               AuthenticationProtos.class,
-               Trace.class,
-               Gauge.class);
+               AuthenticationProtos.class);
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardSummary " + source + (target == null ? " update" : " -> " + target));
         job.getConfiguration().set(SOURCE, source);

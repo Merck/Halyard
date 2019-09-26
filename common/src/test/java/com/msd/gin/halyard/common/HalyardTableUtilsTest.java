@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Put;
@@ -84,7 +85,7 @@ public class HalyardTableUtilsTest {
         IRI pred = vf.createIRI("http://testBigLiteral/pred/");
         Value obj = vf.createLiteral(RandomStringUtils.random(100000));
 		List<Put> puts = new ArrayList<>();
-        for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, null, false, System.currentTimeMillis())) {
+        for (Cell kv : HalyardTableUtils.toKeyValues(subj, pred, obj, null, false, System.currentTimeMillis())) {
 			puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
 		table.put(puts);
@@ -109,13 +110,13 @@ public class HalyardTableUtilsTest {
         Value obj1 = vf.createLiteral("literal1");
         Value obj2 = vf.createLiteral("literal2");
         long timestamp = System.currentTimeMillis();
-        KeyValue kv1[] = HalyardTableUtils.toKeyValues(subj, pred1, obj1, null, false, timestamp);
-        KeyValue kv2[] = HalyardTableUtils.toKeyValues(subj, pred2, obj2, null, false, timestamp);
+        Cell kv1[] = HalyardTableUtils.toKeyValues(subj, pred1, obj1, null, false, timestamp);
+        Cell kv2[] = HalyardTableUtils.toKeyValues(subj, pred2, obj2, null, false, timestamp);
 		List<Put> puts = new ArrayList<>();
         for (int i=0; i<3; i++) {
 			puts.add(new Put(kv1[i].getRowArray(), kv1[i].getRowOffset(), kv1[i].getRowLength(), kv1[i].getTimestamp())
 					.add(kv1[i]));
-            KeyValue conflicting = new KeyValue(kv1[i].getRowArray(), kv1[i].getRowOffset(), kv1[i].getRowLength(),
+            Cell conflicting = new KeyValue(kv1[i].getRowArray(), kv1[i].getRowOffset(), kv1[i].getRowLength(),
                     kv1[i].getFamilyArray(), kv1[i].getFamilyOffset(), kv1[i].getFamilyLength(),
                     kv2[i].getQualifierArray(), kv2[i].getQualifierOffset(), kv2[i].getQualifierLength(),
                     kv1[i].getTimestamp(), KeyValue.Type.Put, kv2[i].getValueArray(), kv2[i].getValueOffset(), kv2[i].getValueLength());
@@ -141,7 +142,7 @@ public class HalyardTableUtilsTest {
         IRI pred = vf.createIRI("http://whatever/pred/");
         Value expl = vf.createLiteral("explicit");
 		List<Put> puts = new ArrayList<>();
-        for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, expl, null, false, System.currentTimeMillis())) {
+        for (Cell kv : HalyardTableUtils.toKeyValues(subj, pred, expl, null, false, System.currentTimeMillis())) {
 			puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
 		table.put(puts);
@@ -185,10 +186,10 @@ public class HalyardTableUtilsTest {
     @Test
     public void testToKeyValuesDelete() throws Exception {
         IRI res = SimpleValueFactory.getInstance().createIRI("http://testiri");
-        KeyValue kvs[] = HalyardTableUtils.toKeyValues(res, res, res, res, true, 0);
+        Cell kvs[] = HalyardTableUtils.toKeyValues(res, res, res, res, true, 0);
         assertEquals(6, kvs.length);
-        for (KeyValue kv : kvs) {
-            assertEquals(KeyValue.Type.DeleteColumn, KeyValue.Type.codeToType(kv.getTypeByte()));
+        for (Cell kv : kvs) {
+            assertEquals(Cell.Type.DeleteColumn, kv.getType());
         }
     }
 

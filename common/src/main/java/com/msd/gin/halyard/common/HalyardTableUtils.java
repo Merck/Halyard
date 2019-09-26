@@ -16,6 +16,10 @@
  */
 package com.msd.gin.halyard.common;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+import com.google.common.hash.Hashing;
+
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
@@ -43,18 +47,20 @@ import javax.xml.datatype.XMLGregorianCalendar;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeepDeletedCells;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.ColumnFamilyDescriptor;
+import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.client.TableDescriptor;
+import org.apache.hadoop.hbase.client.TableDescriptorBuilder;
 import org.apache.hadoop.hbase.filter.ColumnPrefixFilter;
 import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
@@ -82,10 +88,6 @@ import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
-import com.google.common.hash.Hashing;
 
 /**
  * Core Halyard utility class performing RDF to HBase mappings and base HBase table and key management. The methods of this class define how
@@ -155,7 +157,7 @@ public final class HalyardTableUtils {
 
 	private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
-    private static final String REGION_MAX_FILESIZE = "10000000000";
+	private static final long REGION_MAX_FILESIZE = 10000000000l;
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
 
 	private static final ThreadLocal<MessageDigest> MD = new ThreadLocal<MessageDigest>() {
@@ -594,8 +596,7 @@ public final class HalyardTableUtils {
 			try (Admin admin = conn.getAdmin()) {
 				// check if the table exists and if it doesn't, make it
 				if (!admin.tableExists(htableName)) {
-					HTableDescriptor td = new HTableDescriptor(htableName);
-					td.addFamily(createColumnFamily());
+					TableDescriptor td = TableDescriptorBuilder.newBuilder(htableName).setColumnFamily(createColumnFamily()).setMaxFileSize(REGION_MAX_FILESIZE).setRegionSplitPolicyClassName(REGION_SPLIT_POLICY).build();
 					admin.createTable(td, splits);
                 }
             }
@@ -1180,17 +1181,17 @@ public final class HalyardTableUtils {
      * @param stopRow stop row key byte array
      * @return HBase Scan instance
      */
-    public static Scan scan(byte[] startRow, byte[] stopRow) {
+	public static Scan scan(byte[] startRow, byte[] stopRow) {
         Scan scan = new Scan();
         scan.addFamily(CF_NAME);
-        scan.setMaxVersions(1);
+		scan.readVersions(1);
         scan.setAllowPartialResults(true);
         scan.setBatch(10);
         if(startRow != null) {
-        	scan.setStartRow(startRow);
+			scan.withStartRow(startRow);
         }
         if(stopRow != null) {
-        	scan.setStopRow(stopRow);
+			scan.withStopRow(stopRow);
         }
         return scan;
     }
@@ -1222,8 +1223,8 @@ public final class HalyardTableUtils {
 
 // private methods
 
-    private static HColumnDescriptor createColumnFamily() {
-        return new HColumnDescriptor(CF_NAME)
+	private static ColumnFamilyDescriptor createColumnFamily() {
+		return ColumnFamilyDescriptorBuilder.newBuilder(CF_NAME)
                 .setMaxVersions(1)
                 .setBlockCacheEnabled(true)
                 .setBloomFilterType(BloomType.ROW)
@@ -1233,8 +1234,7 @@ public final class HalyardTableUtils {
                 .setCacheDataOnWrite(true)
                 .setCacheIndexesOnWrite(true)
                 .setKeepDeletedCells(KeepDeletedCells.FALSE)
-                .setValue(HTableDescriptor.MAX_FILESIZE, REGION_MAX_FILESIZE)
-                .setValue(HTableDescriptor.SPLIT_POLICY, REGION_SPLIT_POLICY);
+				.build();
     }
 
 	public static byte[] id(Value v) {

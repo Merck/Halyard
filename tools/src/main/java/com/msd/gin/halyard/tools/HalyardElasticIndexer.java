@@ -16,6 +16,11 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.TimestampedValueFactory;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -33,10 +38,10 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
@@ -44,7 +49,6 @@ import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -55,12 +59,6 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.elasticsearch.hadoop.mr.EsOutputFormat;
 import org.json.JSONObject;
-
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFContext;
-import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.TimestampedValueFactory;
-import com.yammer.metrics.core.Gauge;
 
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
@@ -148,20 +146,17 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         String source = cmd.getOptionValue('s');
         String target = cmd.getOptionValue('t');
         URL targetUrl = new URL(target);
-        TableMapReduceUtil.addDependencyJars(getConf(),
-               HalyardExport.class,
+        TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                NTriplesUtil.class,
                Rio.class,
                AbstractRDFHandler.class,
                RDFFormat.class,
                RDFParser.class,
-               HTable.class,
+               Table.class,
                HBaseConfiguration.class,
-               AuthenticationProtos.class,
-               Trace.class,
-               Gauge.class);
+               AuthenticationProtos.class);
         if (System.getProperty("exclude.es-hadoop") == null) {
-        	TableMapReduceUtil.addDependencyJars(getConf(), EsOutputFormat.class);
+        	TableMapReduceUtil.addDependencyJarsForClasses(getConf(), EsOutputFormat.class);
         }
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardElasticIndexer " + source + " -> " + target);
@@ -199,7 +194,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 int response = http.getResponseCode();
                 String msg = http.getResponseMessage();
                 if (response != 200) {
-                    String resp = IOUtils.toString(http.getErrorStream());
+                    String resp = IOUtils.toString(http.getErrorStream(), StandardCharsets.UTF_8);
                     LOG.warn(resp);
                     boolean alreadyExist = false;
                     if (response == 400) try {
@@ -220,12 +215,12 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP literal region(s)
             byte[] graphHash = RDFContext.create(NTriplesUtil.parseResource(cmd.getOptionValue('g'), VF)).getKeyHash();
-            scan.setStartRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash));
-            scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash, HalyardTableUtils.LITERAL_STOP_KEY));
+            scan.withStartRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash));
+            scan.withStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash, HalyardTableUtils.LITERAL_STOP_KEY));
         } else {
             //scan OSP literal region(s)
-            scan.setStartRow(HalyardTableUtils.concat(HalyardTableUtils.OSP_PREFIX, false));
-            scan.setStopRow(HalyardTableUtils.concat(HalyardTableUtils.OSP_PREFIX, false, HalyardTableUtils.LITERAL_STOP_KEY));
+            scan.withStartRow(HalyardTableUtils.concat(HalyardTableUtils.OSP_PREFIX, false));
+            scan.withStopRow(HalyardTableUtils.concat(HalyardTableUtils.OSP_PREFIX, false, HalyardTableUtils.LITERAL_STOP_KEY));
         }
         TableMapReduceUtil.initTableMapperJob(
                 source,

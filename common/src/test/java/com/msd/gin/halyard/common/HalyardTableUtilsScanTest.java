@@ -16,9 +16,6 @@
  */
 package com.msd.gin.halyard.common;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -26,7 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -41,6 +38,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+
+import static org.junit.Assert.*;
 
 /**
  *
@@ -160,7 +159,7 @@ public class HalyardTableUtilsScanTest {
         long timestamp = System.currentTimeMillis();
 		List<Put> puts = new ArrayList<>();
         for (Statement st : allStatements) {
-            for (KeyValue kv : HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext(), false, timestamp)) {
+            for (Cell kv : HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext(), false, timestamp)) {
 				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
             }
         }

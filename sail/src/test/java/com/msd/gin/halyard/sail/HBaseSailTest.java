@@ -21,9 +21,10 @@ import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import java.util.List;
 import java.util.Random;
-import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.TableDescriptor;
+import org.apache.hadoop.hbase.client.TableDescriptorBuilder;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -96,15 +97,14 @@ public class HBaseSailTest {
     public void testIsWritable() throws Exception {
         HBaseSail sail = new HBaseSail(hconn, "whatevertableRW", true, 0, true, 0, null, null);
         sail.initialize();
-        HTableDescriptor desc = sail.getTable().getTableDescriptor();
+		TableDescriptor desc = sail.getTable().getDescriptor();
         assertTrue(sail.isWritable());
         sail.shutDown();
         try (Admin ha = hconn.getAdmin()) {
-            desc = new HTableDescriptor(desc);
-            desc.setReadOnly(true);
-            ha.modifyTable(desc.getTableName(), desc);
+			desc = TableDescriptorBuilder.newBuilder(desc).setReadOnly(true).build();
+			ha.modifyTable(desc);
         }
-        sail = new HBaseSail(hconn, desc.getNameAsString(), true, 0, true, 0, null, null);
+		sail = new HBaseSail(hconn, desc.getTableName().getNameAsString(), true, 0, true, 0, null, null);
         sail.initialize();
         assertFalse(sail.isWritable());
         sail.shutDown();
@@ -115,11 +115,10 @@ public class HBaseSailTest {
         HBaseSail sail = new HBaseSail(hconn, "whatevertableRO", true, 0, true, 0, null, null);
         sail.initialize();
         try {
-            HTableDescriptor desc = sail.getTable().getTableDescriptor();
+			TableDescriptor desc = sail.getTable().getDescriptor();
             try (Admin ha = hconn.getAdmin()) {
-                desc = new HTableDescriptor(desc);
-                desc.setReadOnly(true);
-                ha.modifyTable(desc.getTableName(), desc);
+				desc = TableDescriptorBuilder.newBuilder(desc).setReadOnly(true).build();
+				ha.modifyTable(desc);
             }
             ValueFactory vf = SimpleValueFactory.getInstance();
 			try (SailConnection conn = sail.getConnection()) {

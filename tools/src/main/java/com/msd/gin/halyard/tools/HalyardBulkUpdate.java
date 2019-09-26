@@ -20,10 +20,9 @@ import static com.msd.gin.halyard.tools.HalyardBulkLoad.*;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.repository.HBaseUpdate;
-import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
-import com.yammer.metrics.core.Gauge;
+import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -31,24 +30,23 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
-import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
+import org.apache.hadoop.hbase.tool.LoadIncrementalHFiles;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
@@ -169,7 +167,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 								            kv.getFamilyArray(), kv.getFamilyOffset(), (int) kv.getFamilyLength(),
 								            kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength(),
 								            kv.getTimestamp(), KeyValue.Type.DeleteColumn, kv.getValueArray(), kv.getValueOffset(),
-								            kv.getValueLength(), kv.getTagsArray(), kv.getTagsOffset(), kv.getTagsLength());
+								            kv.getValueLength());
 									try {
 										context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
 									} catch (InterruptedException ex) {
@@ -244,18 +242,15 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         String workdir = cmd.getOptionValue('w');
         getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, Long.parseLong(cmd.getOptionValue('e', String.valueOf(System.currentTimeMillis()))));
         if (cmd.hasOption('i')) getConf().set(ELASTIC_INDEX_URL, cmd.getOptionValue('i'));
-        TableMapReduceUtil.addDependencyJars(getConf(),
-               HalyardExport.class,
+        TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                NTriplesUtil.class,
                Rio.class,
                AbstractRDFHandler.class,
                RDFFormat.class,
                RDFParser.class,
-               HTable.class,
+               Table.class,
                HBaseConfiguration.class,
-               AuthenticationProtos.class,
-               Trace.class,
-               Gauge.class);
+               AuthenticationProtos.class);
         HBaseConfiguration.addHbaseResources(getConf());
         getConf().setStrings(TABLE_NAME_PROPERTY, source);
         getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
@@ -273,7 +268,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 			Connection conn = HalyardTableUtils.getConnection(getConf());
 			try (Table hTable = HalyardTableUtils.getTable(conn, source, false, 0)) {
 				RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());
-				HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), regionLocator);
+				HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), regionLocator);
                 QueryInputFormat.setQueriesFromDirRecursive(job.getConfiguration(), queryFiles, true, stage);
                 Path outPath = new Path(workdir, "stage"+stage);
                 FileOutputFormat.setOutputPath(job, outPath);

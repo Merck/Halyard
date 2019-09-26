@@ -16,7 +16,7 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.yammer.metrics.core.Gauge;
+import static com.msd.gin.halyard.vocab.HALYARD.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,14 +28,13 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.rio.RDFFormat;
@@ -43,7 +42,6 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
-import static com.msd.gin.halyard.vocab.HALYARD.PARALLEL_SPLIT_FUNCTION;
 
 /**
  * Apache Hadoop MapReduce tool for batch exporting of SPARQL queries.
@@ -140,18 +138,15 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
             getConf().setStrings(JDBC_PROPERTIES, props);
         }
         if (cmd.hasOption('i')) getConf().set(HalyardBulkUpdate.ELASTIC_INDEX_URL, cmd.getOptionValue('i'));
-        TableMapReduceUtil.addDependencyJars(getConf(),
-               HalyardExport.class,
+        TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                NTriplesUtil.class,
                Rio.class,
                AbstractRDFHandler.class,
                RDFFormat.class,
                RDFParser.class,
-               HTable.class,
+               Table.class,
                HBaseConfiguration.class,
-               AuthenticationProtos.class,
-               Trace.class,
-               Gauge.class);
+               AuthenticationProtos.class);
         HBaseConfiguration.addHbaseResources(getConf());
         String cp = cmd.getOptionValue('l');
         if (cp != null) {

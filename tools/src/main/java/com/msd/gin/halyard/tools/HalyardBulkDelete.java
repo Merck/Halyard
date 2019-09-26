@@ -17,7 +17,6 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.yammer.metrics.core.Gauge;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -32,21 +31,19 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
-import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
+import org.apache.hadoop.hbase.tool.LoadIncrementalHFiles;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.htrace.Trace;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
@@ -117,7 +114,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
                         c.getFamilyArray(), c.getFamilyOffset(), (int) c.getFamilyLength(),
                         c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength(),
                         c.getTimestamp(), KeyValue.Type.DeleteColumn, c.getValueArray(), c.getValueOffset(),
-                        c.getValueLength(), c.getTagsArray(), c.getTagsOffset(), c.getTagsLength());
+                        c.getValueLength());
                     output.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
                     deleted++;
                 } else {
@@ -151,18 +148,15 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
     @Override
     public int run(CommandLine cmd) throws Exception {
         String source = cmd.getOptionValue('t');
-        TableMapReduceUtil.addDependencyJars(getConf(),
-            HalyardExport.class,
+        TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
             NTriplesUtil.class,
             Rio.class,
             AbstractRDFHandler.class,
             RDFFormat.class,
             RDFParser.class,
-            HTable.class,
+            Table.class,
             HBaseConfiguration.class,
-            AuthenticationProtos.class,
-            Trace.class,
-            Gauge.class);
+            AuthenticationProtos.class);
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardDelete " + source);
         if (cmd.hasOption('s')) {
@@ -197,7 +191,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 		Connection conn = HalyardTableUtils.getConnection(getConf());
 		try (Table hTable = HalyardTableUtils.getTable(conn, source, false, 0)) {
 			RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());
-			HFileOutputFormat2.configureIncrementalLoad(job, hTable.getTableDescriptor(), regionLocator);
+			HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), regionLocator);
             FileOutputFormat.setOutputPath(job, new Path(cmd.getOptionValue('f')));
             TableMapReduceUtil.addDependencyJars(job);
             if (job.waitForCompletion(true)) {

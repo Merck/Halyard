@@ -74,6 +74,8 @@ public class HBaseServerTestInstance {
             conf.set("hbase.master.hostname", "localhost");
             conf.set("hbase.regionserver.hostname", "localhost");
             conf.setInt("hbase.master.info.port", -1);
+            conf.setBoolean("hbase.procedure.store.wal.use.hsync", false);
+            conf.setBoolean("hbase.unsafe.stream.capability.enforce", false);
             conf.set("hbase.fs.tmp.dir", new File(System.getProperty("java.io.tmpdir")).toURI().toURL().toString());
             LocalHBaseCluster cluster = new LocalHBaseCluster(conf);
             cluster.startup();
