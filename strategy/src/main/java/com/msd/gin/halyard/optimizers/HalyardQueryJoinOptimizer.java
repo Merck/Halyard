@@ -62,7 +62,7 @@ public final class HalyardQueryJoinOptimizer extends QueryJoinOptimizer {
 
             @Override
             protected double getTupleExprCardinality(TupleExpr tupleExpr, Map<TupleExpr, Double> cardinalityMap, Map<TupleExpr, List<Var>> varsMap, Map<Var, Integer> varFreqMap, Set<String> boundVars) {
-                //treat all bindings mentioned in HALYARD.PARALLEL_SPLIT_FUNCTION as bound to preffer them in optimization
+                //treat all bindings mentioned in HALYARD.PARALLEL_SPLIT_FUNCTION as bound to prefer them in optimization
                 boundVars.addAll(parallelSplitBounds);
                 boundVars.addAll(priorityBounds);
                 ((HalyardEvaluationStatistics) statistics).updateCardinalityMap(tupleExpr, boundVars, parallelSplitBounds, cardinalityMap);

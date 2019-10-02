@@ -17,11 +17,13 @@
 package com.msd.gin.halyard.optimizers;
 
 import com.msd.gin.halyard.vocab.HALYARD;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;

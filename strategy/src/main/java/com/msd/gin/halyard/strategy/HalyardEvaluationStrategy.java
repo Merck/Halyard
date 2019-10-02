@@ -16,6 +16,11 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.optimizers.EvaluationStatisticsDependent;
+import com.msd.gin.halyard.optimizers.HalyardQueryOptimizerPipeline;
+
+import java.util.Objects;
+
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -27,12 +32,15 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizerPipeline;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
 
 /**
@@ -53,6 +61,7 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
         }
     }
 
+	private final Dataset dataset;
 	/**
 	 * Used to allow queries across more than one Halyard datasets
 	 */
@@ -66,6 +75,8 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
      * Evaluates ValueExpr expressions and all implementations of that interface
      */
     private final HalyardValueExprEvaluation valueEval;
+
+	private QueryOptimizerPipeline pipeline;
 
     /**
      * Ensures 'now' is the same across all parts of the query evaluation chain.
@@ -88,10 +99,12 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 			TupleFunctionRegistry tupleFunctionRegistry,
 			FunctionRegistry functionRegistry, Dataset dataset, FederatedServiceResolver serviceResolver,
 			long timeout) {
+		this.dataset = dataset;
         this.serviceResolver = serviceResolver;
 		this.tupleEval = new HalyardTupleExprEvaluation(this, queryContext, tupleFunctionRegistry, tripleSource,
 				dataset, timeout);
 		this.valueEval = new HalyardValueExprEvaluation(this, functionRegistry, tripleSource.getValueFactory());
+		this.pipeline = new HalyardQueryOptimizerPipeline(this, tripleSource.getValueFactory());
         EvaluationStrategies.register(this);
     }
 
@@ -111,6 +124,26 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
         }
         return serviceResolver.getService(serviceUrl);
     }
+
+	@Override
+	public void setOptimizerPipeline(QueryOptimizerPipeline pipeline) {
+		Objects.requireNonNull(pipeline);
+		this.pipeline = pipeline;
+	}
+
+	@Override
+	public TupleExpr optimize(TupleExpr expr, EvaluationStatistics evaluationStatistics, BindingSet bindings) {
+		TupleExpr optimizedExpr = expr;
+
+		if (pipeline instanceof EvaluationStatisticsDependent) {
+			((EvaluationStatisticsDependent)pipeline).setEvaluationStatistics(evaluationStatistics);
+		}
+
+		for (QueryOptimizer optimizer : pipeline.getOptimizers()) {
+			optimizer.optimize(optimizedExpr, dataset, bindings);
+		}
+		return optimizedExpr;
+	}
 
     /**
      * Called by RDF4J to evaluate a query or part of a query using a service
