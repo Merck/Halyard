@@ -187,9 +187,8 @@ public class HBaseSailConnection implements SailConnection {
 
 		SailConnectionQueryPreparer queryPreparer = new SailConnectionQueryPreparer(this, includeInferred, source);
 		QueryContext queryContext = new QueryContext(queryPreparer);
-		EvaluationStrategy strategy = sail.pushStrategy ? new HalyardEvaluationStrategy(source, queryContext, sail.tupleFunctionRegistry, sail.functionRegistry, dataset,
-				sail, sail.evaluationTimeout)
-				: new ExtendedEvaluationStrategy(source, dataset, sail, 0L, getStatistics());
+		EvaluationStrategy strategy = sail.pushStrategy ? new HalyardEvaluationStrategy(source, queryContext, sail.tupleFunctionRegistry, sail.functionRegistry, dataset, sail.federatedServiceResolver, sail.evaluationTimeout)
+				: new ExtendedEvaluationStrategy(source, dataset, sail.federatedServiceResolver, 0L, getStatistics());
 
 		queryContext.begin();
 		try {

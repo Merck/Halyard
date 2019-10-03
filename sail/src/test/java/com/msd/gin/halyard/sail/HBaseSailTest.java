@@ -437,6 +437,48 @@ public class HBaseSailTest {
         rep.shutDown();
     }
 
+	@Test
+	public void testEvaluateServiceSameTable() throws Exception {
+		ValueFactory vf = SimpleValueFactory.getInstance();
+		HBaseSail sail = new HBaseSail(hconn, "whateverservicesametable", true, 0, true, 0, null, null);
+		SailRepository rep = new SailRepository(sail);
+		rep.init();
+		Random r = new Random(458);
+		IRI pred = vf.createIRI("http://whatever/pred");
+		IRI meta = vf.createIRI("http://whatever/meta");
+		try (RepositoryConnection conn = rep.getConnection()) {
+			for (int i = 0; i < 1000; i++) {
+				IRI subj = vf.createIRI("http://whatever/subj#" + r.nextLong());
+				IRI graph = vf.createIRI("http://whatever/grp#" + r.nextLong());
+				conn.add(subj, pred, graph, meta);
+				for (int j = 0; j < 10; j++) {
+					IRI s = vf.createIRI("http://whatever/s#" + r.nextLong());
+					IRI p = vf.createIRI("http://whatever/p#" + r.nextLong());
+					IRI o = vf.createIRI("http://whatever/o#" + r.nextLong());
+					conn.add(s, p, o, graph);
+				}
+			}
+		}
+		rep.shutDown();
+
+		sail = new HBaseSail(hconn, "whateverservicesametable", true, 0, true, 0, null, null);
+		rep = new SailRepository(sail);
+		rep.init();
+		try (RepositoryConnection conn = rep.getConnection()) {
+			TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL, "select * where {" + "  SERVICE <" + HALYARD.NAMESPACE + "> {" + "    graph <http://whatever/meta> {" + "      ?subj <http://whatever/pred> ?graph"
+					+ "    }" + "    graph ?graph {" + "      ?s ?p ?o" + "    }" + "  }" + "}");
+			int count = 0;
+			try (TupleQueryResult res = q.evaluate()) {
+				while (res.hasNext()) {
+					count++;
+					res.next();
+				}
+			}
+			assertEquals(10000, count);
+		}
+		rep.shutDown();
+	}
+
 	/**
 	 * Tests FederatedService.ask().
 	 */

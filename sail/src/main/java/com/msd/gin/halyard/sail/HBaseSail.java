@@ -16,27 +16,28 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.TimestampedValueFactory;
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.utils.URLEncodedUtils;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.FN;
 import org.eclipse.rdf4j.model.vocabulary.SPIF;
 import org.eclipse.rdf4j.model.vocabulary.SPIN;
-import org.eclipse.rdf4j.query.QueryEvaluationException;
+import org.eclipse.rdf4j.query.algebra.evaluation.federation.AbstractFederatedServiceResolver;
+import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
@@ -51,20 +52,13 @@ import org.eclipse.rdf4j.spin.function.SelectTupleFunction;
 import org.eclipse.rdf4j.spin.function.spif.CanInvoke;
 import org.eclipse.rdf4j.spin.function.spif.ConvertSpinRDFToString;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.TimestampedValueFactory;
-import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
-import com.msd.gin.halyard.vocab.HALYARD;
-
 /**
  * HBaseSail is the RDF Storage And Inference Layer (SAIL) implementation on top of Apache HBase.
  * It implements the interfaces - {@code Sail, SailConnection} and {@code FederatedServiceResolver}. Currently federated queries are
  * only supported for queries across multiple graphs in one Halyard database.
  * @author Adam Sotona (MSD)
  */
-public class HBaseSail implements Sail, FederatedServiceResolver {
+public class HBaseSail implements Sail {
 
     /**
      * Ticker is a simple service interface that is notified when some data are processed.
@@ -86,9 +80,6 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
 	}
 
     private static final long STATUS_CACHING_TIMEOUT = 60000l;
-    private static final String MIN_TIMESTAMP_QUERY_PARAM = "minTimestamp";
-    private static final String MAX_TIMESTAMP_QUERY_PARAM = "maxTimestamp";
-    private static final String MAX_VERSIONS_QUERY_PARAM = "maxVersions";
 
     private final Configuration config; //the configuration of the HBase database
     final String tableName;
@@ -101,6 +92,7 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
     private long readOnlyTimestamp = -1;
     final String elasticIndexURL;
     final Ticker ticker;
+	final FederatedServiceResolver federatedServiceResolver;
 	FunctionRegistry functionRegistry = FunctionRegistry.getInstance();
 	TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
 	SpinParser spinParser = new SpinParser();
@@ -111,23 +103,26 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
 	Connection hConnection;
 	final boolean hConnectionIsShared; //whether a Connection is provided or we need to create our own
 
-	private final Cache<String, SailFederatedService> federatedServices = CacheBuilder.newBuilder().maximumSize(100)
-			.removalListener((evt) -> ((SailFederatedService) evt.getValue()).shutdown()).build();
 
-
-    private HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, ConnectionFactory connFactory) {
-    	this.hConnection = conn;
-    	this.hConnectionIsShared = (conn != null);
-        this.config = config;
-        this.tableName = tableName;
-        this.create = create;
-        this.splitBits = splitBits;
-        this.pushStrategy = pushStrategy;
-        this.evaluationTimeout = evaluationTimeout;
-        this.elasticIndexURL = elasticIndexURL;
-        this.ticker = ticker;
-		this.connFactory = connFactory;
+	private HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, ConnectionFactory connFactory) {
+		this(conn, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, connFactory, new HBaseFederatedServiceResolver(conn, config, tableName, evaluationTimeout, ticker));
     }
+
+	HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, ConnectionFactory connFactory,
+			FederatedServiceResolver fsr) {
+		this.hConnection = conn;
+		this.hConnectionIsShared = (conn != null);
+		this.config = config;
+		this.tableName = tableName;
+		this.create = create;
+		this.splitBits = splitBits;
+		this.pushStrategy = pushStrategy;
+		this.evaluationTimeout = evaluationTimeout;
+		this.elasticIndexURL = elasticIndexURL;
+		this.ticker = ticker;
+		this.connFactory = connFactory;
+		this.federatedServiceResolver = fsr;
+	}
 
     /**
 	 * Construct HBaseSail object with given arguments.
@@ -213,8 +208,15 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
 		}
 
     	this.statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(this), (String service) -> {
-			SailFederatedService fedServ = getService(service);
-			return fedServ != null ? ((HBaseSail) fedServ.getSail()).statistics : null;
+			HalyardEvaluationStatistics fedStats = null;
+			FederatedService fedServ = federatedServiceResolver.getService(service);
+			if (fedServ instanceof SailFederatedService) {
+				Sail sail = ((SailFederatedService) fedServ).getSail();
+				if (sail instanceof HBaseSail) {
+					fedStats = ((HBaseSail) sail).statistics;
+				}
+			}
+			return fedStats;
 		});
 
 		registerSpinParsingFunctions();
@@ -249,68 +251,21 @@ public class HBaseSail implements Sail, FederatedServiceResolver {
 	}
 
     @Override
-	public SailFederatedService getService(String serviceUrl) throws QueryEvaluationException {
-        //provide a service to query over Halyard graphs. Remote service queries are not supported.
-        if (serviceUrl.startsWith(HALYARD.NAMESPACE)) {
-			final String federatedTable;
-        	List<NameValuePair> queryParams;
-        	int queryParamsPos = serviceUrl.lastIndexOf('?');
-        	if (queryParamsPos != -1) {
-            	federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length(), queryParamsPos);
-                queryParams = URLEncodedUtils.parse(serviceUrl.substring(queryParamsPos+1), StandardCharsets.UTF_8);
-        	} else {
-        		federatedTable = serviceUrl.substring(HALYARD.NAMESPACE.length());
-        		queryParams = Collections.emptyList();
-        	}
-
-        	SailFederatedService federatedService;
-            try {
-				federatedService = federatedServices.get(serviceUrl, () -> {
-				    HBaseSail sail = new HBaseSail(hConnection, config, federatedTable, false, 0, true, evaluationTimeout, null, ticker, HBaseSailConnection.Factory.INSTANCE);
-					for (NameValuePair nvp : queryParams) {
-						switch (nvp.getName()) {
-						case MIN_TIMESTAMP_QUERY_PARAM:
-							sail.minTimestamp = HalyardTableUtils.toHalyardTimestamp(Long.parseLong(nvp.getValue()),
-									false);
-							break;
-						case MAX_TIMESTAMP_QUERY_PARAM:
-							sail.maxTimestamp = HalyardTableUtils.toHalyardTimestamp(Long.parseLong(nvp.getValue()),
-									false);
-							break;
-						case MAX_VERSIONS_QUERY_PARAM:
-							sail.maxVersions = Integer.parseInt(nvp.getValue());
-							break;
-						}
-					}
-				    sail.initialize();
-				    return new SailFederatedService(sail);
-				});
-			}
-			catch (ExecutionException e) {
-				if (e.getCause() instanceof RuntimeException) {
-					throw (RuntimeException) e.getCause();
-				} else {
-					throw new AssertionError(e.getClass());
+    public void shutDown() throws SailException { //release resources
+		if (!hConnectionIsShared) {
+			if (hConnection != null) {
+				try {
+					hConnection.close();
+					hConnection = null;
+				} catch (IOException e) {
+					throw new SailException(e);
 				}
 			}
-            return federatedService;
-        } else {
-            throw new QueryEvaluationException("Unsupported service URL: " + serviceUrl);
-        }
-    }
 
-    @Override
-    public void shutDown() throws SailException { //release resources
-		if (!hConnectionIsShared && hConnection != null) {
-			try {
-				hConnection.close();
-				hConnection = null;
-			} catch (IOException e) {
-				throw new SailException(e);
+			if (federatedServiceResolver instanceof AbstractFederatedServiceResolver) {
+				((AbstractFederatedServiceResolver) federatedServiceResolver).shutDown();
 			}
 		}
-
-		federatedServices.invalidateAll(); // release the references to the services
     }
 
     @Override
