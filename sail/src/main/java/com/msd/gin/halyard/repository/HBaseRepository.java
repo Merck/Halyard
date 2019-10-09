@@ -1,14 +1,15 @@
 package com.msd.gin.halyard.repository;
 
+import com.msd.gin.halyard.sail.HBaseSail;
+
 import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
-import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailException;
 
 public class HBaseRepository extends SailRepository {
 
-	public HBaseRepository(Sail sail) {
+	public HBaseRepository(HBaseSail sail) {
 		super(sail);
 	}
 

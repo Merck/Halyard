@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Admin;
@@ -201,7 +200,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                     try {
                         rep.init();
                         try(SailRepositoryConnection con = rep.getConnection()) {
-	                        Update upd = new HBaseUpdate(singleUpdate, con);
+	                        Update upd = new HBaseUpdate(singleUpdate, sail, con);
 	                        LOG.info("Execution of: {}", query);
 	                        context.setStatus(name);
 	                        upd.execute();

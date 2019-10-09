@@ -76,6 +76,7 @@ import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryContextInitializer;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExtendedEvaluationStrategy;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
@@ -97,6 +98,7 @@ public class HBaseSailConnection implements SailConnection {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseSailConnection.class);
 
     private static final int ELASTIC_RESULT_SIZE = 10000;
+	public static final String QUERY_CONTEXT_TABLE_ATTRIBUTE = Table.class.getName();
 
     private final HBaseSail sail;
 	private Table table;
@@ -187,15 +189,18 @@ public class HBaseSailConnection implements SailConnection {
 
 		SailConnectionQueryPreparer queryPreparer = new SailConnectionQueryPreparer(this, includeInferred, source);
 		QueryContext queryContext = new QueryContext(queryPreparer);
-		EvaluationStrategy strategy = sail.pushStrategy ? new HalyardEvaluationStrategy(source, queryContext, sail.tupleFunctionRegistry, sail.functionRegistry, dataset, sail.federatedServiceResolver, sail.evaluationTimeout)
-				: new ExtendedEvaluationStrategy(source, dataset, sail.federatedServiceResolver, 0L, getStatistics());
+		queryContext.setAttribute(QUERY_CONTEXT_TABLE_ATTRIBUTE, table);
+		EvaluationStrategy strategy = sail.pushStrategy ? new HalyardEvaluationStrategy(source, queryContext, sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), dataset, sail.getFederatedServiceResolver(), sail.evaluationTimeout)
+				: new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), 0L, getStatistics());
 
 		queryContext.begin();
 		try {
+			initQueryContext(queryContext);
+
 			if(!(tupleExpr instanceof ServiceRoot)) {
 				// if this is a Halyard federated query then the full query has already passed through the optimizer so don't need to re-run these again
-				new SpinFunctionInterpreter(sail.spinParser, source, sail.functionRegistry).optimize(tupleExpr, dataset, bindings);
-				new SpinMagicPropertyInterpreter(sail.spinParser, source, sail.tupleFunctionRegistry, null).optimize(tupleExpr, dataset, bindings);
+				new SpinFunctionInterpreter(sail.getSpinParser(), source, sail.getFunctionRegistry()).optimize(tupleExpr, dataset, bindings);
+				new SpinMagicPropertyInterpreter(sail.getSpinParser(), source, sail.getTupleFunctionRegistry(), null).optimize(tupleExpr, dataset, bindings);
 			}
 			strategy.optimize(tupleExpr, getStatistics(), bindings);
 			LOG.debug("Evaluated TupleExpr after optimization:\n{}", tupleExpr);
@@ -215,9 +220,25 @@ public class HBaseSailConnection implements SailConnection {
 				throw new SailException(ex);
 			}
 		} finally {
-			queryContext.end();
+			try {
+				destroyQueryContext(queryContext);
+			} finally {
+				queryContext.end();
+			}
 		}
     }
+
+	private void initQueryContext(QueryContext qctx) {
+		for (QueryContextInitializer initializer : sail.getQueryContextInitializers()) {
+			initializer.init(qctx);
+		}
+	}
+
+	private void destroyQueryContext(QueryContext qctx) {
+		for (QueryContextInitializer initializer : sail.getQueryContextInitializers()) {
+			initializer.destroy(qctx);
+		}
+	}
 
     protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(EvaluationStrategy strategy, TupleExpr tupleExpr) {
         return strategy.evaluate(tupleExpr, EmptyBindingSet.getInstance());

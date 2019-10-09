@@ -22,6 +22,7 @@ import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -36,6 +37,7 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.FN;
 import org.eclipse.rdf4j.model.vocabulary.SPIF;
 import org.eclipse.rdf4j.model.vocabulary.SPIN;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryContextInitializer;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.AbstractFederatedServiceResolver;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
@@ -92,10 +94,11 @@ public class HBaseSail implements Sail {
     private long readOnlyTimestamp = -1;
     final String elasticIndexURL;
     final Ticker ticker;
-	final FederatedServiceResolver federatedServiceResolver;
-	FunctionRegistry functionRegistry = FunctionRegistry.getInstance();
-	TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
-	SpinParser spinParser = new SpinParser();
+	private FederatedServiceResolver federatedServiceResolver;
+	private FunctionRegistry functionRegistry = FunctionRegistry.getInstance();
+	private TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
+	private SpinParser spinParser = new SpinParser();
+	private final List<QueryContextInitializer> queryContextInitializers = new ArrayList<>();
 	long minTimestamp = 0;
 	long maxTimestamp = Long.MAX_VALUE;
 	int maxVersions = 1;
@@ -248,6 +251,46 @@ public class HBaseSail implements Sail {
 		if (!tupleFunctionRegistry.has(SPIN.SELECT_PROPERTY.stringValue())) {
 			tupleFunctionRegistry.add(new SelectTupleFunction(spinParser));
 		}
+	}
+
+	public FunctionRegistry getFunctionRegistry() {
+		return functionRegistry;
+	}
+
+	public void setFunctionRegistry(FunctionRegistry registry) {
+		this.functionRegistry = registry;
+	}
+
+	public TupleFunctionRegistry getTupleFunctionRegistry() {
+		return tupleFunctionRegistry;
+	}
+
+	public void setTupleFunctionRegistry(TupleFunctionRegistry registry) {
+		this.tupleFunctionRegistry = registry;
+	}
+
+	public FederatedServiceResolver getFederatedServiceResolver() {
+		return federatedServiceResolver;
+	}
+
+	public void setFederatedServiceResolver(FederatedServiceResolver resolver) {
+		this.federatedServiceResolver = resolver;
+	}
+
+	public void addQueryContextInitializer(QueryContextInitializer initializer) {
+		this.queryContextInitializers.add(initializer);
+	}
+
+	protected List<QueryContextInitializer> getQueryContextInitializers() {
+		return this.queryContextInitializers;
+	}
+
+	public SpinParser getSpinParser() {
+		return spinParser;
+	}
+
+	public void setSpinParser(SpinParser parser) {
+		this.spinParser = parser;
 	}
 
     @Override

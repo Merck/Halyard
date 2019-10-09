@@ -1,7 +1,8 @@
 package com.msd.gin.halyard.repository;
 
-import com.msd.gin.halyard.vocab.HALYARD;
+import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.TimestampedUpdateContext;
+import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -60,8 +61,11 @@ import org.eclipse.rdf4j.spin.SpinParser;
 import org.slf4j.LoggerFactory;
 
 public class HBaseUpdate extends SailUpdate {
-	public HBaseUpdate(ParsedUpdate parsedUpdate, SailRepositoryConnection con) {
+	private final HBaseSail sail;
+
+	public HBaseUpdate(ParsedUpdate parsedUpdate, HBaseSail sail, SailRepositoryConnection con) {
 		super(parsedUpdate, con);
+		this.sail = sail;
 	}
 
 	@Override
@@ -71,7 +75,7 @@ public class HBaseUpdate extends SailUpdate {
 		Map<UpdateExpr, Dataset> datasetMapping = parsedUpdate.getDatasetMapping();
 
 		SailRepositoryConnection con = getConnection();
-		HBaseUpdateExecutor executor = new HBaseUpdateExecutor(con.getSailConnection(), con.getValueFactory(), con.getParserConfig());
+		HBaseUpdateExecutor executor = new HBaseUpdateExecutor(sail, con.getSailConnection(), con.getValueFactory(), con.getParserConfig());
 
 		boolean localTransaction = false;
 		try {
@@ -119,11 +123,13 @@ public class HBaseUpdate extends SailUpdate {
 	}
 
 	static class HBaseUpdateExecutor extends SailUpdateExecutor {
-		SailConnection con;
-		ValueFactory vf;
+		final HBaseSail sail;
+		final SailConnection con;
+		final ValueFactory vf;
 
-		public HBaseUpdateExecutor(SailConnection con, ValueFactory vf, ParserConfig loadConfig) {
+		public HBaseUpdateExecutor(HBaseSail sail, SailConnection con, ValueFactory vf, ParserConfig loadConfig) {
 			super(con, vf, loadConfig);
+			this.sail = sail;
 			this.con = con;
 			this.vf = vf;
 		}
@@ -187,7 +193,7 @@ public class HBaseUpdate extends SailUpdate {
 		}
 
 		private TupleExpr optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-			SpinParser spinParser = new SpinParser();
+			SpinParser spinParser = sail.getSpinParser();
 			TripleSource source = new TripleSource() {
 				@Override
 				public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
@@ -199,7 +205,7 @@ public class HBaseUpdate extends SailUpdate {
 					return vf;
 				}
 			};
-			TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
+			TupleFunctionRegistry tupleFunctionRegistry = sail.getTupleFunctionRegistry();
 			new SpinMagicPropertyInterpreter(spinParser, source, tupleFunctionRegistry, null).optimize(tupleExpr, dataset, bindings);
 			return tupleExpr;
 		}
