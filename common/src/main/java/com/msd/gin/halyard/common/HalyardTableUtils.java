@@ -1248,7 +1248,7 @@ public final class HalyardTableUtils {
 			hasHash = (hash != null);
 		}
 
-		if (hash == null) {
+		if (!hasHash) {
 			hash = hashUnique(v.toString().getBytes(StandardCharsets.UTF_8));
 			// literal prefix
 			if (v instanceof Literal) {

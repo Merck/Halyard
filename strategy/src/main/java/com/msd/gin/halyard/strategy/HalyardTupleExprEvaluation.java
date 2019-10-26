@@ -16,6 +16,9 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.strategy.collections.BigHashSet;
+import com.msd.gin.halyard.strategy.collections.Sorter;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.HashSet;
@@ -97,9 +100,6 @@ import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
-
-import com.msd.gin.halyard.strategy.collections.BigHashSet;
-import com.msd.gin.halyard.strategy.collections.Sorter;
 
 /**
  * Evaluates {@link TupleExpression}s and it's sub-interfaces and implementations.
@@ -306,6 +306,10 @@ final class HalyardTupleExprEvaluation {
             public boolean push(BindingSet bs) throws InterruptedException {
                 return parent.push(bs == null ? null : ProjectionIterator.project(projection.getProjectionElemList(), bs, bindings, includeAll));
             }
+            @Override
+            public String toString() {
+            	return "ProjectionBindingSetPipe";
+            }
         }, projection.getArg(), pushDownBindings);
     }
 
@@ -339,6 +343,10 @@ final class HalyardTupleExprEvaluation {
                     }
                 }
                 return true;
+            }
+            @Override
+            public String toString() {
+            	return "MultiProjectionBindingSetPipe";
             }
         }, multiProjection.getArg(), bindings);
     }
@@ -383,6 +391,10 @@ final class HalyardTupleExprEvaluation {
                     // failed to evaluate condition
                     return false;
                 }
+            }
+            @Override
+            public String toString() {
+            	return "FilterBindingSetPipe";
             }
         }, filter.getArg(), bindings);
     }
@@ -498,6 +510,10 @@ final class HalyardTupleExprEvaluation {
                         sorter.close();
                     }
                 }
+                @Override
+                public String toString() {
+                	return "OrderBindingSetPipe";
+                }
             }, order.getArg(), bindings);
 //        } catch (IOException e) {
 //            throw new QueryEvaluationException(e);
@@ -540,6 +556,10 @@ final class HalyardTupleExprEvaluation {
                 }
                 return parent.push(bs);
             }
+            @Override
+            public String toString() {
+            	return "ReducedBindingSetPipe";
+            }
         }, reduced.getArg(), bindings);
     }
 
@@ -572,6 +592,10 @@ final class HalyardTupleExprEvaluation {
                     }
                 }
                 return parent.push(bs);
+            }
+            @Override
+            public String toString() {
+            	return "DistinctBindingSetPipe";
             }
         }, distinct.getArg(), bindings);
     }
@@ -615,6 +639,10 @@ final class HalyardTupleExprEvaluation {
                 }
                 return parent.push(targetBindings);
             }
+            @Override
+            public String toString() {
+            	return "ExtensionBindingSetPipe";
+            }
         }, extension.getArg(), bindings);
     }
 
@@ -643,6 +671,10 @@ final class HalyardTupleExprEvaluation {
                 } else {
                     return parent.push(null);
                 }
+            }
+            @Override
+            public String toString() {
+            	return "SliceBindingSetPipe";
             }
         }, slice.getArg(), bindings);
     }
@@ -772,6 +804,10 @@ final class HalyardTupleExprEvaluation {
                     return parent.push(bs);
                 }
             }
+            @Override
+            public String toString() {
+            	return "JoinBindingSetPipe(right)";
+            }
         };
         evaluateTupleExpr(new BindingSetPipe(rightPipe) {
             @Override
@@ -783,6 +819,10 @@ final class HalyardTupleExprEvaluation {
                     evaluateTupleExpr(parent, join.getRightArg(), bs);
                     return true;
                 }
+            }
+            @Override
+            public String toString() {
+            	return "JoinBindingSetPipe(left)";
             }
         }, join.getLeftArg(), bindings);
     }
@@ -832,6 +872,10 @@ final class HalyardTupleExprEvaluation {
 		}
                 return true;
             }
+            @Override
+            public String toString() {
+            	return "LeftJoinBindingSetPipe(right)";
+            }
         };
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
             AtomicBoolean leftInProgress = new AtomicBoolean(true);
@@ -878,6 +922,10 @@ final class HalyardTupleExprEvaluation {
                             }
                             return true;
                         }
+                        @Override
+                        public String toString() {
+                        	return "LeftJoinBindingSetPipe(left)";
+                        }
                     }, leftJoin.getRightArg(), leftBindings);
                 }
                 return true;
@@ -911,6 +959,10 @@ final class HalyardTupleExprEvaluation {
                 } else {
                     return parent.push(bs);
                 }
+            }
+            @Override
+            public String toString() {
+            	return "UnionBindingSetPipe";
             }
         };
         evaluateTupleExpr(pipe, union.getLeftArg(), bindings);
@@ -954,9 +1006,17 @@ final class HalyardTupleExprEvaluation {
                                 return false;
                             }
                         }
+                        @Override
+                        public String toString() {
+                        	return "IntersectionBindingSetPipe(left)";
+                        }
                     }, intersection.getLeftArg(), bindings);
                     return false;
                 }
+            }
+            @Override
+            public String toString() {
+            	return "IntersectionBindingSetPipe(right)";
             }
         }, intersection.getRightArg(), bindings);
     }
@@ -1011,11 +1071,18 @@ final class HalyardTupleExprEvaluation {
                             }
                             return parent.push(bs);
                         }
+                        @Override
+                        public String toString() {
+                        	return "DifferenceBindingSetPipe(left)";
+                        }
                     }, difference.getLeftArg(), bindings);
                 }
                 return false;
             }
-
+            @Override
+            public String toString() {
+            	return "DifferenceBindingSetPipe(right)";
+            }
         }, difference.getRightArg(), bindings);
     }
 

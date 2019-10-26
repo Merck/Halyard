@@ -16,14 +16,17 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.common.Timestamped;
+import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
+import com.msd.gin.halyard.vocab.HALYARD;
+
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.WeakHashMap;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -34,7 +37,6 @@ import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
-import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.SESAME;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
@@ -49,9 +51,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 
-import com.msd.gin.halyard.common.Timestamped;
-import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
-
 /**
  * This class evaluates statement patterns as part of query evaluations. It is a helper class for the {@code HalyardEvaluationStrategy}
  * @author Adam Sotona (MSD)
@@ -59,12 +58,11 @@ import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 final class HalyardStatementPatternEvaluation {
 
     private static final int THREADS = 50;
-    private static final IRI SEARCH_TYPE = SimpleValueFactory.getInstance().createIRI("http://merck.github.io/Halyard/ns#search");
 
     /**
      * A holder for the BindingSetPipe and the iterator over a tree of query sub-parts
      */
-    private static class PipeAndIteration {
+    private static class PipeAndIteration implements Comparable<PipeAndIteration> {
 
         private final HalyardTupleExprEvaluation.BindingSetPipe pipe;
         private final CloseableIteration<BindingSet, QueryEvaluationException> iter;
@@ -83,101 +81,44 @@ final class HalyardStatementPatternEvaluation {
             this.iter = iter;
             this.priority = priority;
         }
-    }
 
-    /**
-     * Implementation of a priority queue as an array of typed {@code LinkedList}s,
-     * used in this class to create priority queue of {@code PipeAndIteration} objects
-     */
-    private static class PriorityQueue<E> {
-
-        @SuppressWarnings("unchecked")
-        private LinkedList<E>[] q = new LinkedList[64];
-
-        /**
-         * Add an object to the queue at the specified level. Putting an object in the queue will notify any threads that are waiting on a successful
-         * {@code this.take()} that they should wake up and try another call this {@code this.poll()}.
-         * @param level the level to add at (the index of the {@code LinkedList} that it is being added to)
-         * @param e the object to add
-         */
-        public synchronized void put(int level, E e) {
-            if (q.length <= level) { //need to extend the queue
-                q = Arrays.copyOf(q, level + 16);
+		public boolean pushNext() {
+        	try {
+                if (pipe.isClosed()) {
+                    iter.close();
+                } else {
+                	if(iter.hasNext()) {
+                        BindingSet bs = iter.next();
+                        if (pipe.push(bs)) { //true indicates more data is expected from this binding set, put it on the queue
+                            if (bs != null) {
+                            	return true;
+                            }
+                        } else { //no more data from this binding set close the iterator of this PipeAndIteration
+                            iter.close();
+                        }
+                	} else {
+                		iter.close();
+                		pipe.push(null);
+                	}
+                }
+            } catch (Exception e) {
+                pipe.handleException(e);
             }
-            LinkedList<E> subQueue = q[level];
-            if (subQueue == null) { //create the sub-queue if it doesn't already exist
-                subQueue = new LinkedList<>();
-                q[level] = subQueue;
-            }
-            subQueue.addLast(e); // add the object to the end of the subQueue
-            notify(); //notify any waiting threads that there is now data available
-        }
+        	return false;
+		}
 
-        /**
-         * Find the first non-null value in the array of Linked Lists searching in descending order of {@code level}.
-         * @return the first non-null value or {@codee null} if there is nothing in the {@code PriorityQueue}
-         */
-        private E poll() {
-            for (int i=q.length - 1; i >= 0; i--) {
-                LinkedList<E> subQueue = q[i];
-                E e = subQueue == null || subQueue.isEmpty() ? null : subQueue.removeFirst();
-                if (e != null) return e;
-            }
-            return null;
-        }
-
-        /**
-         * Find the first non-null value in the array of Linked Lists searching in descending order of {@code level} or block until something is available.
-         * Essentially, wait until {@code this.poll()} is non-null;
-         * @return The first {@code E} in the highest priority group
-         * @throws InterruptedException
-         */
-        public synchronized E take() throws InterruptedException {
-            E e;
-            while ((e = poll()) == null) {
-                wait();
-            }
-            return e;
-        }
-    }
-
-    /**
-     * Wraps an object so that a call to {@code hashCode()} will return the {@code System.identityHashCode()} and not invoke any overridden
-     * implementation of that method. Also overrides any custom implementation of {@code equals()}. The end result is that objects are compared for canonical
-     * identity (they are references of the same object) and not logical identity (the objects are logically equivalent) and that calls to {@code hashCode()}
-     * and {@code equals()} return consistent results as required by JDK contract.
-     *
-     * @param <T>
-     */
-    private static class IdentityWrapper<T> {
-
-        int hash;
-        T o;
-
-        IdentityWrapper(T o) {
-            this.o = o;
-            hash = System.identityHashCode(o);
-        }
-
-        @Override
-        public int hashCode() {
-            return hash;
-        }
-
-        @SuppressWarnings("rawtypes")
 		@Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            return (o instanceof IdentityWrapper) && (this.o == ((IdentityWrapper)o).o);
-        }
+		public int compareTo(PipeAndIteration o) {
+			return o.priority - this.priority;
+		}
     }
 
 
     private final Dataset dataset;
     private final TripleSource tripleSource;
     //a map of query model nodes and their priority
-    private static final Map<IdentityWrapper<QueryModelNode>, Integer> PRIORITY_MAP_CACHE = Collections.synchronizedMap(new WeakHashMap<>());
-    private static final PriorityQueue<PipeAndIteration> PRIORITY_QUEUE = new PriorityQueue<>();
+    private static final Cache<QueryModelNode, Integer> PRIORITY_MAP_CACHE = CacheBuilder.newBuilder().weakKeys().build();
+    private static final PriorityBlockingQueue<PipeAndIteration> PRIORITY_QUEUE = new PriorityBlockingQueue<>(64);
 
     /**
      * Queues a binding set and {@code QueryModelNode} for evaluation using the current priority.
@@ -189,7 +130,7 @@ final class HalyardStatementPatternEvaluation {
 			CloseableIteration<BindingSet, QueryEvaluationException> iter,
 			QueryModelNode node) {
         int priority = getPriorityForNode(node);
-		PRIORITY_QUEUE.put(priority, new PipeAndIteration(pipe, iter, priority));
+		PRIORITY_QUEUE.put(new PipeAndIteration(pipe, iter, priority));
     }
 
     /**
@@ -198,7 +139,7 @@ final class HalyardStatementPatternEvaluation {
      * @return the priority of the node, a count of the number of child nodes of {@code node}.
      */
     private static int getPriorityForNode(final QueryModelNode node) {
-        Integer p = PRIORITY_MAP_CACHE.get(new IdentityWrapper<>(node));
+        Integer p = PRIORITY_MAP_CACHE.getIfPresent(node);
         if (p != null) {
             return p;
         } else {
@@ -211,7 +152,7 @@ final class HalyardStatementPatternEvaluation {
                 @Override
                 protected void meetNode(QueryModelNode n) throws RuntimeException {
                     int pp = counter.getAndIncrement();
-                    PRIORITY_MAP_CACHE.put(new IdentityWrapper<>(n), pp);
+                    PRIORITY_MAP_CACHE.put(n, pp);
                     if (n == node || n == node.getParentNode()) ret.set(pp);
                     super.meetNode(n);
                 }
@@ -227,7 +168,7 @@ final class HalyardStatementPatternEvaluation {
                     final int checkpoint = counter.get();
                     n.visitChildren(this);
                     int pp = counter.getAndIncrement();
-                    PRIORITY_MAP_CACHE.put(new IdentityWrapper<>(n), pp);
+                    PRIORITY_MAP_CACHE.put(n, pp);
                     if (n == node) ret.set(pp);
                     counter.getAndUpdate((int count) -> 2 * count - checkpoint + 1); //at least double the distance to have a space for service optimizations
                 }
@@ -262,30 +203,12 @@ final class HalyardStatementPatternEvaluation {
                         while (true) {
                             PipeAndIteration pai = PRIORITY_QUEUE.take(); //take the highest priority PipeAndIteration object
                             if (pai.priority % THREADS == threadNum) {
-                                PRIORITY_QUEUE.put(pai.priority, pai); //always keep some threads out of execution to avoid thread exhaustion
-                                Thread.sleep(100);
+                                PRIORITY_QUEUE.put(pai); //always keep some threads out of execution to avoid thread exhaustion
+                                Thread.sleep(1);
                             } else {
-                            	try {
-	                                if (pai.pipe.isClosed()) {
-	                                    pai.iter.close();
-	                                } else {
-	                                	if(pai.iter.hasNext()) {
-		                                    BindingSet bs = pai.iter.next();
-		                                    if (pai.pipe.push(bs)) { //true indicates more data is expected from this binding set, put it on the queue
-		                                        if (bs != null) {
-		                                            PRIORITY_QUEUE.put(pai.priority, pai);
-		                                        }
-		                                    } else { //no more data from this binding set close the iterator of this PipeAndIteration
-		                                        pai.iter.close();
-		                                    }
-	                                	} else {
-	                                		pai.iter.close();
-	                                		pai.pipe.push(null);
-	                                	}
-	                                }
-	                            } catch (Exception e) {
-	                                pai.pipe.handleException(e);
-	                            }
+                            	if (pai.pushNext()) {
+                                    PRIORITY_QUEUE.put(pai);
+                            	}
                             }
                         }
                     } catch (InterruptedException e) {
@@ -448,6 +371,7 @@ final class HalyardStatementPatternEvaluation {
             }
         } catch (InterruptedException | QueryEvaluationException e) {
             parent.handleException(e);
+            return;
         }
 
         // The same variable might have been used multiple times in this
@@ -508,7 +432,7 @@ final class HalyardStatementPatternEvaluation {
                 if (objVar != null && !objVar.isConstant()) {
                     Value val = result.getValue(objVar.getName());
                     // override Halyard search type object literals with real object value from the statement
-                    if (!result.hasBinding(objVar.getName()) || ((val instanceof Literal) && SEARCH_TYPE.equals(((Literal)val).getDatatype()))) {
+                    if (!result.hasBinding(objVar.getName()) || ((val instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal)val).getDatatype()))) {
                         result.setBinding(objVar.getName(), st.getObject());
                     }
                 }

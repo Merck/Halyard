@@ -249,28 +249,14 @@ public class HBaseSailConnection implements SailConnection {
 
         //generate an iterator over the identifiers of the contexts available in Halyard.
         final CloseableIteration<? extends Statement, SailException> scanner = getStatements(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, null, true, HALYARD.STATS_GRAPH_CONTEXT);
-        return new CloseableIteration<Resource, SailException>() {
-            @Override
-            public void close() throws SailException {
-                scanner.close();
-            }
+        return new ConvertingIteration<Statement, Resource, SailException>(scanner) {
 
-            @Override
-            public boolean hasNext() throws SailException {
-                return scanner.hasNext();
-            }
+			@Override
+			protected Resource convert(Statement stmt) throws SailException {
+				return (IRI) stmt.getObject();
+			}
 
-            @Override
-            public Resource next() throws SailException {
-                return (IRI)scanner.next().getObject();
-            }
-
-            @Override
-            public void remove() throws SailException {
-                throw new UnsupportedOperationException();
-            }
-
-        };
+		};
     }
 
     @Override
