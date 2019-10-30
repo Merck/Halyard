@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
@@ -37,9 +39,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.WeakHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hbase.KeyValue;
@@ -88,7 +89,6 @@ import org.eclipse.rdf4j.sail.UpdateContext;
 import org.eclipse.rdf4j.sail.spin.SpinFunctionInterpreter;
 import org.eclipse.rdf4j.sail.spin.SpinMagicPropertyInterpreter;
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.slf4j.Logger;
@@ -530,13 +530,13 @@ public class HBaseSailConnection implements SailConnection {
         }
     }
 
-	private static final Map<String, List<RDFObject>> SEARCH_CACHE = new WeakHashMap<>();
+	private static final Cache<String, List<RDFObject>> SEARCH_CACHE = CacheBuilder.newBuilder().maximumSize(100).expireAfterAccess(1, TimeUnit.MINUTES).build();
 
     //Scans the Halyard table for statements that match the specified pattern
     private class LiteralSearchStatementScanner extends StatementScanner {
 
 		final ValueFactory vf = sail.getValueFactory();
-		Iterator<RDFObject> objectHashes = null;
+		Iterator<RDFObject> objects = null;
         private final String literalSearchQuery;
 
         public LiteralSearchStatementScanner(long startTime, Resource subj, IRI pred, String literalSearchQuery, Resource... contexts) throws SailException {
@@ -551,49 +551,49 @@ public class HBaseSailConnection implements SailConnection {
         protected Result nextResult() throws IOException {
             while (true) {
                 if (obj == null) {
-                    if (objectHashes == null) { //perform ES query and parse results
-                        synchronized (SEARCH_CACHE) {
-							List<RDFObject> objectHashesList = SEARCH_CACHE.get(literalSearchQuery);
-                            if (objectHashesList == null) {
-                                objectHashesList = new ArrayList<>();
-                                HttpURLConnection http = (HttpURLConnection)(new URL(sail.elasticIndexURL + "/_search").openConnection());
-                                try {
-                                    http.setRequestMethod("POST");
-                                    http.setDoOutput(true);
-                                    http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                                    http.connect();
-                                    try (PrintStream out = new PrintStream(http.getOutputStream(), true, "UTF-8")) {
+                    if (objects == null) { //perform ES query and parse results
+						try {
+							List<RDFObject> objectList = SEARCH_CACHE.get(literalSearchQuery, () -> {
+								ArrayList<RDFObject> objList = new ArrayList<>();
+								HttpURLConnection http = (HttpURLConnection) (new URL(sail.elasticIndexURL + "/_search").openConnection());
+								try {
+									http.setRequestMethod("POST");
+									http.setDoOutput(true);
+									http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+									http.connect();
+									try (PrintStream out = new PrintStream(http.getOutputStream(), true, "UTF-8")) {
 										out.print("{\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"size\":" + ELASTIC_RESULT_SIZE + "}");
-                                    }
-                                    int response = http.getResponseCode();
-                                    String msg = http.getResponseMessage();
-                                    if (response != 200) {
-                                        LOG.info("ElasticSearch error response: " + msg + " on query: " + literalSearchQuery);
-                                    } else {
-                                        try (InputStreamReader isr = new InputStreamReader(http.getInputStream(), "UTF-8")) {
-                                            JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
-                                            for (int i=0; i<hits.length(); i++) {
+									}
+									int response = http.getResponseCode();
+									String msg = http.getResponseMessage();
+									if (response != 200) {
+										LOG.info("ElasticSearch error response: " + msg + " on query: " + literalSearchQuery);
+									} else {
+										try (InputStreamReader isr = new InputStreamReader(http.getInputStream(), "UTF-8")) {
+											JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
+											for (int i = 0; i < hits.length(); i++) {
 												JSONObject source = hits.getJSONObject(i).getJSONObject("_source");
-												if(source.has("lang")) {
-													objectHashesList.add(RDFObject.create(vf.createLiteral(source.getString("label"), source.getString("lang"))));
+												if (source.has("lang")) {
+													objList.add(RDFObject.create(vf.createLiteral(source.getString("label"), source.getString("lang"))));
 												} else {
-													objectHashesList.add(RDFObject.create(vf.createLiteral(source.getString("label"), vf.createIRI(source.getString("datatype")))));
+													objList.add(RDFObject.create(vf.createLiteral(source.getString("label"), vf.createIRI(source.getString("datatype")))));
 												}
-                                            }
-                                        }
-                                        SEARCH_CACHE.put(new String(literalSearchQuery), objectHashesList);
-                                    }
-								} catch (JSONException ex) {
-                                    throw new IOException(ex);
-                                } finally {
-                                    http.disconnect();
-                                }
-                            }
-                            objectHashes = objectHashesList.iterator();
-                        }
+											}
+										}
+									}
+								} finally {
+									http.disconnect();
+								}
+								objList.trimToSize();
+								return objList;
+							});
+							objects = objectList.iterator();
+						} catch (ExecutionException ex) {
+							throw new IOException(ex.getCause());
+						}
                     }
-                    if (objectHashes.hasNext()) {
-                        obj = objectHashes.next();
+                    if (objects.hasNext()) {
+                        obj = objects.next();
                     } else {
                         return null;
                     }
