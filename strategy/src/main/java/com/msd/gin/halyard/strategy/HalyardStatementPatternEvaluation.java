@@ -20,13 +20,18 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
+import com.msd.gin.halyard.strategy.HalyardTupleExprEvaluation.BindingSetPipe;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -62,10 +67,9 @@ final class HalyardStatementPatternEvaluation {
     /**
      * A holder for the BindingSetPipe and the iterator over a tree of query sub-parts
      */
-    private static class PipeAndIteration implements Comparable<PipeAndIteration> {
-
-        private final HalyardTupleExprEvaluation.BindingSetPipe pipe;
-        private final CloseableIteration<BindingSet, QueryEvaluationException> iter;
+    private static class PipeAndIteration implements Comparable<PipeAndIteration>, Runnable {
+        final HalyardTupleExprEvaluation.BindingSetPipe pipe;
+        final CloseableIteration<BindingSet, QueryEvaluationException> iter;
         private final int priority;
 
         /**
@@ -108,17 +112,46 @@ final class HalyardStatementPatternEvaluation {
 		}
 
 		@Override
-		public int compareTo(PipeAndIteration o) {
+    	public final void run() {
+        	if (pushNext()) {
+                EXECUTOR.execute(this);
+        	}
+    	}
+
+		@Override
+		public final int compareTo(PipeAndIteration o) {
 			return o.priority - this.priority;
 		}
     }
 
+    private static class PipeAllAndIteration extends PipeAndIteration {
+		public PipeAllAndIteration(BindingSetPipe pipe, CloseableIteration<BindingSet, QueryEvaluationException> iter, int priority) {
+			super(pipe, iter, priority);
+		}
 
-    private final Dataset dataset;
-    private final TripleSource tripleSource;
+		@Override
+		public boolean pushNext() {
+			while (super.pushNext()) {
+				;
+			}
+			return false;
+		}
+    }
+
+    private static Executor createExecutor() {
+        ThreadGroup tg = new ThreadGroup("Halyard Executors");
+        ThreadFactory tf = (r) -> {
+        	Thread thr = new Thread(tg, r);
+        	thr.setDaemon(true);
+        	return thr;
+        };
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(THREADS, THREADS, 60L, TimeUnit.SECONDS, new PriorityBlockingQueue<>(64), tf);
+        executor.allowCoreThreadTimeOut(true);
+        return executor;
+    }
+    private static final Executor EXECUTOR = createExecutor();
     //a map of query model nodes and their priority
     private static final Cache<QueryModelNode, Integer> PRIORITY_MAP_CACHE = CacheBuilder.newBuilder().weakKeys().build();
-    private static final PriorityBlockingQueue<PipeAndIteration> PRIORITY_QUEUE = new PriorityBlockingQueue<>(64);
 
     /**
      * Queues a binding set and {@code QueryModelNode} for evaluation using the current priority.
@@ -130,10 +163,17 @@ final class HalyardStatementPatternEvaluation {
 			CloseableIteration<BindingSet, QueryEvaluationException> iter,
 			QueryModelNode node) {
         int priority = getPriorityForNode(node);
-		PRIORITY_QUEUE.put(new PipeAndIteration(pipe, iter, priority));
+		EXECUTOR.execute(new PipeAndIteration(pipe, iter, priority));
     }
 
-    /**
+	static void enqueueAll(HalyardTupleExprEvaluation.BindingSetPipe pipe,
+			CloseableIteration<BindingSet, QueryEvaluationException> iter,
+			QueryModelNode node) {
+        int priority = getPriorityForNode(node);
+		EXECUTOR.execute(new PipeAllAndIteration(pipe, iter, priority));
+    }
+
+	/**
      * Get the priority of this node from the PRIORITY_MAP_CACHE or determine the priority and then cache it. Also caches priority for sub-nodes of {@code node}
      * @param node the node that you want the priority for
      * @return the priority of the node, a count of the number of child nodes of {@code node}.
@@ -185,41 +225,8 @@ final class HalyardStatementPatternEvaluation {
         }
     }
 
-    /**
-     * Static Initializer, sets up the thread group for execution of queries
-     */
-    static {
-        ThreadGroup tg = new ThreadGroup("Halyard Executors");
-        for (int i = 0; i < THREADS; i++) {
-            final int threadNum = i;
-            Thread t = new Thread(tg, new Runnable() {
-
-            		/**
-            		 * Defines the behavior of every evaluation thread
-            		 */
-            		@Override
-                public void run() {
-                    try {
-                        while (true) {
-                            PipeAndIteration pai = PRIORITY_QUEUE.take(); //take the highest priority PipeAndIteration object
-                            if (pai.priority % THREADS == threadNum) {
-                                PRIORITY_QUEUE.put(pai); //always keep some threads out of execution to avoid thread exhaustion
-                                Thread.sleep(1);
-                            } else {
-                            	if (pai.pushNext()) {
-                                    PRIORITY_QUEUE.put(pai);
-                            	}
-                            }
-                        }
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            });
-            t.setDaemon(true);
-            t.start();
-        }
-    }
+    private final Dataset dataset;
+    private final TripleSource tripleSource;
 
     /**
      * Constructor

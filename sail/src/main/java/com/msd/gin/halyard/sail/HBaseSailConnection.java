@@ -28,6 +28,7 @@ import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
+import com.msd.gin.halyard.strategy.TimeoutTracker;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
@@ -609,8 +610,6 @@ public class HBaseSailConnection implements SailConnection {
         }
     }
 
-	private static final int TIMEOUT_POLL_MILLIS = 1000;
-
 	private class StatementScanner implements CloseableIteration<Statement, SailException> {
 
         private final RDFSubject subj;
@@ -620,12 +619,9 @@ public class HBaseSailConnection implements SailConnection {
         protected final List<Resource> contextsList;
         protected Iterator<Resource> contexts;
         private ResultScanner rs = null;
-        private final long endTime;
         private Statement next = null;
         private Iterator<Statement> iter = null;
-		private int counter = 0;
-		private int timeoutCount = 1;
-		private long counterStartTime;
+		private final TimeoutTracker timeoutTracker;
 
         public StatementScanner(long startTime, Resource subj, IRI pred, Value obj, Resource...contexts) throws SailException {
             this.subj = RDFSubject.create(subj);
@@ -633,8 +629,7 @@ public class HBaseSailConnection implements SailConnection {
             this.obj = RDFObject.create(obj);
             this.contextsList = Arrays.asList(normalizeContexts(contexts));
             this.contexts = contextsList.iterator();
-			this.endTime = startTime + TimeUnit.SECONDS.toMillis(sail.evaluationTimeout);
-			this.counterStartTime = startTime;
+			this.timeoutTracker = new TimeoutTracker(startTime, sail.evaluationTimeout);
 			LOG.trace("New StatementScanner {} {} {} {}", subj, pred, obj, contextsList);
         }
 
@@ -673,26 +668,8 @@ public class HBaseSailConnection implements SailConnection {
 
         @Override
         public synchronized boolean hasNext() throws SailException {
-			if (sail.evaluationTimeout > 0) {
-				// avoid the cost of calling System.currentTimeMillis() too often
-				counter++;
-				if (counter >= timeoutCount) {
-					long time = System.currentTimeMillis();
-					if (time > endTime) {
-						throw new SailException("Statements scanning exceeded specified timeout " + sail.evaluationTimeout + "s");
-					}
-					int elapsed = (int) (time - counterStartTime);
-					if (elapsed > 0) {
-						timeoutCount = (timeoutCount * TIMEOUT_POLL_MILLIS) / elapsed;
-						if (timeoutCount == 0) {
-							timeoutCount = 1;
-						}
-					} else {
-						timeoutCount *= 2;
-					}
-					counter = 0;
-					counterStartTime = time;
-				}
+			if (timeoutTracker.checkTimeout()) {
+				throw new SailException("Statements scanning exceeded specified timeout " + sail.evaluationTimeout + "s");
 			}
 
 			if (next == null) {
