@@ -531,7 +531,7 @@ public class HBaseSailConnection implements SailConnection {
         }
     }
 
-	private static final Cache<String, List<RDFObject>> SEARCH_CACHE = CacheBuilder.newBuilder().maximumSize(100).expireAfterAccess(1, TimeUnit.MINUTES).build();
+	private static final Cache<String, List<RDFObject>> SEARCH_CACHE = CacheBuilder.newBuilder().maximumSize(25).expireAfterAccess(1, TimeUnit.MINUTES).build();
 
     //Scans the Halyard table for statements that match the specified pattern
     private class LiteralSearchStatementScanner extends StatementScanner {

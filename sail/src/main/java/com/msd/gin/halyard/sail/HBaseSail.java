@@ -88,6 +88,7 @@ public class HBaseSail implements Sail {
     final boolean create;
     final boolean pushStrategy;
     final int splitBits;
+	private SailConnection statsConnection;
 	protected HalyardEvaluationStatistics statistics;
     final int evaluationTimeout;
     private boolean readOnly = false;
@@ -210,7 +211,8 @@ public class HBaseSail implements Sail {
 			throw new SailException(e);
 		}
 
-    	this.statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(this), (String service) -> {
+		statsConnection = getConnection();
+		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(statsConnection, getValueFactory()), service -> {
 			HalyardEvaluationStatistics fedStats = null;
 			FederatedService fedServ = federatedServiceResolver.getService(service);
 			if (fedServ instanceof SailFederatedService) {
@@ -295,7 +297,15 @@ public class HBaseSail implements Sail {
 
     @Override
     public void shutDown() throws SailException { //release resources
+		try {
+			statsConnection.close();
+		} catch (SailException ignore) {
+		}
 		if (!hConnectionIsShared) {
+			if (federatedServiceResolver instanceof AbstractFederatedServiceResolver) {
+				((AbstractFederatedServiceResolver) federatedServiceResolver).shutDown();
+			}
+
 			if (hConnection != null) {
 				try {
 					hConnection.close();
@@ -303,10 +313,6 @@ public class HBaseSail implements Sail {
 				} catch (IOException e) {
 					throw new SailException(e);
 				}
-			}
-
-			if (federatedServiceResolver instanceof AbstractFederatedServiceResolver) {
-				((AbstractFederatedServiceResolver) federatedServiceResolver).shutDown();
 			}
 		}
     }

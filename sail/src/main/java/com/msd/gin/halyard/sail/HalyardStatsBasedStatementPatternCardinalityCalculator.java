@@ -30,7 +30,6 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.Var;
-import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.slf4j.Logger;
@@ -43,12 +42,12 @@ import org.slf4j.LoggerFactory;
 public final class HalyardStatsBasedStatementPatternCardinalityCalculator implements HalyardEvaluationStatistics.StatementPatternCardinalityCalculator {
 	private static final Logger LOG = LoggerFactory.getLogger(HalyardStatsBasedStatementPatternCardinalityCalculator.class);
 
+	private final SailConnection statsConnection;
     private final ValueFactory valueFactory;
-    private final SailConnection statsConnection;
 
-    public HalyardStatsBasedStatementPatternCardinalityCalculator(Sail sail) {
-    	this.valueFactory = sail.getValueFactory();
-        this.statsConnection = sail.getConnection();
+	public HalyardStatsBasedStatementPatternCardinalityCalculator(SailConnection statsConnection, ValueFactory valueFactory) {
+		this.statsConnection = statsConnection;
+		this.valueFactory = valueFactory;
     }
 
     @Override

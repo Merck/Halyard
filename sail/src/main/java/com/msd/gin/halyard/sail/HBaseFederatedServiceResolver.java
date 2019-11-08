@@ -31,7 +31,7 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 	private final int evaluationTimeout;
 	private final Ticker ticker;
 
-	private final Cache<String, SailFederatedService> federatedServices = CacheBuilder.newBuilder().maximumSize(100).removalListener((evt) -> ((SailFederatedService) evt.getValue()).shutdown()).build();
+	private final Cache<String, SailFederatedService> federatedServices = CacheBuilder.newBuilder().maximumSize(10).removalListener((evt) -> ((SailFederatedService) evt.getValue()).shutdown()).build();
 
 	public HBaseFederatedServiceResolver(Connection conn, Configuration config, String defaultTableName, int evaluationTimeout, Ticker ticker) {
 		this.hConnection = conn;
