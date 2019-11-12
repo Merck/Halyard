@@ -20,11 +20,7 @@ public final class RDFContext extends RDFValue<Resource> {
 		super(val);
 	}
 
-	protected int keyHashSize() {
-		return KEY_SIZE;
-	}
-
-	protected int endKeyHashSize() {
-		throw new AssertionError("Context is never at end");
+	public RDFRole getRole() {
+		return RDFRole.CONTEXT;
 	}
 }

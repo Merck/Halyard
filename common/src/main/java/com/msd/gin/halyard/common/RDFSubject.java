@@ -22,11 +22,7 @@ public final class RDFSubject extends RDFValue<Resource> {
 		super(val);
 	}
 
-	protected int keyHashSize() {
-		return KEY_SIZE;
-	}
-
-	protected int endKeyHashSize() {
-		return END_KEY_SIZE;
+	public RDFRole getRole() {
+		return RDFRole.SUBJECT;
 	}
 }

@@ -136,7 +136,7 @@ public final class HalyardTableUtils {
     public static final byte COSP_PREFIX = 5;
 
 	private static final int PREFIXES = 3;
-	private static final int ID_SIZE = 20;
+	static final int ID_SIZE = 20;
 
 	static final byte[] STOP_KEY_16 = new byte[2];
 	static final byte[] STOP_KEY_32 = new byte[4];
@@ -160,7 +160,7 @@ public final class HalyardTableUtils {
 	private static final long REGION_MAX_FILESIZE = 10000000000l;
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
 
-	private static final ThreadLocal<MessageDigest> MD = new ThreadLocal<MessageDigest>() {
+    private static final ThreadLocal<MessageDigest> MD = new ThreadLocal<MessageDigest>() {
         @Override
 		protected MessageDigest initialValue() {
 			return getMessageDigest("SHA-1");
@@ -739,11 +739,11 @@ public final class HalyardTableUtils {
         	case OSP_PREFIX:
 				r = ByteBuffer.allocate(1 + v1.keyHashSize() + v2.keyHashSize() + v3.endKeyHashSize() + (v4 != null ? v4.keyHashSize() : 0));
 				r.put(prefix);
-				r.put(v1.getKeyHash());
-				r.put(v2.getKeyHash());
-				r.put(v3.getEndKeyHash());
+				r.put(v1.getKeyHash(prefix));
+				r.put(v2.getKeyHash(prefix));
+				r.put(v3.getEndKeyHash(prefix));
         		if(v4 != null) {
-					r.put(v4.getKeyHash());
+					r.put(v4.getKeyHash(prefix));
         		}
                 break;
         		
@@ -752,10 +752,10 @@ public final class HalyardTableUtils {
         	case COSP_PREFIX:
         		r = ByteBuffer.allocate(1 + v1.keyHashSize() + v2.keyHashSize() + v3.keyHashSize() + v4.endKeyHashSize());
 				r.put(prefix);
-        		r.put(v1.getKeyHash());
-        		r.put(v2.getKeyHash());
-        		r.put(v3.getKeyHash());
-       			r.put(v4.getEndKeyHash());
+        		r.put(v1.getKeyHash(prefix));
+        		r.put(v2.getKeyHash(prefix));
+        		r.put(v3.getKeyHash(prefix));
+       			r.put(v4.getEndKeyHash(prefix));
                 break;
             default:
             	throw new AssertionError("Invalid prefix: "+prefix);
@@ -1042,40 +1042,40 @@ public final class HalyardTableUtils {
     	byte prefix = key.get();
         switch(prefix) {
         	case SPO_PREFIX:
-        		s = parseShortRDFValue(subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
-        		p = parseShortRDFValue(pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
-        		o = parseIntRDFValue(obj, key, cn, cv, RDFObject.END_KEY_SIZE, vf);
-        		c = parseLastRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
+        		s = parseShortRDFValue(prefix, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
+        		p = parseShortRDFValue(prefix, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
+        		o = parseIntRDFValue(prefix, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.END_KEY_SIZE, vf);
+        		c = parseLastRDFValue(prefix, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
                 break;
         	case POS_PREFIX:
-        		p = parseShortRDFValue(pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
-        		o = parseIntRDFValue(obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
-        		s = parseShortRDFValue(subj, key, cn, cv, RDFSubject.END_KEY_SIZE, vf);
-        		c = parseLastRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
+        		p = parseShortRDFValue(prefix, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
+        		o = parseIntRDFValue(prefix, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
+        		s = parseShortRDFValue(prefix, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.END_KEY_SIZE, vf);
+        		c = parseLastRDFValue(prefix, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
                 break;
         	case OSP_PREFIX:
-        		o = parseIntRDFValue(obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
-        		s = parseShortRDFValue(subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
-        		p = parseShortRDFValue(pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, vf);
-        		c = parseLastRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
+        		o = parseIntRDFValue(prefix, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
+        		s = parseShortRDFValue(prefix, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
+        		p = parseShortRDFValue(prefix, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, vf);
+        		c = parseLastRDFValue(prefix, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
                 break;
         	case CSPO_PREFIX:
-        		c = parseShortRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
-        		s = parseShortRDFValue(subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
-        		p = parseShortRDFValue(pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
-        		o = parseLastRDFValue(obj, key, cn, cv, RDFObject.END_KEY_SIZE, vf);
+        		c = parseShortRDFValue(prefix, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
+        		s = parseShortRDFValue(prefix, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
+        		p = parseShortRDFValue(prefix, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
+        		o = parseLastRDFValue(prefix, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.END_KEY_SIZE, vf);
                 break;
         	case CPOS_PREFIX:
-        		c = parseShortRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
-        		p = parseShortRDFValue(pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
-        		o = parseIntRDFValue(obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
-        		s = parseLastRDFValue(subj, key, cn, cv, RDFSubject.END_KEY_SIZE, vf);
+        		c = parseShortRDFValue(prefix, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
+        		p = parseShortRDFValue(prefix, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf);
+        		o = parseIntRDFValue(prefix, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
+        		s = parseLastRDFValue(prefix, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.END_KEY_SIZE, vf);
                 break;
         	case COSP_PREFIX:
-        		c = parseShortRDFValue(ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
-        		o = parseIntRDFValue(obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
-        		s = parseShortRDFValue(subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
-        		p = parseLastRDFValue(pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, vf);
+        		c = parseShortRDFValue(prefix, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf);
+        		o = parseIntRDFValue(prefix, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, vf);
+        		s = parseShortRDFValue(prefix, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, vf);
+        		p = parseLastRDFValue(prefix, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, vf);
                 break;
             default:
             	throw new AssertionError("Invalid prefix: "+prefix);
@@ -1093,7 +1093,7 @@ public final class HalyardTableUtils {
 		return stmt;
     }
 
-    private static <V extends Value> V parseShortRDFValue(RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf) {
+    private static <V extends Value> V parseShortRDFValue(byte prefix, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf) {
     	byte marker = cv.get(cv.position()); // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -1101,10 +1101,10 @@ public final class HalyardTableUtils {
     	} else {
     		len = cv.getShort();
     	}
-   		return parseRDFValue(pattern, key, cn, cv, keySize, ID_SIZE, len, vf);
+   		return parseRDFValue(prefix, role, pattern, key, cn, cv, keySize, ID_SIZE, len, vf);
     }
 
-    private static <V extends Value> V parseIntRDFValue(RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf) {
+    private static <V extends Value> V parseIntRDFValue(byte prefix, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf) {
     	byte marker = cv.get(cv.position()); // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -1112,10 +1112,10 @@ public final class HalyardTableUtils {
     	} else {
     		len = cv.getInt();
     	}
-   		return parseRDFValue(pattern, key, cn, cv, keySize, ID_SIZE, len, vf);
+   		return parseRDFValue(prefix, role, pattern, key, cn, cv, keySize, ID_SIZE, len, vf);
     }
 
-    private static <V extends Value> V parseLastRDFValue(RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf) {
+    private static <V extends Value> V parseLastRDFValue(byte prefix, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf) {
     	byte marker = cv.hasRemaining() ? cv.get(cv.position()) : 0; // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -1123,11 +1123,11 @@ public final class HalyardTableUtils {
     	} else {
     		len = cv.remaining();
     	}
-   		return parseRDFValue(pattern, key, cn, cv, keySize, ID_SIZE, len, vf);
+   		return parseRDFValue(prefix, role, pattern, key, cn, cv, keySize, ID_SIZE, len, vf);
     }
 
     @SuppressWarnings("unchecked")
-	private static <V extends Value> V parseRDFValue(RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, int idSize, int len, ValueFactory vf) {
+	private static <V extends Value> V parseRDFValue(byte prefix, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, int idSize, int len, ValueFactory vf) {
     	if(pattern != null) {
     		skipId(key, cn, keySize, idSize);
     		if (len > 0) {
@@ -1135,14 +1135,14 @@ public final class HalyardTableUtils {
     		}
 			return pattern.val;
     	} else if(len == WELL_KNOWN_IRI_MARKER) {
-			ByteBuffer id = parseId(key, cn, keySize, idSize);
+			ByteBuffer id = parseId(prefix, role, key, cn, keySize, idSize);
 			IRI iri = WELL_KNOWN_IRI_IDS.get(id);
 			if (iri == null) {
 				throw new IllegalStateException(String.format("Unknown IRI hash: %s", encode(id)));
 			}
 			return (V) iri;
 		} else if(len > 0) {
-			ByteBuffer id = parseId(key, cn, keySize, idSize);
+			ByteBuffer id = parseId(prefix, role, key, cn, keySize, idSize);
 			int limit = cv.limit();
 			cv.limit(cv.position() + len);
 			V value = (V) readValue(cv, vf);
@@ -1158,14 +1158,14 @@ public final class HalyardTableUtils {
 		}
     }
 
-	private static ByteBuffer parseId(ByteBuffer key, ByteBuffer cn, int keySize, int idSize) {
+	private static ByteBuffer parseId(byte prefix, RDFRole role, ByteBuffer key, ByteBuffer cn, int keySize, int idSize) {
 		ByteBuffer id = ByteBuffer.allocate(idSize);
-		int keyLimit = key.limit();
+		role.rotateLeft(key.array(), key.arrayOffset()+key.position(), keySize, prefix, id.array());
+		key.position(key.position()+keySize);
 		int cnLimit = cn.limit();
-		key.limit(key.position() + keySize);
 		cn.limit(cn.position() + idSize - keySize);
-		id.put(key).put(cn).flip();
-		key.limit(keyLimit);
+		id.position(keySize);
+		id.put(cn).flip();
 		cn.limit(cnLimit);
 		return id;
 	}
@@ -1284,34 +1284,34 @@ public final class HalyardTableUtils {
 	}
 
 	private static Scan scan3_1(byte prefix, RDFValue<?> key1, byte[] stopKey2, byte[] stopKey3) {
-		return scan(concat(prefix, false, key1.getKeyHash()), concat(prefix, true, key1.getKeyHash(), stopKey2, stopKey3, RDFContext.STOP_KEY))
+		return scan(concat(prefix, false, key1.getKeyHash(prefix)), concat(prefix, true, key1.getKeyHash(prefix), stopKey2, stopKey3, RDFContext.STOP_KEY))
 				.setFilter(new ColumnPrefixFilter(qualifier(prefix, key1, null, null, null)));
 	}
 
 	private static Scan scan3_2(byte prefix, RDFValue<?> key1, RDFValue<?> key2, byte[] stopKey3) {
-		return scan(concat(prefix, false, key1.getKeyHash(), key2.getKeyHash()), concat(prefix, true, key1.getKeyHash(), key2.getKeyHash(), stopKey3, RDFContext.STOP_KEY))
+		return scan(concat(prefix, false, key1.getKeyHash(prefix), key2.getKeyHash(prefix)), concat(prefix, true, key1.getKeyHash(prefix), key2.getKeyHash(prefix), stopKey3, RDFContext.STOP_KEY))
 				.setFilter(new ColumnPrefixFilter(qualifier(prefix, key1, key2, null, null)));
 	}
 
 	private static Scan scan3_3(byte prefix, RDFValue<?> key1, RDFValue<?> key2, RDFValue<?> key3) {
-		return scan(concat(prefix, false, key1.getKeyHash(), key2.getKeyHash(), key3.getEndKeyHash()), concat(prefix, true, key1.getKeyHash(), key2.getKeyHash(), key3.getEndKeyHash(), RDFContext.STOP_KEY))
+		return scan(concat(prefix, false, key1.getKeyHash(prefix), key2.getKeyHash(prefix), key3.getEndKeyHash(prefix)), concat(prefix, true, key1.getKeyHash(prefix), key2.getKeyHash(prefix), key3.getEndKeyHash(prefix), RDFContext.STOP_KEY))
 				.setFilter(new ColumnPrefixFilter(qualifier(prefix, key1, key2, key3, null)));
 	}
 
 	private static Scan scan4_1(byte prefix, RDFValue<?> key1, byte[] stopKey2, byte[] stopKey3, byte[] stopKey4) {
-		return scan(concat(prefix, false, key1.getKeyHash()), concat(prefix, true, key1.getKeyHash(), stopKey2, stopKey3, stopKey4)).setFilter(new ColumnPrefixFilter(qualifier(prefix, key1, null, null, null)));
+		return scan(concat(prefix, false, key1.getKeyHash(prefix)), concat(prefix, true, key1.getKeyHash(prefix), stopKey2, stopKey3, stopKey4)).setFilter(new ColumnPrefixFilter(qualifier(prefix, key1, null, null, null)));
     }
 
 	private static Scan scan4_2(byte prefix, RDFValue<?> key1, RDFValue<?> key2, byte[] stopKey3, byte[] stopKey4) {
-		return scan(concat(prefix, false, key1.getKeyHash(), key2.getKeyHash()), concat(prefix, true, key1.getKeyHash(), key2.getKeyHash(), stopKey3, stopKey4)).setFilter(new ColumnPrefixFilter(qualifier(prefix, key1, key2, null, null)));
+		return scan(concat(prefix, false, key1.getKeyHash(prefix), key2.getKeyHash(prefix)), concat(prefix, true, key1.getKeyHash(prefix), key2.getKeyHash(prefix), stopKey3, stopKey4)).setFilter(new ColumnPrefixFilter(qualifier(prefix, key1, key2, null, null)));
     }
 
 	private static Scan scan4_3(byte prefix, RDFValue<?> key1, RDFValue<?> key2, RDFValue<?> key3, byte[] stopKey4) {
-		return scan(concat(prefix, false, key1.getKeyHash(), key2.getKeyHash(), key3.getKeyHash()), concat(prefix, true, key1.getKeyHash(), key2.getKeyHash(), key3.getKeyHash(), stopKey4)).setFilter(new ColumnPrefixFilter(qualifier(prefix, key1, key2, key3, null)));
+		return scan(concat(prefix, false, key1.getKeyHash(prefix), key2.getKeyHash(prefix), key3.getKeyHash(prefix)), concat(prefix, true, key1.getKeyHash(prefix), key2.getKeyHash(prefix), key3.getKeyHash(prefix), stopKey4)).setFilter(new ColumnPrefixFilter(qualifier(prefix, key1, key2, key3, null)));
     }
 
 	private static Scan scan4_4(byte prefix, RDFValue<?> key1, RDFValue<?> key2, RDFValue<?> key3, RDFValue<?> key4) {
-		return scan(concat(prefix, false, key1.getKeyHash(), key2.getKeyHash(), key3.getKeyHash(), key4.getEndKeyHash()), concat(prefix, true, key1.getKeyHash(), key2.getKeyHash(), key3.getKeyHash(), key4.getEndKeyHash()))
+		return scan(concat(prefix, false, key1.getKeyHash(prefix), key2.getKeyHash(prefix), key3.getKeyHash(prefix), key4.getEndKeyHash(prefix)), concat(prefix, true, key1.getKeyHash(prefix), key2.getKeyHash(prefix), key3.getKeyHash(prefix), key4.getEndKeyHash(prefix)))
 				.setFilter(new ColumnPrefixFilter(qualifier(prefix, key1, key2, key3, key4)));
     }
 

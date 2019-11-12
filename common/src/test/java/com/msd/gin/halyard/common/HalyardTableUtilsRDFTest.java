@@ -95,9 +95,14 @@ public class HalyardTableUtilsRDFTest {
 	}
 
 	private static void assertRDFValueHashes(byte[] id, RDFValue<?> v) {
-		assertArrayEquals(id, concat(v.getKeyHash(), v.getQualifierHash()));
-		if(!(v instanceof RDFContext)) {
-			assertArrayEquals(id, concat(v.getEndKeyHash(), v.getEndQualifierHash()));
+		for(int i=0; i<6; i++) {
+			/// non-literal flag means we can't rotate
+			if(!(v instanceof RDFObject)) {
+				assertArrayEquals(id, concat(v.getRole().rotateLeft(v.getKeyHash((byte)i), 0, v.keyHashSize(), (byte)i), v.getQualifierHash()));
+				if(!(v instanceof RDFContext)) {
+					assertArrayEquals(id, concat(v.getRole().rotateLeft(v.getEndKeyHash((byte)i), 0, v.endKeyHashSize(), (byte)i), v.getEndQualifierHash()));
+				}
+			}
 		}
 	}
 

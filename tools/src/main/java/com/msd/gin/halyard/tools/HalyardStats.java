@@ -93,7 +93,9 @@ public final class HalyardStats extends AbstractHalyardTool {
     private static final String TARGET_GRAPH = "halyard.stats.target.graph";
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
-	private static final byte[] TYPE_HASH = RDFPredicate.create(RDF.TYPE).getKeyHash();
+	private static final RDFPredicate RDF_TYPE_PREDICATE = RDFPredicate.create(RDF.TYPE);
+	private static final byte[] POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(HalyardTableUtils.POS_PREFIX);
+	private static final byte[] CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(HalyardTableUtils.CPOS_PREFIX);
 
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
@@ -105,7 +107,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         final byte[] lastCtxFragment = new byte[RDFContext.KEY_SIZE];
         final byte[] lastClassFragment = new byte[RDFObject.KEY_SIZE];
         IRI statsContext, graphContext;
-        byte[] statsContextHash;
+        byte[] cspoStatsContextHash;
         byte lastRegion = -1;
         long counter = 0;
         boolean update;
@@ -127,7 +129,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             statsContext = SVF.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String gc = conf.get(GRAPH_CONTEXT);
             if (gc != null) graphContext = SVF.createIRI(gc);
-			statsContextHash = RDFContext.create(statsContext).getKeyHash();
+			cspoStatsContextHash = RDFContext.create(statsContext).getKeyHash(HalyardTableUtils.CSPO_PREFIX);
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, int len, byte[] target) {
@@ -166,7 +168,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 					graph = (IRI) stmts.get(0).getContext();
                 }
                 if (update && region == HalyardTableUtils.CSPO_PREFIX) {
-                    if (Arrays.equals(statsContextHash, lastCtxFragment)) {
+                    if (Arrays.equals(cspoStatsContextHash, lastCtxFragment)) {
                         if (sail == null) {
                             Configuration conf = output.getConfiguration();
                             sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
@@ -254,8 +256,12 @@ public final class HalyardStats extends AbstractHalyardTool {
                     triples += stmtCount;
                     break;
                 case HalyardTableUtils.POS_PREFIX:
+                    if (Arrays.equals(POS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + RDFPredicate.KEY_SIZE, RDFObject.KEY_SIZE, lastClassFragment) || hashChange)) {
+                    	classes++;
+                    }
+                    break;
                 case HalyardTableUtils.CPOS_PREFIX:
-                    if (Arrays.equals(TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + RDFPredicate.KEY_SIZE, RDFObject.KEY_SIZE, lastClassFragment) || hashChange)) {
+                    if (Arrays.equals(CPOS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + RDFPredicate.KEY_SIZE, RDFObject.KEY_SIZE, lastClassFragment) || hashChange)) {
                     	classes++;
                     }
                     break;
@@ -514,13 +520,13 @@ public final class HalyardStats extends AbstractHalyardTool {
         Scan scan = HalyardTableUtils.scan(null, null);
         if (graphContext != null) { //restricting stats to scan given graph context only
             List<RowRange> ranges = new ArrayList<>(4);
-			byte[] gcHash = RDFContext.create(SVF.createIRI(graphContext)).getKeyHash();
-            ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX, gcHash, RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY));
-            ranges.add(rowRange(HalyardTableUtils.CPOS_PREFIX, gcHash, RDFPredicate.STOP_KEY, RDFObject.STOP_KEY, RDFSubject.END_STOP_KEY));
-            ranges.add(rowRange(HalyardTableUtils.COSP_PREFIX, gcHash, RDFObject.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY));
+            RDFContext rdfGraphCtx = RDFContext.create(SVF.createIRI(graphContext));
+            ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX, rdfGraphCtx.getKeyHash(HalyardTableUtils.CSPO_PREFIX), RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY));
+            ranges.add(rowRange(HalyardTableUtils.CPOS_PREFIX, rdfGraphCtx.getKeyHash(HalyardTableUtils.CPOS_PREFIX), RDFPredicate.STOP_KEY, RDFObject.STOP_KEY, RDFSubject.END_STOP_KEY));
+            ranges.add(rowRange(HalyardTableUtils.COSP_PREFIX, rdfGraphCtx.getKeyHash(HalyardTableUtils.COSP_PREFIX), RDFObject.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY));
             if (target == null) { //add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
 				ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX,
-						RDFContext.create(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SVF.createIRI(targetGraph)).getKeyHash(),
+						RDFContext.create(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SVF.createIRI(targetGraph)).getKeyHash(HalyardTableUtils.CSPO_PREFIX),
 						RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY));
             }
             scan.setFilter(new MultiRowRangeFilter(ranges));

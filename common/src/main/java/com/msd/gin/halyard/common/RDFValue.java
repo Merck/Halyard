@@ -17,9 +17,12 @@ public abstract class RDFValue<V extends Value> {
 		return dest;
 	}
 
+
 	protected RDFValue(V val) {
 		this.val = val;
 	}
+
+	public abstract RDFRole getRole();
 
 	public final byte[] getSerializedForm() {
 		if (ser == null) {
@@ -35,31 +38,35 @@ public abstract class RDFValue<V extends Value> {
 		return hash;
 	}
 
-	public final byte[] getKeyHash() {
-		return copy(getUniqueHash(), 0, keyHashSize());
+	public final byte[] getKeyHash(byte prefix) {
+		return getRole().rotateRight(getUniqueHash(), 0, getRole().keyHashSize(), prefix);
 	}
 
-	final byte[] getEndKeyHash() {
-		return copy(getUniqueHash(), 0, endKeyHashSize());
+	final byte[] getEndKeyHash(byte prefix) {
+		return getRole().rotateRight(getUniqueHash(), 0, getRole().endKeyHashSize(), prefix);
 	}
 
 	final byte[] getQualifierHash() {
-		return copy(getUniqueHash(), keyHashSize(), qualifierHashSize());
+		return copy(getUniqueHash(), getRole().keyHashSize(), getRole().qualifierHashSize());
 	}
 
 	final byte[] getEndQualifierHash() {
-		return copy(getUniqueHash(), endKeyHashSize(), endQualifierHashSize());
+		return copy(getUniqueHash(), getRole().endKeyHashSize(), getRole().endQualifierHashSize());
 	}
 
-	protected abstract int keyHashSize();
+	final int keyHashSize() {
+		return getRole().keyHashSize();
+	}
 
-	protected abstract int endKeyHashSize();
+	final int endKeyHashSize() {
+		return getRole().endKeyHashSize();
+	}
 
 	final int qualifierHashSize() {
-		return getUniqueHash().length - keyHashSize();
+		return getRole().qualifierHashSize();
 	}
 
 	final int endQualifierHashSize() {
-		return getUniqueHash().length - endKeyHashSize();
+		return getRole().endQualifierHashSize();
 	}
 }
