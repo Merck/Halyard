@@ -16,11 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFContext;
-import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.TimestampedValueFactory;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -35,10 +30,9 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.StringBuilderWriter;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
-import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
@@ -59,6 +53,11 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 import org.elasticsearch.hadoop.mr.EsOutputFormat;
 import org.json.JSONObject;
+
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.TimestampedValueFactory;
 
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
@@ -120,25 +119,32 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             "Halyard ElasticSearch Index is a MapReduce application that indexes all literals in the given dataset into a supplementary ElasticSearch server/cluster. "
                 + "A Halyard repository configured with such supplementary ElasticSearch index can then provide more advanced text search features over the indexed literals.",
             "Default index configuration is:\n"
-            + "\u00A0{\n"
-            + "\u00A0   \"mappings\" : {\n"
-            + "\u00A0       \"properties\" : {\n"
-            + "\u00A0           \"label\" : { \"type\" : \"text\" }\n"
-            + "\u00A0        }\n"
-            + "\u00A0    },\n"
-            + "\u00A0   \"settings\": {\n"
-            + "\u00A0       \"index.query.default_field\": \"label\",\n"
-            + "\u00A0       \"refresh_interval\": \"1h\",\n"
-            + "\u00A0       \"number_of_shards\": 1+(<dataset_table_regions>/256),\n"
-            + "\u00A0       \"number_of_replicas\": 0\n"
-            + "\u00A0    }\n"
-            + "\u00A0}\n"
+            + getMappingConfig("\u00A0", "2*<num_of_region_servers>", "1")
             + "Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index"
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-index", "target_url", "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
         addOption("c", "create-index", null, "Optionally create Elasticsearch index", false, true);
         addOption("g", "named-graph", "named_graph", "Optional restrict indexing to the given named graph only", false, true);
+    }
+
+    private static String getMappingConfig(String linePrefix, String shards, String replicas) {
+        return    linePrefix + "{\n"
+                + linePrefix + "    \"mappings\" : {\n"
+                + linePrefix + "        \"properties\" : {\n"
+                + linePrefix + "            \"id\" : { \"type\" : \"keyword\", \"index\" : false },\n"
+                + linePrefix + "            \"label\" : { \"type\" : \"text\" },\n"
+                + linePrefix + "            \"datatype\" : { \"type\" : \"keyword\", \"index\" : false },\n"
+                + linePrefix + "            \"lang\" : { \"type\" : \"keyword\", \"index\" : false }\n"
+                + linePrefix + "        }\n"
+                + linePrefix + "    },\n"
+                + linePrefix + "   \"settings\": {\n"
+                + linePrefix + "       \"index.query.default_field\": \"label\",\n"
+                + linePrefix + "       \"refresh_interval\": \"1h\",\n"
+                + linePrefix + "       \"number_of_shards\": " + shards + ",\n"
+                + linePrefix + "       \"number_of_replicas\": " + replicas + "\n"
+                + linePrefix + "    }\n"
+                + linePrefix + "}\n";
     }
 
     @Override
@@ -163,28 +169,17 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         job.getConfiguration().set(SOURCE, source);
         if (cmd.hasOption('c')) {
             int shards;
+            int replicas = 1;
             try (Connection conn = ConnectionFactory.createConnection(getConf())) {
-                try (RegionLocator rl = conn.getRegionLocator(TableName.valueOf(source))) {
-                    shards = 1 + (rl.getStartKeys().length >> 8);
+                try (Admin admin = conn.getAdmin()) {
+                    shards = 2 * admin.getRegionServers().size(); // 2 shards per node to allow for growth
                 }
             }
             HttpURLConnection http = (HttpURLConnection)targetUrl.openConnection();
             http.setRequestMethod("PUT");
             http.setDoOutput(true);
             http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-            byte b[] = ("{\n"
-                + "    \"mappings\" : {\n"
-                + "        \"properties\" : {\n"
-                + "            \"label\" : { \"type\" : \"text\" }\n"
-                + "        }\n"
-                + "    },\n"
-                + "   \"settings\": {\n"
-                + "       \"index.query.default_field\": \"label\",\n"
-                + "       \"refresh_interval\": \"1h\",\n"
-                + "       \"number_of_shards\": " + shards + ",\n"
-                + "       \"number_of_replicas\": 0\n"
-                + "    }\n"
-                + "}").getBytes(StandardCharsets.UTF_8);
+            byte b[] = getMappingConfig("", Integer.toString(shards), Integer.toString(replicas)).getBytes(StandardCharsets.UTF_8);
             http.setFixedLengthStreamingMode(b.length);
             http.connect();
             try {
