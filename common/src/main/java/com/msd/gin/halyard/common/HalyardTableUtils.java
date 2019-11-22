@@ -136,7 +136,7 @@ public final class HalyardTableUtils {
     public static final byte COSP_PREFIX = 5;
 
 	private static final int PREFIXES = 3;
-	static final int ID_SIZE = 20;
+	public static final int ID_SIZE = 20;
 
 	static final byte[] STOP_KEY_16 = new byte[2];
 	static final byte[] STOP_KEY_32 = new byte[4];

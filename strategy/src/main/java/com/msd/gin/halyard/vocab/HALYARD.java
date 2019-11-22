@@ -16,22 +16,28 @@
  */
 package com.msd.gin.halyard.vocab;
 
+import com.msd.gin.halyard.common.Vocabulary;
+
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Namespace;
+import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.kohsuke.MetaInfServices;
 
 /**
  * IRI constants used by Halyard.
  * @author Adam Sotona (MSD)
  */
-public final class HALYARD {
-
-    HALYARD() {}
+@MetaInfServices(Vocabulary.class)
+public final class HALYARD implements Vocabulary {
 
     private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
     public static final String PREFIX = "halyard";
 
     public static final String NAMESPACE = "http://merck.github.io/Halyard/ns#";
+
+    public static final Namespace NS = new SimpleNamespace(PREFIX, NAMESPACE);
 
     public static final IRI STATS_ROOT_NODE = SVF.createIRI(NAMESPACE, "statsRoot");
 
@@ -59,4 +65,7 @@ public final class HALYARD {
 
 	public final static IRI TIMESTAMP_PROPERTY = SVF.createIRI(NAMESPACE, "timestamp");
 
+	public final static IRI STATEMENT_PROPERTY = SVF.createIRI(NAMESPACE, "statement");
+
+    public static final Namespace STATEMENT_NS = new SimpleNamespace("hstmts", "halyard:/statements/");
 }

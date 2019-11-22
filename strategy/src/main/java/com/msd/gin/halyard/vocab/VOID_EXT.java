@@ -16,20 +16,26 @@
  */
 package com.msd.gin.halyard.vocab;
 
+import com.msd.gin.halyard.common.Vocabulary;
+
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Namespace;
+import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.kohsuke.MetaInfServices;
 
 /**
  * Prefix, namespace and IRIs for the parts of the VIOD ontology used in Halyard
  * @author Adam Sotona (MSD)
  */
-public final class VOID_EXT {
-
-    VOID_EXT(){}
+@MetaInfServices(Vocabulary.class)
+public final class VOID_EXT implements Vocabulary {
 
     public static final String PREFIX = "void-ext";
 
     public static final String NAMESPACE = "http://ldf.fi/void-ext#";
+
+    public static final Namespace NS = new SimpleNamespace(PREFIX, NAMESPACE);
 
     private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
