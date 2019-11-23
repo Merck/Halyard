@@ -24,6 +24,7 @@ import java.net.MalformedURLException;
 
 import org.apache.http.client.HttpClient;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.eclipse.rdf4j.repository.config.RepositoryConfig;
 import org.eclipse.rdf4j.repository.sail.config.SailRepositoryConfig;
 import org.eclipse.rdf4j.sail.memory.config.MemoryStoreConfig;
@@ -46,8 +47,7 @@ public class HBaseRepositoryManagerTest {
     public void testHttpClient() {
         HBaseRepositoryManager rm = new HBaseRepositoryManager();
         assertNull(rm.getHttpClient());
-        @SuppressWarnings("deprecation")
-        HttpClient cl = new DefaultHttpClient();
+		HttpClient cl = HttpClientBuilder.create().build();
         rm.setHttpClient(cl);
         assertEquals(cl, rm.getHttpClient());
     }

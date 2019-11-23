@@ -134,7 +134,7 @@ public class HBaseSailVersionTest {
 			admin.createTable(td, null);
         }
 
-		HBaseSail sail = new HBaseSail(hconn, "timestamptable", true, 0, true, 0, null, null);
+		HBaseSail sail = new HBaseSail(hconn, "timestamptable", false, 0, true, 0, null, null);
 		HBaseRepository rep = new HBaseRepository(sail);
         rep.init();
         try(SailRepositoryConnection con = rep.getConnection()) {

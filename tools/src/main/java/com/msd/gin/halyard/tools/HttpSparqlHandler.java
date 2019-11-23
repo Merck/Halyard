@@ -336,7 +336,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         } else {
             int i = param.indexOf("=");
             if (i >= 0) {
-                sparqlQuery.addParameter(URLDecoder.decode(param.substring(0, i)), URLDecoder.decode(param.substring(i + 1)));
+                sparqlQuery.addParameter(URLDecoder.decode(param.substring(0, i), CHARSET), URLDecoder.decode(param.substring(i + 1), CHARSET));
             } else {
                 throw new IllegalArgumentException("Invalid request parameter: " + param);
             }
@@ -399,7 +399,7 @@ public final class HttpSparqlHandler implements HttpHandler {
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
                 BooleanQueryResultWriter w = BooleanQueryResultWriterRegistry.getInstance().get(format).get().getWriter(response);
                 w.setWriterConfig(writerConfig);
-                w.write(((BooleanQuery) query).evaluate());
+                w.handleBoolean(((BooleanQuery) query).evaluate());
             }
         }
         if (verbose) {

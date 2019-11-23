@@ -74,8 +74,9 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 								break;
 						}
 					}
-					sail.initialize();
-					return new SailFederatedService(sail);
+					SailFederatedService sailFedService = new SailFederatedService(sail);
+					sailFedService.initialize();
+					return sailFedService;
 				});
 			} catch (ExecutionException e) {
 				if (e.getCause() instanceof RuntimeException) {

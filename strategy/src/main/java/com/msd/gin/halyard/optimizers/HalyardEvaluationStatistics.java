@@ -87,6 +87,7 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
 
     private class HalyardCardinalityCalculator extends CardinalityCalculator {
 
+    	private final double VAR_CARDINALITY = 10.0;
         private final Set<String> boundVars;
         private final Set<String> priorityVariables;
         private final Map<TupleExpr, Double> mapToUpdate;
@@ -106,7 +107,7 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
             }
             Double card = spcalc == null ? null : spcalc.getCardinality(sp, boundVars);
             if (card == null) { //fallback to default cardinality calculation
-                card = (hasValue(sp.getSubjectVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getPredicateVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getObjectVar(), boundVars) ? 1.0 : 10.0) * (hasValue(sp.getContextVar(), boundVars) ? 1.0 : 10.0);
+                card = (hasValue(sp.getSubjectVar(), boundVars) ? 1.0 : VAR_CARDINALITY) * (hasValue(sp.getPredicateVar(), boundVars) ? 1.0 : VAR_CARDINALITY) * (hasValue(sp.getObjectVar(), boundVars) ? 1.0 : VAR_CARDINALITY) * (hasValue(sp.getContextVar(), boundVars) ? 1.0 : VAR_CARDINALITY);
             }
             for (Var v : sp.getVarList()) {
                 //decrease cardinality for each priority variable present
@@ -218,7 +219,9 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
         }
 
 		protected void meetTupleFunctionCall(TupleFunctionCall node) {
+			// must evaluate last to ensure arguments have been bound
 			cardinality = Double.MAX_VALUE;
+			updateMap(node);
 		}
 
         @Override
