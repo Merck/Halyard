@@ -11,12 +11,6 @@ public abstract class RDFValue<V extends Value> {
 		return pattern == null || pattern.val.equals(value);
 	}
 
-	private static byte[] copy(byte[] src, int offset, int len) {
-		byte[] dest = new byte[len];
-		System.arraycopy(src, offset, dest, 0, len);
-		return dest;
-	}
-
 
 	protected RDFValue(V val) {
 		this.val = val;
@@ -39,19 +33,19 @@ public abstract class RDFValue<V extends Value> {
 	}
 
 	public final byte[] getKeyHash(byte prefix) {
-		return getRole().rotateRight(getUniqueHash(), 0, getRole().keyHashSize(), prefix);
+		return getRole().keyHash(prefix, getUniqueHash());
 	}
 
 	final byte[] getEndKeyHash(byte prefix) {
-		return getRole().rotateRight(getUniqueHash(), 0, getRole().endKeyHashSize(), prefix);
+		return getRole().endKeyHash(prefix, getUniqueHash());
 	}
 
 	final byte[] getQualifierHash() {
-		return copy(getUniqueHash(), getRole().keyHashSize(), getRole().qualifierHashSize());
+		return getRole().qualifierHash(getUniqueHash());
 	}
 
 	final byte[] getEndQualifierHash() {
-		return copy(getUniqueHash(), getRole().endKeyHashSize(), getRole().endQualifierHashSize());
+		return getRole().endQualifierHash(getUniqueHash());
 	}
 
 	final int keyHashSize() {

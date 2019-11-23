@@ -9,21 +9,21 @@ import java.util.List;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.SingletonIteration;
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunction;
-import org.eclipse.rdf4j.spin.function.InverseMagicProperty;
 import org.kohsuke.MetaInfServices;
 
 @MetaInfServices(TupleFunction.class)
-public class StatementTupleFunction implements InverseMagicProperty {
+public class IdentifierTupleFunction implements TupleFunction {
 
 	@Override
 	public String getURI() {
-		return HALYARD.STATEMENT_PROPERTY.toString();
+		return HALYARD.IDENTIFIER_PROPERTY.toString();
 	}
 
 	@Override
@@ -31,18 +31,18 @@ public class StatementTupleFunction implements InverseMagicProperty {
 			Value... args)
 		throws ValueExprEvaluationException
 	{
-		if (args.length != 3) {
-			throw new ValueExprEvaluationException(String.format("%s requires 3 arguments, got %d", getURI(), args.length));
-		}
-
-		if (!(args[0] instanceof Resource)) {
-			throw new ValueExprEvaluationException("First argument must be a subject");
-		}
-		if (!(args[1] instanceof IRI)) {
-			throw new ValueExprEvaluationException("Second argument must be a predicate");
-		}
-		if (!(args[2] instanceof Value)) {
-			throw new ValueExprEvaluationException("Third argument must be an object");
+		if (args.length == 3) {
+			if (!(args[0] instanceof Resource)) {
+				throw new ValueExprEvaluationException("First argument must be a subject");
+			}
+			if (!(args[1] instanceof IRI)) {
+				throw new ValueExprEvaluationException("Second argument must be a predicate");
+			}
+			if (!(args[2] instanceof Value)) {
+				throw new ValueExprEvaluationException("Third argument must be an object");
+			}
+		} else if (args.length != 1) {
+			throw new ValueExprEvaluationException(String.format("%s requires 1 or 3 arguments, got %d", getURI(), args.length));
 		}
 
 		byte[] stmtId = new byte[args.length * HalyardTableUtils.ID_SIZE];
@@ -50,6 +50,7 @@ public class StatementTupleFunction implements InverseMagicProperty {
 			byte[] id = HalyardTableUtils.id(args[i]);
 			System.arraycopy(id, 0, stmtId, i * HalyardTableUtils.ID_SIZE, HalyardTableUtils.ID_SIZE);
 		}
-		return new SingletonIteration<>(Collections.singletonList(vf.createIRI(HALYARD.STATEMENT_ID_NS.getName(), HalyardTableUtils.encode(stmtId))));
+		Namespace ns = (args.length == 3) ? HALYARD.STATEMENT_ID_NS : HALYARD.VALUE_ID_NS;
+		return new SingletonIteration<>(Collections.singletonList(vf.createIRI(ns.getName(), HalyardTableUtils.encode(stmtId))));
 	}
 }

@@ -65,7 +65,11 @@ public final class HALYARD implements Vocabulary {
 
 	public final static IRI TIMESTAMP_PROPERTY = SVF.createIRI(NAMESPACE, "timestamp");
 
+	public final static IRI IDENTIFIER_PROPERTY = SVF.createIRI(NAMESPACE, "identifier");
+
 	public final static IRI STATEMENT_PROPERTY = SVF.createIRI(NAMESPACE, "statement");
 
-    public static final Namespace STATEMENT_NS = new SimpleNamespace("hstmts", "halyard:/statements/");
+    public static final Namespace VALUE_ID_NS = new SimpleNamespace("hvalues", "halyard:id:values/");
+
+    public static final Namespace STATEMENT_ID_NS = new SimpleNamespace("hstmts", "halyard:id:statements/");
 }

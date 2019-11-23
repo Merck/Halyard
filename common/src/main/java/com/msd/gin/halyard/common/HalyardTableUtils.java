@@ -62,6 +62,8 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.client.TableDescriptor;
 import org.apache.hadoop.hbase.client.TableDescriptorBuilder;
 import org.apache.hadoop.hbase.filter.ColumnPrefixFilter;
+import org.apache.hadoop.hbase.filter.FilterList;
+import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.regionserver.BloomType;
@@ -98,7 +100,8 @@ import org.slf4j.LoggerFactory;
 public final class HalyardTableUtils {
 
     private static final byte[] CF_NAME = "e".getBytes(StandardCharsets.UTF_8);
-    private static final Base64.Encoder ENC = Base64.getUrlEncoder().withoutPadding();
+    private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
+    private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
 
     /*
      * Triples/ quads are stored in multiple regions as different permutations.
@@ -990,7 +993,50 @@ public final class HalyardTableUtils {
         }
     }
 
-    /**
+	public static Resource getSubject(Table table, byte[] id, ValueFactory vf) throws IOException {
+		Scan scan = scan(RDFRole.SUBJECT, SPO_PREFIX, id, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY);
+		for(Result result : table.getScanner(scan)) {
+			Cell[] cells = result.rawCells();
+			if(cells != null && cells.length > 0) {
+				Statement stmt = parseStatement(null, null, null, null, cells[0], vf);
+				return stmt.getSubject();
+			}
+		}
+		return null;
+	}
+
+	public static IRI getPredicate(Table table, byte[] id, ValueFactory vf) throws IOException {
+		Scan scan = scan(RDFRole.PREDICATE, POS_PREFIX, id, RDFObject.STOP_KEY, RDFSubject.END_STOP_KEY);
+		for(Result result : table.getScanner(scan)) {
+			Cell[] cells = result.rawCells();
+			if(cells != null && cells.length > 0) {
+				Statement stmt = parseStatement(null, null, null, null, cells[0], vf);
+				return stmt.getPredicate();
+			}
+		}
+		return null;
+	}
+
+	public static Value getObject(Table table, byte[] id, ValueFactory vf) throws IOException {
+		Scan scan = scan(RDFRole.OBJECT, OSP_PREFIX, id, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY);
+		for(Result result : table.getScanner(scan)) {
+			Cell[] cells = result.rawCells();
+			if(cells != null && cells.length > 0) {
+				Statement stmt = parseStatement(null, null, null, null, cells[0], vf);
+				return stmt.getObject();
+			}
+		}
+		return null;
+	}
+
+	private static Scan scan(RDFRole role, byte prefix, byte[] id, byte[] stopKey2, byte[] stopKey3) {
+		byte[] keyHash = role.keyHash(prefix, id);
+		byte[] qualifierHash = role.qualifierHash(id);
+		return scan(concat(prefix, false, keyHash), concat(prefix, true, keyHash, stopKey2, stopKey3, RDFContext.STOP_KEY))
+			.setFilter(new FilterList(new ColumnPrefixFilter(qualifierHash), new FirstKeyOnlyFilter())).setOneRowLimit();
+	}
+
+	/**
 	 * Parser method returning all Statements from a single HBase Scan Result
 	 * 
      * @param subj subject if known
@@ -1269,14 +1315,18 @@ public final class HalyardTableUtils {
 	}
 
     public static String encode(byte b[]) {
-        return ENC.encodeToString(b);
+        return ENCODER.encodeToString(b);
     }
 
-	/**
+    public static byte[] decode(String s) {
+    	return DECODER.decode(s);
+    }
+
+    /**
 	 * NB: this alters the buffer.
 	 */
 	private static CharSequence encode(ByteBuffer b) {
-		return StandardCharsets.UTF_8.decode(ENC.encode(b));
+		return StandardCharsets.UTF_8.decode(ENCODER.encode(b));
 	}
 
 	private static Scan scan3_0(byte prefix, byte[] stopKey1, byte[] stopKey2, byte[] stopKey3) {

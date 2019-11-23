@@ -39,6 +39,7 @@ import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
+import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
@@ -107,13 +108,29 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
             }
             Double card = spcalc == null ? null : spcalc.getCardinality(sp, boundVars);
             if (card == null) { //fallback to default cardinality calculation
-                card = (hasValue(sp.getSubjectVar(), boundVars) ? 1.0 : VAR_CARDINALITY) * (hasValue(sp.getPredicateVar(), boundVars) ? 1.0 : VAR_CARDINALITY) * (hasValue(sp.getObjectVar(), boundVars) ? 1.0 : VAR_CARDINALITY) * (hasValue(sp.getContextVar(), boundVars) ? 1.0 : VAR_CARDINALITY);
+                card = super.getCardinality(sp);
             }
             for (Var v : sp.getVarList()) {
                 //decrease cardinality for each priority variable present
                 if (v != null && priorityVariables.contains(v.getName())) card /= 1000000.0;
             }
             return card;
+        }
+
+        @Override
+		protected double getCardinality(double varCardinality, Var var) {
+			return hasValue(var, boundVars) ? 1.0 : varCardinality;
+		}
+
+        @Override
+        protected int countConstantVars(Iterable<Var> vars) {
+        	int constantVarCount = 0;
+        	for(Var var : vars) {
+        		if(hasValue(var, boundVars)) {
+        			constantVarCount++;
+        		}
+        	}
+        	return constantVarCount;
         }
 
         private boolean hasValue(Var partitionVar, Collection<String> boundVars) {
@@ -219,8 +236,16 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
         }
 
 		protected void meetTupleFunctionCall(TupleFunctionCall node) {
-			// must evaluate last to ensure arguments have been bound
-			cardinality = Double.MAX_VALUE;
+			// must have all arguments bound to be able to evaluate
+			double argCard = 1.0;
+			for (ValueExpr expr : node.getArgs()) {
+				if (expr instanceof Var) {
+					argCard *= getCardinality(1000.0, (Var) expr);
+				} else {
+					argCard *= 1000.0;
+				}
+			}
+			cardinality = argCard * getCardinality(VAR_CARDINALITY, ((TupleFunctionCall) node).getResultVars());
 			updateMap(node);
 		}
 

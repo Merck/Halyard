@@ -62,8 +62,8 @@ public class TimestampTupleFunction extends AbstractSpinFunction implements Tupl
 
 		// check to see if we have the actual statement at hand
 		for (Value arg : args) {
-			if (arg instanceof StatementValue) {
-				Statement stmt = ((StatementValue) arg).getStatement();
+			if (arg instanceof StatementValue<?>) {
+				Statement stmt = ((StatementValue<?>) arg).getStatement();
 				if (stmt.equals(stmtPattern) && stmt instanceof Timestamped) {
 					long ts = ((Timestamped) stmt).getTimestamp();
 					return new SingletonIteration<>(Collections.singletonList(vf.createLiteral(new Date(ts))));

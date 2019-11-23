@@ -207,7 +207,7 @@ class HalyardValueExprEvaluation {
             value = bindings.getValue(var.getName());
         }
         if (value == null) {
-            throw new ValueExprEvaluationException();
+            throw new ValueExprEvaluationException(String.format("Var %s has no value (%s)", var.getName(), bindings));
         }
         return value;
     }

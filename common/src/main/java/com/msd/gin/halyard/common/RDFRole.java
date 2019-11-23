@@ -117,13 +117,27 @@ public enum RDFRole {
 		return HalyardTableUtils.ID_SIZE - endKeyHashSize();
 	}
 
-	protected abstract int toShift(byte prefix);
-
-	final byte[] rotateRight(byte[] src, int offset, int len, byte prefix) {
-		return rotateRight(src, offset, len, prefix, new byte[len]);
+	final byte[] keyHash(byte prefix, byte[] id) {
+		int len = keyHashSize();
+		return rotateRight(id, 0, len, prefix, new byte[len]);
 	}
 
-	final byte[] rotateRight(byte[] src, int offset, int len, byte prefix, byte[] dest) {
+	final byte[] endKeyHash(byte prefix, byte[] id) {
+		int len = endKeyHashSize();
+		return rotateRight(id, 0, len, prefix, new byte[len]);
+	}
+
+	final byte[] qualifierHash(byte[] id) {
+		return copy(id, keyHashSize(), qualifierHashSize());
+	}
+
+	final byte[] endQualifierHash(byte[] id) {
+		return copy(id, endKeyHashSize(), endQualifierHashSize());
+	}
+
+	protected abstract int toShift(byte prefix);
+
+	private final byte[] rotateRight(byte[] src, int offset, int len, byte prefix, byte[] dest) {
 		int shift = toShift(prefix);
 		if(shift > len) {
 			shift = shift % len;
@@ -144,6 +158,12 @@ public enum RDFRole {
 		}
 		System.arraycopy(src, offset+shift, dest, 0, len-shift);
 		System.arraycopy(src, offset, dest, len-shift, shift);
+		return dest;
+	}
+
+	private static byte[] copy(byte[] src, int offset, int len) {
+		byte[] dest = new byte[len];
+		System.arraycopy(src, offset, dest, 0, len);
 		return dest;
 	}
 }
