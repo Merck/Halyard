@@ -4,7 +4,7 @@ import org.eclipse.rdf4j.model.BNode;
 
 public abstract class BNodeWrapper implements BNode {
 	private static final long serialVersionUID = -3342094906407476268L;
-	private final BNode bnode;
+	protected final BNode bnode;
 
 	protected BNodeWrapper(BNode iri) {
 		this.bnode = iri;

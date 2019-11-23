@@ -2,7 +2,7 @@ package com.msd.gin.halyard.common;
 
 import org.eclipse.rdf4j.model.Literal;
 
-public class IdentifiableLiteral extends LiteralWrapper implements Identifiable {
+public final class IdentifiableLiteral extends LiteralWrapper implements Identifiable {
 	private static final long serialVersionUID = 4299930477670062440L;
 	private byte[] id;
 

@@ -11,7 +11,7 @@ import org.eclipse.rdf4j.model.Literal;
 
 public abstract class LiteralWrapper implements Literal {
 	private static final long serialVersionUID = -3751940963092784186L;
-	private final Literal literal;
+	protected final Literal literal;
 
 	protected LiteralWrapper(Literal literal) {
 		this.literal = literal;

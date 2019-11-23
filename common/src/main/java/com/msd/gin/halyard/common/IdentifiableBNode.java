@@ -2,7 +2,7 @@ package com.msd.gin.halyard.common;
 
 import org.eclipse.rdf4j.model.BNode;
 
-public class IdentifiableBNode extends BNodeWrapper implements Identifiable {
+public final class IdentifiableBNode extends BNodeWrapper implements Identifiable {
 	private static final long serialVersionUID = -6212507967580561560L;
 	private byte[] id;
 

@@ -2,7 +2,7 @@ package com.msd.gin.halyard.common;
 
 import org.eclipse.rdf4j.model.IRI;
 
-public class IdentifiableIRI extends IRIWrapper implements Identifiable {
+public final class IdentifiableIRI extends IRIWrapper implements Identifiable {
 	private static final long serialVersionUID = 8055405742401584331L;
 	private byte[] id;
 

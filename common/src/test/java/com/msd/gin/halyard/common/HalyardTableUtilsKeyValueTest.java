@@ -4,10 +4,13 @@ import java.util.Arrays;
 import java.util.Collection;
 
 import org.apache.hadoop.hbase.Cell;
+import org.eclipse.rdf4j.model.BNode;
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -18,16 +21,16 @@ import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class HalyardTableUtilsKeyValueTest {
-	private static final ValueFactory vf = SimpleValueFactory.getInstance();
+	private static final ValueFactory vf = TimestampedValueFactory.getInstance();
 
-    private static final String SUBJ1 = "http://whatever/subj1";
-    private static final String SUBJ2 = RDF.NIL.stringValue();
-    private static final String PRED1 = RDF.TYPE.stringValue();
-    private static final String PRED2 = "http://whatever/pred";
-    private static final String EXPL1 = "whatever explicit value1";
-    private static final String EXPL2 = "whatever explicit value2";
-    private static final String CTX1 = RDF.STATEMENT.stringValue();
-    private static final String CTX2 = "http://whatever/ctx2";
+    private static final IRI SUBJ1 = vf.createIRI("http://whatever/subj1");
+    private static final IRI SUBJ2 = RDF.NIL;
+    private static final IRI PRED1 = RDF.TYPE;
+    private static final IRI PRED2 = vf.createIRI("http://whatever/pred");
+    private static final Literal EXPL1 = vf.createLiteral("whatever explicit value1");
+    private static final Literal EXPL2 = vf.createLiteral("whatever explicit value2");
+    private static final IRI CTX1 = RDF.STATEMENT;
+    private static final BNode CTX2 = vf.createBNode();
 
     @Parameters(name = "{0}, {1}, {2}, {3}")
     public static Collection<Object[]> data() {
@@ -40,6 +43,7 @@ public class HalyardTableUtilsKeyValueTest {
                  {SUBJ2, PRED1, EXPL1, null},
                  {SUBJ1, PRED1, EXPL2, null},
                  {SUBJ2, PRED2, EXPL1, null},
+                 {vf.createBNode(), PRED2, vf.createBNode(), null},
                  {SUBJ1, PRED1, EXPL1, CTX1},
                  {SUBJ2, PRED2, EXPL2, CTX1},
                  {SUBJ1, PRED2, EXPL1, CTX1},
@@ -56,6 +60,7 @@ public class HalyardTableUtilsKeyValueTest {
                  {SUBJ2, PRED1, EXPL1, CTX2},
                  {SUBJ1, PRED1, EXPL2, CTX2},
                  {SUBJ2, PRED2, EXPL1, CTX2},
+                 {vf.createBNode(), PRED2, RDF.NIL, CTX2},
            });
     }
 
@@ -64,29 +69,47 @@ public class HalyardTableUtilsKeyValueTest {
     private final RDFObject o;
     private final RDFContext c;
 
-	public HalyardTableUtilsKeyValueTest(String s, String p, String o, String c) {
-        this.s = RDFSubject.create(vf.createIRI(s));
-        this.p = RDFPredicate.create(vf.createIRI(p));
-        this.o = RDFObject.create(vf.createLiteral(o));
-        this.c = (c != null) ? RDFContext.create(vf.createIRI(c)) : null;
+	public HalyardTableUtilsKeyValueTest(Resource s, IRI p, Value o, Resource c) {
+        this.s = RDFSubject.create(s);
+        this.p = RDFPredicate.create(p);
+        this.o = RDFObject.create(o);
+        this.c = (c != null) ? RDFContext.create(c) : null;
 	}
 
 	@Test
 	public void testKeyValues() {
+		long ts = 0;
 		Resource ctx = c != null ? c.val : null;
 		Statement expected = vf.createStatement(s.val, p.val, o.val, ctx);
-		Cell[] kvs = HalyardTableUtils.toKeyValues(s.val, p.val, o.val, ctx, false, 0);
+		Cell[] kvs = HalyardTableUtils.toKeyValues(s.val, p.val, o.val, ctx, false, ts);
 		for(Cell kv : kvs) {
-			Statement stmt = HalyardTableUtils.parseStatement(s, p, o, c != null ? c : null, kv, vf);
-			assertEquals("spoc", expected, stmt);
-			stmt = HalyardTableUtils.parseStatement(null, p, o, c != null ? c : null, kv, vf);
-			assertEquals("_poc", expected, stmt);
-			stmt = HalyardTableUtils.parseStatement(s, null, o, c != null ? c : null, kv, vf);
-			assertEquals("s_oc", expected, stmt);
-			stmt = HalyardTableUtils.parseStatement(s, p, null, c != null ? c : null, kv, vf);
-			assertEquals("sp_c", expected, stmt);
-			stmt = HalyardTableUtils.parseStatement(null, null, null, c != null ? c : null, kv, vf);
-			assertEquals("___c", expected, stmt);
+			testParseStatement("spoc", expected, s, p, o, c != null ? c : null, kv, ts);
+			testParseStatement("_poc", expected, null, p, o, c != null ? c : null, kv, ts);
+			testParseStatement("s_oc", expected, s, null, o, c != null ? c : null, kv, ts);
+			testParseStatement("sp_c", expected, s, p, null, c != null ? c : null, kv, ts);
+			testParseStatement("___c", expected, null, null, null, c != null ? c : null, kv, ts);
+		}
+	}
+
+	private void testParseStatement(String msg, Statement expected, RDFSubject s, RDFPredicate p, RDFObject o, RDFContext c, Cell kv, long ts) {
+		Statement actual = HalyardTableUtils.parseStatement(s, p, o, c, kv, vf);
+		assertEquals(msg, expected, actual);
+		assertEquals(ts, ((Timestamped)actual).getTimestamp());
+		if(s == null) {
+			assertArrayEquals(HalyardTableUtils.id(expected.getSubject()), ((Identifiable)actual.getSubject()).getId());
+			assertEquals(actual, ((StatementValue<?>)actual.getSubject()).getStatement());
+		}
+		if(p == null) {
+			assertArrayEquals(HalyardTableUtils.id(expected.getPredicate()), ((Identifiable)actual.getPredicate()).getId());
+			assertEquals(actual, ((StatementValue<?>)actual.getPredicate()).getStatement());
+		}
+		if(o == null) {
+			assertArrayEquals(HalyardTableUtils.id(expected.getObject()), ((Identifiable)actual.getObject()).getId());
+			assertEquals(actual, ((StatementValue<?>)actual.getObject()).getStatement());
+		}
+		if (c == null && (expected.getContext() != null || actual.getContext() != null)) {
+			assertArrayEquals(HalyardTableUtils.id(expected.getContext()), ((Identifiable)actual.getContext()).getId());
+			assertEquals(actual, ((StatementValue<?>)actual.getContext()).getStatement());
 		}
 	}
 }

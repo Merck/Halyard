@@ -4,7 +4,7 @@ import org.eclipse.rdf4j.model.IRI;
 
 public abstract class IRIWrapper implements IRI {
 	private static final long serialVersionUID = 4897685753727929653L;
-	private final IRI iri;
+	protected final IRI iri;
 
 	protected IRIWrapper(IRI iri) {
 		this.iri = iri;

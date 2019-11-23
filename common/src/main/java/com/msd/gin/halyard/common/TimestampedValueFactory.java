@@ -7,24 +7,68 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.AbstractValueFactory;
+import org.eclipse.rdf4j.model.impl.BooleanLiteral;
 import org.eclipse.rdf4j.model.impl.ContextStatement;
 import org.eclipse.rdf4j.model.impl.SimpleStatement;
 
 public class TimestampedValueFactory extends AbstractValueFactory {
 	private static final TimestampedValueFactory VF = new TimestampedValueFactory();
+	private static final Literal TRUE = new IdentifiableLiteral(HalyardTableUtils.id(BooleanLiteral.TRUE), BooleanLiteral.TRUE);
+	private static final Literal FALSE = new IdentifiableLiteral(HalyardTableUtils.id(BooleanLiteral.FALSE), BooleanLiteral.FALSE);
 
 	public static TimestampedValueFactory getInstance() {
 		return VF;
 	}
 
 	@Override
+	public IRI createIRI(String iri) {
+		return new IdentifiableIRI(super.createIRI(iri));
+	}
+
+	@Override
+	public BNode createBNode(String nodeID) {
+		return new IdentifiableBNode(super.createBNode(nodeID));
+	}
+
+	@Override
+	public Literal createLiteral(String value) {
+		return new IdentifiableLiteral(super.createLiteral(value));
+	}
+
+	@Override
+	public Literal createLiteral(String value, String language) {
+		return new IdentifiableLiteral(super.createLiteral(value, language));
+	}
+
+	@Override
+	public Literal createLiteral(String value, IRI datatype) {
+		return new IdentifiableLiteral(super.createLiteral(value, datatype));
+	}
+
+	@Override
+	public Literal createLiteral(boolean b) {
+		return b ? TRUE : FALSE;
+	}
+
+	@Override
+	protected Literal createNumericLiteral(Number number, IRI datatype) {
+		return new IdentifiableLiteral(super.createNumericLiteral(number, datatype));
+	}
+
+	@Override
 	public Statement createStatement(Resource subject, IRI predicate, Value object) {
-		return new TimestampedStatement(subject, predicate, object);
+		return new TimestampedStatement(unwrap(subject), unwrap(predicate), unwrap(object));
 	}
 
 	@Override
 	public Statement createStatement(Resource subject, IRI predicate, Value object, Resource context) {
-		return new TimestampedContextStatement(subject, predicate, object, context);
+		return new TimestampedContextStatement(unwrap(subject), unwrap(predicate), unwrap(object), unwrap(context));
+	}
+
+
+	@SuppressWarnings("unchecked")
+	private static <T extends Value> T unwrap(T v) {
+		return (v instanceof StatementValue<?>) ? ((StatementValue<T>)v).getValue() : v;
 	}
 
 	static final class TimestampedStatement extends SimpleStatement implements Timestamped {
@@ -146,7 +190,7 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 		}
 	}
 
-	static final class StatementIRI extends IdentifiableIRI implements StatementValue {
+	static final class StatementIRI extends IRIWrapper implements StatementValue<IRI>, Identifiable {
 		private static final long serialVersionUID = 3191250345781815876L;
 		private final Statement stmt;
 
@@ -155,12 +199,30 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 			this.stmt = stmt;
 		}
 
+		@Override
+		public IRI getValue() {
+			return iri;
+		}
+
+		@Override
 		public Statement getStatement() {
 			return stmt;
 		}
+
+		@Override
+		public byte[] getId() {
+			return (iri instanceof Identifiable) ? ((Identifiable)iri).getId() : null;
+		}
+
+		@Override
+		public void setId(byte[] id) {
+			if(iri instanceof Identifiable) {
+				((Identifiable)iri).setId(id);
+			}
+		}
 	}
 
-	static final class StatementBNode extends IdentifiableBNode implements StatementValue {
+	static final class StatementBNode extends BNodeWrapper implements StatementValue<BNode>, Identifiable {
 		private static final long serialVersionUID = 2844469156112345508L;
 		private final Statement stmt;
 
@@ -169,12 +231,30 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 			this.stmt = stmt;
 		}
 
+		@Override
+		public BNode getValue() {
+			return bnode;
+		}
+
+		@Override
 		public Statement getStatement() {
 			return stmt;
 		}
+
+		@Override
+		public byte[] getId() {
+			return (bnode instanceof Identifiable) ? ((Identifiable)bnode).getId() : null;
+		}
+
+		@Override
+		public void setId(byte[] id) {
+			if(bnode instanceof Identifiable) {
+				((Identifiable)bnode).setId(id);
+			}
+		}
 	}
 
-	static final class StatementLiteral extends IdentifiableLiteral implements StatementValue {
+	static final class StatementLiteral extends LiteralWrapper implements StatementValue<Literal>, Identifiable {
 		private static final long serialVersionUID = 8851736583549871759L;
 		private final Statement stmt;
 
@@ -183,8 +263,26 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 			this.stmt = stmt;
 		}
 
+		@Override
+		public Literal getValue() {
+			return literal;
+		}
+
+		@Override
 		public Statement getStatement() {
 			return stmt;
+		}
+
+		@Override
+		public byte[] getId() {
+			return (literal instanceof Identifiable) ? ((Identifiable)literal).getId() : null;
+		}
+
+		@Override
+		public void setId(byte[] id) {
+			if(literal instanceof Identifiable) {
+				((Identifiable)literal).setId(id);
+			}
 		}
 	}
 }
