@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -74,7 +75,7 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
                     public ValueFactory getValueFactory() {
                         return tripleSource.getValueFactory();
                     }
-                }, dataset, null, -1);
+                }, dataset, null, new HalyardEvaluationStatistics(null, null), -1);
                 es.setOptimizerPipeline(new StandardQueryOptimizerPipeline(es, tripleSource, new EvaluationStatistics()));
                 return es;
             }
