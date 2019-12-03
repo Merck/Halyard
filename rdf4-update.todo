@@ -1,0 +1,3 @@
+- QueryOptimizerPipeline in HalyardEvaluationStrategy and SAIL...
+- failing tests in HalyardComplexSPARQLQueryTest
+- SDK packaging
