@@ -22,7 +22,6 @@
     </dependencies>
     <build>
         <plugins>
-<!--            
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
@@ -38,7 +37,7 @@
                             <artifactItems>
                                 <artifactItem>
                                     <groupId>org.eclipse.rdf4j</groupId>
-                                    <artifactId>rdf4j-client</artifactId>
+                                    <artifactId>rdf4j-repository-api</artifactId>
                                     <version>${rdf4j.version}</version>
                                     <type>jar</type>
                                 </artifactItem>
@@ -49,7 +48,6 @@
                     </execution>
                 </executions>
             </plugin>
--->            
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <version>1.8</version>
@@ -59,7 +57,7 @@
                         <phase>process-classes</phase>
                         <configuration>
                             <target>
-                                <zip destfile="${project.build.directory}/rdf4j-client-${rdf4j.version}.jar" update="true">
+                                <zip destfile="${project.build.directory}/rdf4j-repository-api-${rdf4j.version}.jar" update="true">
                                     <fileset dir="src/main/patches/rdf4j-client"/>
                                 </zip>
                             </target>
