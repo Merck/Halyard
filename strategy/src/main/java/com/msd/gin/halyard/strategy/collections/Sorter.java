@@ -94,7 +94,7 @@ public class Sorter <E extends Comparable<E> & Serializable> implements Iterable
     public void close() {
         try {
             db.close();
-        } catch (IllegalAccessError ignore) {
+        } catch (IllegalAccessError|IllegalStateException ignore) {
             //silent close
         }
     }
