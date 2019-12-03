@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import java.util.Objects;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.Value;
@@ -83,11 +84,12 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
      * @param serviceResolver {@code FederatedServiceResolver} resolver for any federated services (graphs) required for the evaluation
      * @param timeout {@code long} query evaluation timeout in seconds, negative values mean no timeout
      */
-    public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset, FederatedServiceResolver serviceResolver, long timeout) {
+    public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset, FederatedServiceResolver serviceResolver, HalyardEvaluationStatistics statistics, long timeout) {
         this.serviceResolver = serviceResolver;
         this.tupleEval = new HalyardTupleExprEvaluation(this, tripleSource, dataset, timeout);
         this.valueEval = new HalyardValueExprEvaluation(this, tripleSource.getValueFactory());
         this.dataset = dataset;
+        this.pipeline = new HalyardQueryOptimizerPipeline(this, tripleSource, statistics);
         EvaluationStrategies.register(this);
     }
 
