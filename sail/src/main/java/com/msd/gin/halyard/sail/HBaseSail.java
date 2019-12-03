@@ -19,8 +19,6 @@ package com.msd.gin.halyard.sail;
 import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
-import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
-import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 import java.io.File;
@@ -79,15 +77,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.BindingAssigner;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.CompareOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConstantOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.OrderLimitOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.repository.sparql.query.InsertBindingSetCursor;
@@ -360,20 +349,8 @@ public class HBaseSail implements Sail, SailConnection, FederatedServiceResolver
             }
         };
 
-        EvaluationStrategy strategy = pushStrategy ? new HalyardEvaluationStrategy(source, dataset, this, evaluationTimeout) : new StrictEvaluationStrategy(source, dataset, this);
-
-        new BindingAssigner().optimize(tupleExpr, dataset, bindings);
-        new ConstantOptimizer(strategy).optimize(tupleExpr, dataset, bindings);
-        new CompareOptimizer().optimize(tupleExpr, dataset, bindings);
-        new ConjunctiveConstraintSplitter().optimize(tupleExpr, dataset, bindings);
-        new DisjunctiveConstraintOptimizer().optimize(tupleExpr, dataset, bindings);
-        new SameTermFilterOptimizer().optimize(tupleExpr, dataset, bindings);
-        new QueryModelNormalizer().optimize(tupleExpr, dataset, bindings);
-        new HalyardQueryJoinOptimizer(statistics).optimize(tupleExpr, dataset, bindings);
-        // new SubSelectJoinOptimizer().optimize(tupleExpr, dataset, bindings);
-        new IterativeEvaluationOptimizer().optimize(tupleExpr, dataset, bindings);
-        new HalyardFilterOptimizer().optimize(tupleExpr, dataset, bindings); //apply filter optimizer twice (before and after Joins and Unions shaking)
-        new OrderLimitOptimizer().optimize(tupleExpr, dataset, bindings);
+        EvaluationStrategy strategy = pushStrategy ? new HalyardEvaluationStrategy(source, dataset, this, statistics, evaluationTimeout) : new StrictEvaluationStrategy(source, dataset, this);
+        strategy.optimize(tupleExpr, statistics, bindings);
         LOG.log(Level.FINE, "Evaluated TupleExpr after optimization:\n{0}", tupleExpr);
         try {
         		//evaluate the expression against the TripleSource according to the EvaluationStrategy.
