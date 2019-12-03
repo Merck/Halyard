@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import java.util.Objects;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -26,10 +27,13 @@ import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizerPipeline;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
 
 /**
@@ -69,6 +73,9 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
      */
     Value sharedValueOfNow;
 
+    private QueryOptimizerPipeline pipeline;
+    private Dataset dataset;
+
     /**
      * Default constructor of HalyardEvaluationStrategy
      * @param tripleSource {@code TripleSource} to be queried for the existence of triples in a context
@@ -80,6 +87,7 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
         this.serviceResolver = serviceResolver;
         this.tupleEval = new HalyardTupleExprEvaluation(this, tripleSource, dataset, timeout);
         this.valueEval = new HalyardValueExprEvaluation(this, tripleSource.getValueFactory());
+        this.dataset = dataset;
         EvaluationStrategies.register(this);
     }
 
@@ -124,5 +132,21 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
     @Override
     public boolean isTrue(ValueExpr expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         return valueEval.isTrue(expr, bindings);
+    }
+
+    @Override
+    public void setOptimizerPipeline(QueryOptimizerPipeline pipeline) {
+        Objects.requireNonNull(pipeline);
+        this.pipeline = pipeline;
+    }
+
+    @Override
+    public TupleExpr optimize(TupleExpr expr, EvaluationStatistics evaluationStatistics, BindingSet bindings) {
+        TupleExpr optimizedExpr = expr;
+
+        for (QueryOptimizer optimizer : pipeline.getOptimizers()) {
+            optimizer.optimize(optimizedExpr, dataset, bindings);
+        }
+        return optimizedExpr;
     }
 }

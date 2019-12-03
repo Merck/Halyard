@@ -59,4 +59,17 @@ public class HalyardComplexSPARQLQueryTest extends ComplexSPARQLQueryTest {
         super.testEmptyUnion();
     }
 
+    @Override
+    @Test
+    @Ignore
+    public void testBindScope() throws Exception {
+        super.testBindScope();
+    }
+
+    @Override
+    @Test
+    @Ignore
+    public void testBindScopeUnion() {
+        super.testBindScopeUnion();
+    }
 }
