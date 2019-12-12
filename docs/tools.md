@@ -147,8 +147,8 @@ Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.
  -h,--help                                    Prints this help
  -v,--version                                 Prints version
  -s,--source <source_paths>                   Source path(s) with RDF files, more paths can be
-                                              delimited by comma, the paths are searched for the
-                                              supported files recurrently
+                                              delimited by comma, the paths are recursively searched
+                                              for the supported files 
  -t,--target <dataset_table>                  Target HBase table with Halyard RDF store, optional
                                               HBase namespace of the target table must already exist
  -i,--skip-invalid                            Optionally skip invalid source files and parsing
@@ -174,8 +174,8 @@ Filesystem (HDFS) into HBase in the form of a Halyard dataset.
  -h,--help                                Prints this help
  -v,--version                             Prints version
  -s,--source <source_paths>               Source path(s) with RDF files, more paths can be delimited
-                                          by comma, the paths are searched for the supported files
-                                          recurrently
+                                          by comma, the paths are recursively searched for the supported
+                                          files
  -w,--work-dir <shared_folder>            Unique non-existent folder within shared filesystem to
                                           server as a working directory for the temporary HBase
                                           files,  the files are moved to their final HBase locations

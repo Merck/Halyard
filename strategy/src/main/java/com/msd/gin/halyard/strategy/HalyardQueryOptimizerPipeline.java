@@ -1,4 +1,24 @@
-package com.msd.gin.halyard.optimizers;
+/*
+ * Copyright 2016 Merck Sharp & Dohme Corp. a subsidiary of Merck & Co.,
+ * Inc., Kenilworth, NJ, USA.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.msd.gin.halyard.strategy;
+
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
+import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
 
 import java.util.Arrays;
 
@@ -11,28 +31,25 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.CompareOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConstantOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.OrderLimitOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.RegexAsStringFunctionOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
-public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeline, EvaluationStatisticsDependent {
+/**
+*
+* @author Adam Sotona
+*/
+public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeline {
 
+	private final HalyardEvaluationStatistics statistics;
 	private final EvaluationStrategy strategy;
 	private final ValueFactory valueFactory;
 
-	private EvaluationStatistics statistics;
-
-	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory) {
+	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory, HalyardEvaluationStatistics statistics) {
 		this.strategy = strategy;
 		this.valueFactory = valueFactory;
-	}
-
-	@Override
-	public void setEvaluationStatistics(EvaluationStatistics statistics) {
 		this.statistics = statistics;
 	}
 
@@ -47,8 +64,7 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 			new DisjunctiveConstraintOptimizer(),
 			new SameTermFilterOptimizer(),
 			new QueryModelNormalizer(),
-			(statistics instanceof HalyardEvaluationStatistics) ? new HalyardQueryJoinOptimizer((HalyardEvaluationStatistics) statistics) :
-				new QueryJoinOptimizer(statistics),
+			new HalyardQueryJoinOptimizer(statistics),
 			// new SubSelectJoinOptimizer(),
 			new IterativeEvaluationOptimizer(),
 			new HalyardFilterOptimizer(), // apply filter optimizer twice (before and after Joins and Unions shaking)

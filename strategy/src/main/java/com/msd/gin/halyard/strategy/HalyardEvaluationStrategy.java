@@ -16,8 +16,7 @@
  */
 package com.msd.gin.halyard.strategy;
 
-import com.msd.gin.halyard.optimizers.EvaluationStatisticsDependent;
-import com.msd.gin.halyard.optimizers.HalyardQueryOptimizerPipeline;
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 
 import java.util.Objects;
 
@@ -98,20 +97,20 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 	public HalyardEvaluationStrategy(TripleSource tripleSource, QueryContext queryContext,
 			TupleFunctionRegistry tupleFunctionRegistry,
 			FunctionRegistry functionRegistry, Dataset dataset, FederatedServiceResolver serviceResolver,
-			long timeout) {
+			HalyardEvaluationStatistics statistics, long timeout) {
 		this.dataset = dataset;
         this.serviceResolver = serviceResolver;
 		this.tupleEval = new HalyardTupleExprEvaluation(this, queryContext, tupleFunctionRegistry, tripleSource,
 				dataset, timeout);
 		this.valueEval = new HalyardValueExprEvaluation(this, functionRegistry, tripleSource.getValueFactory());
-		this.pipeline = new HalyardQueryOptimizerPipeline(this, tripleSource.getValueFactory());
+		this.pipeline = new HalyardQueryOptimizerPipeline(this, tripleSource.getValueFactory(), statistics);
         EvaluationStrategies.register(this);
     }
 
 	public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset,
-			FederatedServiceResolver serviceResolver, long timeout) {
+			FederatedServiceResolver serviceResolver, HalyardEvaluationStatistics statistics, long timeout) {
 		this(tripleSource, new QueryContext(), TupleFunctionRegistry.getInstance(), FunctionRegistry.getInstance(),
-				dataset, serviceResolver, timeout);
+				dataset, serviceResolver, statistics, timeout);
 	}
 
     /**
@@ -134,10 +133,6 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 	@Override
 	public TupleExpr optimize(TupleExpr expr, EvaluationStatistics evaluationStatistics, BindingSet bindings) {
 		TupleExpr optimizedExpr = expr;
-
-		if (pipeline instanceof EvaluationStatisticsDependent) {
-			((EvaluationStatisticsDependent)pipeline).setEvaluationStatistics(evaluationStatistics);
-		}
 
 		for (QueryOptimizer optimizer : pipeline.getOptimizers()) {
 			optimizer.optimize(optimizedExpr, dataset, bindings);

@@ -54,19 +54,20 @@ public class HalyardExportJDBCTypesTest {
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
 			for (int i = 1; i < 10; i++) {
-				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/date"), vf.createLiteral(new Date(i, i, i)));
-				Date d = new Date(i, i, i, i, i, i);
-				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/time"), vf.createLiteral(d));
-				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/timestamp"), vf.createLiteral(new Date(d.getTime() + i))); // add millis
-				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/string"), vf.createLiteral("value" + i));
-				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/boolean"), vf.createLiteral(i < 5));
-				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/byte"), vf.createLiteral((byte) i));
-				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/double"), vf.createLiteral((double) i / 100.0));
-				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/float"), vf.createLiteral((float) i / 10.0));
-				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/int"), vf.createLiteral(i * 100));
-				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/long"), vf.createLiteral((long) i * 10000000000l));
-				conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/short"), vf.createLiteral((short) (i * 10)));
+	            conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/date"), vf.createLiteral(new Date(100 + i, i, i)));
+	            Date d = new Date(100 + i, i, i, i, i, i);
+	            conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/time"), vf.createLiteral(d));
+	            conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/timestamp"), vf.createLiteral(new Date(d.getTime() + i))); // add millis
+	            conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/string"), vf.createLiteral("value" + i));
+	            conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/boolean"), vf.createLiteral(i < 5));
+	            conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/byte"), vf.createLiteral((byte)i));
+	            conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/double"), vf.createLiteral((double)i/100.0));
+	            conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/float"), vf.createLiteral((float)i/10.0));
+	            conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/int"), vf.createLiteral(i * 100));
+	            conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/long"), vf.createLiteral((long)i * 10000000000l));
+	            conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/short"), vf.createLiteral((short)(i * 10)));
 			}
+	        conn.commit();
 		}
         sail.shutDown();
     }
@@ -83,14 +84,13 @@ public class HalyardExportJDBCTypesTest {
             try (Connection c = DriverManager.getConnection("jdbc:derby:memory:halyard-export-types-test")) {
                 try (ResultSet rs = c.createStatement().executeQuery("select * from " + name.getMethodName())) {
                     ResultSetMetaData m = rs.getMetaData();
-                    int count = m.getColumnCount();
                     for (int row = 1; row < 10; row++) {
                         assertTrue(rs.next());
                         int i = rs.getByte("byte");
                         assertEquals("http://whatever/subj" + i, rs.getString("subj"));
-                        assertEquals(new java.sql.Date(i, i, i), rs.getDate("date"));
+                        assertEquals(new java.sql.Date(100 + i, i, i), rs.getDate("date"));
                         assertEquals(new Time(i, i, i), rs.getTime("time"));
-                        assertEquals(new Timestamp(i, i, i, i, i, i, 1000000*i), rs.getTimestamp("timestamp"));
+                        assertEquals(new Timestamp(100 + i, i, i, i, i, i, 1000000*i), rs.getTimestamp("timestamp"));
                         assertEquals("value" + i, rs.getString("string"));
                         assertEquals((double)i/100.0, rs.getDouble("doubl"), 0.001);
                         assertEquals((float)i/10.0, rs.getFloat("floa"), 0.01);

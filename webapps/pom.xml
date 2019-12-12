@@ -6,7 +6,7 @@
     <parent>
         <groupId>com.msd.gin.halyard</groupId>
         <artifactId>halyard</artifactId>
-        <version>2.5-SNAPSHOT</version>
+        <version>2.5</version>
     </parent>
     <dependencies>
         <dependency>
@@ -84,7 +84,8 @@
                                     <zipfileset dir="../common/target" includes="halyard-common-${project.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="../strategy/target" includes="halyard-strategy-${project.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="../sail/target" includes="halyard-sail-${project.version}.jar" prefix="WEB-INF/lib"/>
-                                    <zipfileset dir="../sdk/target" includes="rdf4j-client-${rdf4j.version}.jar" prefix="WEB-INF/lib"/>
+                                    <zipfileset dir="../rio/target" includes="halyard-rio-${project.version}.jar" prefix="WEB-INF/lib"/>
+                                    <zipfileset dir="../sdk/target" includes="rdf4j-repository-api-${rdf4j.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="${project.build.directory}" includes="json-20140107.jar" prefix="WEB-INF/lib"/>
                                 </zip>
                                 <unzip src="${project.build.directory}/rdf4j-workbench.war" dest="target/rdf4j-workbench-patch" overwrite="true">
@@ -99,7 +100,8 @@
                                     <zipfileset dir="../common/target" includes="halyard-common-${project.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="../strategy/target" includes="halyard-strategy-${project.version}.jar" prefix="WEB-INF/lib"/>
                                     <zipfileset dir="../sail/target" includes="halyard-sail-${project.version}.jar" prefix="WEB-INF/lib"/>
-                                    <zipfileset dir="../sdk/target" includes="rdf4j-client-${rdf4j.version}.jar" prefix="WEB-INF/lib"/>
+                                    <zipfileset dir="../rio/target" includes="halyard-rio-${project.version}.jar" prefix="WEB-INF/lib"/>
+                                    <zipfileset dir="../sdk/target" includes="rdf4j-repository-api-${rdf4j.version}.jar" prefix="WEB-INF/lib"/>
                                 </zip>
                             </target>
                         </configuration>

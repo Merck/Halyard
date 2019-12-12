@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -27,6 +28,8 @@ import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.StandardQueryOptimizerPipeline;
 import org.eclipse.rdf4j.sail.NotifyingSailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
@@ -44,7 +47,7 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
 
             @Override
             protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, final TripleSource tripleSource) {
-                return new HalyardEvaluationStrategy(new TripleSource() {
+                EvaluationStrategy es = new HalyardEvaluationStrategy(new TripleSource() {
                     @Override
                     public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
                         return new FilterIteration<Statement, QueryEvaluationException>(tripleSource.getStatements(subj, pred, obj, contexts)){
@@ -72,7 +75,9 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
                     public ValueFactory getValueFactory() {
                         return tripleSource.getValueFactory();
                     }
-                }, dataset, null, -1);
+                }, dataset, null, new HalyardEvaluationStatistics(null, null), -1);
+                es.setOptimizerPipeline(new StandardQueryOptimizerPipeline(es, tripleSource, new EvaluationStatistics()));
+                return es;
             }
 
         };
