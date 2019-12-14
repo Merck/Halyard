@@ -97,6 +97,11 @@
             <artifactId>commons-codec</artifactId>
             <version>1.9</version>
         </dependency>
+        <dependency>
+            <groupId>net.sf.saxon</groupId>
+            <artifactId>Saxon-HE</artifactId>
+            <version>9.9.1-6</version>
+        </dependency>
 
 		<dependency>
 			<groupId>org.kohsuke.metainf-services</groupId>

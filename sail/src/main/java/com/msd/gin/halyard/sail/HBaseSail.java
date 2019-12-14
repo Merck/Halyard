@@ -18,6 +18,7 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.TimestampedValueFactory;
+import com.msd.gin.halyard.function.DynamicFunctionRegistry;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 
 import java.io.File;
@@ -96,7 +97,7 @@ public class HBaseSail implements Sail {
     final String elasticIndexURL;
     final Ticker ticker;
 	private FederatedServiceResolver federatedServiceResolver;
-	private FunctionRegistry functionRegistry = FunctionRegistry.getInstance();
+	private FunctionRegistry functionRegistry = new DynamicFunctionRegistry();
 	private TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
 	private SpinParser spinParser = new SpinParser();
 	private final List<QueryContextInitializer> queryContextInitializers = new ArrayList<>();

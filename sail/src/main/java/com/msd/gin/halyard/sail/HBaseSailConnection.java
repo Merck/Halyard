@@ -164,7 +164,7 @@ public class HBaseSailConnection implements SailConnection {
         TripleSource source = new TripleSource() {
             @Override
             public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
-            	if (RDF.TYPE.equals(pred) && SPIN.MAGIC_PROPERTIES_CLASS.equals(obj)) {
+				if (RDF.TYPE.equals(pred) && SPIN.MAGIC_PROPERTY_CLASS.equals(obj)) {
             		// cache magic property definitions here
             		return new EmptyIteration<>();
             	} else {
