@@ -16,22 +16,23 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.vocab.VOID_EXT;
-import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.vocab.HALYARD;
+import com.msd.gin.halyard.vocab.VOID_EXT;
+
 import java.util.Collection;
+
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
-import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
+import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.Var;
-import org.eclipse.rdf4j.sail.SailConnection;
-import org.eclipse.rdf4j.sail.SailException;
+import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,12 +43,10 @@ import org.slf4j.LoggerFactory;
 public final class HalyardStatsBasedStatementPatternCardinalityCalculator implements HalyardEvaluationStatistics.StatementPatternCardinalityCalculator {
 	private static final Logger LOG = LoggerFactory.getLogger(HalyardStatsBasedStatementPatternCardinalityCalculator.class);
 
-	private final SailConnection statsConnection;
-    private final ValueFactory valueFactory;
+	private final TripleSource statsSource;
 
-	public HalyardStatsBasedStatementPatternCardinalityCalculator(SailConnection statsConnection, ValueFactory valueFactory) {
-		this.statsConnection = statsConnection;
-		this.valueFactory = valueFactory;
+	public HalyardStatsBasedStatementPatternCardinalityCalculator(TripleSource statsSource) {
+		this.statsSource = statsSource;
     }
 
     @Override
@@ -93,7 +92,7 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
 
     //get the Triples count for a giving subject from VOID statistics or return the default value
     private long getTriplesCount(IRI subjectNode, long defaultValue) {
-        try (CloseableIteration<? extends Statement, SailException> ci = statsConnection.getStatements(subjectNode, VOID.TRIPLES, null, true, HALYARD.STATS_GRAPH_CONTEXT)) {
+		try (CloseableIteration<? extends Statement, QueryEvaluationException> ci = statsSource.getStatements(subjectNode, VOID.TRIPLES, null, HALYARD.STATS_GRAPH_CONTEXT)) {
             if (ci.hasNext()) {
                 Value v = ci.next().getObject();
                 if (v instanceof Literal) {
@@ -120,6 +119,6 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
         if (partitionVar == null || !partitionVar.hasValue()) {
             return defaultCardinality;
         }
-        return getTriplesCount(valueFactory.createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.id(partitionVar.getValue()))), 100l);
+		return getTriplesCount(statsSource.getValueFactory().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.id(partitionVar.getValue()))), 100l);
     }
 }

@@ -82,7 +82,13 @@ public class HBaseSail implements Sail {
 		SailConnection createConnection(HBaseSail sail);
 	}
 
-    private static final long STATUS_CACHING_TIMEOUT = 60000l;
+	static final class ScanSettings {
+		long minTimestamp = 0;
+		long maxTimestamp = Long.MAX_VALUE;
+		int maxVersions = 1;
+	}
+
+	private static final long STATUS_CACHING_TIMEOUT = 60000l;
 
     private final Configuration config; //the configuration of the HBase database
     final String tableName;
@@ -101,9 +107,7 @@ public class HBaseSail implements Sail {
 	private TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
 	private SpinParser spinParser = new SpinParser();
 	private final List<QueryContextInitializer> queryContextInitializers = new ArrayList<>();
-	long minTimestamp = 0;
-	long maxTimestamp = Long.MAX_VALUE;
-	int maxVersions = 1;
+	ScanSettings scanSettings = new ScanSettings();
 	final ConnectionFactory connFactory;
 	Connection hConnection;
 	final boolean hConnectionIsShared; //whether a Connection is provided or we need to create our own
@@ -213,7 +217,7 @@ public class HBaseSail implements Sail {
 		}
 
 		statsConnection = getConnection();
-		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(statsConnection, getValueFactory()), service -> {
+		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(new SailConnectionTripleSource(statsConnection, false, getValueFactory())), service -> {
 			HalyardEvaluationStatistics fedStats = null;
 			FederatedService fedServ = federatedServiceResolver.getService(service);
 			if (fedServ instanceof SailFederatedService) {

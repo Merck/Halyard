@@ -185,7 +185,6 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 
 								@Override
 								public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
-									contexts = normalizeContexts(contexts);
 									try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
 										while (iter.hasNext()) {
 											Statement st = iter.next();
