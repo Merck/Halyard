@@ -19,6 +19,14 @@ package com.msd.gin.halyard.strategy;
 import static com.msd.gin.halyard.strategy.HalyardStatementPatternEvaluation.enqueue;
 import static com.msd.gin.halyard.strategy.HalyardStatementPatternEvaluation.enqueueAll;
 
+import com.msd.gin.halyard.strategy.aggregators.Aggregator;
+import com.msd.gin.halyard.strategy.aggregators.AvgAggregator;
+import com.msd.gin.halyard.strategy.aggregators.ConcatAggregator;
+import com.msd.gin.halyard.strategy.aggregators.CountAggregator;
+import com.msd.gin.halyard.strategy.aggregators.MaxAggregator;
+import com.msd.gin.halyard.strategy.aggregators.MinAggregator;
+import com.msd.gin.halyard.strategy.aggregators.SampleAggregator;
+import com.msd.gin.halyard.strategy.aggregators.SumAggregator;
 import com.msd.gin.halyard.strategy.collections.BigHashSet;
 import com.msd.gin.halyard.strategy.collections.Sorter;
 
@@ -26,6 +34,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,8 +55,10 @@ import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryResults;
 import org.eclipse.rdf4j.query.algebra.AggregateOperator;
 import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
+import org.eclipse.rdf4j.query.algebra.Avg;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
+import org.eclipse.rdf4j.query.algebra.Count;
 import org.eclipse.rdf4j.query.algebra.DescribeOperator;
 import org.eclipse.rdf4j.query.algebra.Difference;
 import org.eclipse.rdf4j.query.algebra.Distinct;
@@ -56,9 +67,13 @@ import org.eclipse.rdf4j.query.algebra.Extension;
 import org.eclipse.rdf4j.query.algebra.ExtensionElem;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.Group;
+import org.eclipse.rdf4j.query.algebra.GroupConcat;
+import org.eclipse.rdf4j.query.algebra.GroupElem;
 import org.eclipse.rdf4j.query.algebra.Intersection;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
+import org.eclipse.rdf4j.query.algebra.Max;
+import org.eclipse.rdf4j.query.algebra.Min;
 import org.eclipse.rdf4j.query.algebra.MultiProjection;
 import org.eclipse.rdf4j.query.algebra.Order;
 import org.eclipse.rdf4j.query.algebra.OrderElem;
@@ -68,11 +83,13 @@ import org.eclipse.rdf4j.query.algebra.ProjectionElemList;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.Reduced;
+import org.eclipse.rdf4j.query.algebra.Sample;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.Slice;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.SubQueryValueOperator;
+import org.eclipse.rdf4j.query.algebra.Sum;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
@@ -524,13 +541,78 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateGroup(BindingSetPipe parent, Group group, BindingSet bindings) {
-        //temporary solution using copy of the original iterator
-        //re-writing this to push model is a bit more complex task
-        try {
-			enqueue(parent, new GroupIterator(parentStrategy, group, bindings), group);
-        } catch (QueryEvaluationException e) {
-            parent.handleException(e);
-        }
+    	if (group.getGroupBindingNames().isEmpty()) {
+    		// no GROUP BY present
+			final Map<String,Aggregator> aggregators = new LinkedHashMap<>();
+			for (GroupElem ge : group.getGroupElements()) {
+				Aggregator agg = createAggregator(ge.getOperator(), bindings);
+				if (agg != null) {
+					aggregators.put(ge.getName(), agg);
+				}
+			}
+    		evaluateTupleExpr(new BindingSetPipe(parent) {
+				@Override
+				public boolean push(BindingSet bs) throws InterruptedException {
+					if (bs != null) {
+						for(Aggregator agg : aggregators.values()) {
+							agg.process(bs);
+						}
+						return true;
+					} else {
+						QueryBindingSet result = new QueryBindingSet();
+						for(Map.Entry<String,Aggregator> entry : aggregators.entrySet()) {
+							try(Aggregator agg = entry.getValue()) {
+								Value v = agg.getValue();
+								if (v != null) {
+									result.setBinding(entry.getKey(), v);
+								}
+							} catch (ValueExprEvaluationException ignore) {
+								// There was a type error when calculating the value of the
+								// aggregate.
+								// We silently ignore the error, resulting in no result value
+								// being bound.
+							}
+						}
+						if(!parent.push(result)) {
+							return false;
+						}
+						return parent.push(null);
+					}
+				}
+				@Override
+				public String toString() {
+					return "AggregateBindingSetPipe";
+				}
+    		}, group.getArg(), bindings);
+    	} else {
+	        //temporary solution using copy of the original iterator
+	        //re-writing this to push model is a bit more complex task
+	        try {
+				enqueue(parent, new GroupIterator(parentStrategy, group, bindings), group);
+	        } catch (QueryEvaluationException e) {
+	            parent.handleException(e);
+	        }
+    	}
+    }
+
+    private Aggregator createAggregator(AggregateOperator operator, BindingSet bindings) {
+		if (operator instanceof Count) {
+			return new CountAggregator((Count) operator, parentStrategy, tripleSource.getValueFactory());
+		} else if (operator instanceof Min) {
+			return new MinAggregator((Min) operator, parentStrategy);
+		} else if (operator instanceof Max) {
+			return new MaxAggregator((Max) operator, parentStrategy);
+		} else if (operator instanceof Sum) {
+			return new SumAggregator((Sum) operator, parentStrategy);
+		} else if (operator instanceof Avg) {
+			return new AvgAggregator((Avg) operator, parentStrategy, tripleSource.getValueFactory());
+		} else if (operator instanceof Sample) {
+			return new SampleAggregator((Sample) operator, parentStrategy);
+		} else if (operator instanceof GroupConcat) {
+			return new ConcatAggregator((GroupConcat) operator, parentStrategy, bindings, tripleSource.getValueFactory());
+		} else {
+			return null;
+		}
     }
 
     /**

@@ -18,12 +18,14 @@ package com.msd.gin.halyard.strategy;
 
 import static junit.framework.TestCase.assertFalse;
 import static junit.framework.TestCase.assertTrue;
+
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SESAME;
+import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQueryResult;
@@ -33,7 +35,9 @@ import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 /**
  * @author Adam Sotona (MSD)
@@ -182,5 +186,44 @@ public class HalyardStrategyExtendedTest {
             "}";
         TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
         assertTrue(res.hasNext());
+    }
+
+    @Test
+    public void testAggregates() {
+    	String q ="SELECT (MAX(?x) as ?maxx) (MIN(?x) as ?minx) (AVG(?x) as ?avgx) (SUM(?x) as ?sumx) (COUNT(?x) as ?countx) (SAMPLE(?x) as ?samplex) (GROUP_CONCAT(?x) as ?concatx) { VALUES ?x {1 2 2 3} }";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+        BindingSet bs = res.next();
+        assertEquals(3, ((Literal) bs.getValue("maxx")).intValue());
+        assertEquals(1, ((Literal) bs.getValue("minx")).intValue());
+        assertEquals(2, ((Literal) bs.getValue("avgx")).intValue());
+        assertEquals(4, ((Literal) bs.getValue("countx")).intValue());
+        assertEquals(8, ((Literal) bs.getValue("sumx")).intValue());
+        assertNotNull(bs.getValue("samplex"));
+        assertEquals("1 2 2 3", ((Literal) bs.getValue("concatx")).getLabel());
+    }
+
+    @Test
+    public void testDistinctAggregates() {
+    	String q ="SELECT (MAX(distinct ?x) as ?maxx) (MIN(distinct ?x) as ?minx) (AVG(distinct ?x) as ?avgx) (SUM(distinct ?x) as ?sumx) (COUNT(distinct ?x) as ?countx) (SAMPLE(distinct ?x) as ?samplex) (GROUP_CONCAT(distinct ?x) as ?concatx) { VALUES ?x {1 2 2 3} }";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+        BindingSet bs = res.next();
+        assertEquals(3, ((Literal) bs.getValue("maxx")).intValue());
+        assertEquals(1, ((Literal) bs.getValue("minx")).intValue());
+        assertEquals(2, ((Literal) bs.getValue("avgx")).intValue());
+        assertEquals(3, ((Literal) bs.getValue("countx")).intValue());
+        assertEquals(6, ((Literal) bs.getValue("sumx")).intValue());
+        assertNotNull(bs.getValue("samplex"));
+        assertEquals("1 2 3", ((Literal) bs.getValue("concatx")).getLabel());
+    }
+
+    @Test
+    public void testEmptyAggregate() {
+    	String q ="SELECT (MAX(?x) as ?maxx) {}";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+        BindingSet bs = res.next();
+        assertEquals(0, bs.size());
     }
 }
