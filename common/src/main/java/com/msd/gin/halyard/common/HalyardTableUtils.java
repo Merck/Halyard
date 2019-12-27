@@ -215,7 +215,7 @@ public final class HalyardTableUtils {
     }
 
 	private static final BiMap<ByteBuffer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(256);
-	private static final Map<ByteBuffer, IRI> WELL_KNOWN_IRI_IDS = new HashMap<>(256);
+	private static final BiMap<ByteBuffer, IRI> WELL_KNOWN_IRI_IDS = HashBiMap.create(256);
 	private static final BiMap<ByteBuffer, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);
 	private static final byte WELL_KNOWN_IRI_MARKER = (byte) ('#' | 0x80);  // marker must be negative (msb set) so it is distinguishable from a length (>=0)
 
@@ -1284,17 +1284,26 @@ public final class HalyardTableUtils {
     }
 
 	public static byte[] id(Value v) {
-		byte[] hash = null;
-		Identifiable idValue = null;
-		boolean hasHash = false;
+		byte[] hash;
+		Identifiable idValue;
 
 		if (v instanceof Identifiable) {
 			idValue = (Identifiable) v;
 			hash = idValue.getId();
-			hasHash = (hash != null);
+		} else {
+			idValue = null;
+			ByteBuffer id = WELL_KNOWN_IRI_IDS.inverse().get(v);
+			if (id != null) {
+				hash = new byte[ID_SIZE];
+    			// NB: do not alter original hash buffer which is shared across threads
+				id.duplicate().get(hash);
+			} else {
+				hash = null;
+			}
 		}
 
-		if (!hasHash) {
+		boolean alreadyHasHash = (hash != null);
+		if (!alreadyHasHash) {
 			hash = hashUnique(v.toString().getBytes(StandardCharsets.UTF_8));
 			// literal prefix
 			if (v instanceof Literal) {
@@ -1304,7 +1313,7 @@ public final class HalyardTableUtils {
 			}
 		}
 
-		if (idValue != null && !hasHash) {
+		if (idValue != null && !alreadyHasHash) {
 			idValue.setId(hash);
 		}
 		return hash;
