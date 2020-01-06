@@ -121,13 +121,15 @@ public class HalyardStrategyExtendedTest {
     @Test(expected = QueryEvaluationException.class)
     public void testService() throws Exception {
         String sparql = "SELECT * WHERE {SERVICE <http://whatever/> { ?s ?p ?o . }}";
-        con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
+        res.hasNext();
     }
 
     @Test
     public void testServiceSilent() throws Exception {
         String sparql = "SELECT * WHERE {SERVICE SILENT <http://whatever/> { ?s ?p ?o . }}";
-        con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
+        res.hasNext();
     }
 
     @Test

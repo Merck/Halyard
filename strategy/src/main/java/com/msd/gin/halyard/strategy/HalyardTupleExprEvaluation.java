@@ -16,9 +16,10 @@
  */
 package com.msd.gin.halyard.strategy;
 
-import static com.msd.gin.halyard.strategy.HalyardStatementPatternEvaluation.enqueue;
-import static com.msd.gin.halyard.strategy.HalyardStatementPatternEvaluation.enqueueAll;
+import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPush;
+import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPushAsync;
 
+import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.strategy.aggregators.Aggregator;
 import com.msd.gin.halyard.strategy.aggregators.AvgAggregator;
 import com.msd.gin.halyard.strategy.aggregators.ConcatAggregator;
@@ -29,25 +30,33 @@ import com.msd.gin.halyard.strategy.aggregators.SampleAggregator;
 import com.msd.gin.halyard.strategy.aggregators.SumAggregator;
 import com.msd.gin.halyard.strategy.collections.BigHashSet;
 import com.msd.gin.halyard.strategy.collections.Sorter;
+import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteratorIteration;
+import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
+import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.vocabulary.SESAME;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
@@ -118,7 +127,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ZeroLengthPathIterati
 import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
-import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
 
 /**
@@ -127,58 +135,13 @@ import org.eclipse.rdf4j.query.impl.MapBindingSet;
  */
 final class HalyardTupleExprEvaluation {
 
-    private static final int MAX_QUEUE_SIZE = 1000;
-
-    /**
-     * Binding set pipes instances hold {@BindingSet}s (set of evaluated, un-evaluated and intermediate variables) that
-     * form part of the query evaluation (a query generates an evaluation tree).
-     */
-    static abstract class BindingSetPipe {
-
-        protected final BindingSetPipe parent;
-
-        /**
-         * Create a pipe
-         * @param parent the parent of this part of the evaluation chain
-         */
-        protected BindingSetPipe(BindingSetPipe parent) {
-            this.parent = parent;
-        }
-
-        /**
-         * Pushes BindingSet up to the pipe, pushing null indicates end of data. In case you need to interrupt the tree data flow (when for example just a Slice
-         * of data is expected), it is necessary to indicate that no more data are expected down the tree (to stop feeding this pipe) by returning false and
-         * also to indicate up the tree that this is the end of data (by pushing null into the parent pipe in the evaluation tree).
-         * Must be thread-safe.
-         *
-         * @param bs BindingSet or null if there are no more data
-         * @return boolean indicating if more data are expected from the caller
-         * @throws InterruptedException
-         * @throws QueryEvaluationException
-         */
-        public abstract boolean push(BindingSet bs) throws InterruptedException;
-
-        protected void handleException(Exception e) {
-            if (parent != null) {
-                parent.handleException(e);
-            }
-        }
-
-        protected boolean isClosed() {
-            if (parent != null) {
-                return parent.isClosed();
-            } else {
-                return false;
-            }
-        }
-    }
-
     private final HalyardEvaluationStrategy parentStrategy;
 	private final TupleFunctionRegistry tupleFunctionRegistry;
 	private final TripleSource tripleSource;
 	private final QueryContext queryContext;
-    private final HalyardStatementPatternEvaluation statementEvaluation;
-    private final TimeoutTracker timeoutTracker;
+    private final Dataset dataset;
+    private final long startTime;
+    private final long timeoutSecs;
 
     /**
 	 * Constructor used by {@link HalyardEvaluationStrategy} to create this helper class
@@ -196,8 +159,9 @@ final class HalyardTupleExprEvaluation {
 		this.queryContext = queryContext;
 		this.tupleFunctionRegistry = tupleFunctionRegistry;
 		this.tripleSource = tripleSource;
-		this.statementEvaluation = new HalyardStatementPatternEvaluation(dataset, tripleSource);
-		this.timeoutTracker = new TimeoutTracker(System.currentTimeMillis(), timeoutSecs);
+		this.dataset = dataset;
+		this.startTime = System.currentTimeMillis();
+		this.timeoutSecs = timeoutSecs;
     }
 
     /**
@@ -207,9 +171,7 @@ final class HalyardTupleExprEvaluation {
      * @return an iterator on the binding set pipe
      */
     CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) {
-        BindingSetPipeIterator root = new BindingSetPipeIterator();
-        evaluateTupleExpr(root.pipe, expr, bindings);
-        return root;
+    	return HalyardEvaluationExecutor.consumeAndQueue(pipe -> evaluateTupleExpr(pipe, expr, bindings), expr, startTime, timeoutSecs);
     }
 
     /**
@@ -221,7 +183,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateTupleExpr(BindingSetPipe parent, TupleExpr expr, BindingSet bindings) {
         if (expr instanceof StatementPattern) {
-            statementEvaluation.evaluateStatementPattern(parent, (StatementPattern) expr, bindings);
+            evaluateStatementPattern(parent, (StatementPattern) expr, bindings);
         } else if (expr instanceof UnaryTupleOperator) {
             evaluateUnaryTupleOperator(parent, (UnaryTupleOperator) expr, bindings);
         } else if (expr instanceof BinaryTupleOperator) {
@@ -244,6 +206,246 @@ final class HalyardTupleExprEvaluation {
             parent.handleException(new IllegalArgumentException("expr must not be null"));
         } else {
             parent.handleException(new QueryEvaluationException("Unsupported tuple expr type: " + expr.getClass()));
+        }
+    }
+
+    /**
+     * Evaluate the statement pattern using the supplied bindings
+     * @param parent to push or enqueue evaluation results
+     * @param sp the {@code StatementPattern} to evaluate
+     * @param bindings the set of names to which values are bound. For example, select ?s, ?p, ?o has the names s, p and o and the values bound to them are the
+     * results of the evaluation of this statement pattern
+     */
+    private void evaluateStatementPattern(final BindingSetPipe parent, final StatementPattern sp, final BindingSet bindings) {
+        final Var subjVar = sp.getSubjectVar(); //subject
+        final Var predVar = sp.getPredicateVar(); //predicate
+        final Var objVar = sp.getObjectVar(); //object
+        final Var conVar = sp.getContextVar(); //graph or target context
+
+        final Value subjValue = getVarValue(subjVar, bindings);
+        final Value predValue = getVarValue(predVar, bindings);
+        final Value objValue = getVarValue(objVar, bindings);
+        final Value contextValue = getVarValue(conVar, bindings);
+
+        CloseableIteration<? extends Statement, QueryEvaluationException> stIter = null;
+        try {
+            if (isUnbound(subjVar, bindings) || isUnbound(predVar, bindings) || isUnbound(objVar, bindings) || isUnbound(conVar, bindings)) {
+                // the variable must remain unbound for this solution see https://www.w3.org/TR/sparql11-query/#assignment
+                parent.close();
+                return;
+            }
+            try {
+                Resource[] contexts;
+
+                Set<IRI> graphs = null;
+                boolean emptyGraph = false;
+
+                if (dataset != null) {
+                    if (sp.getScope() == StatementPattern.Scope.DEFAULT_CONTEXTS) { //evaluate against the default graph(s)
+                        graphs = dataset.getDefaultGraphs();
+                        emptyGraph = graphs.isEmpty() && !dataset.getNamedGraphs().isEmpty();
+                    } else { //evaluate against the named graphs
+                        graphs = dataset.getNamedGraphs();
+                        emptyGraph = graphs.isEmpty() && !dataset.getDefaultGraphs().isEmpty();
+                    }
+                }
+
+                if (emptyGraph) {
+                    // Search zero contexts
+                    parent.close(); //no results from this statement pattern
+                    return;
+                } else if (graphs == null || graphs.isEmpty()) {
+                    // store default behaivour
+                    if (contextValue != null) {
+                        contexts = new Resource[]{(Resource) contextValue};
+                    } /* TODO activate this to have an exclusive (rather than inclusive) interpretation of the default graph in SPARQL querying.
+                     else if (sp.getScope() == Scope.DEFAULT_CONTEXTS ) {
+                     contexts = new Resource[] { (Resource)null };
+                     }
+                     */ else {
+                        contexts = new Resource[0];
+                    }
+                } else if (contextValue != null) {
+                    if (graphs.contains(contextValue)) {
+                        contexts = new Resource[]{(Resource) contextValue};
+                    } else {
+                        // Statement pattern specifies a context that is not part of
+                        // the dataset
+                        parent.close(); //no results possible because the context is not available
+                        return;
+                    }
+                } else {
+                    contexts = new Resource[graphs.size()];
+                    int i = 0;
+                    for (IRI graph : graphs) {
+                        IRI context = null;
+                        if (!SESAME.NIL.equals(graph)) {
+                            context = graph;
+                        }
+                        contexts[i++] = context;
+                    }
+                }
+
+                //get an iterator over all triple statements that match the s, p, o specification in the contexts
+                stIter = tripleSource.getStatements((Resource) subjValue, (IRI) predValue, objValue, contexts);
+
+                if (contexts.length == 0 && sp.getScope() == StatementPattern.Scope.NAMED_CONTEXTS) {
+                    // Named contexts are matched by retrieving all statements from
+                    // the store and filtering out the statements that do not have a
+                    // context.
+                    stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
+
+                        @Override
+                        protected boolean accept(Statement st) {
+                            return st.getContext() != null;
+                        }
+
+                    }; // end anonymous class
+                } else if (contexts.length == 0 && sp.getScope() == StatementPattern.Scope.DEFAULT_CONTEXTS) {
+                    // Filter out contexts (quads -> triples) and de-duplicate triples
+                    stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
+                        private Resource lastSubj;
+                        private IRI lastPred;
+                        private Value lastObj;
+                        private Long lastTS;
+                        @Override
+                        public Statement next() throws QueryEvaluationException {
+                            Statement st = super.next();
+                            //Filter out contexts
+                            return st.getContext() == null ? st : tripleSource.getValueFactory().createStatement(st.getSubject(), st.getPredicate(), st.getObject());
+                        }
+                        @Override
+                        protected boolean accept(Statement st) {
+                            //de-duplicate triples
+                            if (st.getSubject().equals(lastSubj) && st.getPredicate().equals(lastPred) && st.getObject().equals(lastObj) && Objects.equals(getTimestamp(st), lastTS)) {
+                                return false;
+                            } else {
+                                lastSubj = st.getSubject();
+                                lastPred = st.getPredicate();
+                                lastObj = st.getObject();
+                                lastTS = getTimestamp(st);
+                                return true;
+                            }
+                        }
+
+                        private Long getTimestamp(Statement st) {
+                        	return (st instanceof Timestamped) ? ((Timestamped)st).getTimestamp() : null;
+                        }
+                    };
+                } else if (graphs != null && graphs.contains(SESAME.NIL)) {
+                    // usage of SESAME.NIL triggers query over all graphs, which must be filtered here
+                    final Set<Resource> ctxSet = new HashSet<>(Arrays.asList(contexts));
+                    stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
+                        @Override
+                        protected boolean accept(Statement st) {
+                            return ctxSet.contains(st.getContext());
+                        }
+                    };                	
+                }
+            } catch (ClassCastException e) {
+                // Invalid value type for subject, predicate and/or context
+                parent.close();
+                return;
+            }
+        } catch (InterruptedException | QueryEvaluationException e) {
+            parent.handleException(e);
+            return;
+        }
+
+        // The same variable might have been used multiple times in this
+        // StatementPattern, verify value equality in those cases.
+        // TODO: skip this filter if not necessary
+        stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
+
+            @Override
+            protected boolean accept(Statement st) {
+                Resource subj = st.getSubject();
+                IRI pred = st.getPredicate();
+                Value obj = st.getObject();
+                Resource context = st.getContext();
+
+                if (subjVar != null && subjValue == null) {
+                    if (subjVar.equals(predVar) && !subj.equals(pred)) {
+                        return false;
+                    }
+                    if (subjVar.equals(objVar) && !subj.equals(obj)) {
+                        return false;
+                    }
+                    if (subjVar.equals(conVar) && !subj.equals(context)) {
+                        return false;
+                    }
+                }
+
+                if (predVar != null && predValue == null) {
+                    if (predVar.equals(objVar) && !pred.equals(obj)) {
+                        return false;
+                    }
+                    if (predVar.equals(conVar) && !pred.equals(context)) {
+                        return false;
+                    }
+                }
+
+                if (objVar != null && objValue == null) {
+                    if (objVar.equals(conVar) && !obj.equals(context)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+        };
+
+        // Return an iterator that converts the RDF statements (triples) to var bindings
+        pullAndPushAsync(parent, new ConvertingIteration<Statement, BindingSet, QueryEvaluationException>(stIter) {
+
+            @Override
+            protected BindingSet convert(Statement st) {
+                QueryBindingSet result = new QueryBindingSet(bindings);
+                if (subjVar != null && !subjVar.isConstant() && !result.hasBinding(subjVar.getName())) {
+                    result.addBinding(subjVar.getName(), st.getSubject());
+                }
+                if (predVar != null && !predVar.isConstant() && !result.hasBinding(predVar.getName())) {
+                    result.addBinding(predVar.getName(), st.getPredicate());
+                }
+                if (objVar != null && !objVar.isConstant()) {
+                    Value val = result.getValue(objVar.getName());
+                    // override Halyard search type object literals with real object value from the statement
+                    if (!result.hasBinding(objVar.getName()) || ((val instanceof Literal) && HALYARD.SEARCH_TYPE.equals(((Literal)val).getDatatype()))) {
+                        result.setBinding(objVar.getName(), st.getObject());
+                    }
+                }
+                if (conVar != null && !conVar.isConstant() && !result.hasBinding(conVar.getName())
+                        && st.getContext() != null) {
+                    result.addBinding(conVar.getName(), st.getContext());
+                }
+
+                return result;
+            }
+		}, sp);
+    }
+
+    private boolean isUnbound(Var var, BindingSet bindings) {
+        if (var == null) {
+            return false;
+        } else {
+            return bindings.hasBinding(var.getName()) && bindings.getValue(var.getName()) == null;
+        }
+    }
+
+    /**
+     * Gets a value from a {@code Var} if it has a {@code Value}. If it does not then the method will attempt to get it
+     * from the bindings using the name of the Var
+     * @param var
+     * @param bindings
+     * @return the matching {@code Value} or {@code null} if var is {@code null}
+     */
+    private static Value getVarValue(Var var, BindingSet bindings) {
+        if (var == null) {
+            return null;
+        } else if (var.hasValue()) {
+            return var.getValue();
+        } else {
+            return bindings.getValue(var.getName());
         }
     }
 
@@ -317,8 +519,8 @@ final class HalyardTupleExprEvaluation {
 
         evaluateTupleExpr(new BindingSetPipe(parent) {
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
-                return parent.push(bs == null ? null : ProjectionIterator.project(projection.getProjectionElemList(), bs, bindings, includeAll));
+            protected boolean next(BindingSet bs) throws InterruptedException {
+                return parent.push(ProjectionIterator.project(projection.getProjectionElemList(), bs, bindings, includeAll));
             }
             @Override
             public String toString() {
@@ -334,14 +536,12 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateMultiProjection(BindingSetPipe parent, final MultiProjection multiProjection, final BindingSet bindings) {
-        final List<ProjectionElemList> projections = multiProjection.getProjections();
-        final BindingSet prev[] = new BindingSet[projections.size()];
         evaluateTupleExpr(new BindingSetPipe(parent) {
+            final List<ProjectionElemList> projections = multiProjection.getProjections();
+            final BindingSet prev[] = new BindingSet[projections.size()];
+
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
-                if (bs == null) {
-                    return parent.push(null);
-                }
+            protected boolean next(BindingSet bs) throws InterruptedException {
                 for (int i=0; i<prev.length; i++) {
                     BindingSet nb = ProjectionIterator.project(projections.get(i), bs, bindings);
                     //ignore duplicates
@@ -372,13 +572,11 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateFilter(BindingSetPipe parent, final Filter filter, final BindingSet bindings) {
-        final Set<String> scopeBindingNames = filter.getBindingNames();
         evaluateTupleExpr(new BindingSetPipe(parent) {
+            final Set<String> scopeBindingNames = filter.getBindingNames();
+
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
-                if (bs == null) {
-                    return parent.push(null);
-                }
+            protected boolean next(BindingSet bs) throws InterruptedException {
                 try {
                     if (accept(bs)) {
                         return parent.push(bs); //push results that pass the filter.
@@ -386,9 +584,8 @@ final class HalyardTupleExprEvaluation {
                         return true; //nothing passes the filter but processing continues.
                     }
                 } catch (QueryEvaluationException e) {
-                    parent.handleException(e);
+                    return handleException(e);
                 }
-                return false;
             }
             private boolean accept(BindingSet bindings) throws QueryEvaluationException {
                 try {
@@ -420,7 +617,7 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateDescribeOperator(BindingSetPipe parent, DescribeOperator operator, BindingSet bindings) {
-		enqueue(parent, new DescribeIteration(evaluate(operator.getArg(), bindings), parentStrategy,
+		pullAndPushAsync(parent, new DescribeIteration(evaluate(operator.getArg(), bindings), parentStrategy,
 				operator.getBindingNames(), bindings), operator);
     }
 
@@ -439,7 +636,6 @@ final class HalyardTupleExprEvaluation {
         private final Value values[];
         private final boolean ascending[];
         private final long minorOrder;
-
 
         public ComparableBindingSetWrapper(EvaluationStrategy strategy, BindingSet bs, List<OrderElem> elements, long minorOrder) throws QueryEvaluationException {
             this.bs = bs;
@@ -478,7 +674,6 @@ final class HalyardTupleExprEvaluation {
         public boolean equals(Object obj) {
             return obj instanceof ComparableBindingSetWrapper && bs.equals(((ComparableBindingSetWrapper)obj).bs);
         }
-
     }
 
     /**
@@ -490,40 +685,44 @@ final class HalyardTupleExprEvaluation {
     private void evaluateOrder(final BindingSetPipe parent, final Order order, BindingSet bindings) {
 //        try {
             final Sorter<ComparableBindingSetWrapper> sorter = new Sorter<>(getLimit(order), isReducedOrDistinct(order));
-            final AtomicLong minorOrder = new AtomicLong();
             evaluateTupleExpr(new BindingSetPipe(parent) {
+                final AtomicLong minorOrder = new AtomicLong();
 
                 @Override
-                protected void handleException(Exception e) {
+                protected boolean handleException(Exception e) {
                     sorter.close();
-                    super.handleException(e);
+                    return parent.handleException(e);
                 }
 
                 @Override
-                public boolean push(BindingSet bs) throws InterruptedException {
-                    if (bs != null) try {
+                protected boolean next(BindingSet bs) throws InterruptedException {
+                    try {
                         ComparableBindingSetWrapper cbsw = new ComparableBindingSetWrapper(parentStrategy, bs, order.getElements(), minorOrder.getAndIncrement());
                         synchronized (sorter) {
                             sorter.add(cbsw);
                         }
                         return true;
                     } catch (QueryEvaluationException | IOException e) {
-                        handleException(e);
-                        return false;
+                        return handleException(e);
                     }
+                }
+
+                @Override
+                public void close() throws InterruptedException {
                     try {
                         for (Map.Entry<ComparableBindingSetWrapper, Long> me : sorter) {
                             for (long i = me.getValue(); i > 0; i--) {
                                 if (!parent.push(me.getKey().bs)) {
-                                    return false;
+                                    return;
                                 }
                             }
                         }
-                        return parent.push(null);
+                        parent.close();
                     } finally {
                         sorter.close();
                     }
                 }
+
                 @Override
                 public String toString() {
                 	return "OrderBindingSetPipe";
@@ -552,32 +751,29 @@ final class HalyardTupleExprEvaluation {
 			}
     		evaluateTupleExpr(new BindingSetPipe(parent) {
 				@Override
-				public boolean push(BindingSet bs) throws InterruptedException {
-					if (bs != null) {
-						for(Aggregator agg : aggregators.values()) {
-							agg.process(bs);
-						}
-						return true;
-					} else {
-						QueryBindingSet result = new QueryBindingSet();
-						for(Map.Entry<String,Aggregator> entry : aggregators.entrySet()) {
-							try(Aggregator agg = entry.getValue()) {
-								Value v = agg.getValue();
-								if (v != null) {
-									result.setBinding(entry.getKey(), v);
-								}
-							} catch (ValueExprEvaluationException ignore) {
-								// There was a type error when calculating the value of the
-								// aggregate.
-								// We silently ignore the error, resulting in no result value
-								// being bound.
-							}
-						}
-						if(!parent.push(result)) {
-							return false;
-						}
-						return parent.push(null);
+				protected boolean next(BindingSet bs) throws InterruptedException {
+					for(Aggregator agg : aggregators.values()) {
+						agg.process(bs);
 					}
+					return true;
+				}
+				@Override
+				public void close() throws InterruptedException {
+					QueryBindingSet result = new QueryBindingSet();
+					for(Map.Entry<String,Aggregator> entry : aggregators.entrySet()) {
+						try(Aggregator agg = entry.getValue()) {
+							Value v = agg.getValue();
+							if (v != null) {
+								result.setBinding(entry.getKey(), v);
+							}
+						} catch (ValueExprEvaluationException ignore) {
+							// There was a type error when calculating the value of the
+							// aggregate.
+							// We silently ignore the error, resulting in no result value
+							// being bound.
+						}
+					}
+					parent.pushLast(result);
 				}
 				@Override
 				public String toString() {
@@ -588,7 +784,7 @@ final class HalyardTupleExprEvaluation {
 	        //temporary solution using copy of the original iterator
 	        //re-writing this to push model is a bit more complex task
 	        try {
-				enqueue(parent, new GroupIterator(parentStrategy, group, bindings), group);
+				pullAndPushAsync(parent, new GroupIterator(parentStrategy, group, bindings), group);
 	        } catch (QueryEvaluationException e) {
 	            parent.handleException(e);
 	        }
@@ -626,9 +822,9 @@ final class HalyardTupleExprEvaluation {
             private BindingSet previous = null;
 
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
+            protected boolean next(BindingSet bs) throws InterruptedException {
                 synchronized (this) {
-                    if (bs != null && bs.equals(previous)) {
+                    if (bs.equals(previous)) {
                         return true;
                     }
                     previous = bs;
@@ -652,25 +848,29 @@ final class HalyardTupleExprEvaluation {
         evaluateTupleExpr(new BindingSetPipe(parent) {
             private final BigHashSet<BindingSet> set = new BigHashSet<>();
             @Override
-            protected void handleException(Exception e) {
+            protected boolean handleException(Exception e) {
                 set.close();
-                super.handleException(e);
+                return parent.handleException(e);
             }
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
+            protected boolean next(BindingSet bs) throws InterruptedException {
                 synchronized (set) {
-                    if (bs == null) {
-                        set.close();
-                    } else try {
+                    try {
                         if (!set.add(bs)) {
                             return true;
                         }
                     } catch (IOException e) {
-                        handleException(e);
-                        return false;
+                        return handleException(e);
                     }
                 }
                 return parent.push(bs);
+            }
+            @Override
+            public void close() throws InterruptedException {
+                synchronized (set) {
+                	set.close();
+                }
+                parent.close();
             }
             @Override
             public String toString() {
@@ -688,10 +888,7 @@ final class HalyardTupleExprEvaluation {
     private void evaluateExtension(BindingSetPipe parent, final Extension extension, BindingSet bindings) {
         evaluateTupleExpr(new BindingSetPipe(parent) {
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
-                if (bs == null) {
-                    return parent.push(null);
-                }
+            protected boolean next(BindingSet bs) throws InterruptedException {
                 QueryBindingSet targetBindings = new QueryBindingSet(bs);
                 for (ExtensionElem extElem : extension.getElements()) {
                     ValueExpr expr = extElem.getExpr();
@@ -712,7 +909,7 @@ final class HalyardTupleExprEvaluation {
                             // use null as place holder for unbound variables that must remain so
                             targetBindings.setBinding(extElem.getName(), null);
                         } catch (QueryEvaluationException e) {
-                            parent.handleException(e);
+                            handleException(e);
                         }
                     }
                 }
@@ -737,18 +934,16 @@ final class HalyardTupleExprEvaluation {
         evaluateTupleExpr(new BindingSetPipe(parent) {
             private final AtomicLong ll = new AtomicLong(0);
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
+            protected boolean next(BindingSet bs) throws InterruptedException {
                 long l = ll.incrementAndGet();
-                if (l > limit+1) {
-                    return false;
-                }
-                if (bs == null) return parent.push(null);
                 if (l <= offset) {
                     return true;
-                } else if (l <= limit) {
+                } else if (l < limit) {
                     return parent.push(bs);
+                } else if (l == limit) {
+                    return parent.pushLast(bs);
                 } else {
-                    return parent.push(null);
+                	return false;
                 }
             }
             @Override
@@ -808,18 +1003,17 @@ final class HalyardTupleExprEvaluation {
                     if (exists) {
                         parent.push(bindings);
                     }
-                    parent.push(null);
+                    parent.close();
                     return;
 
                 }
                 // otherwise: perform a SELECT query
                 CloseableIteration<BindingSet, QueryEvaluationException> result = fs.select(service, freeVars, bindings, baseUri);
-				enqueue(parent, service.isSilent() ? new SilentIteration(result) : result, service);
+				pullAndPushAsync(parent, service.isSilent() ? new SilentIteration(result) : result, service);
             } catch (QueryEvaluationException e) {
                 // suppress exceptions if silent
                 if (service.isSilent()) {
-                    parent.push(bindings);
-                    parent.push(null);
+                    parent.pushLast(bindings);
                 } else {
                     throw e;
                 }
@@ -828,8 +1022,7 @@ final class HalyardTupleExprEvaluation {
                 // wrapped
                 // QueryEval) if silent
                 if (service.isSilent()) {
-                    parent.push(bindings);
-                    parent.push(null);
+                    parent.pushLast(bindings);
                 } else {
                     throw e;
                 }
@@ -870,34 +1063,34 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
-        final AtomicLong joinsInProgress = new AtomicLong(1);
-        BindingSetPipe rightPipe = new BindingSetPipe(topPipe) {
+        evaluateTupleExpr(new BindingSetPipe(topPipe) {
+        	final AtomicLong joinsInProgress = new AtomicLong();
+        	final AtomicBoolean joinsFinished = new AtomicBoolean();
+
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
-                if (bs == null) {
-                    if (joinsInProgress.decrementAndGet() == 0) {
-                        parent.push(null);
+            protected boolean next(BindingSet bs) throws InterruptedException {
+            	joinsInProgress.incrementAndGet();
+                evaluateTupleExpr(new BindingSetPipe(parent) {
+                    @Override
+                    public void close() throws InterruptedException {
+                    	joinsInProgress.decrementAndGet();
+                    	if (joinsFinished.get() && joinsInProgress.compareAndSet(0L, -1L)) {
+                    		parent.close();
+                    	}
                     }
-                    return false;
-                } else {
-                    return parent.push(bs);
-                }
+                    @Override
+                    public String toString() {
+                    	return "JoinBindingSetPipe(right)";
+                    }
+                }, join.getRightArg(), bs);
+                return true;
             }
             @Override
-            public String toString() {
-            	return "JoinBindingSetPipe(right)";
-            }
-        };
-        evaluateTupleExpr(new BindingSetPipe(rightPipe) {
-            @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
-                if (bs == null) {
-                    return parent.push(null);
-                } else {
-                    joinsInProgress.incrementAndGet();
-                    evaluateTupleExpr(parent, join.getRightArg(), bs);
-                    return true;
-                }
+            public void close() throws InterruptedException {
+            	joinsFinished.set(true);
+            	if(joinsInProgress.compareAndSet(0L, -1L)) {
+            		parent.close();
+            	}
             }
             @Override
             public String toString() {
@@ -923,91 +1116,94 @@ final class HalyardTupleExprEvaluation {
         final Set<String> problemVars = optionalVarCollector.getVarNames();
         problemVars.removeAll(leftJoin.getLeftArg().getBindingNames());
         problemVars.retainAll(bindings.getBindingNames());
-        final AtomicLong joinsInProgress = new AtomicLong(1);
         final Set<String> scopeBindingNames = leftJoin.getBindingNames();
         final BindingSetPipe topPipe = problemVars.isEmpty() ? parentPipe : new BindingSetPipe(parentPipe) {
             //Handle badly designed left join
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
-                if (bs == null) {
-                    return parent.push(null);
-                }
-		if (QueryResults.bindingSetsCompatible(bindings, bs)) {
+            protected boolean next(BindingSet bs) throws InterruptedException {
+            	if (QueryResults.bindingSetsCompatible(bindings, bs)) {
                     // Make sure the provided problemVars are part of the returned results
                     // (necessary in case of e.g. LeftJoin and Union arguments)
                     QueryBindingSet extendedResult = null;
                     for (String problemVar : problemVars) {
-                            if (!bs.hasBinding(problemVar)) {
-                                    if (extendedResult == null) {
-                                            extendedResult = new QueryBindingSet(bs);
-                                    }
-                                    extendedResult.addBinding(problemVar, bindings.getValue(problemVar));
+                        if (!bs.hasBinding(problemVar)) {
+                            if (extendedResult == null) {
+                                extendedResult = new QueryBindingSet(bs);
                             }
+                            extendedResult.addBinding(problemVar, bindings.getValue(problemVar));
+                        }
                     }
                     if (extendedResult != null) {
-                            bs = extendedResult;
+                        bs = extendedResult;
                     }
                     return parent.push(bs);
-		}
+            	}
                 return true;
             }
             @Override
             public String toString() {
-            	return "LeftJoinBindingSetPipe(right)";
+            	return "LeftJoinBindingSetPipe(top)";
             }
         };
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
-            final AtomicBoolean leftInProgress = new AtomicBoolean(true);
-            @Override
-            public boolean push(final BindingSet leftBindings) throws InterruptedException {
-                if (leftBindings == null) {
-                    if (leftInProgress.getAndSet(false)) {
-                        if (joinsInProgress.decrementAndGet() == 0) {
-                            parent.push(null);
-                        }
-                    }
-                } else {
-                    joinsInProgress.incrementAndGet();
-                    evaluateTupleExpr(new BindingSetPipe(topPipe) {
-                        private boolean failed = true;
-                        @Override
-                        public boolean push(BindingSet rightBindings) throws InterruptedException {
-                            if (rightBindings == null) {
-                                if (failed) {
-                                    // Join failed, return left arg's bindings
-                                    parent.push(leftBindings);
-                                }
-                                if (joinsInProgress.decrementAndGet() == 0) {
-                                    parent.push(null);
-                                }
-                                return false;
-                            } else try {
-                                if (leftJoin.getCondition() == null) {
+        	final AtomicLong joinsInProgress = new AtomicLong();
+        	final AtomicBoolean joinsFinished = new AtomicBoolean();
+
+        	@Override
+            protected boolean next(final BindingSet leftBindings) throws InterruptedException {
+            	joinsInProgress.incrementAndGet();
+                evaluateTupleExpr(new BindingSetPipe(parent) {
+                    private boolean failed = true;
+                    @Override
+                    protected boolean next(BindingSet rightBindings) throws InterruptedException {
+                    	try {
+                            if (leftJoin.getCondition() == null) {
+                                failed = false;
+                                return parent.push(rightBindings);
+                            } else {
+                                // Limit the bindings to the ones that are in scope for
+                                // this filter
+                                QueryBindingSet scopeBindings = new QueryBindingSet(rightBindings);
+                                scopeBindings.retainAll(scopeBindingNames);
+                                if (parentStrategy.isTrue(leftJoin.getCondition(), scopeBindings)) {
                                     failed = false;
                                     return parent.push(rightBindings);
-                                } else {
-                                    // Limit the bindings to the ones that are in scope for
-                                    // this filter
-                                    QueryBindingSet scopeBindings = new QueryBindingSet(rightBindings);
-                                    scopeBindings.retainAll(scopeBindingNames);
-                                    if (parentStrategy.isTrue(leftJoin.getCondition(), scopeBindings)) {
-                                        failed = false;
-                                        return parent.push(rightBindings);
-                                    }
                                 }
-                            } catch (ValueExprEvaluationException ignore) {
-                            } catch (QueryEvaluationException e) {
-                                parent.handleException(e);
                             }
-                            return true;
+                        } catch (ValueExprEvaluationException ignore) {
+                        } catch (QueryEvaluationException e) {
+                            parent.handleException(e);
                         }
-                        @Override
-                        public String toString() {
-                        	return "LeftJoinBindingSetPipe(left)";
+                        return true;
+                    }
+                    @Override
+                    public void close() throws InterruptedException {
+                        if (failed) {
+                            // Join failed, return left arg's bindings
+                            parent.push(leftBindings);
                         }
-                    }, leftJoin.getRightArg(), leftBindings);
-                }
+                    	joinsInProgress.decrementAndGet();
+                    	if (joinsFinished.get() && joinsInProgress.compareAndSet(0L, -1L)) {
+                    		parent.close();
+                    	}
+                    }
+                    @Override
+                    public String toString() {
+                    	return "LeftJoinBindingSetPipe(right)";
+                    }
+                }, leftJoin.getRightArg(), leftBindings);
                 return true;
+            }
+            @Override
+            public void close() throws InterruptedException {
+            	joinsFinished.set(true);
+            	if(joinsInProgress.compareAndSet(0L, -1L)) {
+            		parent.close();
+            	}
+            }
+            @Override
+            public String toString() {
+            	return "LeftJoinBindingSetPipe(left)";
             }
         }, leftJoin.getLeftArg(), problemVars.isEmpty() ? bindings : getFilteredBindings(bindings, problemVars));
     }
@@ -1028,15 +1224,9 @@ final class HalyardTupleExprEvaluation {
         BindingSetPipe pipe = new BindingSetPipe(parent) {
             final AtomicInteger args = new AtomicInteger(2);
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
-                if (bs == null) {
-                    if (args.decrementAndGet() == 0) {
-                        return parent.push(null);
-                    } else {
-                        return false;
-                    }
-                } else {
-                    return parent.push(bs);
+            public void close() throws InterruptedException {
+                if (args.decrementAndGet() == 0) {
+                    parent.close();
                 }
             }
             @Override
@@ -1058,40 +1248,40 @@ final class HalyardTupleExprEvaluation {
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
             private final BigHashSet<BindingSet> secondSet = new BigHashSet<>();
             @Override
-            protected void handleException(Exception e) {
+            protected boolean handleException(Exception e) {
                 secondSet.close();
-                super.handleException(e);
+                return parent.handleException(e);
             }
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
-                if (bs != null) try {
+            protected boolean next(BindingSet bs) throws InterruptedException {
+                try {
                     secondSet.add(bs);
                     return true;
                 } catch (IOException e) {
-                    handleException(e);
-                    return false;
-                } else {
-                    evaluateTupleExpr(new BindingSetPipe(parent) {
-                        @Override
-                        public boolean push(BindingSet bs) throws InterruptedException {
-                            try {
-                                if (bs == null) {
-                                    secondSet.close();
-                                    return parent.push(null);
-                                }
-                                return secondSet.contains(bs) ? parent.push(bs) : true;
-                            } catch (IOException e) {
-                                super.handleException(e);
-                                return false;
-                            }
-                        }
-                        @Override
-                        public String toString() {
-                        	return "IntersectionBindingSetPipe(left)";
-                        }
-                    }, intersection.getLeftArg(), bindings);
-                    return false;
+                    return handleException(e);
                 }
+            }
+            @Override
+            public void close() throws InterruptedException {
+                evaluateTupleExpr(new BindingSetPipe(parent) {
+                    @Override
+                    protected boolean next(BindingSet bs) throws InterruptedException {
+                        try {
+                            return secondSet.contains(bs) ? parent.push(bs) : true;
+                        } catch (IOException e) {
+                            return parent.handleException(e);
+                        }
+                    }
+                    @Override
+                    public void close() throws InterruptedException {
+                        secondSet.close();
+                        parent.close();
+                    }
+                    @Override
+                    public String toString() {
+                    	return "IntersectionBindingSetPipe(left)";
+                    }
+                }, intersection.getLeftArg(), bindings);
             }
             @Override
             public String toString() {
@@ -1110,53 +1300,54 @@ final class HalyardTupleExprEvaluation {
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
             private final BigHashSet<BindingSet> excludeSet = new BigHashSet<>();
             @Override
-            protected void handleException(Exception e) {
+            protected boolean handleException(Exception e) {
                 excludeSet.close();
-                super.handleException(e);
+                return parent.handleException(e);
             }
             @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
-                if (bs != null) try {
+            protected boolean next(BindingSet bs) throws InterruptedException {
+                try {
                     excludeSet.add(bs);
                     return true;
                 } catch (IOException e) {
-                    handleException(e);
-                    return false;
-                } else {
-                    evaluateTupleExpr(new BindingSetPipe(topPipe) {
-                        @Override
-                        public boolean push(BindingSet bs) throws InterruptedException {
-                            if (bs == null) {
-                                excludeSet.close();
-                                return parent.push(null);
-                            }
-                            for (BindingSet excluded : excludeSet) {
-                                // build set of shared variable names
-                                Set<String> sharedBindingNames = new HashSet<>(excluded.getBindingNames());
-                                sharedBindingNames.retainAll(bs.getBindingNames());
-                                // two bindingsets that share no variables are compatible by
-                                // definition, however, the formal
-                                // definition of SPARQL MINUS indicates that such disjoint sets should
-                                // be filtered out.
-                                // See http://www.w3.org/TR/sparql11-query/#sparqlAlgebra
-                                if (!sharedBindingNames.isEmpty()) {
-                                    if (QueryResults.bindingSetsCompatible(excluded, bs)) {
-                                        // at least one compatible bindingset has been found in the
-                                        // exclude set, therefore the object is compatible, therefore it
-                                        // should not be accepted.
-                                        return true;
-                                    }
+                    return handleException(e);
+                }
+            }
+            @Override
+            public void close() throws InterruptedException {
+                evaluateTupleExpr(new BindingSetPipe(topPipe) {
+                    @Override
+                    protected boolean next(BindingSet bs) throws InterruptedException {
+                        for (BindingSet excluded : excludeSet) {
+                            // build set of shared variable names
+                            Set<String> sharedBindingNames = new HashSet<>(excluded.getBindingNames());
+                            sharedBindingNames.retainAll(bs.getBindingNames());
+                            // two bindingsets that share no variables are compatible by
+                            // definition, however, the formal
+                            // definition of SPARQL MINUS indicates that such disjoint sets should
+                            // be filtered out.
+                            // See http://www.w3.org/TR/sparql11-query/#sparqlAlgebra
+                            if (!sharedBindingNames.isEmpty()) {
+                                if (QueryResults.bindingSetsCompatible(excluded, bs)) {
+                                    // at least one compatible bindingset has been found in the
+                                    // exclude set, therefore the object is compatible, therefore it
+                                    // should not be accepted.
+                                    return true;
                                 }
                             }
-                            return parent.push(bs);
                         }
-                        @Override
-                        public String toString() {
-                        	return "DifferenceBindingSetPipe(left)";
-                        }
-                    }, difference.getLeftArg(), bindings);
-                }
-                return false;
+                        return parent.push(bs);
+                    }
+                    @Override
+                    public void close() throws InterruptedException {
+                        excludeSet.close();
+                        parent.close();
+                    }
+                    @Override
+                    public String toString() {
+                    	return "DifferenceBindingSetPipe(left)";
+                    }
+                }, difference.getLeftArg(), bindings);
             }
             @Override
             public String toString() {
@@ -1173,9 +1364,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateSingletonSet(BindingSetPipe parent, SingletonSet singletonSet, BindingSet bindings) {
         try {
-            if (parent.push(bindings)) {
-                parent.push(null);
-            }
+            parent.pushLast(bindings);
         } catch (InterruptedException e) {
             parent.handleException(e);
         }
@@ -1189,7 +1378,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateEmptySet(BindingSetPipe parent, EmptySet emptySet, BindingSet bindings) {
         try {
-            parent.push(null);
+            parent.close();
         } catch (InterruptedException e) {
             parent.handleException(e);
         }
@@ -1203,7 +1392,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateExternalSet(BindingSetPipe parent, ExternalSet externalSet, BindingSet bindings) {
         try {
-			enqueue(parent, externalSet.evaluate(bindings), externalSet);
+			pullAndPushAsync(parent, externalSet.evaluate(bindings), externalSet);
         } catch (QueryEvaluationException e) {
             parent.handleException(e);
         }
@@ -1224,7 +1413,7 @@ final class HalyardTupleExprEvaluation {
         if (subj != null && obj != null) {
             if (!subj.equals(obj)) {
                 try {
-                    parent.push(null);
+                    parent.close();
                 } catch (InterruptedException e) {
                     parent.handleException(e);
                 }
@@ -1233,7 +1422,7 @@ final class HalyardTupleExprEvaluation {
         }
         //temporary solution using copy of the original iterator
         //re-writing this to push model is a bit more complex task
-		enqueue(parent,
+		pullAndPushAsync(parent,
 				new ZeroLengthPathIteration(parentStrategy, subjectVar, objVar, subj, obj, contextVar, bindings), zlp);
     }
 
@@ -1253,7 +1442,7 @@ final class HalyardTupleExprEvaluation {
         //temporary solution using copy of the original iterator
         //re-writing this to push model is a bit more complex task
         try {
-			enqueue(parent, new PathIteration(new StrictEvaluationStrategy(null, null) {
+			pullAndPushAsync(parent, new PathIteration(new StrictEvaluationStrategy(null, null) {
                 @Override
                 public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(ZeroLengthPath zlp, BindingSet bindings) throws QueryEvaluationException {
                     return parentStrategy.evaluate(zlp, bindings);
@@ -1279,11 +1468,10 @@ final class HalyardTupleExprEvaluation {
     private void evaluateBindingSetAssignment(BindingSetPipe parent, BindingSetAssignment bsa, BindingSet bindings) {
         final Iterator<BindingSet> iter = bsa.getBindingSets().iterator();
         if (bindings.size() == 0) { // empty binding set
-			enqueue(parent, new CloseableIteratorIteration<>(iter), bsa);
+			pullAndPush(parent, new CloseableIteratorIteration<>(iter));
         } else {
             final QueryBindingSet b = new QueryBindingSet(bindings);
-            // iterator won't block so enqueue all
-			enqueueAll(parent, new LookAheadIteration<BindingSet, QueryEvaluationException>() {
+			pullAndPush(parent, new LookAheadIteration<BindingSet, QueryEvaluationException>() {
                 @Override
                 protected BindingSet getNextElement() throws QueryEvaluationException {
                     QueryBindingSet result = null;
@@ -1314,7 +1502,7 @@ final class HalyardTupleExprEvaluation {
                     }
                     return result;
                 }
-            }, bsa);
+            });
         }
     }
 
@@ -1332,28 +1520,28 @@ final class HalyardTupleExprEvaluation {
 
 		List<ValueExpr> args = tfc.getArgs();
 
-		Value[] argValues = new Value[args.size()];
 		try {
+			Value[] argValues = new Value[args.size()];
 			for (int i = 0; i < args.size(); i++) {
 				argValues[i] = parentStrategy.evaluate(args.get(i), bindings);
 			}
+
+			CloseableIteration<BindingSet, QueryEvaluationException> iter;
+			queryContext.begin();
+			try {
+				iter = TupleFunctionEvaluationStrategy.evaluate(func, tfc.getResultVars(), bindings, tripleSource.getValueFactory(), argValues);
+			} finally {
+				queryContext.end();
+			}
+			pullAndPushAsync(parent, new QueryContextIteration(iter, queryContext), tfc);
 		} catch (ValueExprEvaluationException veee) {
 			// can't evaluate arguments
 	        try {
-	            parent.push(null);
+	            parent.close();
 	        } catch (InterruptedException ex) {
 	            parent.handleException(ex);
 	        }
 		}
-
-		CloseableIteration<BindingSet, QueryEvaluationException> iter;
-		queryContext.begin();
-		try {
-			iter = TupleFunctionEvaluationStrategy.evaluate(func, tfc.getResultVars(), bindings, tripleSource.getValueFactory(), argValues);
-		} finally {
-			queryContext.end();
-		}
-		enqueue(parent, new QueryContextIteration(iter, queryContext), tfc);
 	}
 
 	/**
@@ -1403,7 +1591,7 @@ final class HalyardTupleExprEvaluation {
      * @param node
      * @return
      */
-    private boolean isPartOfSubQuery(QueryModelNode node) {
+    private static boolean isPartOfSubQuery(QueryModelNode node) {
         if (node instanceof SubQueryValueOperator) {
             return true;
         }
@@ -1412,69 +1600,6 @@ final class HalyardTupleExprEvaluation {
             return false;
         } else {
             return isPartOfSubQuery(parent);
-        }
-    }
-
-	private static final BindingSet NULL = new EmptyBindingSet();
-
-    private final class BindingSetPipeIterator extends LookAheadIteration<BindingSet, QueryEvaluationException> {
-
-        private final LinkedBlockingQueue<BindingSet> queue = new LinkedBlockingQueue<>(MAX_QUEUE_SIZE);
-        private Exception exception = null;
-
-        private final BindingSetPipe pipe = new BindingSetPipe(null) {
-        	/**
-        	 * This may block.
-        	 */
-            @Override
-            public boolean push(BindingSet bs) throws InterruptedException {
-                if (isClosed()) return false;
-                queue.put(bs == null ? NULL : bs);
-                return bs != null;
-            }
-
-            @Override
-            protected void handleException(Exception e) {
-                if (exception != null) e.addSuppressed(exception);
-                exception = e;
-                try {
-                    handleClose();
-                } catch (QueryEvaluationException ex) {
-                    exception.addSuppressed(ex);
-                }
-            }
-
-            @Override
-            protected boolean isClosed() {
-                return exception != null || BindingSetPipeIterator.super.isClosed();
-            }
-        };
-
-
-
-        @Override
-        protected BindingSet getNextElement() throws QueryEvaluationException {
-			BindingSet bs = null;
-			try {
-                while (bs == null) {
-					bs = queue.poll(TimeoutTracker.TIMEOUT_POLL_MILLIS, TimeUnit.MILLISECONDS);
-                    if (exception != null) throw new QueryEvaluationException(exception);
-
-                    if (timeoutTracker.checkTimeout()) {
-						throw new QueryEvaluationException("Query evaluation exceeded specified timeout " + timeoutTracker.getTimeout() + "s");
-                    }
-                }
-            } catch (InterruptedException ex) {
-                throw new QueryEvaluationException(ex);
-            }
-            return bs == NULL ? null : bs;
-        }
-
-        @Override
-        protected void handleClose() throws QueryEvaluationException {
-            super.handleClose();
-            queue.clear();
-            queue.add(NULL);
         }
     }
 }
