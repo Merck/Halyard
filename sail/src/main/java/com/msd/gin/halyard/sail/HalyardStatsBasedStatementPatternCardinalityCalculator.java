@@ -83,7 +83,7 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
             } else {
                 card = triples;
             }
-			LOG.debug("cardinality of {} = {}", sp.toString(), card);
+			LOG.debug("cardinality of {} = {}", sp, card);
             return card;
         } else { // stats are not present
             return null;

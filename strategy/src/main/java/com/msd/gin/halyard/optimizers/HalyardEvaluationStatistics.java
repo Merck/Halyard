@@ -46,7 +46,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
 
 /**
- *
+ * Must be thread-safe.
  * @author Adam Sotona (MSD)
  */
 public final class HalyardEvaluationStatistics extends EvaluationStatistics {
@@ -73,18 +73,21 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
         expr.visit(new HalyardCardinalityCalculator(boundVars, priorityVars, mapToUpdate));
     }
 
-    public double getCardinality(TupleExpr expr, final Set<String> boundVariables, final Set<String> priorityVariables) {
-        if (cc == null) {
-            cc = new HalyardCardinalityCalculator(boundVariables, priorityVariables, null);
-        }
-        expr.visit(cc);
-        return cc.getCardinality();
-    }
+	public double getCardinality(TupleExpr expr, final Set<String> boundVariables, final Set<String> priorityVariables) {
+		HalyardCardinalityCalculator cc = new HalyardCardinalityCalculator(boundVariables, priorityVariables, null);
+		expr.visit(cc);
+		return cc.getCardinality();
+	}
 
-    @Override
-    protected CardinalityCalculator createCardinalityCalculator() {
-        return new HalyardCardinalityCalculator(Collections.emptySet(), Collections.emptySet(), null);
-    }
+	@Override
+	public double getCardinality(TupleExpr expr) {
+		return getCardinality(expr, Collections.emptySet(), Collections.emptySet());
+	}
+
+	@Override
+	protected CardinalityCalculator createCardinalityCalculator() {
+		return new HalyardCardinalityCalculator(Collections.emptySet(), Collections.emptySet(), null);
+	}
 
     private class HalyardCardinalityCalculator extends CardinalityCalculator {
 
