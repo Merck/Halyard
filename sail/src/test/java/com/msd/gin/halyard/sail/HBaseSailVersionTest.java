@@ -94,7 +94,9 @@ public class HBaseSailVersionTest {
 			try (TupleQueryResult res = q.evaluate()) {
 				assertTrue(res.hasNext());
 				BindingSet bs = res.next();
-				assertTrue(((Literal) bs.getValue("t")).calendarValue().compare(startDate.calendarValue()) > 0);
+				Literal t = (Literal) bs.getValue("t");
+				assertNotNull("Missing binding", t);
+				assertTrue(String.format("Expected %s > %s", t, startDate), t.calendarValue().compare(startDate.calendarValue()) > 0);
 			}
 		}
         rep.shutDown();

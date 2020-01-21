@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.StarJoin;
 import com.msd.gin.halyard.vocab.HALYARD;
 import java.util.HashSet;
 import java.util.List;
@@ -27,11 +28,14 @@ import org.eclipse.rdf4j.query.IncompatibleOperationException;
 import org.eclipse.rdf4j.query.algebra.Extension;
 import org.eclipse.rdf4j.query.algebra.FunctionCall;
 import org.eclipse.rdf4j.query.algebra.Join;
+import org.eclipse.rdf4j.query.algebra.QueryModelNode;
+import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
+import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
 
 /**
  *
@@ -78,6 +82,24 @@ public final class HalyardQueryJoinOptimizer extends QueryJoinOptimizer {
                 } finally {
                     priorityBounds = origPriorityBounds;
                 }
+            }
+
+            @Override
+            public void meetNode(QueryModelNode node) {
+            	if (node instanceof StarJoin) {
+            		meetStarJoin((StarJoin) node);
+            	} else {
+            		super.meetNode(node);
+            	}
+            }
+
+            private void meetStarJoin(StarJoin node) {
+            	Join joins = node.toJoins();
+            	QueryRoot root = new QueryRoot(joins);
+            	meet(joins);
+        		StatementPatternCollector spc = new StatementPatternCollector();
+        		root.visit(spc);
+            	node.setArgs(spc.getStatementPatterns());
             }
 
             @Override

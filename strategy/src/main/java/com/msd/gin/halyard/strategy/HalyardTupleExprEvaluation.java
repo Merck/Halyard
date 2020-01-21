@@ -19,6 +19,7 @@ package com.msd.gin.halyard.strategy;
 import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPush;
 import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPushAsync;
 
+import com.msd.gin.halyard.algebra.StarJoin;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.strategy.aggregators.Aggregator;
 import com.msd.gin.halyard.strategy.aggregators.AvgAggregator;
@@ -188,12 +189,12 @@ final class HalyardTupleExprEvaluation {
             evaluateUnaryTupleOperator(parent, (UnaryTupleOperator) expr, bindings);
         } else if (expr instanceof BinaryTupleOperator) {
             evaluateBinaryTupleOperator(parent, (BinaryTupleOperator) expr, bindings);
+        } else if (expr instanceof StarJoin) {
+        	evaluateStarJoin(parent, (StarJoin) expr, bindings);
         } else if (expr instanceof SingletonSet) {
             evaluateSingletonSet(parent, (SingletonSet) expr, bindings);
         } else if (expr instanceof EmptySet) {
             evaluateEmptySet(parent, (EmptySet) expr, bindings);
-        } else if (expr instanceof ExternalSet) {
-            evaluateExternalSet(parent, (ExternalSet) expr, bindings);
         } else if (expr instanceof ZeroLengthPath) {
             evaluateZeroLengthPath(parent, (ZeroLengthPath) expr, bindings);
         } else if (expr instanceof ArbitraryLengthPath) {
@@ -202,6 +203,8 @@ final class HalyardTupleExprEvaluation {
             evaluateBindingSetAssignment(parent, (BindingSetAssignment) expr, bindings);
 		} else if (expr instanceof TupleFunctionCall) {
 			evaluateTupleFunctionCall(parent, (TupleFunctionCall) expr, bindings);
+        } else if (expr instanceof ExternalSet) {
+            evaluateExternalSet(parent, (ExternalSet) expr, bindings);
         } else if (expr == null) {
             parent.handleException(new IllegalArgumentException("expr must not be null"));
         } else {
@@ -1354,6 +1357,10 @@ final class HalyardTupleExprEvaluation {
             	return "DifferenceBindingSetPipe(right)";
             }
         }, difference.getRightArg(), bindings);
+    }
+
+    private void evaluateStarJoin(BindingSetPipe parent, StarJoin starJoin, BindingSet bindings) {
+    	evaluateTupleExpr(parent, starJoin.toJoins(), bindings);
     }
 
     /**

@@ -19,6 +19,7 @@ package com.msd.gin.halyard.strategy;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
 import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
+import com.msd.gin.halyard.optimizers.StarJoinOptimizer;
 
 import java.util.Arrays;
 
@@ -63,6 +64,7 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 			new ConjunctiveConstraintSplitter(),
 			new DisjunctiveConstraintOptimizer(),
 			new SameTermFilterOptimizer(),
+			new StarJoinOptimizer(),
 			new QueryModelNormalizer(),
 			new HalyardQueryJoinOptimizer(statistics),
 			// new SubSelectJoinOptimizer(),

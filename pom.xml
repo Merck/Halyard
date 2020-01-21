@@ -198,6 +198,12 @@
 	            <artifactId>hadoop-common</artifactId>
 	            <version>${hadoop.version}</version>
 	            <classifier>tests</classifier>
+	            <exclusions>
+	            	<exclusion>
+	            		<groupId>com.google.guava</groupId>
+	            		<artifactId>guava</artifactId>
+	            	</exclusion>
+	            </exclusions>
 	        </dependency>
 	        <dependency>
 	            <groupId>org.apache.hadoop</groupId>
@@ -218,12 +224,24 @@
 	            <groupId>org.apache.hadoop</groupId>
 	            <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
 	            <version>${hadoop.version}</version>
+	            <exclusions>
+	            	<exclusion>
+	            		<groupId>com.google.guava</groupId>
+	            		<artifactId>guava</artifactId>
+	            	</exclusion>
+	            </exclusions>
 	        </dependency>
 	        <dependency>
 	            <groupId>org.apache.hadoop</groupId>
 	            <artifactId>hadoop-yarn-server-tests</artifactId>
 	            <version>${hadoop.version}</version>
 	            <classifier>tests</classifier>
+	            <exclusions>
+	            	<exclusion>
+	            		<groupId>com.google.guava</groupId>
+	            		<artifactId>guava</artifactId>
+	            	</exclusion>
+	            </exclusions>
 	        </dependency>
 	        <dependency>
 	            <groupId>org.apache.hbase</groupId>
@@ -265,6 +283,10 @@
 	            <artifactId>hbase-server</artifactId>
 	            <version>${hbase.version}</version>
 	            <exclusions>
+	            	<exclusion>
+	            		<groupId>com.google.guava</groupId>
+	            		<artifactId>guava</artifactId>
+	            	</exclusion>
 		            <exclusion>
 			            <groupId>org.eclipse.jetty</groupId>
 			            <artifactId>jetty-server</artifactId>
