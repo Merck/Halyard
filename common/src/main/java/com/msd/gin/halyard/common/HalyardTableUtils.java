@@ -647,6 +647,11 @@ public final class HalyardTableUtils {
 		addSplitsNoLiterals(splitKeys, new byte[] { SPO_PREFIX }, splitBits);
 		addSplitsNoLiterals(splitKeys, new byte[] { POS_PREFIX }, splitBits);
         addSplits(splitKeys, new byte[]{OSP_PREFIX}, splitBits);
+        if (quads) {
+			addSplitsNoLiterals(splitKeys, new byte[] { CSPO_PREFIX }, splitBits/2);
+			addSplitsNoLiterals(splitKeys, new byte[] { CPOS_PREFIX }, splitBits/2);
+			addSplitsNoLiterals(splitKeys, new byte[] { COSP_PREFIX }, splitBits/2);
+        }
         return splitKeys.toArray(new byte[splitKeys.size()][]);
     }
 
