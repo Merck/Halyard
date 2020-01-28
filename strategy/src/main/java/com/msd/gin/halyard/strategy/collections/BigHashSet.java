@@ -19,14 +19,17 @@ package com.msd.gin.halyard.strategy.collections;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 
 /**
  * TODO
- * This is a MapDB implementation, however a hash set backed by HDFS is expected here
+ * This is a MapDB implementation, however a hash set backed by HDFS is expected here.
+ * Thread-safe.
  * @author Adam Sotona (MSD)
  * @param <E> Serializable element type
  */
@@ -34,8 +37,16 @@ public class BigHashSet<E extends Serializable> implements Iterable<E>, Closeabl
 
     private static final String SET_NAME = "temp";
 
-    private final DB db = DBMaker.newTempFileDB().deleteFilesAfterClose().closeOnJvmShutdown().transactionDisable().make();
-    private final Set<E> set = db.getHashSet(SET_NAME);
+    private Set<E> set;
+    private DB db;
+
+    public static <E extends Serializable> BigHashSet<E> create() {
+    	return new BigHashSet<>();
+    }
+
+    private BigHashSet() {
+    	this.set = new HashSet<>(1024);
+    }
 
     /**
      * Adds element to the BigHashSet
@@ -43,16 +54,35 @@ public class BigHashSet<E extends Serializable> implements Iterable<E>, Closeabl
      * @return boolean if the element has been already present
      * @throws IOException throws IOException in case of problem with underlying storage
      */
-    public boolean add(E e) throws IOException {
-        try {
+    public synchronized boolean add(E e) throws IOException {
+    	if (set == null) {
+    		throw new IOException("Already closed");
+    	}
+
+    	if (db == null && set.size() > 100000) {
+    		swapToDisk();
+    	}
+
+    	try {
             return set.add(e);
         } catch (IllegalAccessError err) {
             throw new IOException(err);
         }
     }
 
+    private synchronized void swapToDisk() {
+    	if (db != null) {
+    		return;
+    	}
+
+    	db = DBMaker.newTempFileDB().deleteFilesAfterClose().closeOnJvmShutdown().transactionDisable().asyncWriteEnable().make();
+        Set<E> dbSet = db.getHashSet(SET_NAME);
+        dbSet.addAll(set);
+        set = dbSet;
+    }
+
     @Override
-    public Iterator<E> iterator() {
+    public synchronized Iterator<E> iterator() {
         return set.iterator();
     }
 
@@ -62,8 +92,12 @@ public class BigHashSet<E extends Serializable> implements Iterable<E>, Closeabl
      * @return boolean if the element has been present
      * @throws IOException throws IOException in case of problem with underlying storage
      */
-    public boolean contains(E e) throws IOException {
-        try {
+    public synchronized boolean contains(E e) throws IOException {
+    	if (set == null) {
+    		throw new IOException("Already closed");
+    	}
+
+    	try {
             return set.contains(e);
         } catch (IllegalAccessError err) {
             throw new IOException(err);
@@ -71,11 +105,16 @@ public class BigHashSet<E extends Serializable> implements Iterable<E>, Closeabl
     }
 
     @Override
-    public void close() {
-        try {
-            db.close();
-        } catch (IllegalAccessError ignore) {
-            //silent close
-        }
+    public synchronized void close() {
+    	set = null;
+    	if (db != null) {
+	        try {
+	            db.close();
+	        } catch (IllegalAccessError|IllegalStateException ignore) {
+	            //silent close
+	        } finally {
+	        	db = null;
+	        }
+    	}
     }
 }

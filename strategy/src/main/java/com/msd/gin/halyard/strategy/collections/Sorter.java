@@ -22,6 +22,8 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.TreeMap;
+
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 
@@ -36,11 +38,11 @@ public class Sorter <E extends Comparable<E> & Serializable> implements Iterable
 
     private static final String MAP_NAME = "temp";
 
-    private final DB db;
-    private final NavigableMap<E, Long> map;
+    private NavigableMap<E, Long> map;
+    private DB db;
     private final long limit;
     private final boolean distinct;
-    private long size = 0;
+    private long size;
 
     /**
      * Constructs Sorter with optional limit and optional distinct filtering
@@ -48,54 +50,80 @@ public class Sorter <E extends Comparable<E> & Serializable> implements Iterable
      * @param distinct optional boolean switch to do not preserve multiple equal elements
      */
     public Sorter(long limit, boolean distinct) {
-        this.db = DBMaker.newTempFileDB().deleteFilesAfterClose().closeOnJvmShutdown().transactionDisable().make();
-        this.map = db.createTreeMap(MAP_NAME).make();
+        this.map = new TreeMap<>();
         this.limit = limit;
         this.distinct = distinct;
     }
 
     /**
-     * Adds new element to the sorter
+     * Adds new element to the sorter.
+     * Thread-safe.
      * @param e element to be added to Sorter
      * @throws IOException throws IOException in case of problem with underlying storage
      */
-    public void add(E e) throws IOException {
-        if (size < limit || e.compareTo(map.lastKey()) < 0) try {
-            Long c = map.get(e);
-            if (c == null) {
-                map.put(e, 1l);
-                size ++;
-            } else if (!distinct) {
-                map.put(e, c + 1l);
-                size ++;
-            }
-            while (size > limit) {
-                // Discard key(s) that are currently sorted last
-                Map.Entry<E, Long> last = map.lastEntry();
-                if (last.getValue() > size - limit) {
-                    map.put(last.getKey(), last.getValue() + limit - size);
-                    size = limit;
-                } else {
-                    map.remove(last.getKey());
-                    size -= last.getValue();
-                }
-            }
-        } catch (IllegalAccessError err) {
-            throw new IOException(err);
-        }
+    public synchronized void add(E e) throws IOException {
+    	if (map == null) {
+    		throw new IOException("Already closed");
+    	}
+
+    	if (db == null && map.size() > 100000) {
+    		swapToDisk();
+    	}
+
+    	if (size < limit || e.compareTo(map.lastKey()) < 0) {
+    		try {
+	            Long c = map.get(e);
+	            if (c == null) {
+	                map.put(e, 1l);
+	                size++;
+	            } else if (!distinct) {
+	                map.put(e, c + 1l);
+	                size++;
+	            }
+	            while (size > limit) {
+	                // Discard key(s) that are currently sorted last
+	                Map.Entry<E, Long> last = map.lastEntry();
+	                if (last.getValue() > size - limit) {
+	                    map.put(last.getKey(), last.getValue() + limit - size);
+	                    size = limit;
+	                } else {
+	                    map.remove(last.getKey());
+	                    size -= last.getValue();
+	                }
+	            }
+	        } catch (IllegalAccessError err) {
+	            throw new IOException(err);
+	        }
+    	}
+    }
+
+    private synchronized void swapToDisk() {
+    	if (db != null) {
+    		return;
+    	}
+
+    	db = DBMaker.newTempFileDB().deleteFilesAfterClose().closeOnJvmShutdown().transactionDisable().asyncWriteEnable().make();
+        NavigableMap<E,Long> dbMap = db.createTreeMap(MAP_NAME).make();
+        dbMap.putAll(map);
+        map = dbMap;
     }
 
     @Override
-    public Iterator<Map.Entry<E, Long>> iterator() {
+    public synchronized Iterator<Map.Entry<E, Long>> iterator() {
         return map.entrySet().iterator();
     }
 
     @Override
-    public void close() {
-        try {
-            db.close();
-        } catch (IllegalAccessError|IllegalStateException ignore) {
-            //silent close
-        }
+    public synchronized void close() {
+    	map = null;
+    	if (db != null) {
+	        try {
+	            db.close();
+	        } catch (IllegalAccessError|IllegalStateException ignore) {
+	            //silent close
+	        } finally {
+	        	db = null;
+	        }
+    	}
     }
 }

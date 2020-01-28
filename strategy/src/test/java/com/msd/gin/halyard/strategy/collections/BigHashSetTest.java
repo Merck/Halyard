@@ -28,7 +28,7 @@ public class BigHashSetTest {
 
     @Test
     public void testBigHashSet() throws Exception {
-        BigHashSet<String> bhs = new BigHashSet<>();
+        BigHashSet<String> bhs = BigHashSet.create();
         bhs.add("hi");
         assertEquals("hi", bhs.iterator().next());
         assertTrue(bhs.contains("hi"));
@@ -38,14 +38,14 @@ public class BigHashSetTest {
 
     @Test(expected = IOException.class)
     public void testFailAdd() throws Exception {
-        BigHashSet<String> bhs = new BigHashSet<>();
+        BigHashSet<String> bhs = BigHashSet.create();
         bhs.close();
         bhs.add("hi");
     }
 
     @Test(expected = IOException.class)
     public void testFailContains() throws Exception {
-        BigHashSet<String> bhs = new BigHashSet<>();
+        BigHashSet<String> bhs = BigHashSet.create();
         bhs.close();
         bhs.contains("hi");
     }

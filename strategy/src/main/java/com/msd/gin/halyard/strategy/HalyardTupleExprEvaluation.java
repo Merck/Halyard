@@ -701,9 +701,7 @@ final class HalyardTupleExprEvaluation {
                 protected boolean next(BindingSet bs) throws InterruptedException {
                     try {
                         ComparableBindingSetWrapper cbsw = new ComparableBindingSetWrapper(parentStrategy, bs, order.getElements(), minorOrder.getAndIncrement());
-                        synchronized (sorter) {
-                            sorter.add(cbsw);
-                        }
+                        sorter.add(cbsw);
                         return true;
                     } catch (QueryEvaluationException | IOException e) {
                         return handleException(e);
@@ -849,7 +847,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateDistinct(BindingSetPipe parent, final Distinct distinct, BindingSet bindings) {
         evaluateTupleExpr(new BindingSetPipe(parent) {
-            private final BigHashSet<BindingSet> set = new BigHashSet<>();
+            private final BigHashSet<BindingSet> set = BigHashSet.create();
             @Override
             protected boolean handleException(Exception e) {
                 set.close();
@@ -857,22 +855,18 @@ final class HalyardTupleExprEvaluation {
             }
             @Override
             protected boolean next(BindingSet bs) throws InterruptedException {
-                synchronized (set) {
-                    try {
-                        if (!set.add(bs)) {
-                            return true;
-                        }
-                    } catch (IOException e) {
-                        return handleException(e);
+                try {
+                    if (!set.add(bs)) {
+                        return true;
                     }
+                } catch (IOException e) {
+                    return handleException(e);
                 }
                 return parent.push(bs);
             }
             @Override
             public void close() throws InterruptedException {
-                synchronized (set) {
-                	set.close();
-                }
+               	set.close();
                 parent.close();
             }
             @Override
@@ -1249,7 +1243,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateIntersection(final BindingSetPipe topPipe, final Intersection intersection, final BindingSet bindings) {
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
-            private final BigHashSet<BindingSet> secondSet = new BigHashSet<>();
+            private final BigHashSet<BindingSet> secondSet = BigHashSet.create();
             @Override
             protected boolean handleException(Exception e) {
                 secondSet.close();
@@ -1301,7 +1295,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateDifference(final BindingSetPipe topPipe, final Difference difference, final BindingSet bindings) {
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
-            private final BigHashSet<BindingSet> excludeSet = new BigHashSet<>();
+            private final BigHashSet<BindingSet> excludeSet = BigHashSet.create();
             @Override
             protected boolean handleException(Exception e) {
                 excludeSet.close();

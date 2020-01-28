@@ -62,7 +62,7 @@ public class CountAggregator extends Aggregator {
 	protected boolean distinctBindingSet(BindingSet s) {
 		if (isDistinct()) {
 			if (distinctBindingSets == null) {
-				distinctBindingSets = new BigHashSet<>();
+				distinctBindingSets = BigHashSet.create();
 			}
 			try {
 				return distinctBindingSets.add(s);

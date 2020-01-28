@@ -79,7 +79,7 @@ public abstract class Aggregator implements AutoCloseable {
 	protected boolean distinctValue(Value v) {
 		if (isDistinct) {
 			if (distinctValues == null) {
-				distinctValues = new BigHashSet<>();
+				distinctValues = BigHashSet.create();
 			}
 			try {
 				return distinctValues.add(v);
