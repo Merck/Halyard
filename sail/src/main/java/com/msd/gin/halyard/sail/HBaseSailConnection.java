@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
@@ -25,6 +27,13 @@ import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
+import java.io.Serializable;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hbase.KeyValue;
@@ -36,7 +45,6 @@ import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
-import org.eclipse.rdf4j.common.iteration.EmptyIteration;
 import org.eclipse.rdf4j.common.iteration.ExceptionConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.TimeLimitIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -47,9 +55,7 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
-import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SD;
-import org.eclipse.rdf4j.model.vocabulary.SPIN;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
@@ -75,7 +81,10 @@ import org.slf4j.LoggerFactory;
 public class HBaseSailConnection implements SailConnection {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseSailConnection.class);
 
+	public static final String SOURCE_STRING_BINDING = "__source__";
 	public static final String QUERY_CONTEXT_TABLE_ATTRIBUTE = Table.class.getName();
+
+	private final Cache<PreparedQueryKey, TupleExpr> queryCache = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(5000).expireAfterWrite(1L, TimeUnit.HOURS).build();
 
     private final HBaseSail sail;
 	private Table table;
@@ -123,66 +132,80 @@ public class HBaseSailConnection implements SailConnection {
 		}
     }
 
-	private TripleSource createTripleSource(long startTime) {
+	private TripleSource createTripleSource() {
+		long startTime = System.currentTimeMillis();
 		return new HBaseSearchTripleSource(table, sail.getValueFactory(), startTime, sail.evaluationTimeout, sail.scanSettings, sail.elasticIndexURL, sail.ticker);
 	}
 
-    //evaluate queries/ subqueries
-    @Override
-    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred) throws SailException {
-		flush();
-		LOG.debug("Evaluated TupleExpr before optimizers:\n{}", tupleExpr);
-        tupleExpr = tupleExpr.clone();
-        if (!(tupleExpr instanceof QueryRoot)) {
-            // Add a dummy root node to the tuple expressions to allow the
-            // optimizers to modify the actual root node
-            tupleExpr = new QueryRoot(tupleExpr);
-        }
-
-        final long startTime = System.currentTimeMillis();
-		TripleSource baseSource = createTripleSource(startTime);
-        TripleSource source = new TripleSource() {
-            @Override
-            public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
-				if (RDF.TYPE.equals(pred) && SPIN.MAGIC_PROPERTY_CLASS.equals(obj)) {
-            		// cache magic property definitions here
-            		return new EmptyIteration<>();
-            	} else {
-					return baseSource.getStatements(subj, pred, obj, contexts);
-            	}
-            }
-
-            @Override
-            public ValueFactory getValueFactory() {
-				return baseSource.getValueFactory();
-            }
-        };
-
+	private QueryContext createQueryContext(TripleSource source, boolean includeInferred) {
 		SailConnectionQueryPreparer queryPreparer = new SailConnectionQueryPreparer(this, includeInferred, source);
 		QueryContext queryContext = new QueryContext(queryPreparer);
 		queryContext.setAttribute(QUERY_CONTEXT_TABLE_ATTRIBUTE, table);
+		return queryContext;
+	}
+
+	private EvaluationStrategy createEvaluationStrategy(TripleSource source, Dataset dataset, QueryContext queryContext) {
 		HalyardEvaluationStatistics stats = getStatistics();
-		EvaluationStrategy strategy = sail.pushStrategy
+		return sail.pushStrategy
 				? new HalyardEvaluationStrategy(source, queryContext, sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), dataset, sail.getFederatedServiceResolver(), stats, sail.evaluationTimeout)
 				: new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), 0L, stats);
+	}
+
+	private TupleExpr optimize(final TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred, TripleSource source, EvaluationStrategy strategy) {
+		LOG.debug("Evaluated TupleExpr before optimizers:\n{}", tupleExpr);
+		TupleExpr optimizedTupleExpr = tupleExpr.clone();
+		if (!(optimizedTupleExpr instanceof QueryRoot)) {
+			// Add a dummy root node to the tuple expressions to allow the
+			// optimizers to modify the actual root node
+			optimizedTupleExpr = new QueryRoot(optimizedTupleExpr);
+		}
+		if (!(optimizedTupleExpr instanceof ServiceRoot)) {
+			// if this is a Halyard federated query then the full query has already passed through the optimizer so don't need to re-run these again
+			new SpinFunctionInterpreter(sail.getSpinParser(), source, sail.getFunctionRegistry()).optimize(optimizedTupleExpr, dataset, bindings);
+			if (includeInferred) {
+				new SpinMagicPropertyInterpreter(sail.getSpinParser(), source, sail.getTupleFunctionRegistry(), null).optimize(optimizedTupleExpr, dataset, bindings);
+			}
+		}
+		strategy.optimize(optimizedTupleExpr, getStatistics(), bindings);
+		LOG.debug("Evaluated TupleExpr after optimization:\n{}", optimizedTupleExpr);
+		return optimizedTupleExpr;
+	}
+
+	// evaluate queries/ subqueries
+    @Override
+	public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(final TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred) throws SailException {
+		flush();
+
+		TripleSource baseSource = createTripleSource();
+		TripleSource tripleSource = new SpinAwareTripleSource(baseSource);
+		QueryContext queryContext = createQueryContext(tripleSource, includeInferred);
+		EvaluationStrategy strategy = createEvaluationStrategy(tripleSource, dataset, queryContext);
 
 		queryContext.begin();
 		try {
 			initQueryContext(queryContext);
 
-			if(!(tupleExpr instanceof ServiceRoot)) {
-				// if this is a Halyard federated query then the full query has already passed through the optimizer so don't need to re-run these again
-				new SpinFunctionInterpreter(sail.getSpinParser(), source, sail.getFunctionRegistry()).optimize(tupleExpr, dataset, bindings);
-				if (includeInferred) {
-					new SpinMagicPropertyInterpreter(sail.getSpinParser(), source, sail.getTupleFunctionRegistry(), null).optimize(tupleExpr, dataset, bindings);
+			TupleExpr optimizedTupleExpr;
+			Literal sourceString = (Literal) bindings.getValue(SOURCE_STRING_BINDING);
+			if (sourceString != null) {
+				PreparedQueryKey pqkey = new PreparedQueryKey(sourceString.getLabel(), dataset, bindings, includeInferred);
+				try {
+					optimizedTupleExpr = queryCache.get(pqkey, () -> optimize(tupleExpr, dataset, bindings, includeInferred, tripleSource, strategy));
+				} catch (ExecutionException e) {
+					if (e.getCause() instanceof RuntimeException) {
+						throw (RuntimeException) e.getCause();
+					} else {
+						throw new AssertionError(e);
+					}
 				}
+			} else {
+				optimizedTupleExpr = optimize(tupleExpr, dataset, bindings, includeInferred, tripleSource, strategy);
 			}
-			strategy.optimize(tupleExpr, getStatistics(), bindings);
-			LOG.debug("Evaluated TupleExpr after optimization:\n{}", tupleExpr);
+
 			try {
 				// evaluate the expression against the TripleSource according to the
 				// EvaluationStrategy.
-				CloseableIteration<BindingSet, QueryEvaluationException> iter = evaluateInternal(strategy, tupleExpr);
+				CloseableIteration<BindingSet, QueryEvaluationException> iter = evaluateInternal(strategy, optimizedTupleExpr);
 				return sail.evaluationTimeout <= 0 ? iter
 						: new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter, TimeUnit.SECONDS.toMillis(sail.evaluationTimeout)) {
 							@Override
@@ -237,8 +260,7 @@ public class HBaseSailConnection implements SailConnection {
     @Override
     public CloseableIteration<? extends Statement, SailException> getStatements(Resource subj, IRI pred, Value obj, boolean includeInferred, Resource... contexts) throws SailException {
 		flush();
-		long startTime = System.currentTimeMillis();
-		TripleSource tripleSource = createTripleSource(startTime);
+		TripleSource tripleSource = createTripleSource();
 		return new ExceptionConvertingIteration<Statement, SailException>(tripleSource.getStatements(subj, pred, obj, contexts)) {
 			@Override
 			protected SailException convert(Exception e) {
@@ -503,6 +525,57 @@ public class HBaseSailConnection implements SailConnection {
 			LOG.warn("Namespaces could not be cleared due to an exception", e);
         }
     }
+
+	private static final class PreparedQueryKey implements Serializable {
+		private static final long serialVersionUID = -8673870599435959092L;
+
+		final String sourceString;
+		final Set<IRI> datasetGraphs;
+		final Set<IRI> datasetNamedGraphs;
+		final IRI datasetInsertGraph;
+		final Set<IRI> datasetRemoveGraphs;
+		final Set<String> bindingNames;
+		final boolean includeInferred;
+
+		static <E> Set<E> copy(Set<E> set) {
+			switch (set.size()) {
+				case 0:
+					return Collections.emptySet();
+				case 1:
+					return Collections.singleton(set.iterator().next());
+				default:
+					return new HashSet<>(set);
+			}
+		}
+
+		PreparedQueryKey(String sourceString, Dataset dataset, BindingSet bindings, boolean includeInferred) {
+			this.sourceString = sourceString;
+			this.datasetGraphs = dataset != null ? copy(dataset.getDefaultGraphs()) : null;
+			this.datasetNamedGraphs = dataset != null ? copy(dataset.getNamedGraphs()) : null;
+			this.datasetInsertGraph = dataset != null ? dataset.getDefaultInsertGraph() : null;
+			this.datasetRemoveGraphs = dataset != null ? copy(dataset.getDefaultRemoveGraphs()) : null;
+			this.bindingNames = copy(bindings.getBindingNames());
+			this.includeInferred = includeInferred;
+		}
+
+		private Object[] toArray() {
+			return new Object[] { sourceString, bindingNames, includeInferred, datasetGraphs, datasetNamedGraphs, datasetInsertGraph, datasetRemoveGraphs };
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if (!(o instanceof PreparedQueryKey)) {
+				return false;
+			}
+			PreparedQueryKey other = (PreparedQueryKey) o;
+			return Arrays.equals(this.toArray(), other.toArray());
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(toArray());
+		}
+	}
 
 	public static class Factory implements ConnectionFactory {
 		public static final ConnectionFactory INSTANCE = new Factory();

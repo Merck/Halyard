@@ -20,6 +20,7 @@ import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 
 import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -67,7 +68,9 @@ public final class HalyardProfile extends AbstractHalyardTool {
 			@Override
 			public SailConnection createConnection(HBaseSail sail) {
 				return new HBaseSailConnection(sail) {
-		            @Override
+					private final NumberFormat cardinalityFormatter = DecimalFormat.getNumberInstance();
+
+					@Override
 		            public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred) throws SailException {
 		                print("Original query:", tupleExpr);
 		                return super.evaluate(tupleExpr, dataset, bindings, includeInferred); //To change body of generated methods, choose Tools | Templates.
@@ -95,7 +98,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
 		                        buf.append(node.getSignature());
 		                        Double card = cardMap.get(node);
 		                        if (card != null) {
-		                            buf.append(" [").append(DecimalFormat.getNumberInstance().format(card)).append(']');
+		                            buf.append(" [").append(cardinalityFormatter.format(card)).append(']');
 		                        }
 		                        buf.append('\n');
 		                        indentLevel++;
