@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Function;
 
 import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeConstants;
@@ -633,7 +634,10 @@ public final class HalyardTableUtils {
 	 * @param splitBits must be between 0 and 15, larger values result in more keys.
 	 * @return An array of keys represented as {@code byte[]}s
 	 */
-	static byte[][] calculateSplits(int splitBits, boolean quads) {
+	static byte[][] calculateSplits(final int splitBits, boolean quads) {
+		return calculateSplits(splitBits, quads, null, 0.5f);
+	}
+	static byte[][] calculateSplits(final int splitBits, boolean quads, Map<IRI,Float> predicateRatios, float literalRatio) {
         TreeSet<byte[]> splitKeys = new TreeSet<>(Bytes.BYTES_COMPARATOR);
         //basic presplits
         splitKeys.add(new byte[]{POS_PREFIX});
@@ -644,38 +648,51 @@ public final class HalyardTableUtils {
 			splitKeys.add(new byte[] { COSP_PREFIX });
 		}
         //common presplits
-		addSplitsNoLiterals(splitKeys, new byte[] { SPO_PREFIX }, splitBits);
-		addSplitsNoLiterals(splitKeys, new byte[] { POS_PREFIX }, splitBits);
-        addSplits(splitKeys, new byte[]{OSP_PREFIX}, splitBits);
+		addSplitsNoLiterals(splitKeys, new byte[] { SPO_PREFIX }, splitBits, null);
+		addSplitsNoLiterals(splitKeys, new byte[] { POS_PREFIX }, splitBits, transformKeys(predicateRatios, iri -> RDFPredicate.create(iri)));
+        addSplits(splitKeys, new byte[]{OSP_PREFIX}, splitBits, literalRatio);
         if (quads) {
-			addSplitsNoLiterals(splitKeys, new byte[] { CSPO_PREFIX }, splitBits/2);
-			addSplitsNoLiterals(splitKeys, new byte[] { CPOS_PREFIX }, splitBits/2);
-			addSplitsNoLiterals(splitKeys, new byte[] { COSP_PREFIX }, splitBits/2);
+			addSplitsNoLiterals(splitKeys, new byte[] { CSPO_PREFIX }, splitBits/2, null);
+			addSplitsNoLiterals(splitKeys, new byte[] { CPOS_PREFIX }, splitBits/2, null);
+			addSplitsNoLiterals(splitKeys, new byte[] { COSP_PREFIX }, splitBits/2, null);
         }
         return splitKeys.toArray(new byte[splitKeys.size()][]);
     }
 
-    /**
+	private static <K1,K2,V> Map<K2,V> transformKeys(Map<K1,V> map, Function<K1,K2> f) {
+		if (map == null) {
+			return null;
+		}
+		Map<K2,V> newMap = new HashMap<>(map.size()+1);
+		for (Map.Entry<K1,V> entry : map.entrySet()) {
+			newMap.put(f.apply(entry.getKey()), entry.getValue());
+		}
+		return newMap;
+	}
+
+	/**
 	 * Generate the split key and add it to the collection.
 	 * 
 	 * @param splitKeys the {@code TreeSet} to add the collection to.
 	 * @param prefix the prefix to calculate the key for
 	 * @param splitBits between 0 and 16, larger values generate smaller split steps
 	 */
-	private static void addSplits(TreeSet<byte[]> splitKeys, byte[] prefix, int splitBits) {
-		if (splitBits == 0) {
-			return;
+	private static void addSplits(TreeSet<byte[]> splitKeys, byte[] prefix, final int splitBits, float literalRatio) {
+		int noLitSplitBits = (int)Math.round((1.0f-literalRatio)*splitBits);
+		int litSplitBits = (int)Math.round(literalRatio*splitBits);
+		boolean needDivider = (noLitSplitBits > 0) && (litSplitBits > 0);
+		// adjust for rounding errors
+		if (noLitSplitBits + litSplitBits > splitBits) {
+			float scale = (float)splitBits/(float)(noLitSplitBits + litSplitBits);
+			noLitSplitBits *= scale;
+			litSplitBits *= scale;
 		}
-		if (splitBits < 0 || splitBits > 16) {
-			throw new IllegalArgumentException("Illegal nunmber of split bits");
-		}
-
-		final int splitStep = 1 << (16 - splitBits); // 1 splitBit gives a split step of 32768, 8 splitBits gives a split step of 256
-		for (int i = splitStep; i <= 0xFFFF; i += splitStep) { // 0xFFFF is 65535 so a split step of 32768 will give 2 iterations, larger split bits give more iterations
-			byte bb[] = Arrays.copyOf(prefix, prefix.length + 2);
-			bb[prefix.length] = (byte) ((i >> 8) & 0xff); // 0xff = 255.
-			bb[prefix.length + 1] = (byte) (i & 0xff);
-			splitKeys.add(bb);
+		addSplitsNoLiterals(splitKeys, prefix, noLitSplitBits, null);
+		addSplitsLiterals(splitKeys, prefix, litSplitBits);
+		if (needDivider) {
+			byte[] prefixLiteralSplit = Arrays.copyOf(prefix, prefix.length + 2);
+			prefixLiteralSplit[prefix.length] = NON_LITERAL_FLAG;
+			splitKeys.add(prefixLiteralSplit);
 		}
 	}
 
@@ -686,13 +703,57 @@ public final class HalyardTableUtils {
 	 * @param prefix the prefix to calculate the key for
 	 * @param splitBits between 0 and 15, larger values generate smaller split steps
 	 */
-	private static void addSplitsNoLiterals(TreeSet<byte[]> splitKeys, byte[] prefix, int splitBits) {
+	private static void addSplitsNoLiterals(TreeSet<byte[]> splitKeys, byte[] prefix, final int splitBits, Map<RDFValue<?>,Float> keyFractions) {
         if (splitBits == 0) return;
 		if (splitBits < 0 || splitBits > 15) {
 			throw new IllegalArgumentException("Illegal nunmber of split bits");
 		}
 
-		final int splitStep = 1 << (15 - splitBits); // 1 splitBit gives a split step of 16384, 8 splitBits gives a split step of 128
+		int actualSplitBits = 0;
+		int nonZeroSplitCount = 0;
+		float fractionSum = 0.0f;
+		if (keyFractions != null && !keyFractions.isEmpty()) {
+			for (Float f : keyFractions.values()) {
+				actualSplitBits += (int)Math.round(f*splitBits);
+				if (actualSplitBits > 0) {
+					nonZeroSplitCount++;
+				}
+				fractionSum += f;
+			}
+		}
+		int otherSplitBits = (int)Math.round((1.0f - fractionSum)*splitBits);
+		actualSplitBits += otherSplitBits;
+		if (otherSplitBits > 0) {
+			nonZeroSplitCount++;
+		}
+		float scale = (float)splitBits/(float)actualSplitBits;
+
+		fractionSum = 0.0f;
+		if (keyFractions != null && !keyFractions.isEmpty()) {
+			for (Map.Entry<RDFValue<?>, Float> entry : keyFractions.entrySet()) {
+				byte[] keyHash = entry.getKey().getKeyHash(prefix[0]);
+				byte[] keyPrefix = new byte[1+keyHash.length];
+				keyPrefix[0] = prefix[0];
+				System.arraycopy(keyHash, 0, keyPrefix, 1, keyHash.length);
+				if (nonZeroSplitCount > 1) {
+					// add divider
+					splitKeys.add(keyPrefix);
+				}
+				float fraction = entry.getValue();
+				int keySplitBits = (int)(scale*Math.round(fraction*splitBits));
+				final int splitStep = 1 << (16 - keySplitBits);
+				for (int i = splitStep; i <= 0xFFFF; i += splitStep) {
+		            byte bb[] = Arrays.copyOf(keyPrefix, keyPrefix.length + 2);
+					bb[keyPrefix.length] = (byte) ((i >> 8) & 0xff); // 0xff = 255.
+		            bb[keyPrefix.length + 1] = (byte)(i & 0xff);
+		            splitKeys.add(bb);
+				}
+				fractionSum += fraction;
+			}
+		}
+
+		otherSplitBits *= scale;
+		final int splitStep = 1 << (15 - otherSplitBits); // 1 splitBit gives a split step of 16384, 8 splitBits gives a split step of 128
 		for (int i = splitStep; i <= 0x7FFF; i += splitStep) { // 0x7FFF is 32767 so a split step of 16384 will give 2 iterations, larger split bits give more iterations
             byte bb[] = Arrays.copyOf(prefix, prefix.length + 2);
 			bb[prefix.length] = (byte) (0x80 + ((i >> 8) & 0xff)); // 0xff = 255.
@@ -701,7 +762,22 @@ public final class HalyardTableUtils {
         }
     }
 
-    /**
+	private static void addSplitsLiterals(TreeSet<byte[]> splitKeys, byte[] prefix, final int splitBits) {
+        if (splitBits == 0) return;
+		if (splitBits < 0 || splitBits > 15) {
+			throw new IllegalArgumentException("Illegal nunmber of split bits");
+		}
+
+		final int splitStep = 1 << (15 - splitBits); // 1 splitBit gives a split step of 16384, 8 splitBits gives a split step of 128
+		for (int i = splitStep; i <= 0x7FFF; i += splitStep) { // 0x7FFF is 32767 so a split step of 16384 will give 2 iterations, larger split bits give more iterations
+            byte bb[] = Arrays.copyOf(prefix, prefix.length + 2);
+			bb[prefix.length] = (byte) ((i >> 8) & 0xff); // 0xff = 255.
+            bb[prefix.length + 1] = (byte)(i & 0xff);
+            splitKeys.add(bb);
+        }
+    }
+
+	/**
      * Conversion method from Subj, Pred, Obj and optional Context into an array of HBase keys
      * @param subj subject Resource
      * @param pred predicate IRI
