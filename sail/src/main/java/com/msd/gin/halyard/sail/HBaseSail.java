@@ -97,7 +97,7 @@ public class HBaseSail implements Sail {
     final int splitBits;
 	private SailConnection statsConnection;
 	protected HalyardEvaluationStatistics statistics;
-    final int evaluationTimeout;
+	final int evaluationTimeout; // secs
     private boolean readOnly = false;
     private long readOnlyTimestamp = -1;
     final String elasticIndexURL;
@@ -302,6 +302,9 @@ public class HBaseSail implements Sail {
 
     @Override
     public void shutDown() throws SailException { //release resources
+		if (statsConnection == null) {
+			throw new IllegalStateException("Sail has not been initialized");
+		}
 		try {
 			statsConnection.close();
 		} catch (SailException ignore) {

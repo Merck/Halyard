@@ -22,8 +22,9 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.RDF4J;
 import org.eclipse.rdf4j.model.vocabulary.SESAME;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
@@ -185,7 +186,7 @@ public class HBaseUpdate extends SailUpdate {
 			if (set.isEmpty()) {
 				return new IRI[0];
 			}
-			if (set.remove(SESAME.NIL)) {
+			if (set.remove(RDF4J.NIL) | set.remove(SESAME.NIL)) {
 				set.add(null);
 			}
 
@@ -313,7 +314,7 @@ public class HBaseUpdate extends SailUpdate {
 					setTimestamp(uc, toBeDeleted, deleteClause.getTupleFunctionCalls(), whereBinding);
 
 					if (context != null) {
-						if (SESAME.NIL.equals(context)) {
+						if (RDF4J.NIL.equals(context) || SESAME.NIL.equals(context)) {
 							con.removeStatement(uc, subject, predicate, object, (Resource) null);
 						} else {
 							con.removeStatement(uc, subject, predicate, object, context);
@@ -370,7 +371,7 @@ public class HBaseUpdate extends SailUpdate {
 					}
 					if (stmt.equals(tsStmt)) {
 						Literal ts = (Literal) getValueForVar(tfc.getResultVars().get(0), bindings);
-						if(XMLSchema.DATETIME.equals(ts.getDatatype())) {
+						if (XSD.DATETIME.equals(ts.getDatatype())) {
 							uc.setTimestamp(ts.calendarValue().toGregorianCalendar().getTimeInMillis());
 						} else {
 							uc.setTimestamp(ts.longValue());
@@ -473,13 +474,11 @@ public class HBaseUpdate extends SailUpdate {
 				}
 			}
 
-			Statement st = null;
-			if (subject != null && predicate != null && object != null) {
-				if (context != null) {
-					st = vf.createStatement(subject, predicate, object, context);
-				} else {
-					st = vf.createStatement(subject, predicate, object);
-				}
+			Statement st;
+			if (context != null) {
+				st = vf.createStatement(subject, predicate, object, context);
+			} else {
+				st = vf.createStatement(subject, predicate, object);
 			}
 			return st;
 		}

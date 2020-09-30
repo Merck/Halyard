@@ -16,21 +16,18 @@
  */
 package com.msd.gin.halyard.sail;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import com.msd.gin.halyard.common.HBaseServerTestInstance;
 
 import java.net.MalformedURLException;
 
 import org.apache.http.client.HttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.eclipse.rdf4j.repository.config.RepositoryConfig;
 import org.eclipse.rdf4j.repository.sail.config.SailRepositoryConfig;
 import org.eclipse.rdf4j.sail.memory.config.MemoryStoreConfig;
 import org.junit.Test;
 
-import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import static org.junit.Assert.*;
 
 /**
  *

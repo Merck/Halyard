@@ -81,9 +81,9 @@ final class HalyardEvaluationExecutor {
 		while(pai.pushNext());
 	}
 
-	static CloseableIteration<BindingSet, QueryEvaluationException> consumeAndQueue(Consumer<BindingSetPipe> action, QueryModelNode node, long startTime, long timeoutSecs) {
+	static CloseableIteration<BindingSet, QueryEvaluationException> consumeAndQueue(Consumer<BindingSetPipe> action, QueryModelNode node) {
         int priority = getPriorityForNode(node);
-        BindingSetPipeQueue queue = new BindingSetPipeQueue(startTime, timeoutSecs);
+        BindingSetPipeQueue queue = new BindingSetPipeQueue();
         EXECUTOR.execute(new PipeAndConsumer(queue.pipe, action, priority));
         return queue.iteration;
 	}
@@ -231,6 +231,7 @@ final class HalyardEvaluationExecutor {
     }
 
     private static final int MAX_QUEUE_SIZE = 5000;
+	private static final int TIMEOUT_POLL_MILLIS = 1000;
     private static final BindingSet END = new EmptyBindingSet();
 
     static final class BindingSetPipeQueue {
@@ -238,13 +239,8 @@ final class HalyardEvaluationExecutor {
         private final LinkedBlockingQueue<BindingSet> queue = new LinkedBlockingQueue<>(MAX_QUEUE_SIZE);
         private volatile Exception exception;
 
-        final BindingSetPipeIteration iteration;
-        final QueueingBindingSetPipe pipe;
-
-        BindingSetPipeQueue(long startTime, long timeoutSecs) {
-        	this.iteration = new BindingSetPipeIteration(startTime, timeoutSecs);
-        	this.pipe = new QueueingBindingSetPipe(startTime, timeoutSecs);
-        }
+        final BindingSetPipeIteration iteration = new BindingSetPipeIteration();
+        final QueueingBindingSetPipe pipe = new QueueingBindingSetPipe();
 
         @Override
         public String toString() {
@@ -252,26 +248,17 @@ final class HalyardEvaluationExecutor {
         }
 
         final class BindingSetPipeIteration extends LookAheadIteration<BindingSet, QueryEvaluationException> {
-            private final TimeoutTracker timeoutTracker;
-
-            BindingSetPipeIteration(long startTime, long timeoutSecs) {
-            	this.timeoutTracker = new TimeoutTracker(startTime, timeoutSecs);
-            }
 
             @Override
             protected BindingSet getNextElement() throws QueryEvaluationException {
     			BindingSet bs = null;
     			try {
                     for (int retries = 0; bs == null && !isClosed(); retries++) {
-    					bs = queue.poll(TimeoutTracker.TIMEOUT_POLL_MILLIS, TimeUnit.MILLISECONDS);
+    					bs = queue.poll(TIMEOUT_POLL_MILLIS, TimeUnit.MILLISECONDS);
     					if (exception instanceof RuntimeException) {
     						throw (RuntimeException) exception;
     					} else if (exception != null) {
                         	throw new QueryEvaluationException(exception);
-                        }
-
-    					if (timeoutTracker.checkTimeout()) {
-    						throw new QueryEvaluationException("Query evaluation exceeded specified timeout " + timeoutTracker.getTimeout() + "s");
                         }
 
     					if (retries > MAX_RETRIES && EXECUTOR.getActiveCount() == EXECUTOR.getMaximumPoolSize() && EXECUTOR.getMaximumPoolSize() < MAX_THREADS) {
@@ -300,22 +287,16 @@ final class HalyardEvaluationExecutor {
         }
 
         final class QueueingBindingSetPipe extends BindingSetPipe {
-            private final TimeoutTracker timeoutTracker;
         	volatile boolean isClosed = false;
 
-            QueueingBindingSetPipe(long startTime, long timeoutSecs) {
+            QueueingBindingSetPipe() {
             	super(null);
-            	this.timeoutTracker = new TimeoutTracker(startTime, timeoutSecs);
             }
 
             private boolean addToQueue(BindingSet bs) throws InterruptedException {
             	boolean added = false;
             	for (int retries = 0; !added && !isClosed(); retries++) {
-            		added = queue.offer(bs, TimeoutTracker.TIMEOUT_POLL_MILLIS, TimeUnit.MILLISECONDS);
-
-					if (timeoutTracker.checkTimeout()) {
-						throw new QueryEvaluationException("Query evaluation exceeded specified timeout " + timeoutTracker.getTimeout() + "s");
-                    }
+            		added = queue.offer(bs, TIMEOUT_POLL_MILLIS, TimeUnit.MILLISECONDS);
 
 					if (retries > MAX_RETRIES && EXECUTOR.getActiveCount() == EXECUTOR.getMaximumPoolSize() && EXECUTOR.getMaximumPoolSize() < MAX_THREADS) {
 						EXECUTOR.setMaximumPoolSize(Math.min(EXECUTOR.getMaximumPoolSize()+THREAD_INCREASE, MAX_THREADS));

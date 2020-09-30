@@ -19,6 +19,10 @@ package com.msd.gin.halyard.sail;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.RDFPredicate;
+import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
@@ -40,12 +44,17 @@ import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
+import org.eclipse.rdf4j.common.iteration.EmptyIteration;
 import org.eclipse.rdf4j.common.iteration.ExceptionConvertingIteration;
+import org.eclipse.rdf4j.common.iteration.ReducedIteration;
 import org.eclipse.rdf4j.common.iteration.TimeLimitIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -57,12 +66,14 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.vocabulary.SD;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
+import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContextInitializer;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
@@ -133,8 +144,7 @@ public class HBaseSailConnection implements SailConnection {
     }
 
 	private TripleSource createTripleSource() {
-		long startTime = System.currentTimeMillis();
-		return new HBaseSearchTripleSource(table, sail.getValueFactory(), startTime, sail.evaluationTimeout, sail.scanSettings, sail.elasticIndexURL, sail.ticker);
+		return new HBaseSearchTripleSource(table, sail.getValueFactory(), sail.evaluationTimeout, sail.scanSettings, sail.elasticIndexURL, sail.ticker);
 	}
 
 	private QueryContext createQueryContext(TripleSource source, boolean includeInferred) {
@@ -147,7 +157,7 @@ public class HBaseSailConnection implements SailConnection {
 	private EvaluationStrategy createEvaluationStrategy(TripleSource source, Dataset dataset, QueryContext queryContext) {
 		HalyardEvaluationStatistics stats = getStatistics();
 		return sail.pushStrategy
-				? new HalyardEvaluationStrategy(source, queryContext, sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), dataset, sail.getFederatedServiceResolver(), stats, sail.evaluationTimeout)
+				? new HalyardEvaluationStrategy(source, queryContext, sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), dataset, sail.getFederatedServiceResolver(), stats)
 				: new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), 0L, stats);
 	}
 
@@ -173,7 +183,7 @@ public class HBaseSailConnection implements SailConnection {
 
 	// evaluate queries/ subqueries
     @Override
-	public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(final TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred) throws SailException {
+	public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(final TupleExpr tupleExpr, final Dataset dataset, final BindingSet bindings, final boolean includeInferred) throws SailException {
 		flush();
 
 		TripleSource baseSource = createTripleSource();
@@ -187,10 +197,11 @@ public class HBaseSailConnection implements SailConnection {
 
 			TupleExpr optimizedTupleExpr;
 			Literal sourceString = (Literal) bindings.getValue(SOURCE_STRING_BINDING);
+			BindingSet queryBindings = removeImplicitBindings(bindings);
 			if (sourceString != null) {
-				PreparedQueryKey pqkey = new PreparedQueryKey(sourceString.getLabel(), dataset, bindings, includeInferred);
+				PreparedQueryKey pqkey = new PreparedQueryKey(sourceString.getLabel(), dataset, queryBindings, includeInferred);
 				try {
-					optimizedTupleExpr = queryCache.get(pqkey, () -> optimize(tupleExpr, dataset, bindings, includeInferred, tripleSource, strategy));
+					optimizedTupleExpr = queryCache.get(pqkey, () -> optimize(tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy));
 				} catch (ExecutionException e) {
 					if (e.getCause() instanceof RuntimeException) {
 						throw (RuntimeException) e.getCause();
@@ -199,7 +210,7 @@ public class HBaseSailConnection implements SailConnection {
 					}
 				}
 			} else {
-				optimizedTupleExpr = optimize(tupleExpr, dataset, bindings, includeInferred, tripleSource, strategy);
+				optimizedTupleExpr = optimize(tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy);
 			}
 
 			try {
@@ -211,7 +222,7 @@ public class HBaseSailConnection implements SailConnection {
 							@Override
 							protected void throwInterruptedException() throws QueryEvaluationException {
 								throw new QueryEvaluationException(
-										"Query evaluation exceeded specified timeout " + sail.evaluationTimeout + "s");
+										String.format("Query evaluation exceeded specified timeout %ds", sail.evaluationTimeout));
 							}
 						};
 			} catch (QueryEvaluationException ex) {
@@ -225,6 +236,17 @@ public class HBaseSailConnection implements SailConnection {
 			}
 		}
     }
+
+	private BindingSet removeImplicitBindings(BindingSet bs) {
+		QueryBindingSet cleaned = new QueryBindingSet();
+		for (Binding b : bs) {
+			if (!(b.getName().startsWith("__") && b.getName().endsWith("__"))) {
+				cleaned.addBinding(b);
+			}
+		}
+		// canonicalise
+		return (cleaned.size() > 0) ? cleaned : EmptyBindingSet.getInstance();
+	}
 
 	private void initQueryContext(QueryContext qctx) {
 		for (QueryContextInitializer initializer : sail.getQueryContextInitializers()) {
@@ -246,15 +268,55 @@ public class HBaseSailConnection implements SailConnection {
     public CloseableIteration<? extends Resource, SailException> getContextIDs() throws SailException {
 
         //generate an iterator over the identifiers of the contexts available in Halyard.
-        final CloseableIteration<? extends Statement, SailException> scanner = getStatements(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, null, true, HALYARD.STATS_GRAPH_CONTEXT);
-        return new ConvertingIteration<Statement, Resource, SailException>(scanner) {
+		final CloseableIteration<? extends Statement, SailException> scanner = getStatements(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, null, true, HALYARD.STATS_GRAPH_CONTEXT);
+		if (scanner.hasNext()) {
+			return new ConvertingIteration<Statement, Resource, SailException>(scanner) {
 
-			@Override
-			protected Resource convert(Statement stmt) throws SailException {
-				return (IRI) stmt.getObject();
+				@Override
+				protected Resource convert(Statement stmt) throws SailException {
+					return (IRI) stmt.getObject();
+				}
+
+			};
+		} else if (sail.evaluationTimeout > 0) {
+			// try to find them manually if there are no stats and there is a specific timeout
+			Scan scan = HalyardTableUtils.scan(HalyardTableUtils.concat(HalyardTableUtils.CSPO_PREFIX, false),
+					HalyardTableUtils.concat(HalyardTableUtils.CSPO_PREFIX, true, RDFContext.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY));
+			try {
+				ResultScanner rs = table.getScanner(scan);
+				return new TimeLimitIteration<Resource, SailException>(new ReducedIteration<Resource, SailException>(
+						new ConvertingIteration<Statement, Resource, SailException>(new ExceptionConvertingIteration<Statement, SailException>(new AbstractStatementScanner(sail.getValueFactory()) {
+							@Override
+							protected Result nextResult() throws IOException {
+								return rs.next();
+							}
+
+							@Override
+							public void close() throws IOException {
+								rs.close();
+							}
+						}) {
+							@Override
+							protected SailException convert(Exception e) {
+								return new SailException(e);
+							}
+						}) {
+							@Override
+							protected Resource convert(Statement stmt) throws SailException {
+								return stmt.getContext();
+							}
+						}), TimeUnit.SECONDS.toMillis(sail.evaluationTimeout)) {
+							@Override
+					protected void throwInterruptedException() throws SailException {
+						throw new SailException(String.format("Evaluation exceeded specified timeout %ds", sail.evaluationTimeout));
+							}
+				};
+			} catch (IOException ioe) {
+				throw new SailException(ioe);
 			}
-
-		};
+		} else {
+			return new EmptyIteration<>();
+		}
     }
 
     @Override
@@ -295,12 +357,14 @@ public class HBaseSailConnection implements SailConnection {
             }
         }
         // try to count it manually if there are no stats and there is a specific timeout
-        if (size == 0 && sail.evaluationTimeout > 0) try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(null, null, null, true, contexts)) {
-            while (scanner.hasNext()) {
-                scanner.next();
-                size++;
-            }
-        }
+		if (size == 0 && sail.evaluationTimeout > 0) {
+			try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(null, null, null, true, contexts)) {
+				while (scanner.hasNext()) {
+					scanner.next();
+					size++;
+				}
+			}
+		}
         return size;
     }
 
@@ -378,13 +442,19 @@ public class HBaseSailConnection implements SailConnection {
     }
 
     private void checkWritable() {
+		if (table == null)
+			throw new IllegalStateException("Connection is closed");
         if (!sail.isWritable()) throw new SailException(sail.tableName + " is read only");
     }
 
 	protected void addStatementInternal(Resource subj, IRI pred, Value obj, Resource[] contexts, long timestamp) throws SailException {
     	checkWritable();
+		if (contexts == null || contexts.length == 0) {
+			// if all contexts then insert into the default context
+			contexts = new Resource[] { null };
+		}
         try {
-			for (Resource ctx : HBaseTripleSource.normalizeContexts(contexts)) {
+			for (Resource ctx : contexts) {
 				for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, false, timestamp)) { // serialize the key value pairs relating to the statement in HBase
 					put(kv);
 				}
@@ -401,33 +471,39 @@ public class HBaseSailConnection implements SailConnection {
 
     @Override
     public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
-    	checkWritable();
-		contexts = HBaseTripleSource.normalizeContexts(contexts);
-        if (subj == null && pred == null && obj == null && contexts[0] == null) {
-            clearAll();
-        } else {
-            try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
-                while (iter.hasNext()) {
-                    Statement st = iter.next();
-                    removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
-                }
-            }
-        }
+		removeStatements(null, subj, pred, obj, contexts);
     }
+
+	private void removeStatements(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
+		checkWritable();
+		if (subj == null && pred == null && obj == null && (contexts == null || contexts.length == 0)) {
+			clearAll();
+		} else {
+			long timestamp = getTimestamp(op, true);
+			try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
+				while (iter.hasNext()) {
+					Statement st = iter.next();
+					removeStatementInternal(op, st.getSubject(), st.getPredicate(), st.getObject(), new Resource[] { st.getContext() }, timestamp);
+				}
+			}
+		}
+	}
 
     @Override
     public void removeStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
-		// should we be defensive about nulls for subj, pre and obj? removeStatements is
-		// where you would use nulls, not here.
-
-		long timestamp = getTimestamp(op, true);
-		removeStatementInternal(op, subj, pred, obj, contexts, timestamp);
+		if (subj == null || pred == null || obj == null || contexts == null || contexts.length == 0) {
+			removeStatements(op, subj, pred, obj, contexts);
+		} else {
+			long timestamp = getTimestamp(op, true);
+			removeStatementInternal(op, subj, pred, obj, contexts, timestamp);
+		}
     }
 
 	protected void removeStatementInternal(UpdateContext op, Resource subj, IRI pred, Value obj, Resource[] contexts, long timestamp) throws SailException {
+		assert contexts != null && contexts.length > 0;
 		checkWritable();
 		try {
-			for (Resource ctx : HBaseTripleSource.normalizeContexts(contexts)) {
+			for (Resource ctx : contexts) {
 				for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, true, timestamp)) { // calculate the kv's corresponding to the quad (or triple)
 					delete(kv);
 				}

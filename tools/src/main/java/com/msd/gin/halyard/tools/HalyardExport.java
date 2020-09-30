@@ -472,72 +472,70 @@ public final class HalyardExport extends AbstractHalyardTool {
      * @throws ExportException in case of an export problem
      */
     public static void export(Configuration conf, StatusLog log, String source, String query, String targetUrl, String driverClass, String driverClasspath, String[] jdbcProperties, boolean trimTable, String elasticIndexURL) throws ExportException {
-        try {
-            QueryResultWriter writer = null;
-            if (targetUrl.startsWith("null:")) {
-                writer = new NullResultWriter(log);
-            } else if (targetUrl.startsWith("jdbc:")) {
-                int i = targetUrl.lastIndexOf('/');
-                if (i < 0) throw new ExportException("Taret URL does not end with /<table_name>");
-                if (driverClass == null) throw new ExportException("Missing mandatory JDBC driver class name argument -c <driver_class>");
-                URL driverCP[] = null;
-                if (driverClasspath != null) {
-                    String jars[] = driverClasspath.split(":");
-                    driverCP = new URL[jars.length];
-                    for (int j=0; j<jars.length; j++) {
-                        File f = new File(jars[j]);
-                        if (!f.isFile()) throw new ExportException("Invalid JDBC driver classpath element: " + jars[j]);
-                        driverCP[j] = f.toURI().toURL();
-                    }
-                }
-                writer = new JDBCResultWriter(log, targetUrl.substring(0, i), targetUrl.substring(i+1), jdbcProperties, driverClass, driverCP, trimTable);
-            } else {
-                OutputStream out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
-                try {
-                    if (targetUrl.endsWith(".bz2")) {
-                        out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.BZIP2, out);
-                        targetUrl = targetUrl.substring(0, targetUrl.length() - 4);
-                    } else if (targetUrl.endsWith(".gz")) {
-                        out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.GZIP, out);
-                        targetUrl = targetUrl.substring(0, targetUrl.length() - 3);
-                    }
-                } catch (CompressorException e) {
-                    IOUtils.closeQuietly(out);
-                    throw new ExportException(e);
-                }
-                if (targetUrl.endsWith(".csv")) {
-                    writer = new CSVResultWriter(log, out);
-                } else {
-                    Optional<RDFFormat> form = Rio.getWriterFormatForFileName(targetUrl);
-                    if (!form.isPresent()) throw new ExportException("Unsupported target file format extension: " + targetUrl);
-                    writer = new RIOResultWriter(log, form.get(), out);
-                }
-            }
+        try (QueryResultWriter writer = createWriter(conf, log, targetUrl, driverClass, driverClasspath, jdbcProperties, trimTable)) {
+            SailRepository rep = new SailRepository(new HBaseSail(conf, source, false, 0, true, 0, elasticIndexURL, null));
+            rep.init();
             try {
-                SailRepository rep = new SailRepository(new HBaseSail(conf, source, false, 0, true, 0, elasticIndexURL, null));
-                rep.init();
-                try {
-                    writer.initTimer();
-                    log.logStatus("Query execution started");
-                    try(RepositoryConnection conn = rep.getConnection()) {
-	                    Query q = conn.prepareQuery(QueryLanguage.SPARQL, query);
-	                    if (q instanceof TupleQuery) {
-	                        writer.writeTupleQueryResult(((TupleQuery)q).evaluate());
-	                    } else if (q instanceof GraphQuery) {
-	                        writer.writeGraphQueryResult(((GraphQuery)q).evaluate());
-	                    } else {
-	                        throw new ExportException("Only SPARQL Tuple and Graph query types are supported.");
-	                    }
-	                    log.logStatus("Export finished");
+                writer.initTimer();
+                log.logStatus("Query execution started");
+                try(RepositoryConnection conn = rep.getConnection()) {
+                    Query q = conn.prepareQuery(QueryLanguage.SPARQL, query);
+                    if (q instanceof TupleQuery) {
+                        writer.writeTupleQueryResult(((TupleQuery)q).evaluate());
+                    } else if (q instanceof GraphQuery) {
+                        writer.writeGraphQueryResult(((GraphQuery)q).evaluate());
+                    } else {
+                        throw new ExportException("Only SPARQL Tuple and Graph query types are supported.");
                     }
-                } finally {
-                    rep.shutDown();
+                    log.logStatus("Export finished");
                 }
             } finally {
-                writer.close();
+                rep.shutDown();
             }
         } catch (RepositoryException | MalformedQueryException | QueryEvaluationException | IOException e) {
             throw new ExportException(e);
+        }
+    }
+
+    private static QueryResultWriter createWriter(Configuration conf, StatusLog log, String targetUrl, String driverClass, String driverClasspath, String[] jdbcProperties, boolean trimTable) throws IOException, ExportException {
+        if (targetUrl.startsWith("null:")) {
+            return new NullResultWriter(log);
+        } else if (targetUrl.startsWith("jdbc:")) {
+            int i = targetUrl.lastIndexOf('/');
+            if (i < 0) throw new ExportException("Taret URL does not end with /<table_name>");
+            if (driverClass == null) throw new ExportException("Missing mandatory JDBC driver class name argument -c <driver_class>");
+            URL driverCP[] = null;
+            if (driverClasspath != null) {
+                String jars[] = driverClasspath.split(":");
+                driverCP = new URL[jars.length];
+                for (int j=0; j<jars.length; j++) {
+                    File f = new File(jars[j]);
+                    if (!f.isFile()) throw new ExportException("Invalid JDBC driver classpath element: " + jars[j]);
+                    driverCP[j] = f.toURI().toURL();
+                }
+            }
+            return new JDBCResultWriter(log, targetUrl.substring(0, i), targetUrl.substring(i+1), jdbcProperties, driverClass, driverCP, trimTable);
+        } else {
+            OutputStream out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
+            try {
+                if (targetUrl.endsWith(".bz2")) {
+                    out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.BZIP2, out);
+                    targetUrl = targetUrl.substring(0, targetUrl.length() - 4);
+                } else if (targetUrl.endsWith(".gz")) {
+                    out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.GZIP, out);
+                    targetUrl = targetUrl.substring(0, targetUrl.length() - 3);
+                }
+            } catch (CompressorException e) {
+                IOUtils.closeQuietly(out);
+                throw new ExportException(e);
+            }
+            if (targetUrl.endsWith(".csv")) {
+                return new CSVResultWriter(log, out);
+            } else {
+                Optional<RDFFormat> form = Rio.getWriterFormatForFileName(targetUrl);
+                if (!form.isPresent()) throw new ExportException("Unsupported target file format extension: " + targetUrl);
+                return new RIOResultWriter(log, form.get(), out);
+            }
         }
     }
 

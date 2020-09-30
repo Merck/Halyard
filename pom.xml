@@ -22,11 +22,12 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <rdf4j.version>3.0.3</rdf4j.version>
-        <hbase.version>2.1.6</hbase.version>
-        <hadoop.version>3.0.3</hadoop.version>
+        <rdf4j.version>3.4.2</rdf4j.version>
+        <hbase.version>2.3.2</hbase.version>
+        <hadoop.version>3.2.1</hadoop.version>
         <jersey.version>2.25.1</jersey.version>
-        <elasticsearch.version>7.3.2</elasticsearch.version>
+        <jetty.version>9.3.27.v20190418</jetty.version>
+        <elasticsearch.version>7.9.2</elasticsearch.version>
     </properties>
     <modules>
         <module>common</module>
@@ -40,15 +41,15 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>findbugs-maven-plugin</artifactId>
-                <version>3.0.4</version>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.0.4</version>
                 <executions>
                     <execution>
-                        <id>findbugs-on-package</id>
+                        <id>spotbugs-on-package</id>
                         <phase>package</phase>
                         <goals>
-                            <goal>findbugs</goal>
+                            <goal>spotbugs</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -60,7 +61,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.18.1</version>
+                <version>3.0.0-M5</version>
                 <configuration>
                     <workingDirectory>${project.build.directory}</workingDirectory>
                     <systemPropertyVariables>
@@ -72,7 +73,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>2.6</version>
+                <version>3.2.0</version>
                 <configuration>
                     <archive>
                         <manifest>
@@ -84,7 +85,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.4</version>
+                <version>0.8.6</version>
                 <configuration>
                     <includes>
                         <include>com/msd/gin/halyard/**</include>
@@ -125,7 +126,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.0.1</version>
+                <version>3.2.1</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -138,7 +139,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.10.4</version>
+                <version>3.2.0</version>
                 <configuration>
                     <encoding>UTF-8</encoding>
                     <aggregate>true</aggregate>
@@ -155,7 +156,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.3.2</version>
+                <version>3.8.1</version>
                 <configuration>
                     <showDeprecation>true</showDeprecation>
                 </configuration>
@@ -166,7 +167,7 @@
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>license-maven-plugin</artifactId>
-                    <version>1.10</version>
+                    <version>2.0.0</version>
                     <configuration>
                         <includeTransitiveDependencies>true</includeTransitiveDependencies>
                         <acceptPomPackaging>true</acceptPomPackaging>
@@ -179,6 +180,11 @@
     <dependencyManagement>
     	<dependencies>
 	        <dependency>
+	            <groupId>commons-codec</groupId>
+	            <artifactId>commons-codec</artifactId>
+	            <version>1.11</version>
+	        </dependency>
+	        <dependency>
 	            <groupId>org.apache.hadoop</groupId>
 	            <artifactId>hadoop-annotations</artifactId>
 	            <version>${hadoop.version}</version>
@@ -186,6 +192,11 @@
 	        <dependency>
 	            <groupId>org.apache.hadoop</groupId>
 	            <artifactId>hadoop-auth</artifactId>
+	            <version>${hadoop.version}</version>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.apache.hadoop</groupId>
+	            <artifactId>hadoop-client</artifactId>
 	            <version>${hadoop.version}</version>
 	        </dependency>
 	        <dependency>
@@ -198,12 +209,6 @@
 	            <artifactId>hadoop-common</artifactId>
 	            <version>${hadoop.version}</version>
 	            <classifier>tests</classifier>
-	            <exclusions>
-	            	<exclusion>
-	            		<groupId>com.google.guava</groupId>
-	            		<artifactId>guava</artifactId>
-	            	</exclusion>
-	            </exclusions>
 	        </dependency>
 	        <dependency>
 	            <groupId>org.apache.hadoop</groupId>
@@ -224,83 +229,55 @@
 	            <groupId>org.apache.hadoop</groupId>
 	            <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
 	            <version>${hadoop.version}</version>
-	            <exclusions>
-	            	<exclusion>
-	            		<groupId>com.google.guava</groupId>
-	            		<artifactId>guava</artifactId>
-	            	</exclusion>
-	            </exclusions>
 	        </dependency>
 	        <dependency>
 	            <groupId>org.apache.hadoop</groupId>
 	            <artifactId>hadoop-yarn-server-tests</artifactId>
 	            <version>${hadoop.version}</version>
 	            <classifier>tests</classifier>
-	            <exclusions>
-	            	<exclusion>
-	            		<groupId>com.google.guava</groupId>
-	            		<artifactId>guava</artifactId>
-	            	</exclusion>
-	            </exclusions>
 	        </dependency>
 	        <dependency>
 	            <groupId>org.apache.hbase</groupId>
 	            <artifactId>hbase-http</artifactId>
 	            <version>${hbase.version}</version>
-	            <exclusions>
-		            <exclusion>
-			            <groupId>org.glassfish.jersey.core</groupId>
-			            <artifactId>jersey-server</artifactId>
-		            </exclusion>
-		            <exclusion>
-			            <groupId>org.glassfish.jersey.containers</groupId>
-			            <artifactId>jersey-container-servlet-core</artifactId>
-		            </exclusion>
-		            <exclusion>
-			            <groupId>org.eclipse.jetty</groupId>
-			            <artifactId>jetty-http</artifactId>
-		            </exclusion>
-		            <exclusion>
-			            <groupId>org.eclipse.jetty</groupId>
-			            <artifactId>jetty-security</artifactId>
-		            </exclusion>
-		            <exclusion>
-			            <groupId>org.eclipse.jetty</groupId>
-			            <artifactId>jetty-server</artifactId>
-		            </exclusion>
-		            <exclusion>
-			            <groupId>org.eclipse.jetty</groupId>
-			            <artifactId>jetty-servlet</artifactId>
-		            </exclusion>
-		            <exclusion>
-			            <groupId>org.eclipse.jetty</groupId>
-			            <artifactId>jetty-webapp</artifactId>
-		            </exclusion>
-	            </exclusions>
 	        </dependency>
 	        <dependency>
 	            <groupId>org.apache.hbase</groupId>
 	            <artifactId>hbase-server</artifactId>
 	            <version>${hbase.version}</version>
-	            <exclusions>
-	            	<exclusion>
-	            		<groupId>com.google.guava</groupId>
-	            		<artifactId>guava</artifactId>
-	            	</exclusion>
-		            <exclusion>
-			            <groupId>org.eclipse.jetty</groupId>
-			            <artifactId>jetty-server</artifactId>
-		            </exclusion>
-		            <exclusion>
-			            <groupId>org.eclipse.jetty</groupId>
-			            <artifactId>jetty-servlet</artifactId>
-		            </exclusion>
-		            <exclusion>
-			            <groupId>org.eclipse.jetty</groupId>
-			            <artifactId>jetty-webapp</artifactId>
-		            </exclusion>
-	            </exclusions>
 	        </dependency>
+	        <dependency>
+	            <groupId>org.eclipse.jetty</groupId>
+	            <artifactId>jetty-http</artifactId>
+	            <version>${jetty.version}</version>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.eclipse.jetty</groupId>
+	            <artifactId>jetty-security</artifactId>
+	            <version>${jetty.version}</version>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.eclipse.jetty</groupId>
+	            <artifactId>jetty-server</artifactId>
+	            <version>${jetty.version}</version>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.eclipse.jetty</groupId>
+	            <artifactId>jetty-servlet</artifactId>
+	            <version>${jetty.version}</version>
+	        </dependency>
+	        <dependency>
+	            <groupId>org.eclipse.jetty</groupId>
+	            <artifactId>jetty-webapp</artifactId>
+	            <version>${jetty.version}</version>
+	        </dependency>
+
+			<dependency>
+				<groupId>org.kohsuke.metainf-services</groupId>
+				<artifactId>metainf-services</artifactId>
+				<version>1.8</version>
+				<optional>true</optional>
+			</dependency>
     	</dependencies>
     </dependencyManagement>
     <profiles>

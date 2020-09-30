@@ -31,6 +31,7 @@ import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.sail.SailConnection;
+import org.junit.Rule;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -39,6 +40,8 @@ import static org.junit.Assert.*;
  * @author Adam Sotona (MSD)
  */
 public class HalyardBulkLoadTest {
+	@Rule
+	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
 
     @Test
     public void testBulkLoad() throws Exception {

@@ -46,6 +46,8 @@ public class HalyardExportJDBCTypesTest {
 
     @Rule
     public TestName name = new TestName();
+	@Rule
+	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
 
     @BeforeClass
     public static void setup() throws Exception {

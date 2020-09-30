@@ -25,6 +25,7 @@ import org.apache.commons.cli.MissingOptionException;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.util.ToolRunner;
+import org.junit.Rule;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
@@ -33,6 +34,8 @@ import static org.junit.Assert.assertEquals;
  * @author Adam Sotona (MSD)
  */
 public class HalyardPreSplitTest {
+	@Rule
+	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
 
     @Test
     public void testPreSplit() throws Exception {

@@ -37,10 +37,11 @@ import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.sail.SailConnection;
+import org.junit.Rule;
 import org.junit.Test;
 import static org.junit.Assert.*;
 /**
@@ -48,8 +49,10 @@ import static org.junit.Assert.*;
  * @author Adam Sotona (MSD)
  */
 public class HalyardSummaryTest {
+	@Rule
+	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
 
-    private IRI[] generateIRIs(int num, String prefix) {
+	private IRI[] generateIRIs(int num, String prefix) {
         SimpleValueFactory svf = SimpleValueFactory.getInstance();
         IRI iris[] = new IRI[num];
         for (int i = 0; i < num; i++) {
@@ -62,7 +65,7 @@ public class HalyardSummaryTest {
     public void testSummary() throws Exception {
         IRI classes[] = generateIRIs(4, "http://whatever/class#");
         IRI predicates[] = generateIRIs(4, "http://whatever/predicate#");
-        IRI literalTypes[] = new IRI[]{XMLSchema.INT, XMLSchema.STRING, XMLSchema.DOUBLE};
+        IRI literalTypes[] = new IRI[]{XSD.INT, XSD.STRING, XSD.DOUBLE};
         IRI instances[] = generateIRIs(50, "http://whatever/instance#");
         Literal literals[] = new Literal[10];
         SimpleValueFactory svf = SimpleValueFactory.getInstance();

@@ -40,6 +40,7 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.json.JSONObject;
+import org.junit.Rule;
 import org.junit.Test;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
@@ -58,6 +59,9 @@ public class HalyardElasticIndexerTest {
 	private static final String NODE_ID = UUID.randomUUID().toString();
 	private static final String INDEX_NAME = "my_index";
 	private static final String INDEX_PATH = "/"+INDEX_NAME;
+
+	@Rule
+	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
 
 	@Test
     public void testElasticIndexer() throws Exception {

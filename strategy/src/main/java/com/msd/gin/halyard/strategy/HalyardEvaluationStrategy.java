@@ -97,20 +97,20 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 	public HalyardEvaluationStrategy(TripleSource tripleSource, QueryContext queryContext,
 			TupleFunctionRegistry tupleFunctionRegistry,
 			FunctionRegistry functionRegistry, Dataset dataset, FederatedServiceResolver serviceResolver,
-			HalyardEvaluationStatistics statistics, long timeout) {
+			HalyardEvaluationStatistics statistics) {
 		this.dataset = dataset;
         this.serviceResolver = serviceResolver;
 		this.tupleEval = new HalyardTupleExprEvaluation(this, queryContext, tupleFunctionRegistry, tripleSource,
-				dataset, timeout);
-		this.valueEval = new HalyardValueExprEvaluation(this, functionRegistry, tripleSource.getValueFactory());
+				dataset);
+		this.valueEval = new HalyardValueExprEvaluation(this, functionRegistry, tripleSource);
 		this.pipeline = new HalyardQueryOptimizerPipeline(this, tripleSource.getValueFactory(), statistics);
         EvaluationStrategies.register(this);
     }
 
 	public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset,
-			FederatedServiceResolver serviceResolver, HalyardEvaluationStatistics statistics, long timeout) {
+			FederatedServiceResolver serviceResolver, HalyardEvaluationStatistics statistics) {
 		this(tripleSource, new QueryContext(), TupleFunctionRegistry.getInstance(), FunctionRegistry.getInstance(),
-				dataset, serviceResolver, statistics, timeout);
+				dataset, serviceResolver, statistics);
 	}
 
     /**

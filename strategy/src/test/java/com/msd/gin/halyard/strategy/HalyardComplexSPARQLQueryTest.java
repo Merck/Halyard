@@ -19,8 +19,6 @@ package com.msd.gin.halyard.strategy;
 import org.eclipse.rdf4j.query.parser.sparql.ComplexSPARQLQueryTest;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-import org.junit.Ignore;
-import org.junit.Test;
 
 /**
  *
@@ -31,45 +29,5 @@ public class HalyardComplexSPARQLQueryTest extends ComplexSPARQLQueryTest {
     @Override
     protected Repository newRepository() throws Exception {
         return new SailRepository(new MemoryStoreWithHalyardStrategy());
-    }
-
-//    @Rule
-//    public SingleTestRule test = new SingleTestRule();
-//
-//    public class SingleTestRule implements MethodRule {
-//
-//        @Override
-//        public Statement apply(final Statement statement, final FrameworkMethod method, final Object target) {
-//            return new Statement() {
-//                @Override
-//                public void evaluate() throws Throwable {
-//                    if ("test27NormalizeIRIFunction".equals(method.getName())) {
-//                        statement.evaluate();
-//                    }
-//                }
-//            };
-//        }
-//    }
-
-    @Override
-    @Test
-    @Ignore
-    //skip invalid test
-    public void testEmptyUnion() throws Exception {
-        super.testEmptyUnion();
-    }
-
-    @Override
-    @Test
-    @Ignore
-    public void testBindScope() throws Exception {
-        super.testBindScope();
-    }
-
-    @Override
-    @Test
-    @Ignore
-    public void testBindScopeUnion() {
-        super.testBindScopeUnion();
     }
 }

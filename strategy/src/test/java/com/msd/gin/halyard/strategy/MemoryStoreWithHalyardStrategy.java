@@ -61,7 +61,7 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
                                 } catch (InterruptedException ex) {
                                     //ignore
                                 }
-                                return super.hasNext(); //To change body of generated methods, choose Tools | Templates.
+                                return super.hasNext();
                             }
 
                             @Override
@@ -75,7 +75,7 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
                     public ValueFactory getValueFactory() {
                         return tripleSource.getValueFactory();
                     }
-                }, dataset, null, new HalyardEvaluationStatistics(null, null), -1);
+                }, dataset, null, new HalyardEvaluationStatistics(null, null));
                 es.setOptimizerPipeline(new StandardQueryOptimizerPipeline(es, tripleSource, new EvaluationStatistics()));
                 return es;
             }

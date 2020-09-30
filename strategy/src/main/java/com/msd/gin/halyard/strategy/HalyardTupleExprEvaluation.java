@@ -35,7 +35,6 @@ import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -52,11 +51,13 @@ import org.eclipse.rdf4j.common.iteration.CloseableIteratorIteration;
 import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
+import org.eclipse.rdf4j.common.iteration.SilentIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.vocabulary.RDF4J;
 import org.eclipse.rdf4j.model.vocabulary.SESAME;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -120,15 +121,19 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.TupleFunctionEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.DescribeIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.GroupIterator;
+import org.eclipse.rdf4j.query.algebra.evaluation.iterator.HashJoinIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.PathIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ProjectionIterator;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
-import org.eclipse.rdf4j.query.algebra.evaluation.iterator.SilentIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ZeroLengthPathIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
+import org.eclipse.rdf4j.query.algebra.helpers.TupleExprs;
 import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
+import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
+
+import net.sf.saxon.expr.flwor.TupleExpression;
 
 /**
  * Evaluates {@link TupleExpression}s and it's sub-interfaces and implementations.
@@ -141,8 +146,6 @@ final class HalyardTupleExprEvaluation {
 	private final TripleSource tripleSource;
 	private final QueryContext queryContext;
     private final Dataset dataset;
-    private final long startTime;
-    private final long timeoutSecs;
 
     /**
 	 * Constructor used by {@link HalyardEvaluationStrategy} to create this helper class
@@ -155,14 +158,12 @@ final class HalyardTupleExprEvaluation {
 	 * @param timeoutSecs seconds
 	 */
 	HalyardTupleExprEvaluation(HalyardEvaluationStrategy parentStrategy, QueryContext queryContext,
-			TupleFunctionRegistry tupleFunctionRegistry, TripleSource tripleSource, Dataset dataset, long timeoutSecs) {
+			TupleFunctionRegistry tupleFunctionRegistry, TripleSource tripleSource, Dataset dataset) {
         this.parentStrategy = parentStrategy;
 		this.queryContext = queryContext;
 		this.tupleFunctionRegistry = tupleFunctionRegistry;
 		this.tripleSource = tripleSource;
 		this.dataset = dataset;
-		this.startTime = System.currentTimeMillis();
-		this.timeoutSecs = timeoutSecs;
     }
 
     /**
@@ -172,7 +173,7 @@ final class HalyardTupleExprEvaluation {
      * @return an iterator on the binding set pipe
      */
     CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) {
-    	return HalyardEvaluationExecutor.consumeAndQueue(pipe -> evaluateTupleExpr(pipe, expr, bindings), expr, startTime, timeoutSecs);
+    	return HalyardEvaluationExecutor.consumeAndQueue(pipe -> evaluateTupleExpr(pipe, expr, bindings), expr);
     }
 
     /**
@@ -238,11 +239,8 @@ final class HalyardTupleExprEvaluation {
                 return;
             }
             try {
-                Resource[] contexts;
-
-                Set<IRI> graphs = null;
-                boolean emptyGraph = false;
-
+                final Set<IRI> graphs;
+                final boolean emptyGraph;
                 if (dataset != null) {
                     if (sp.getScope() == StatementPattern.Scope.DEFAULT_CONTEXTS) { //evaluate against the default graph(s)
                         graphs = dataset.getDefaultGraphs();
@@ -251,8 +249,12 @@ final class HalyardTupleExprEvaluation {
                         graphs = dataset.getNamedGraphs();
                         emptyGraph = graphs.isEmpty() && !dataset.getDefaultGraphs().isEmpty();
                     }
+                } else {
+                	graphs = null;
+                	emptyGraph = false;
                 }
 
+                final Resource[] contexts;
                 if (emptyGraph) {
                     // Search zero contexts
                     parent.close(); //no results from this statement pattern
@@ -260,14 +262,20 @@ final class HalyardTupleExprEvaluation {
                 } else if (graphs == null || graphs.isEmpty()) {
                     // store default behaivour
                     if (contextValue != null) {
-                        contexts = new Resource[]{(Resource) contextValue};
-                    } /* TODO activate this to have an exclusive (rather than inclusive) interpretation of the default graph in SPARQL querying.
-                     else if (sp.getScope() == Scope.DEFAULT_CONTEXTS ) {
-                     contexts = new Resource[] { (Resource)null };
-                     }
-                     */ else {
-                        contexts = new Resource[0];
+						if (RDF4J.NIL.equals(contextValue) || SESAME.NIL.equals(contextValue)) {
+							contexts = new Resource[] { (Resource) null };
+						} else {
+							contexts = new Resource[] { (Resource) contextValue };
+						}
                     }
+					/*
+					 * TODO activate this to have an exclusive (rather than inclusive) interpretation of the default
+					 * graph in SPARQL querying. else if (statementPattern.getScope() == Scope.DEFAULT_CONTEXTS ) {
+					 * contexts = new Resource[] { (Resource)null }; }
+					 */
+					else {
+						contexts = new Resource[0];
+					}
                 } else if (contextValue != null) {
                     if (graphs.contains(contextValue)) {
                         contexts = new Resource[]{(Resource) contextValue};
@@ -281,9 +289,11 @@ final class HalyardTupleExprEvaluation {
                     contexts = new Resource[graphs.size()];
                     int i = 0;
                     for (IRI graph : graphs) {
-                        IRI context = null;
-                        if (!SESAME.NIL.equals(graph)) {
-                            context = graph;
+                        IRI context;
+						if (RDF4J.NIL.equals(graph) || SESAME.NIL.equals(graph)) {
+                            context = null;
+                        } else {
+                        	context = graph;
                         }
                         contexts[i++] = context;
                     }
@@ -335,15 +345,6 @@ final class HalyardTupleExprEvaluation {
                         	return (st instanceof Timestamped) ? ((Timestamped)st).getTimestamp() : null;
                         }
                     };
-                } else if (graphs != null && graphs.contains(SESAME.NIL)) {
-                    // usage of SESAME.NIL triggers query over all graphs, which must be filtered here
-                    final Set<Resource> ctxSet = new HashSet<>(Arrays.asList(contexts));
-                    stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
-                        @Override
-                        protected boolean accept(Statement st) {
-                            return ctxSet.contains(st.getContext());
-                        }
-                    };                	
                 }
             } catch (ClassCastException e) {
                 // Invalid value type for subject, predicate and/or context
@@ -508,7 +509,7 @@ final class HalyardTupleExprEvaluation {
         }
         final boolean includeAll = !outer;
         BindingSet pushDownBindings;
-        if (projection.isSubquery()) {
+        if (projection.isSubquery() && bindings.size() > 0) {
             pushDownBindings = new QueryBindingSet();
             for (ProjectionElem pe : projection.getProjectionElemList().getElements()) {
                     Value targetValue = bindings.getValue(pe.getSourceName());
@@ -1060,6 +1061,16 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
+    	if (isOutOfScopeForLeftArgBindings(join.getRightArg())) {
+            //re-writing this to push model is a bit more complex task
+            try {
+    			pullAndPushAsync(topPipe, new HashJoinIteration(parentStrategy, join, bindings), join);
+            } catch (QueryEvaluationException e) {
+            	topPipe.handleException(e);
+            }
+            return;
+    	}
+
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
         	final AtomicLong joinsInProgress = new AtomicLong();
         	final AtomicBoolean joinsFinished = new AtomicBoolean();
@@ -1096,6 +1107,10 @@ final class HalyardTupleExprEvaluation {
         }, join.getLeftArg(), bindings);
     }
 
+    private boolean isOutOfScopeForLeftArgBindings(TupleExpr expr) {
+		return (TupleExprs.isVariableScopeChange(expr) || TupleExprs.containsSubquery(expr));
+	}
+
     /**
      * Evaluate {@link LeftJoin} query model nodes
      * @param parentPipe
@@ -1103,7 +1118,17 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateLeftJoin(BindingSetPipe parentPipe, final LeftJoin leftJoin, final BindingSet bindings) {
-        // Check whether optional join is "well designed" as defined in section
+    	if (TupleExprs.containsSubquery(leftJoin.getRightArg())) {
+            //re-writing this to push model is a bit more complex task
+            try {
+    			pullAndPushAsync(parentPipe, new HashJoinIteration(parentStrategy, leftJoin, bindings), leftJoin);
+            } catch (QueryEvaluationException e) {
+            	parentPipe.handleException(e);
+            }
+            return;
+    	}
+
+    	// Check whether optional join is "well designed" as defined in section
         // 4.2 of "Semantics and Complexity of SPARQL", 2006, Jorge Pérez et al.
         VarNameCollector optionalVarCollector = new VarNameCollector();
         leftJoin.getRightArg().visit(optionalVarCollector);
@@ -1206,9 +1231,9 @@ final class HalyardTupleExprEvaluation {
     }
 
     private static QueryBindingSet getFilteredBindings(BindingSet bindings, Set<String> problemVars) {
-            QueryBindingSet filteredBindings = new QueryBindingSet(bindings);
-            filteredBindings.removeAll(problemVars);
-            return filteredBindings;
+        QueryBindingSet filteredBindings = new QueryBindingSet(bindings);
+        filteredBindings.removeAll(problemVars);
+        return filteredBindings;
     }
 
     /**

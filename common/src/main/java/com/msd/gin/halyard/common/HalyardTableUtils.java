@@ -88,7 +88,7 @@ import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.RDFS;
 import org.eclipse.rdf4j.model.vocabulary.SD;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -265,7 +265,7 @@ public final class HalyardTableUtils {
 	}
 
 	static {
-		Class<?>[] defaultVocabs = { RDF.class, RDFS.class, XMLSchema.class, SD.class, VOID.class, FOAF.class,
+		Class<?>[] defaultVocabs = { RDF.class, RDFS.class, XSD.class, SD.class, VOID.class, FOAF.class,
 				OWL.class, DC.class, DCTERMS.class, ORG.class, GEO.class };
 		for(Class<?> vocab : defaultVocabs) {
 			loadNamespacesAndIRIs(vocab);
@@ -320,7 +320,7 @@ public final class HalyardTableUtils {
 	private static final byte DATETIME_TYPE = 'T';
 
 	static {
-		BYTE_WRITERS.put(XMLSchema.BOOLEAN, new ByteWriter() {
+		BYTE_WRITERS.put(XSD.BOOLEAN, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				return new byte[] { l.booleanValue() ? TRUE_TYPE : FALSE_TYPE };
@@ -339,7 +339,7 @@ public final class HalyardTableUtils {
 			}
 		});
 
-		BYTE_WRITERS.put(XMLSchema.BYTE, new ByteWriter() {
+		BYTE_WRITERS.put(XSD.BYTE, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				return new byte[] { BYTE_TYPE, l.byteValue() };
@@ -352,7 +352,7 @@ public final class HalyardTableUtils {
 			}
 		});
 
-		BYTE_WRITERS.put(XMLSchema.SHORT, new ByteWriter() {
+		BYTE_WRITERS.put(XSD.SHORT, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				byte[] b = new byte[3];
@@ -367,7 +367,7 @@ public final class HalyardTableUtils {
 			}
 		});
 
-		BYTE_WRITERS.put(XMLSchema.INT, new ByteWriter() {
+		BYTE_WRITERS.put(XSD.INT, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				byte[] b = new byte[5];
@@ -382,7 +382,7 @@ public final class HalyardTableUtils {
 			}
 		});
 
-		BYTE_WRITERS.put(XMLSchema.LONG, new ByteWriter() {
+		BYTE_WRITERS.put(XSD.LONG, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				byte[] b = new byte[9];
@@ -397,7 +397,7 @@ public final class HalyardTableUtils {
 			}
 		});
 
-		BYTE_WRITERS.put(XMLSchema.FLOAT, new ByteWriter() {
+		BYTE_WRITERS.put(XSD.FLOAT, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				byte[] b = new byte[5];
@@ -412,7 +412,7 @@ public final class HalyardTableUtils {
 			}
 		});
 
-		BYTE_WRITERS.put(XMLSchema.DOUBLE, new ByteWriter() {
+		BYTE_WRITERS.put(XSD.DOUBLE, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				byte[] b = new byte[9];
@@ -427,7 +427,7 @@ public final class HalyardTableUtils {
 			}
 		});
 
-		BYTE_WRITERS.put(XMLSchema.STRING, new ByteWriter() {
+		BYTE_WRITERS.put(XSD.STRING, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				return new StringBuilder().append((char)STRING_TYPE).append(l.getLabel()).toString().getBytes(StandardCharsets.UTF_8);
@@ -440,7 +440,7 @@ public final class HalyardTableUtils {
 			}
 		});
 
-		BYTE_WRITERS.put(XMLSchema.TIME, new ByteWriter() {
+		BYTE_WRITERS.put(XSD.TIME, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				return calendarTypeToBytes(TIME_TYPE, l.calendarValue());
@@ -465,7 +465,7 @@ public final class HalyardTableUtils {
 			}
 		});
 
-		BYTE_WRITERS.put(XMLSchema.DATE, new ByteWriter() {
+		BYTE_WRITERS.put(XSD.DATE, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				return calendarTypeToBytes(DATE_TYPE, l.calendarValue());
@@ -488,7 +488,7 @@ public final class HalyardTableUtils {
 			}
 		});
 
-		BYTE_WRITERS.put(XMLSchema.DATETIME, new ByteWriter() {
+		BYTE_WRITERS.put(XSD.DATETIME, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
 				return calendarTypeToBytes(DATETIME_TYPE, l.calendarValue());

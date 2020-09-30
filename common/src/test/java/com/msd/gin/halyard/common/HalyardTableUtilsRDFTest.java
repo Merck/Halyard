@@ -14,7 +14,7 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -33,8 +33,8 @@ public class HalyardTableUtilsRDFTest {
 				{ vf.createLiteral(74234l) }, { vf.createLiteral(4.809f) },
 				{ vf.createLiteral(BigInteger.valueOf(96)) }, { vf.createLiteral(BigDecimal.valueOf(856.03)) },
 				{ vf.createIRI(RDF.NAMESPACE) }, { vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)) },
-				{ vf.createLiteral(new Date()) }, { vf.createLiteral("13:03:22.000", XMLSchema.TIME) },
-				{ vf.createLiteral("1980-02-14", XMLSchema.DATE)},
+				{ vf.createLiteral(new Date()) }, { vf.createLiteral("13:03:22.000", XSD.TIME) },
+				{ vf.createLiteral("1980-02-14", XSD.DATE)},
 				{ vf.createLiteral("foo", vf.createIRI("urn:bar:1"))}, { vf.createLiteral("foo", "en-gb") }});
 	}
 

@@ -26,6 +26,7 @@ import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
+import org.junit.Rule;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -34,6 +35,8 @@ import static org.junit.Assert.*;
  * @author Adam Sotona (MSD)
  */
 public class HalyardBulkExportTest {
+	@Rule
+	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
 
     @Test
     public void testBulkExport() throws Exception {

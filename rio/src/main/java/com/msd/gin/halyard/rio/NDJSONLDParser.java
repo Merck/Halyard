@@ -24,6 +24,7 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
@@ -52,7 +53,7 @@ public class NDJSONLDParser extends JSONLDParser {
 
     public static final RDFFormat NDJSONLD = new RDFFormat("ND-JSON-LD", Arrays.asList("application/x-nd-json-ld"),
         StandardCharsets.UTF_8, Arrays.asList("ndjsonld"),
-        RDFFormat.SUPPORTS_NAMESPACES, RDFFormat.SUPPORTS_CONTEXTS);
+        RDFFormat.SUPPORTS_NAMESPACES, RDFFormat.SUPPORTS_CONTEXTS, RDFFormat.NO_RDF_STAR);
 
     @Override
     public RDFFormat getRDFFormat() {

@@ -20,7 +20,7 @@ import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.util.Literals;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
@@ -104,11 +104,11 @@ public class DynamicFunctionRegistry extends FunctionRegistry {
 		private final Map<Integer, XPathFunction> arityMap;
 
 		static {
-			LITERAL_CONVERTERS.put(XMLSchema.STRING, Literal::getLabel);
-			LITERAL_CONVERTERS.put(XMLSchema.FLOAT, Literal::floatValue);
-			LITERAL_CONVERTERS.put(XMLSchema.DOUBLE, Literal::doubleValue);
-			LITERAL_CONVERTERS.put(XMLSchema.DECIMAL, Literal::decimalValue);
-			LITERAL_CONVERTERS.put(XMLSchema.INTEGER, l -> {
+			LITERAL_CONVERTERS.put(XSD.STRING, Literal::getLabel);
+			LITERAL_CONVERTERS.put(XSD.FLOAT, Literal::floatValue);
+			LITERAL_CONVERTERS.put(XSD.DOUBLE, Literal::doubleValue);
+			LITERAL_CONVERTERS.put(XSD.DECIMAL, Literal::decimalValue);
+			LITERAL_CONVERTERS.put(XSD.INTEGER, l -> {
 				BigInteger v = l.integerValue();
 				if (v.compareTo(BigIntegerValue.MIN_LONG) < 0 || v.compareTo(BigIntegerValue.MAX_LONG) > 0) {
 					return v;
@@ -121,14 +121,14 @@ public class DynamicFunctionRegistry extends FunctionRegistry {
 					}
 				}
 			});
-			LITERAL_CONVERTERS.put(XMLSchema.INT, Literal::intValue);
-			LITERAL_CONVERTERS.put(XMLSchema.SHORT, Literal::shortValue);
-			LITERAL_CONVERTERS.put(XMLSchema.BYTE, Literal::byteValue);
-			LITERAL_CONVERTERS.put(XMLSchema.DATETIME, l -> l.calendarValue().toGregorianCalendar().getTime());
-			LITERAL_CONVERTERS.put(XMLSchema.BOOLEAN, Literal::booleanValue);
-			LITERAL_CONVERTERS.put(XMLSchema.DAYTIMEDURATION, l -> Duration.parse(l.getLabel()));
-			LITERAL_CONVERTERS.put(XMLSchema.YEARMONTHDURATION, l -> Period.parse(l.getLabel()));
-			LITERAL_CONVERTERS.put(XMLSchema.DURATION, l -> DurationValue.makeDuration(l.getLabel()));
+			LITERAL_CONVERTERS.put(XSD.INT, Literal::intValue);
+			LITERAL_CONVERTERS.put(XSD.SHORT, Literal::shortValue);
+			LITERAL_CONVERTERS.put(XSD.BYTE, Literal::byteValue);
+			LITERAL_CONVERTERS.put(XSD.DATETIME, l -> l.calendarValue().toGregorianCalendar().getTime());
+			LITERAL_CONVERTERS.put(XSD.BOOLEAN, Literal::booleanValue);
+			LITERAL_CONVERTERS.put(XSD.DAYTIMEDURATION, l -> Duration.parse(l.getLabel()));
+			LITERAL_CONVERTERS.put(XSD.YEARMONTHDURATION, l -> Period.parse(l.getLabel()));
+			LITERAL_CONVERTERS.put(XSD.DURATION, l -> DurationValue.makeDuration(l.getLabel()));
 		}
 
 		XPathSparqlFunction(String name, Map<Integer, XPathFunction> arityMap) {

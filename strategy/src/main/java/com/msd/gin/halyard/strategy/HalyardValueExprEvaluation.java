@@ -32,7 +32,7 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.datatypes.XMLDatatypeUtil;
 import org.eclipse.rdf4j.model.impl.BooleanLiteral;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.And;
@@ -69,6 +69,7 @@ import org.eclipse.rdf4j.query.algebra.Str;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
+import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
@@ -85,13 +86,15 @@ class HalyardValueExprEvaluation {
 
     private final HalyardEvaluationStrategy parentStrategy;
 	private final FunctionRegistry functionRegistry;
+    private final TripleSource tripleSource;
     private final ValueFactory valueFactory;
 
 	HalyardValueExprEvaluation(HalyardEvaluationStrategy parentStrategy, FunctionRegistry functionRegistry,
-			ValueFactory valueFactory) {
+			TripleSource tripleSource) {
         this.parentStrategy = parentStrategy;
 		this.functionRegistry = functionRegistry;
-        this.valueFactory = valueFactory;
+        this.tripleSource = tripleSource;
+        this.valueFactory = tripleSource.getValueFactory();
     }
 
     /**
@@ -350,7 +353,7 @@ class HalyardValueExprEvaluation {
                 return RDF.LANGSTRING;
             } else {
                 // simple literal
-                return XMLSchema.STRING;
+                return XSD.STRING;
             }
         }
         throw new ValueExprEvaluationException();
@@ -663,7 +666,7 @@ class HalyardValueExprEvaluation {
     private Value evaluate(FunctionCall node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
 		Optional<Function> function = functionRegistry.get(node.getURI());
         if (!function.isPresent()) {
-            throw new QueryEvaluationException("Unknown function '" + node.getURI() + "'");
+            throw new QueryEvaluationException(String.format("Unknown function '%s'", node.getURI()));
         }
         // the NOW function is a special case as it needs to keep a shared return
         // value for the duration of the query.
@@ -675,7 +678,7 @@ class HalyardValueExprEvaluation {
         for (int i = 0; i < args.size(); i++) {
             argValues[i] = evaluate(args.get(i), bindings);
         }
-        return function.get().evaluate(valueFactory, argValues);
+        return function.get().evaluate(tripleSource, argValues);
     }
 
     /**

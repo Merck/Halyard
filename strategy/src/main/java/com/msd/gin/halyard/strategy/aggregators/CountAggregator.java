@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.Count;
@@ -76,7 +76,7 @@ public class CountAggregator extends Aggregator {
 
 	@Override
 	public Value getValue() {
-		return vf.createLiteral(Long.toString(count.get()), XMLSchema.INTEGER);
+		return vf.createLiteral(Long.toString(count.get()), XSD.INTEGER);
 	}
 
 	@Override

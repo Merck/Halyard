@@ -71,11 +71,11 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
     }
 
     public void updateCardinalityMap(TupleExpr expr, Set<String> boundVars, Set<String> priorityVars, Map<TupleExpr, Double> mapToUpdate) {
-        expr.visit(new HalyardCardinalityCalculator(boundVars, priorityVars, mapToUpdate));
+        expr.visit(new HalyardCardinalityCalculator(spcalc, srvProvider, boundVars, priorityVars, mapToUpdate));
     }
 
 	public double getCardinality(TupleExpr expr, final Set<String> boundVariables, final Set<String> priorityVariables) {
-		HalyardCardinalityCalculator cc = new HalyardCardinalityCalculator(boundVariables, priorityVariables, null);
+		HalyardCardinalityCalculator cc = new HalyardCardinalityCalculator(spcalc, srvProvider, boundVariables, priorityVariables, null);
 		expr.visit(cc);
 		return cc.getCardinality();
 	}
@@ -87,17 +87,21 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
 
 	@Override
 	protected CardinalityCalculator createCardinalityCalculator() {
-		return new HalyardCardinalityCalculator(Collections.emptySet(), Collections.emptySet(), null);
+		return new HalyardCardinalityCalculator(spcalc, srvProvider, Collections.emptySet(), Collections.emptySet(), null);
 	}
 
-    private class HalyardCardinalityCalculator extends CardinalityCalculator {
+    private static class HalyardCardinalityCalculator extends CardinalityCalculator {
 
-    	private final double VAR_CARDINALITY = 10.0;
+    	private static final double VAR_CARDINALITY = 10.0;
+    	private StatementPatternCardinalityCalculator spcalc;
+        private final ServiceStatsProvider srvProvider;
         private final Set<String> boundVars;
         private final Set<String> priorityVariables;
         private final Map<TupleExpr, Double> mapToUpdate;
 
-        public HalyardCardinalityCalculator(Set<String> boundVariables, Set<String> priorityVariables, Map<TupleExpr, Double> mapToUpdate) {
+        public HalyardCardinalityCalculator(StatementPatternCardinalityCalculator spcalc, ServiceStatsProvider srvProvider, Set<String> boundVariables, Set<String> priorityVariables, Map<TupleExpr, Double> mapToUpdate) {
+        	this.spcalc = spcalc;
+        	this.srvProvider = srvProvider;
             this.boundVars = boundVariables;
             this.priorityVariables = priorityVariables;
             this.mapToUpdate = mapToUpdate;
@@ -157,7 +161,7 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
             double leftArgCost = this.cardinality;
             Set<String> newBoundVars = new HashSet<>(boundVars);
             newBoundVars.addAll(node.getLeftArg().getBindingNames());
-            HalyardCardinalityCalculator newCalc = new HalyardCardinalityCalculator(newBoundVars, priorityVariables, mapToUpdate);
+            HalyardCardinalityCalculator newCalc = new HalyardCardinalityCalculator(spcalc, srvProvider, newBoundVars, priorityVariables, mapToUpdate);
             node.getRightArg().visit(newCalc);
             cardinality = newCalc.cardinality;
             updateMap(node.getRightArg());
@@ -250,7 +254,7 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
         	node.getVars(vars);
         	vars.remove(node.getCommonVar());
         	int constCount = countConstantVars(vars);
-            cardinality = card*Math.pow(VAR_CARDINALITY*VAR_CARDINALITY, (vars.size()-constCount)/vars.size());
+            cardinality = card*Math.pow(VAR_CARDINALITY*VAR_CARDINALITY, (double)(vars.size()-constCount)/vars.size());
         	updateMap(node);
         }
 

@@ -16,14 +16,6 @@
  */
 package com.msd.gin.halyard.rio;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.core.JsonTokenId;
-import com.fasterxml.jackson.core.TreeNode;
-import com.fasterxml.jackson.core.util.JsonParserDelegate;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -37,6 +29,7 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -44,7 +37,7 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.OWL;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.RDFS;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.rio.ParseErrorListener;
 import org.eclipse.rdf4j.rio.ParseLocationListener;
 import org.eclipse.rdf4j.rio.ParserConfig;
@@ -56,6 +49,15 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.RDFParserFactory;
 import org.eclipse.rdf4j.rio.RioSetting;
 import org.eclipse.rdf4j.rio.helpers.RioSettingImpl;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.JsonTokenId;
+import com.fasterxml.jackson.core.TreeNode;
+import com.fasterxml.jackson.core.util.JsonParserDelegate;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  *
@@ -77,7 +79,7 @@ public final class JSONParser implements RDFParser {
 
     }
 
-    public static final RDFFormat JSON = new RDFFormat("JSON", Arrays.asList("application/json"), StandardCharsets.UTF_8, Collections.singletonList("json"), RDFFormat.NO_CONTEXTS, RDFFormat.NO_CONTEXTS);
+    public static final RDFFormat JSON = new RDFFormat("JSON", Arrays.asList("application/json"), StandardCharsets.UTF_8, Collections.singletonList("json"), RDFFormat.NO_NAMESPACES, RDFFormat.NO_CONTEXTS, RDFFormat.NO_RDF_STAR);
     public static final RioSetting<Boolean> GENERATE_ONTOLOGY = new RioSettingImpl<>(JSONParser.class.getCanonicalName() + ".GENERATE_ONTOLOGY", "Generate ontology statements while parsing", Boolean.FALSE);
     public static final RioSetting<Boolean> GENERATE_DATA = new RioSettingImpl<>(JSONParser.class.getCanonicalName() + ".GENERATE_DATA", "Generate data statements while parsing", Boolean.TRUE);
 
@@ -155,14 +157,12 @@ public final class JSONParser implements RDFParser {
     }
 
     @Override
-    @SuppressWarnings("deprecation")
     public void setVerifyData(boolean verifyData) {}
 
     @Override
     public void setPreserveBNodeIDs(boolean preserveBNodeIDs) {}
 
     @Override
-    @SuppressWarnings("deprecation")
     public void setStopAtFirstError(boolean stopAtFirstError) {}
 
     @Override
@@ -325,7 +325,7 @@ public final class JSONParser implements RDFParser {
             if (index != null) {
                 IRI indexIRI = vf.createIRI(baseURI + predicatePath + ":index");
                 if (generateData) {
-                    handleStatement(vf.createStatement(pkIRI, indexIRI, vf.createLiteral(index.toString(), XMLSchema.INTEGER)));
+                    handleStatement(vf.createStatement(pkIRI, indexIRI, vf.createLiteral(index.toString(), XSD.INTEGER)));
                 }
                 if (generateOntology) {
                     handleStatement(vf.createStatement(indexIRI, RDF.TYPE, OWL.DATATYPEPROPERTY));

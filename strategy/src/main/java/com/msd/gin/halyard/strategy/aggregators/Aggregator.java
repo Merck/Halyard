@@ -23,7 +23,7 @@ import java.io.IOException;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.AbstractAggregateOperator;
@@ -34,7 +34,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
 
 public abstract class Aggregator implements AutoCloseable {
 	protected static final ValueComparator COMPARATOR = new ValueComparator();
-	protected static final Literal ZERO = SimpleValueFactory.getInstance().createLiteral("0", XMLSchema.INTEGER);
+	protected static final Literal ZERO = SimpleValueFactory.getInstance().createLiteral("0", XSD.INTEGER);
 	private final ValueExpr arg;
 	private final boolean isDistinct;
 	private final EvaluationStrategy strategy;

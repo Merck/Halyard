@@ -53,21 +53,19 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseSearchTripleSource.class);
 	private static final int ELASTIC_RESULT_SIZE = 10000;
 
-	private final long startTime;
 	private final String elasticSearchURL;
 
-	public HBaseSearchTripleSource(Table table, ValueFactory vf, long startTime, long timeout, HBaseSail.ScanSettings settings, String elasticSearchURL, HBaseSail.Ticker ticker) {
-		super(table, vf, startTime, timeout, settings, ticker);
-		this.startTime = startTime;
+	public HBaseSearchTripleSource(Table table, ValueFactory vf, long timeoutSecs, HBaseSail.ScanSettings settings, String elasticSearchURL, HBaseSail.Ticker ticker) {
+		super(table, vf, timeoutSecs, settings, ticker);
 		this.elasticSearchURL = elasticSearchURL;
 	}
 
 	@Override
-	public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
+	protected CloseableIteration<? extends Statement, IOException> getStatementsInternal(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
 		if ((obj instanceof Literal) && (HALYARD.SEARCH_TYPE.equals(((Literal) obj).getDatatype()))) {
-			return new LiteralSearchStatementScanner(startTime, subj, pred, obj.stringValue(), contexts);
+			return new LiteralSearchStatementScanner(subj, pred, obj.stringValue(), contexts);
 		} else {
-			return super.getStatements(subj, pred, obj, contexts);
+			return super.getStatementsInternal(subj, pred, obj, contexts);
 		}
 	}
 
@@ -80,8 +78,8 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 		Iterator<RDFObject> objects = null;
 		private final String literalSearchQuery;
 
-		public LiteralSearchStatementScanner(long startTime, Resource subj, IRI pred, String literalSearchQuery, Resource... contexts) throws SailException {
-			super(startTime, subj, pred, null, contexts);
+		public LiteralSearchStatementScanner(Resource subj, IRI pred, String literalSearchQuery, Resource... contexts) throws SailException {
+			super(subj, pred, null, contexts);
 			if (elasticSearchURL == null || elasticSearchURL.length() == 0) {
 				throw new SailException("ElasticSearch Index URL is not properly configured.");
 			}

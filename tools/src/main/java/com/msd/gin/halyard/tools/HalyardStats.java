@@ -77,7 +77,7 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
-import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
 import org.eclipse.rdf4j.sail.SailConnection;
 
 /**
@@ -390,11 +390,11 @@ public final class HalyardStats extends AbstractHalyardTool {
                 Optional<RDFFormat> form = Rio.getWriterFormatForFileName(targetUrl);
                 if (!form.isPresent()) throw new IOException("Unsupported target file format extension: " + targetUrl);
                 writer = Rio.createWriter(form.get(), out);
+                writer.startRDF();
                 writer.handleNamespace(SD.PREFIX, SD.NAMESPACE);
                 writer.handleNamespace(VOID.PREFIX, VOID.NAMESPACE);
                 writer.handleNamespace(VOID_EXT.PREFIX, VOID_EXT.NAMESPACE);
                 writer.handleNamespace(HALYARD.PREFIX, HALYARD.NAMESPACE);
-                writer.startRDF();
             }
             if (conf.get(GRAPH_CONTEXT) == null) {
                 writeStatement(HALYARD.STATS_ROOT_NODE, RDF.TYPE, VOID.DATASET);

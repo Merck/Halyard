@@ -18,10 +18,8 @@ package com.msd.gin.halyard.strategy;
 
 import java.util.Map;
 
-import junit.framework.Test;
 import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.query.parser.sparql.manifest.SPARQL11ManifestTest;
-import org.eclipse.rdf4j.query.parser.sparql.manifest.SPARQLUpdateConformanceTest;
+import org.eclipse.rdf4j.query.parser.sparql.manifest.SPARQL11UpdateComplianceTest;
 import org.eclipse.rdf4j.repository.contextaware.ContextAwareRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 
@@ -29,16 +27,12 @@ import org.eclipse.rdf4j.repository.sail.SailRepository;
  *
  * @author Adam Sotona (MSD)
  */
-public class W3CApprovedSPARQL11UpdateTest extends SPARQLUpdateConformanceTest {
+public class W3CApprovedSPARQL11UpdateTest extends SPARQL11UpdateComplianceTest {
 
-    public W3CApprovedSPARQL11UpdateTest(String testURI, String name, String requestFile, IRI defaultGraphURI, Map<String, IRI> inputNamedGraphs, IRI resultDefaultGraphURI, Map<String, IRI> resultNamedGraphs) {
-        super(testURI, name, requestFile, defaultGraphURI, inputNamedGraphs, resultDefaultGraphURI, resultNamedGraphs);
-    }
-
-    public static Test suite() throws Exception {
-        return SPARQL11ManifestTest.suite(
-                (String testURI1, String name, String requestFile, IRI defaultGraphURI, Map<String, IRI> inputNamedGraphs1, IRI resultDefaultGraphURI, Map<String, IRI> resultNamedGraphs1)
-                        -> new W3CApprovedSPARQL11UpdateTest(testURI1, name, requestFile, defaultGraphURI, inputNamedGraphs1, resultDefaultGraphURI, resultNamedGraphs1), true, true, false);
+    public W3CApprovedSPARQL11UpdateTest(String displayName, String testURI, String name, String requestFile,
+			IRI defaultGraphURI, Map<String, IRI> inputNamedGraphs, IRI resultDefaultGraphURI,
+			Map<String, IRI> resultNamedGraphs) {
+    	super(displayName, testURI, name, requestFile, defaultGraphURI, inputNamedGraphs, resultDefaultGraphURI, resultNamedGraphs);
     }
 
     @Override

@@ -36,7 +36,7 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SD;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
@@ -49,6 +49,7 @@ import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
 import org.eclipse.rdf4j.rio.helpers.ParseErrorLogger;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
+import org.junit.Rule;
 import org.junit.Test;
 import static org.junit.Assert.*;
 /**
@@ -56,6 +57,8 @@ import static org.junit.Assert.*;
  * @author Adam Sotona (MSD)
  */
 public class HalyardStatsTest {
+	@Rule
+	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
 
     @Test
     public void testStatsTarget() throws Exception {
@@ -102,7 +105,7 @@ public class HalyardStatsTest {
         w.handleNamespace(HALYARD.PREFIX, HALYARD.NAMESPACE);
         w.handleNamespace(VOID.PREFIX, VOID.NAMESPACE);
         w.handleNamespace(VOID_EXT.PREFIX, VOID_EXT.NAMESPACE);
-        w.handleNamespace(XMLSchema.PREFIX, XMLSchema.NAMESPACE);
+        w.handleNamespace(XSD.PREFIX, XSD.NAMESPACE);
         w.handleNamespace(SD.PREFIX, SD.NAMESPACE);
         w.handleNamespace(RDF.PREFIX, RDF.NAMESPACE);
         boolean any = false;
@@ -124,7 +127,7 @@ public class HalyardStatsTest {
         w.handleNamespace(HALYARD.PREFIX, HALYARD.NAMESPACE);
         w.handleNamespace(VOID.PREFIX, VOID.NAMESPACE);
         w.handleNamespace(VOID_EXT.PREFIX, VOID_EXT.NAMESPACE);
-        w.handleNamespace(XMLSchema.PREFIX, XMLSchema.NAMESPACE);
+        w.handleNamespace(XSD.PREFIX, XSD.NAMESPACE);
         w.handleNamespace(SD.PREFIX, SD.NAMESPACE);
         w.handleNamespace(RDF.PREFIX, RDF.NAMESPACE);
         any = false;

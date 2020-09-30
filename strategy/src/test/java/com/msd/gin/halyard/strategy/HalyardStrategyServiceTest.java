@@ -42,12 +42,12 @@ public class HalyardStrategyServiceTest {
             public FederatedService getService(String serviceUrl) throws QueryEvaluationException {
                 return null;
             }
-        }, null, 0).getService(null));
+        }, null).getService(null));
     }
 
     @Test(expected = UnsupportedOperationException.class)
     public void testServiceEvaluateFail() {
-        new HalyardEvaluationStrategy(getTripleSource(), null, null, null, 0).evaluate(null, null, null);
+        new HalyardEvaluationStrategy(getTripleSource(), null, null, null).evaluate(null, null, null);
     }
 
     private TripleSource getTripleSource() {

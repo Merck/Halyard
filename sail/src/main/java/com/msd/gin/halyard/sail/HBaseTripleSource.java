@@ -21,19 +21,25 @@ import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
-import com.msd.gin.halyard.strategy.TimeoutTracker;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
+import org.eclipse.rdf4j.common.iteration.ExceptionConvertingIteration;
+import org.eclipse.rdf4j.common.iteration.FilterIteration;
+import org.eclipse.rdf4j.common.iteration.TimeLimitIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
@@ -41,7 +47,6 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
-import org.eclipse.rdf4j.sail.SailException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,50 +55,78 @@ public class HBaseTripleSource implements TripleSource {
 
 	private final Table table;
 	private final ValueFactory vf;
-	private final long startTime;
-	private final long timeout;
+	private final long timeoutSecs;
 	private final HBaseSail.ScanSettings settings;
 	private final HBaseSail.Ticker ticker;
 
-	public HBaseTripleSource(Table table, ValueFactory vf, long startTime, long timeout, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
+	public HBaseTripleSource(Table table, ValueFactory vf, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
 		this.table = table;
 		this.vf = vf;
-		this.startTime = startTime;
-		this.timeout = timeout;
+		this.timeoutSecs = timeoutSecs;
 		this.settings = settings;
 		this.ticker = ticker;
 	}
 
 	@Override
-	public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
-		return new StatementScanner(startTime, subj, pred, obj, contexts);
+	public final CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
+		CloseableIteration<? extends Statement, QueryEvaluationException> iter = new ExceptionConvertingIteration<Statement, QueryEvaluationException>(getStatementsInternal(subj, pred, obj, contexts)) {
+			@Override
+			protected QueryEvaluationException convert(Exception e) {
+				return new QueryEvaluationException(e);
+			}
+		};
+		if (timeoutSecs > 0) {
+			iter = new TimeLimitIteration<Statement, QueryEvaluationException>(iter, TimeUnit.SECONDS.toMillis(timeoutSecs)) {
+				@Override
+				protected void throwInterruptedException() throws QueryEvaluationException {
+					throw new QueryEvaluationException(String.format("Statements scanning exceeded specified timeout %ds", timeoutSecs));
+				}
+			};
+		}
+		if (contexts != null && Arrays.stream(contexts).anyMatch(Objects::isNull)) {
+			// filter out any scan of the default context (everything) to the specified contexts
+			final Set<Resource> ctxSet = new HashSet<>();
+			Collections.addAll(ctxSet, contexts);
+			iter = new FilterIteration<Statement, QueryEvaluationException>(iter) {
+				@Override
+				protected boolean accept(Statement st) {
+					return ctxSet.contains(st.getContext());
+				}
+			};
+		}
+		return iter;
+	}
+
+	protected CloseableIteration<? extends Statement, IOException> getStatementsInternal(Resource subj, IRI pred, Value obj, Resource... contexts) {
+		return new StatementScanner(subj, pred, obj, contexts);
 	}
 
 	@Override
-	public ValueFactory getValueFactory() {
+	public final ValueFactory getValueFactory() {
 		return vf;
 	}
 
-	protected class StatementScanner implements CloseableIteration<Statement, QueryEvaluationException> {
+	protected class StatementScanner extends AbstractStatementScanner {
 
-		private final RDFSubject subj;
-		private final RDFPredicate pred;
-		protected RDFObject obj;
-		private RDFContext ctx;
 		protected final List<Resource> contextsList;
 		protected Iterator<Resource> contexts;
 		private ResultScanner rs = null;
-		private Statement next = null;
-		private Iterator<Statement> iter = null;
-		private final TimeoutTracker timeoutTracker;
 
-		public StatementScanner(long startTime, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
+		public StatementScanner(Resource subj, IRI pred, Value obj, Resource... contexts) {
+			super(vf);
 			this.subj = RDFSubject.create(subj);
 			this.pred = RDFPredicate.create(pred);
 			this.obj = RDFObject.create(obj);
-			this.contextsList = Arrays.asList(normalizeContexts(contexts));
+			if (contexts == null || contexts.length == 0) {
+				// if all contexts then scan the default context
+				this.contextsList = Collections.singletonList(null);
+			} else if (Arrays.stream(contexts).anyMatch(Objects::isNull)) {
+				// if any context is the default context then just scan the default context (everything)
+				this.contextsList = Collections.singletonList(null);
+			} else {
+				this.contextsList = Arrays.asList(contexts);
+			}
 			this.contexts = contextsList.iterator();
-			this.timeoutTracker = new TimeoutTracker(startTime, timeout);
 			LOG.trace("New StatementScanner {} {} {} {}", subj, pred, obj, contextsList);
 		}
 
@@ -127,67 +160,10 @@ public class HBaseTripleSource implements TripleSource {
 		}
 
 		@Override
-		public void close() throws SailException {
+		public void close() throws IOException {
 			if (rs != null) {
 				rs.close();
 			}
-		}
-
-		@Override
-		public synchronized boolean hasNext() throws SailException {
-			if (timeoutTracker.checkTimeout()) {
-				throw new SailException("Statements scanning exceeded specified timeout " + timeout + "s");
-			}
-
-			if (next == null) {
-				try { // try and find the next result
-					while (true) {
-						if (iter == null) {
-							Result res = nextResult();
-							if (res == null) {
-								return false; // no more Results
-							} else {
-								iter = HalyardTableUtils.parseStatements(subj, pred, obj, ctx, res, vf).iterator();
-							}
-						}
-						while (iter.hasNext()) {
-							Statement s = iter.next();
-							next = s; // cache the next statement which will be returned with a call to next().
-							return true; // there is another statement
-						}
-						iter = null;
-					}
-				} catch (IOException e) {
-					throw new SailException(e);
-				}
-			} else {
-				return true;
-			}
-		}
-
-		@Override
-		public synchronized Statement next() throws SailException {
-			if (hasNext()) { // return the next statement and set next to null so it can be refilled by the next call to hasNext()
-				Statement st = next;
-				next = null;
-				return st;
-			} else {
-				throw new NoSuchElementException();
-			}
-		}
-
-		@Override
-		public void remove() throws SailException {
-			throw new UnsupportedOperationException();
-		}
-	}
-
-	// generates a Resource[] from 0 or more Resources
-	static Resource[] normalizeContexts(Resource... contexts) {
-		if (contexts == null || contexts.length == 0) {
-			return new Resource[] { null };
-		} else {
-			return contexts;
 		}
 	}
 }

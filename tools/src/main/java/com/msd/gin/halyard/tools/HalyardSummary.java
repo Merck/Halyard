@@ -69,7 +69,7 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.RDFS;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.RDFWriter;
@@ -221,7 +221,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                             }
                             if (oldStatement.getObject() instanceof Literal) {
                                 IRI lt = ((Literal)oldStatement.getObject()).getDatatype();
-                                reportPredicateDomainAndRange(oldStatement.getPredicate(), domainClass, lt == null ? XMLSchema.STRING : lt);
+                                reportPredicateDomainAndRange(oldStatement.getPredicate(), domainClass, lt == null ? XSD.STRING : lt);
                             }
                         }
                         if (objectChange) {
@@ -231,7 +231,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                             }
                             if (oldStatement.getObject() instanceof Literal) {
                                 IRI lt = ((Literal)oldStatement.getObject()).getDatatype();
-                                reportPredicateRange(oldStatement.getPredicate(), lt == null ? XMLSchema.STRING : lt, objectCardinality);
+                                reportPredicateRange(oldStatement.getPredicate(), lt == null ? XSD.STRING : lt, objectCardinality);
                             }
                             objectCardinality = 0;
                             rangeClasses = null;
@@ -311,7 +311,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             write(CARDINALITY, RDF.TYPE, RDF.PROPERTY);
             write(CARDINALITY, RDFS.LABEL, SVF.createLiteral("cardinality"));
             write(CARDINALITY, RDFS.COMMENT, SVF.createLiteral("cardinality is positive integer [0..63], it is a binary logarithm of the pattern occurences (2^63 is the maximum allowed number of occurences)"));
-            write(CARDINALITY, RDFS.RANGE, XMLSchema.INTEGER);
+            write(CARDINALITY, RDFS.RANGE, XSD.INTEGER);
         }
 
         private void setupOutput() throws IOException {
@@ -338,8 +338,9 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 Optional<RDFFormat> form = Rio.getWriterFormatForFileName(targetUrl);
                 if (!form.isPresent()) throw new IOException("Unsupported target file format extension: " + targetUrl);
                 writer = Rio.createWriter(form.get(), out);
+                writer.startRDF();
                 writer.handleNamespace("", NAMESPACE);
-                writer.handleNamespace(XMLSchema.PREFIX, XMLSchema.NAMESPACE);
+                writer.handleNamespace(XSD.PREFIX, XSD.NAMESPACE);
                 writer.handleNamespace(RDF.PREFIX, RDF.NAMESPACE);
                 writer.handleNamespace(RDFS.PREFIX, RDFS.NAMESPACE);
 				try (CloseableIteration<? extends Namespace, SailException> iter = conn.getNamespaces()) {
@@ -348,7 +349,6 @@ public final class HalyardSummary extends AbstractHalyardTool {
                         writer.handleNamespace(ns.getPrefix(), ns.getName());
                     }
                 }
-                writer.startRDF();
             }
         }
 

@@ -64,9 +64,9 @@ public abstract class AbstractHalyardTool implements Tool {
 
     protected final void printHelp() {
         HelpFormatter hf = new HelpFormatter();
-        hf.setOptionComparator(new Comparator() {
+        hf.setOptionComparator(new Comparator<Option>() {
             @Override
-            public int compare(Object o1, Object o2) {
+            public int compare(Option o1, Option o2) {
                 if (o1 instanceof OrderedOption && o2 instanceof OrderedOption) return ((OrderedOption)o1).order - ((OrderedOption)o2).order;
                 else return 0;
             }

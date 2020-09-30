@@ -40,14 +40,13 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
-import org.apache.hadoop.hbase.tool.LoadIncrementalHFiles;
+import org.apache.hadoop.hbase.tool.BulkLoadHFiles;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -80,7 +79,7 @@ import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 import org.eclipse.rdf4j.rio.helpers.NTriplesParserSettings;
-import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
+import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
 import org.eclipse.rdf4j.rio.turtle.TurtleParser;
 
 /**
@@ -140,7 +139,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                 @Override
                 public RDFFormat getRDFFormat() {
                     RDFFormat t = RDFFormat.TRIX;
-                    return new RDFFormat(t.getName(), t.getMIMETypes(), t.getCharset(), Arrays.asList("trix"), t.getStandardURI(), t.supportsNamespaces(), t.supportsNamespaces());
+                    return new RDFFormat(t.getName(), t.getMIMETypes(), t.getCharset(), Arrays.asList("trix"), t.getStandardURI(), t.supportsNamespaces(), t.supportsContexts(), t.supportsRDFStar());
                 }
 
                 @Override
@@ -572,9 +571,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 					HalyardTableUtils.truncateTable(conn, hTable);
 					hTable.close();
                 }
-				try (Admin admin = conn.getAdmin()) {
-					new LoadIncrementalHFiles(getConf()).doBulkLoad(new Path(workdir), admin, hTable, regionLocator);
-				}
+				BulkLoadHFiles.create(getConf()).bulkLoad(hTable.getName(), new Path(workdir));
                 LOG.info("Bulk Load Completed..");
                 return 0;
             }

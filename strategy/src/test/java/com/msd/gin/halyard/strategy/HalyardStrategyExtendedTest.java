@@ -187,7 +187,7 @@ public class HalyardStrategyExtendedTest {
             "  OPTIONAL { SELECT * WHERE {<https://nonexisting> <https://nonexisting> <https://nonexisting> .}}" +
             "}";
         TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
-        assertTrue(res.hasNext());
+        assertFalse(res.hasNext());
     }
 
     @Test

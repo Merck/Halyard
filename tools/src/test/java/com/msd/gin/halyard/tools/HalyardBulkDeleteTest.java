@@ -30,6 +30,7 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
@@ -38,8 +39,10 @@ import static org.junit.Assert.assertEquals;
  * @author Adam Sotona (MSD)
  */
 public class HalyardBulkDeleteTest {
-
     private static final String TABLE = "bulkdeletetesttable";
+
+	@Rule
+	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
 
     @Test
     public void testBulkDelete() throws Exception {

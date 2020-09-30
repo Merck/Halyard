@@ -16,53 +16,87 @@
  */
 package com.msd.gin.halyard.strategy;
 
-import junit.framework.Test;
+import java.net.URL;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Deque;
+import java.util.List;
+
 import org.eclipse.rdf4j.query.Dataset;
-import org.eclipse.rdf4j.query.parser.sparql.manifest.SPARQL11ManifestTest;
-import org.eclipse.rdf4j.query.parser.sparql.manifest.SPARQLQueryTest;
+import org.eclipse.rdf4j.query.parser.sparql.manifest.SPARQLQueryComplianceTest;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.dataset.DatasetRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
+import org.junit.Before;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardSPARQLQueryTest extends SPARQLQueryTest {
+@RunWith(Parameterized.class)
+public class HalyardSPARQLQueryTest extends SPARQLQueryComplianceTest {
 
-    public static Test suite()
-            throws Exception {
-        return SPARQL11ManifestTest.suite(new SPARQLQueryTest.Factory() {
+	private static final String[] defaultIgnoredTests = {
+		"BSBM BI use case query 5",
+		"sparql11-sequence-04",
+		"sparql11-sequence-05",
+		"sparql11-sequence-06",
+		"sparql11-wildcard-cycles-04",
+		"sparql11-not-in-02",
+		"sparql11-subquery-05",
+		"sparql11-sum-02"
+	};
 
-            @Override
-            public HalyardSPARQLQueryTest createSPARQLQueryTest(String testURI, String name, String queryFileURL, String resultFileURL, Dataset dataSet, boolean laxCardinality) {
-                return createSPARQLQueryTest(testURI, name, queryFileURL, resultFileURL, dataSet, laxCardinality, false);
-            }
+	private static final List<String> excludedSubdirs = Arrays.asList("service");
 
-            @Override
-            public HalyardSPARQLQueryTest createSPARQLQueryTest(String testURI, String name, String queryFileURL, String resultFileURL, Dataset dataSet, boolean laxCardinality, boolean checkOrder) {
-                String[] ignoredTests = {
-                    // test case incompatible with RDF 1.1 - see
-                    // http://lists.w3.org/Archives/Public/public-sparql-dev/2013AprJun/0006.html
-                    "STRDT   TypeErrors",
-                    // test case incompatible with RDF 1.1 - see
-                    // http://lists.w3.org/Archives/Public/public-sparql-dev/2013AprJun/0006.html
-                    "STRLANG   TypeErrors",
-                    // known issue: SES-937
-                    "sq03 - Subquery within graph pattern, graph variable is not bound"};
+	@Parameterized.Parameters(name = "{0}")
+	public static Collection<Object[]> data() {
+		return Arrays.asList(getTestData());
+	}
 
-                return new HalyardSPARQLQueryTest(testURI, name, queryFileURL, resultFileURL, dataSet, laxCardinality, checkOrder, ignoredTests);
-            }
-        }, true, false, false, "service");
-    }
+	protected static Object[][] getTestData() {
+		List<Object[]> tests = new ArrayList<>();
 
-    protected HalyardSPARQLQueryTest(String testURI, String name, String queryFileURL, String resultFileURL,
-            Dataset dataSet, boolean laxCardinality, boolean checkOrder, String... ignoredTests) {
-        super(testURI, name, queryFileURL, resultFileURL, dataSet, laxCardinality, checkOrder, ignoredTests);
+		Deque<String> manifests = new ArrayDeque<>();
+		manifests.add(getManifestURL().toExternalForm());
+		while (!manifests.isEmpty()) {
+			String pop = manifests.pop();
+			SPARQLQueryTestManifest manifest = new SPARQLQueryTestManifest(pop, excludedSubdirs, false);
+			tests.addAll(manifest.getTests());
+			manifests.addAll(manifest.getSubManifests());
+		}
+
+		Object[][] result = new Object[tests.size()][6];
+		tests.toArray(result);
+
+		return result;
+	}
+
+	protected static URL getManifestURL() {
+		return SPARQLQueryComplianceTest.class.getClassLoader()
+				.getResource("testcases-sparql-1.1/manifest-evaluation.ttl");
+	}
+
+    public HalyardSPARQLQueryTest(String displayName, String testURI, String name, String queryFileURL,
+			String resultFileURL, Dataset dataset, boolean ordered) {
+		super(displayName, testURI, name, queryFileURL, resultFileURL, dataset, ordered);
     }
 
     @Override
     protected Repository newRepository() {
         return new DatasetRepository(new SailRepository(new MemoryStoreWithHalyardStrategy()));
     }
+
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		for (String defaultIgnoredTest : defaultIgnoredTests) {
+			addIgnoredTest(defaultIgnoredTest);
+		}
+	}
 }
