@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -59,7 +60,7 @@ import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardBulkDelete extends AbstractHalyardTool {
-
+    private static final String SOURCE = "halyard.delete.source";
     private static final String SUBJECT = "halyard.delete.subject";
     private static final String PREDICATE = "halyard.delete.predicate";
     private static final String OBJECT = "halyard.delete.object";
@@ -69,6 +70,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 
     static final class DeleteMapper extends TableMapper<ImmutableBytesWritable, KeyValue> {
 
+    	TripleFactory tf;
         long total = 0, deleted = 0;
         Resource subj;
         IRI pred;
@@ -77,19 +79,20 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
-            SimpleValueFactory vf = SimpleValueFactory.getInstance();
             Configuration conf = context.getConfiguration();
+            Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
+            tf = new TripleFactory(table);
             String s = conf.get(SUBJECT);
             if (s!= null) {
-                subj = NTriplesUtil.parseResource(s, vf);
+                subj = NTriplesUtil.parseResource(s, SVF);
             }
             String p = conf.get(PREDICATE);
             if (p!= null) {
-                pred = NTriplesUtil.parseURI(p, vf);
+                pred = NTriplesUtil.parseURI(p, SVF);
             }
             String o = conf.get(OBJECT);
             if (o!= null) {
-                obj = NTriplesUtil.parseValue(o, vf);
+                obj = NTriplesUtil.parseValue(o, SVF);
             }
             String cs[] = conf.getStrings(CONTEXTS);
             if (cs != null) {
@@ -98,7 +101,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
                     if ("NONE".equals(c)) {
                         ctx.add(null);
                     } else {
-                        ctx.add(NTriplesUtil.parseResource(c, vf));
+                        ctx.add(NTriplesUtil.parseResource(c, SVF));
                     }
                 }
             }
@@ -107,7 +110,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             for (Cell c : value.rawCells()) {
-                Statement st = HalyardTableUtils.parseStatement(null, null, null, null, c, SVF);
+                Statement st = HalyardTableUtils.parseStatement(null, null, null, null, c, SVF, tf);
                 if ((subj == null || subj.equals(st.getSubject())) && (pred == null || pred.equals(st.getPredicate())) && (obj == null || obj.equals(st.getObject())) && (ctx == null || ctx.contains(st.getContext()))) {
                     KeyValue kv = new KeyValue(c.getRowArray(), c.getRowOffset(), (int) c.getRowLength(),
                         c.getFamilyArray(), c.getFamilyOffset(), (int) c.getFamilyLength(),
@@ -158,6 +161,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
             AuthenticationProtos.class);
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardDelete " + source);
+        job.getConfiguration().set(SOURCE, source);
         if (cmd.hasOption('s')) {
             job.getConfiguration().set(SUBJECT, cmd.getOptionValue('s'));
         }

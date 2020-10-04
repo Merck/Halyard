@@ -19,10 +19,6 @@ public final class RDFObject extends RDFValue<Value> {
 	public static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
 
 	private RDFObject(Value val) {
-		super(val);
-	}
-
-	public RDFRole getRole() {
-		return RDFRole.OBJECT;
+		super(RDFRole.OBJECT, val);
 	}
 }

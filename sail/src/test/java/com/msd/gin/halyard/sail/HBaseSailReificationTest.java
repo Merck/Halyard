@@ -57,19 +57,19 @@ public class HBaseSailReificationTest {
         try(SailRepositoryConnection con = rep.getConnection()) {
 			// insert a stmt
             update(con,
-					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://s> <http://p> <http://o>. ?stmt <:from> \"source 1\"} where {(<http://s> <http://p> <http://o>) halyard:identifier ?stmt. ?stmt halyard:statement (<http://s> <http://p> <http://o>)}");
+					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://s> <http://p> <http://o>. ?t <:from> \"source 1\"} where {(<http://s> <http://p> <http://o>) halyard:identifier ?t. ?t halyard:triple (<http://s> <http://p> <http://o>)}");
 
 			List<BindingSet> result = select(con,
 					"prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {(<http://s> <http://p> <http://o>) halyard:identifier/<:from> ?s}");
 			assertEquals("source 1", ((Literal) result.get(0).getValue("s")).getLabel());
 
-			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:statement (<http://s> <http://p> <http://o>); <:from> ?s]}");
+			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:triple (<http://s> <http://p> <http://o>); <:from> ?s]}");
 			assertEquals("source 1", ((Literal) result.get(0).getValue("s")).getLabel());
 
 			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {(<http://other> <http://other> <http://other>) halyard:identifier/<:from> ?s}");
 			assertEquals(Collections.emptyList(), result);
 
-			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:statement (<http://other> <http://other> <http://other>); <:from> ?s]}");
+			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:triple (<http://other> <http://other> <http://other>); <:from> ?s]}");
 			assertEquals(Collections.emptyList(), result);
 
 			result = select(con,
@@ -87,12 +87,12 @@ public class HBaseSailReificationTest {
 
 			// delete the stmt
             update(con,
-					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://s> <http://p> <http://o>. ?stmt <:from> \"source 1\"} where {(<http://s> <http://p> <http://o>) halyard:identifier ?stmt. ?stmt halyard:statement (<http://s> <http://p> <http://o>) }");
+					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://s> <http://p> <http://o>. ?t <:from> \"source 1\"} where {(<http://s> <http://p> <http://o>) halyard:identifier ?t. ?t halyard:triple (<http://s> <http://p> <http://o>) }");
 
 			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {(<http://s> <http://p> <http://o>) halyard:identifier/<:from> ?s}");
 			assertEquals(Collections.emptyList(), result);
 
-			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:statement (<http://s> <http://p> <http://o>); <:from> ?s]}");
+			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:triple (<http://s> <http://p> <http://o>); <:from> ?s]}");
 			assertEquals(Collections.emptyList(), result);
         }
         rep.shutDown();

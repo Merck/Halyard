@@ -16,6 +16,12 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.TimestampedValueFactory;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -29,6 +35,7 @@ import java.util.Set;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.StringBuilderWriter;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
@@ -54,11 +61,6 @@ import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
 import org.elasticsearch.hadoop.mr.EsOutputFormat;
 import org.json.JSONObject;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFContext;
-import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.TimestampedValueFactory;
-
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
  * @author Adam Sotona (MSD)
@@ -71,9 +73,17 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
 
+    	TripleFactory tf;
         long counter = 0, exports = 0, statements = 0;
         byte[] lastHash = new byte[RDFObject.KEY_SIZE];
         Set<Literal> literals;
+
+        @Override
+        protected void setup(Context context) throws IOException {
+            Configuration conf = context.getConfiguration();
+            Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
+            tf = new TripleFactory(table);
+        }
 
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
@@ -88,7 +98,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             	lastHash = hash;
             }
 
-            for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, VF)) {
+            for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, VF, tf)) {
                 statements++;
             	Literal l = (Literal) st.getObject();
                 if (literals.add(l)) {

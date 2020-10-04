@@ -1,7 +1,9 @@
 package com.msd.gin.halyard.common;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
 import org.apache.hadoop.hbase.Cell;
 import org.eclipse.rdf4j.model.BNode;
@@ -77,11 +79,11 @@ public class HalyardTableUtilsKeyValueTest {
 	}
 
 	@Test
-	public void testKeyValues() {
+	public void testKeyValues() throws IOException {
 		long ts = 0;
 		Resource ctx = c != null ? c.val : null;
 		Statement expected = vf.createStatement(s.val, p.val, o.val, ctx);
-		Cell[] kvs = HalyardTableUtils.toKeyValues(s.val, p.val, o.val, ctx, false, ts);
+		List<? extends Cell> kvs = HalyardTableUtils.toKeyValues(s.val, p.val, o.val, ctx, false, ts);
 		for(Cell kv : kvs) {
 			testParseStatement("spoc", expected, s, p, o, c != null ? c : null, kv, ts);
 			testParseStatement("_poc", expected, null, p, o, c != null ? c : null, kv, ts);
@@ -91,8 +93,8 @@ public class HalyardTableUtilsKeyValueTest {
 		}
 	}
 
-	private void testParseStatement(String msg, Statement expected, RDFSubject s, RDFPredicate p, RDFObject o, RDFContext c, Cell kv, long ts) {
-		Statement actual = HalyardTableUtils.parseStatement(s, p, o, c, kv, vf);
+	private void testParseStatement(String msg, Statement expected, RDFSubject s, RDFPredicate p, RDFObject o, RDFContext c, Cell kv, long ts) throws IOException {
+		Statement actual = HalyardTableUtils.parseStatement(s, p, o, c, kv, vf, null);
 		assertEquals(msg, expected, actual);
 		assertEquals(ts, ((Timestamped)actual).getTimestamp());
 		if(s == null) {

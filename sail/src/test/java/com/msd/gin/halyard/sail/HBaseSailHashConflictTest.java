@@ -78,8 +78,8 @@ public class HBaseSailHashConflictTest {
     public static void setup() throws Exception {
 		try (Table table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", true, 0)) {
             long timestamp = System.currentTimeMillis();
-			Cell triple[] = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp);
-			Cell conflicts[][] = new Cell[][] {
+			List<? extends Cell> triple = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp);
+			List<? extends Cell> conflicts[] = new List[] {
                 HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null, false, timestamp),
                 HalyardTableUtils.toKeyValues(SUBJ, CONF,  OBJ, null, false, timestamp),
                 HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null, false, timestamp),
@@ -89,15 +89,16 @@ public class HBaseSailHashConflictTest {
                 HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null, false, timestamp),
             };
 			List<Put> puts = new ArrayList<>();
-            for (int i=0; i<triple.length; i++) {
-				Cell kv = triple[i];
+			for (int i = 0; i < triple.size(); i++) {
+				Cell kv = triple.get(i);
 				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
                 for (int j=0; j<conflicts.length; j++) {
+					Cell conflictCell = conflicts[j].get(i);
 					Cell xkv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(),
                             kv.getFamilyArray(), kv.getFamilyOffset(), kv.getFamilyLength(),
-                            conflicts[j][i].getQualifierArray(), conflicts[j][i].getQualifierOffset(), conflicts[j][i].getQualifierLength(),
+							conflictCell.getQualifierArray(), conflictCell.getQualifierOffset(), conflictCell.getQualifierLength(),
                             kv.getTimestamp(), KeyValue.Type.Put,
-                            conflicts[j][i].getValueArray(), conflicts[j][i].getValueOffset(), conflicts[j][i].getValueLength());
+							conflictCell.getValueArray(), conflictCell.getValueOffset(), conflictCell.getValueLength());
 					puts.add(new Put(xkv.getRowArray(), xkv.getRowOffset(), xkv.getRowLength(), xkv.getTimestamp()).add(xkv));
                 }
             }

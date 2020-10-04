@@ -17,10 +17,12 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
+import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -37,24 +39,27 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
+import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.ExceptionConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.common.iteration.TimeLimitIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
+import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HBaseTripleSource implements TripleSource {
+public class HBaseTripleSource implements RDFStarTripleSource {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseTripleSource.class);
 
 	private final Table table;
 	private final ValueFactory vf;
+	private final TripleFactory tf;
 	private final long timeoutSecs;
 	private final HBaseSail.ScanSettings settings;
 	private final HBaseSail.Ticker ticker;
@@ -62,6 +67,7 @@ public class HBaseTripleSource implements TripleSource {
 	public HBaseTripleSource(Table table, ValueFactory vf, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
 		this.table = table;
 		this.vf = vf;
+		this.tf = new TripleFactory(table);
 		this.timeoutSecs = timeoutSecs;
 		this.settings = settings;
 		this.ticker = ticker;
@@ -78,13 +84,13 @@ public class HBaseTripleSource implements TripleSource {
 		if (timeoutSecs > 0) {
 			iter = new TimeLimitIteration<Statement, QueryEvaluationException>(iter, TimeUnit.SECONDS.toMillis(timeoutSecs)) {
 				@Override
-				protected void throwInterruptedException() throws QueryEvaluationException {
+				protected void throwInterruptedException() {
 					throw new QueryEvaluationException(String.format("Statements scanning exceeded specified timeout %ds", timeoutSecs));
 				}
 			};
 		}
 		if (contexts != null && Arrays.stream(contexts).anyMatch(Objects::isNull)) {
-			// filter out any scan of the default context (everything) to the specified contexts
+			// filter out any scan that includes the default context (everything) to the specified contexts
 			final Set<Resource> ctxSet = new HashSet<>();
 			Collections.addAll(ctxSet, contexts);
 			iter = new FilterIteration<Statement, QueryEvaluationException>(iter) {
@@ -113,7 +119,7 @@ public class HBaseTripleSource implements TripleSource {
 		private ResultScanner rs = null;
 
 		public StatementScanner(Resource subj, IRI pred, Value obj, Resource... contexts) {
-			super(vf);
+			super(vf, tf);
 			this.subj = RDFSubject.create(subj);
 			this.pred = RDFPredicate.create(pred);
 			this.obj = RDFObject.create(obj);
@@ -165,5 +171,30 @@ public class HBaseTripleSource implements TripleSource {
 				rs.close();
 			}
 		}
+	}
+
+	@Override
+	public final CloseableIteration<? extends Triple, QueryEvaluationException> getRdfStarTriples(Resource subj, IRI pred, Value obj) throws QueryEvaluationException {
+		CloseableIteration<? extends Triple, QueryEvaluationException> iter = new ConvertingIteration<Statement, Triple, QueryEvaluationException>(
+			new ExceptionConvertingIteration<Statement, QueryEvaluationException>(getStatementsInternal(subj, pred, obj, HALYARD.TRIPLE_GRAPH_CONTEXT)) {
+				@Override
+				protected QueryEvaluationException convert(Exception e) {
+					return new QueryEvaluationException(e);
+				}
+			}) {
+			@Override
+			protected Triple convert(Statement stmt) {
+				return vf.createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
+			}
+		};
+		if (timeoutSecs > 0) {
+			iter = new TimeLimitIteration<Triple, QueryEvaluationException>(iter, TimeUnit.SECONDS.toMillis(timeoutSecs)) {
+				@Override
+				protected void throwInterruptedException() {
+					throw new QueryEvaluationException(String.format("Statements scanning exceeded specified timeout %ds", timeoutSecs));
+				}
+			};
+		}
+		return iter;
 	}
 }

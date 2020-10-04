@@ -19,6 +19,7 @@ package com.msd.gin.halyard.sail;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
@@ -76,6 +77,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContextInitializer;
+import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExtendedEvaluationStrategy;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
@@ -143,7 +145,7 @@ public class HBaseSailConnection implements SailConnection {
 		}
     }
 
-	private TripleSource createTripleSource() {
+	private RDFStarTripleSource createTripleSource() {
 		return new HBaseSearchTripleSource(table, sail.getValueFactory(), sail.evaluationTimeout, sail.scanSettings, sail.elasticIndexURL, sail.ticker);
 	}
 
@@ -186,7 +188,7 @@ public class HBaseSailConnection implements SailConnection {
 	public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(final TupleExpr tupleExpr, final Dataset dataset, final BindingSet bindings, final boolean includeInferred) throws SailException {
 		flush();
 
-		TripleSource baseSource = createTripleSource();
+		RDFStarTripleSource baseSource = createTripleSource();
 		TripleSource tripleSource = new SpinAwareTripleSource(baseSource);
 		QueryContext queryContext = createQueryContext(tripleSource, includeInferred);
 		EvaluationStrategy strategy = createEvaluationStrategy(tripleSource, dataset, queryContext);
@@ -220,7 +222,7 @@ public class HBaseSailConnection implements SailConnection {
 				return sail.evaluationTimeout <= 0 ? iter
 						: new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter, TimeUnit.SECONDS.toMillis(sail.evaluationTimeout)) {
 							@Override
-							protected void throwInterruptedException() throws QueryEvaluationException {
+							protected void throwInterruptedException() {
 								throw new QueryEvaluationException(
 										String.format("Query evaluation exceeded specified timeout %ds", sail.evaluationTimeout));
 							}
@@ -273,49 +275,61 @@ public class HBaseSailConnection implements SailConnection {
 			return new ConvertingIteration<Statement, Resource, SailException>(scanner) {
 
 				@Override
-				protected Resource convert(Statement stmt) throws SailException {
+				protected Resource convert(Statement stmt) {
 					return (IRI) stmt.getObject();
 				}
 
 			};
-		} else if (sail.evaluationTimeout > 0) {
-			// try to find them manually if there are no stats and there is a specific timeout
-			Scan scan = HalyardTableUtils.scan(HalyardTableUtils.concat(HalyardTableUtils.CSPO_PREFIX, false),
-					HalyardTableUtils.concat(HalyardTableUtils.CSPO_PREFIX, true, RDFContext.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY));
-			try {
-				ResultScanner rs = table.getScanner(scan);
-				return new TimeLimitIteration<Resource, SailException>(new ReducedIteration<Resource, SailException>(
-						new ConvertingIteration<Statement, Resource, SailException>(new ExceptionConvertingIteration<Statement, SailException>(new AbstractStatementScanner(sail.getValueFactory()) {
-							@Override
-							protected Result nextResult() throws IOException {
-								return rs.next();
-							}
-
-							@Override
-							public void close() throws IOException {
-								rs.close();
-							}
-						}) {
-							@Override
-							protected SailException convert(Exception e) {
-								return new SailException(e);
-							}
-						}) {
-							@Override
-							protected Resource convert(Statement stmt) throws SailException {
-								return stmt.getContext();
-							}
-						}), TimeUnit.SECONDS.toMillis(sail.evaluationTimeout)) {
-							@Override
-					protected void throwInterruptedException() throws SailException {
-						throw new SailException(String.format("Evaluation exceeded specified timeout %ds", sail.evaluationTimeout));
-							}
-				};
-			} catch (IOException ioe) {
-				throw new SailException(ioe);
-			}
 		} else {
-			return new EmptyIteration<>();
+			scanner.close();
+
+			if (sail.evaluationTimeout > 0) {
+				// try to find them manually if there are no stats and there is a specific timeout
+				class StatementScanner extends AbstractStatementScanner {
+					final ResultScanner rs;
+
+					StatementScanner() throws IOException {
+						super(sail.getValueFactory(), new TripleFactory(table));
+						Scan scan = HalyardTableUtils.scan(HalyardTableUtils.concat(HalyardTableUtils.CSPO_PREFIX, false),
+								HalyardTableUtils.concat(HalyardTableUtils.CSPO_PREFIX, true, RDFContext.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY));
+						rs = table.getScanner(scan);
+					}
+
+					@Override
+					protected Result nextResult() throws IOException {
+						return rs.next();
+					}
+
+					@Override
+					public void close() throws IOException {
+						rs.close();
+					}
+				}
+
+				try {
+					return new TimeLimitIteration<Resource, SailException>(
+							new ReducedIteration<Resource, SailException>(new ConvertingIteration<Statement, Resource, SailException>(new ExceptionConvertingIteration<Statement, SailException>(new StatementScanner()) {
+								@Override
+								protected SailException convert(Exception e) {
+									return new SailException(e);
+								}
+							}) {
+								@Override
+								protected Resource convert(Statement stmt) {
+									return stmt.getContext();
+								}
+							}), TimeUnit.SECONDS.toMillis(sail.evaluationTimeout)) {
+						@Override
+						protected void throwInterruptedException() {
+							throw new SailException(String.format("Evaluation exceeded specified timeout %ds", sail.evaluationTimeout));
+						}
+					};
+				} catch (IOException ioe) {
+					throw new SailException(ioe);
+				}
+			} else {
+				return new EmptyIteration<>();
+			}
 		}
     }
 

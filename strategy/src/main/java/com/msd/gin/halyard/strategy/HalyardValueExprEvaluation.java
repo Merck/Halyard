@@ -68,6 +68,7 @@ import org.eclipse.rdf4j.query.algebra.SameTerm;
 import org.eclipse.rdf4j.query.algebra.Str;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
+import org.eclipse.rdf4j.query.algebra.ValueExprTripleRef;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
@@ -189,6 +190,8 @@ class HalyardValueExprEvaluation {
             return evaluate((If) expr, bindings);
         } else if (expr instanceof ListMemberOperator) {
             return evaluate((ListMemberOperator) expr, bindings);
+		} else if (expr instanceof ValueExprTripleRef) {
+			return evaluate((ValueExprTripleRef) expr, bindings);
         } else if (expr == null) {
             throw new IllegalArgumentException("expr must not be null");
         } else {
@@ -999,4 +1002,21 @@ class HalyardValueExprEvaluation {
             return BooleanLiteral.valueOf(iter.hasNext());
         }
     }
+
+	private Value evaluate(ValueExprTripleRef node, BindingSet bindings) throws QueryEvaluationException {
+		Value subj = evaluate(node.getSubjectVar(), bindings);
+		if (!(subj instanceof Resource)) {
+			throw new ValueExprEvaluationException("no subject value");
+		}
+		Value pred = evaluate(node.getPredicateVar(), bindings);
+		if (!(pred instanceof IRI)) {
+			throw new ValueExprEvaluationException("no predicate value");
+		}
+		Value obj = evaluate(node.getObjectVar(), bindings);
+		if (obj == null) {
+			throw new ValueExprEvaluationException("no object value");
+		}
+		return tripleSource.getValueFactory().createTriple((Resource) subj, (IRI) pred, obj);
+
+	}
 }

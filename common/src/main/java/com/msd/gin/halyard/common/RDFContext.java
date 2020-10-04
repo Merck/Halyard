@@ -17,10 +17,6 @@ public final class RDFContext extends RDFValue<Resource> {
 	public static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_48;
 
 	private RDFContext(Resource val) {
-		super(val);
-	}
-
-	public RDFRole getRole() {
-		return RDFRole.CONTEXT;
+		super(RDFRole.CONTEXT, val);
 	}
 }

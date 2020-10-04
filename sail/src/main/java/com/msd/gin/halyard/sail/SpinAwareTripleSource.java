@@ -21,14 +21,16 @@ import org.eclipse.rdf4j.common.iteration.EmptyIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SPIN;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
+import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 
-public final class SpinAwareTripleSource implements TripleSource {
+public final class SpinAwareTripleSource implements RDFStarTripleSource {
 	private final TripleSource baseSource;
 
 	public SpinAwareTripleSource(TripleSource source) {
@@ -43,6 +45,11 @@ public final class SpinAwareTripleSource implements TripleSource {
 		} else {
 			return baseSource.getStatements(subj, pred, obj, contexts);
 		}
+	}
+
+	@Override
+	public CloseableIteration<? extends Triple, QueryEvaluationException> getRdfStarTriples(Resource subj, IRI pred, Value obj) throws QueryEvaluationException {
+		return (baseSource instanceof RDFStarTripleSource) ? ((RDFStarTripleSource) baseSource).getRdfStarTriples(subj, pred, obj) : new EmptyIteration<>();
 	}
 
 	@Override

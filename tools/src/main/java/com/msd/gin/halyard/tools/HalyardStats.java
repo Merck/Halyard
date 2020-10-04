@@ -21,6 +21,7 @@ import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
+import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.vocab.VOID_EXT;
@@ -108,6 +109,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         final byte[] lastClassFragment = new byte[RDFObject.KEY_SIZE];
         IRI statsContext, graphContext;
         byte[] cspoStatsContextHash;
+        TripleFactory tf;
         byte lastRegion = -1;
         long counter = 0;
         boolean update;
@@ -130,6 +132,8 @@ public final class HalyardStats extends AbstractHalyardTool {
             String gc = conf.get(GRAPH_CONTEXT);
             if (gc != null) graphContext = SVF.createIRI(gc);
 			cspoStatsContextHash = RDFContext.create(statsContext).getKeyHash(HalyardTableUtils.CSPO_PREFIX);
+            Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
+            tf = new TripleFactory(table);
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, int len, byte[] target) {
@@ -155,7 +159,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
-			List<Statement> stmts = HalyardTableUtils.parseStatements(null, null, null, null, value, SVF);
+			List<Statement> stmts = HalyardTableUtils.parseStatements(null, null, null, null, value, SVF, tf);
             int hashShift;
             if (region < HalyardTableUtils.CSPO_PREFIX) {
             	// triple region
@@ -356,6 +360,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         RDFWriter writer;
         Map<String, Boolean> graphs;
         IRI statsGraphContext;
+        TripleFactory tf;
         HBaseSail sail;
 		SailConnection conn;
         long removed = 0, added = 0;
@@ -364,6 +369,8 @@ public final class HalyardStats extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             statsGraphContext = SVF.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
+            Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
+            tf = new TripleFactory(table);
             String targetUrl = conf.get(TARGET);
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
@@ -438,7 +445,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                     }
                 }
                 if (partitionId.hasRemaining()) {
-					Value partition = HalyardTableUtils.readValue(partitionId, SVF);
+					Value partition = HalyardTableUtils.readValue(partitionId, SVF, tf);
                     IRI pred = SVF.createIRI(predicate);
 					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.id(partition)));
                     writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);

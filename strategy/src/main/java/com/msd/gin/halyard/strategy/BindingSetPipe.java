@@ -36,11 +36,11 @@ abstract class BindingSetPipe {
     }
 
     /**
-     * Pushes BindingSet up the pipe, use pushEnd() to indicate end of data. In case you need to interrupt the tree data flow
+     * Pushes BindingSet up the pipe, use pushLast() to indicate end of data. In case you need to interrupt the tree data flow
      * (when for example just a Slice of data is expected), it is necessary to indicate that no more data is expected down the tree
      * (to stop feeding this pipe) by returning false and
      * also to indicate up the tree that this is the end of data
-     * (by calling pushEnd() on the parent pipe in the evaluation tree).
+     * (by calling pushLast() on the parent pipe in the evaluation tree).
      * Must be thread-safe.
      *
      * @param bs BindingSet
@@ -83,6 +83,14 @@ abstract class BindingSetPipe {
             return parent.isClosed();
         } else {
             return false;
+        }
+    }
+
+    public final void empty() {
+        try {
+            close();
+        } catch (InterruptedException e) {
+            handleException(e);
         }
     }
 }

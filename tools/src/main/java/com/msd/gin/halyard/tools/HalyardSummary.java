@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.sail.HBaseSail;
@@ -113,15 +114,15 @@ public final class HalyardSummary extends AbstractHalyardTool {
         private int decimationFactor;
         private final Random random = new Random(0);
         private Table table;
+        private TripleFactory tf;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             this.mapContext = context;
             Configuration conf = context.getConfiguration();
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
-            if (table == null) {
-                table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            }
+            this.table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
+            this.tf = new TripleFactory(table);
         }
 
         private Set<IRI> queryForClasses(Value instance) throws IOException {
@@ -132,7 +133,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 Scan scan = HalyardTableUtils.scan(s, p, null, null);
                 try (ResultScanner scanner = table.getScanner(scan)) {
                     for (Result r : scanner) {
-                        for (Statement st : HalyardTableUtils.parseStatements(s, p, null, null, r, SVF)) {
+                        for (Statement st : HalyardTableUtils.parseStatements(s, p, null, null, r, SVF, tf)) {
 	                        if (st.getSubject().equals(instance) && st.getPredicate().equals(RDF.TYPE) && (st.getObject() instanceof IRI)) {
 	                            res.add((IRI)st.getObject());
 	                        }
@@ -250,7 +251,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             if (random.nextInt(decimationFactor) == 0) {
-                statementChange(HalyardTableUtils.parseStatement(null, null, null, null, value.rawCells()[0], SVF));
+                statementChange(HalyardTableUtils.parseStatement(null, null, null, null, value.rawCells()[0], SVF, tf));
             }
             if (++counter % 10000 == 0) {
                 output.setStatus(MessageFormat.format("{0} cc:{1} pc:{2} pd:{3} pr:{4} pdr:{5}", counter, ccCounter, pcCounter, pdCounter, prCounter, pdrCounter));

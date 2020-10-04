@@ -94,10 +94,10 @@ public class HalyardTableUtilsTest {
         RDFPredicate p = RDFPredicate.create(pred);
         RDFObject o = RDFObject.create(obj);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
-            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, o, null, rs.next(), vf).iterator().next().getObject());
+            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, o, null, rs.next(), vf, null).iterator().next().getObject());
         }
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, null, null))) {
-            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, null, null, rs.next(), vf).iterator().next().getObject());
+            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, null, null, rs.next(), vf, null).iterator().next().getObject());
         }
     }
 
@@ -110,16 +110,18 @@ public class HalyardTableUtilsTest {
         Value obj1 = vf.createLiteral("literal1");
         Value obj2 = vf.createLiteral("literal2");
         long timestamp = System.currentTimeMillis();
-        Cell kv1[] = HalyardTableUtils.toKeyValues(subj, pred1, obj1, null, false, timestamp);
-        Cell kv2[] = HalyardTableUtils.toKeyValues(subj, pred2, obj2, null, false, timestamp);
+        List<? extends Cell> kv1 = HalyardTableUtils.toKeyValues(subj, pred1, obj1, null, false, timestamp);
+        List<? extends Cell> kv2 = HalyardTableUtils.toKeyValues(subj, pred2, obj2, null, false, timestamp);
 		List<Put> puts = new ArrayList<>();
         for (int i=0; i<3; i++) {
-			puts.add(new Put(kv1[i].getRowArray(), kv1[i].getRowOffset(), kv1[i].getRowLength(), kv1[i].getTimestamp())
-					.add(kv1[i]));
-            Cell conflicting = new KeyValue(kv1[i].getRowArray(), kv1[i].getRowOffset(), kv1[i].getRowLength(),
-                    kv1[i].getFamilyArray(), kv1[i].getFamilyOffset(), kv1[i].getFamilyLength(),
-                    kv2[i].getQualifierArray(), kv2[i].getQualifierOffset(), kv2[i].getQualifierLength(),
-                    kv1[i].getTimestamp(), KeyValue.Type.Put, kv2[i].getValueArray(), kv2[i].getValueOffset(), kv2[i].getValueLength());
+        	Cell cell1 = kv1.get(i);
+        	Cell cell2 = kv2.get(i);
+			puts.add(new Put(cell1.getRowArray(), cell1.getRowOffset(), cell1.getRowLength(), cell1.getTimestamp())
+					.add(cell1));
+            Cell conflicting = new KeyValue(cell1.getRowArray(), cell1.getRowOffset(), cell1.getRowLength(),
+                    cell1.getFamilyArray(), cell1.getFamilyOffset(), cell1.getFamilyLength(),
+                    cell2.getQualifierArray(), cell2.getQualifierOffset(), cell2.getQualifierLength(),
+                    cell1.getTimestamp(), KeyValue.Type.Put, cell2.getValueArray(), cell2.getValueOffset(), cell2.getValueLength());
 			puts.add(new Put(conflicting.getRowArray(), conflicting.getRowOffset(), conflicting.getRowLength(),
 					conflicting.getTimestamp()).add(conflicting));
         }
@@ -129,7 +131,7 @@ public class HalyardTableUtilsTest {
         RDFPredicate p1 = RDFPredicate.create(pred1);
         RDFObject o1 = RDFObject.create(obj1);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p1, o1, null))) {
-            List<Statement> res = HalyardTableUtils.parseStatements(s, p1, o1, null, rs.next(), vf);
+            List<Statement> res = HalyardTableUtils.parseStatements(s, p1, o1, null, rs.next(), vf, null);
             assertEquals(1, res.size());
             assertTrue(res.contains(SimpleValueFactory.getInstance().createStatement(subj, pred1, obj1)));
         }
@@ -169,8 +171,8 @@ public class HalyardTableUtilsTest {
     }
 
     @Test
-    public void testNoResult() {
-        assertEquals(0, HalyardTableUtils.parseStatements(null, null, null, null, Result.EMPTY_RESULT, SimpleValueFactory.getInstance()).size());
+    public void testNoResult() throws Exception {
+        assertEquals(0, HalyardTableUtils.parseStatements(null, null, null, null, Result.EMPTY_RESULT, SimpleValueFactory.getInstance(), null).size());
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -186,8 +188,8 @@ public class HalyardTableUtilsTest {
     @Test
     public void testToKeyValuesDelete() throws Exception {
         IRI res = SimpleValueFactory.getInstance().createIRI("http://testiri");
-        Cell kvs[] = HalyardTableUtils.toKeyValues(res, res, res, res, true, 0);
-        assertEquals(6, kvs.length);
+        List<? extends Cell> kvs = HalyardTableUtils.toKeyValues(res, res, res, res, true, 0);
+        assertEquals(6, kvs.size());
         for (Cell kv : kvs) {
             assertEquals(Cell.Type.DeleteColumn, kv.getType());
         }

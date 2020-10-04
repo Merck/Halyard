@@ -31,7 +31,12 @@ public class IdentifierTupleFunction implements TupleFunction {
 			Value... args)
 		throws ValueExprEvaluationException
 	{
-		if (args.length == 3) {
+		Namespace ns;
+		byte[] id;
+		if (args.length == 1) {
+			ns = HALYARD.VALUE_ID_NS;
+			id = HalyardTableUtils.id(args[0]);
+		} else if (args.length == 3) {
 			if (!(args[0] instanceof Resource)) {
 				throw new ValueExprEvaluationException("First argument must be a subject");
 			}
@@ -41,16 +46,13 @@ public class IdentifierTupleFunction implements TupleFunction {
 			if (!(args[2] instanceof Value)) {
 				throw new ValueExprEvaluationException("Third argument must be an object");
 			}
-		} else if (args.length != 1) {
+			ns = HALYARD.TRIPLE_ID_NS;
+			id = new byte[3 * HalyardTableUtils.ID_SIZE];
+			HalyardTableUtils.writeTripleIdentifier((Resource) args[0], (IRI) args[1], args[2], id, 0);
+		} else {
 			throw new ValueExprEvaluationException(String.format("%s requires 1 or 3 arguments, got %d", getURI(), args.length));
 		}
 
-		byte[] stmtId = new byte[args.length * HalyardTableUtils.ID_SIZE];
-		for (int i = 0; i < args.length; i++) {
-			byte[] id = HalyardTableUtils.id(args[i]);
-			System.arraycopy(id, 0, stmtId, i * HalyardTableUtils.ID_SIZE, HalyardTableUtils.ID_SIZE);
-		}
-		Namespace ns = (args.length == 3) ? HALYARD.STATEMENT_ID_NS : HALYARD.VALUE_ID_NS;
-		return new SingletonIteration<>(Collections.singletonList(vf.createIRI(ns.getName(), HalyardTableUtils.encode(stmtId))));
+		return new SingletonIteration<>(Collections.singletonList(vf.createIRI(ns.getName(), HalyardTableUtils.encode(id))));
 	}
 }

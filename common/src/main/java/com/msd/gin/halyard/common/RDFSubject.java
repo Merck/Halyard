@@ -19,10 +19,6 @@ public final class RDFSubject extends RDFValue<Resource> {
 	public static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_64;
 
 	private RDFSubject(Resource val) {
-		super(val);
-	}
-
-	public RDFRole getRole() {
-		return RDFRole.SUBJECT;
+		super(RDFRole.SUBJECT, val);
 	}
 }

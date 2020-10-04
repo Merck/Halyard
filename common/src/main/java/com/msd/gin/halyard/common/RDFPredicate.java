@@ -19,10 +19,6 @@ public final class RDFPredicate extends RDFValue<IRI> {
 	public static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
 
 	private RDFPredicate(IRI val) {
-		super(val);
-	}
-
-	public RDFRole getRole() {
-		return RDFRole.PREDICATE;
+		super(RDFRole.PREDICATE, val);
 	}
 }

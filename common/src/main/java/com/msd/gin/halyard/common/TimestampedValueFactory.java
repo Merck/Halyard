@@ -5,6 +5,7 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.AbstractValueFactory;
 import org.eclipse.rdf4j.model.impl.BooleanLiteral;
@@ -56,6 +57,11 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 	}
 
 	@Override
+	public Triple createTriple(Resource subject, IRI predicate, Value object) {
+		return new IdentifiableTriple(super.createTriple(unwrap(subject), unwrap(predicate), unwrap(object)));
+	}
+
+	@Override
 	public Statement createStatement(Resource subject, IRI predicate, Value object) {
 		return new TimestampedStatement(unwrap(subject), unwrap(predicate), unwrap(object));
 	}
@@ -95,6 +101,8 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 				return new StatementIRI((IRI) subj, this);
 			} else if (subj instanceof BNode) {
 				return new StatementBNode((BNode) subj, this);
+			} else if (subj instanceof Triple) {
+				return new StatementTriple((Triple) subj, this);
 			} else {
 				throw new AssertionError();
 			}
@@ -113,6 +121,8 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 				return new StatementBNode((BNode) obj, this);
 			} else if (obj instanceof Literal) {
 				return new StatementLiteral((Literal) obj, this);
+			} else if (obj instanceof Triple) {
+				return new StatementTriple((Triple) obj, this);
 			} else {
 				throw new AssertionError();
 			}
@@ -147,6 +157,8 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 				return new StatementIRI((IRI) subj, this);
 			} else if (subj instanceof BNode) {
 				return new StatementBNode((BNode) subj, this);
+			} else if (subj instanceof Triple) {
+				return new StatementTriple((Triple) subj, this);
 			} else {
 				throw new AssertionError();
 			}
@@ -165,6 +177,8 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 				return new StatementBNode((BNode) obj, this);
 			} else if (obj instanceof Literal) {
 				return new StatementLiteral((Literal) obj, this);
+			} else if (obj instanceof Triple) {
+				return new StatementTriple((Triple) obj, this);
 			} else {
 				throw new AssertionError();
 			}
@@ -282,6 +296,38 @@ public class TimestampedValueFactory extends AbstractValueFactory {
 		public void setId(byte[] id) {
 			if(literal instanceof Identifiable) {
 				((Identifiable)literal).setId(id);
+			}
+		}
+	}
+
+	static final class StatementTriple extends TripleWrapper implements StatementValue<Triple>, Identifiable {
+		private static final long serialVersionUID = 5514584239151236972L;
+		private final Statement stmt;
+
+		StatementTriple(Triple triple, Statement stmt) {
+			super(triple);
+			this.stmt = stmt;
+		}
+
+		@Override
+		public Triple getValue() {
+			return triple;
+		}
+
+		@Override
+		public Statement getStatement() {
+			return stmt;
+		}
+
+		@Override
+		public byte[] getId() {
+			return (triple instanceof Identifiable) ? ((Identifiable)triple).getId() : null;
+		}
+
+		@Override
+		public void setId(byte[] id) {
+			if(triple instanceof Identifiable) {
+				((Identifiable)triple).setId(id);
 			}
 		}
 	}

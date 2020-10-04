@@ -45,6 +45,8 @@ public final class HALYARD implements Vocabulary {
 
     public static final IRI SYSTEM_GRAPH_CONTEXT = SVF.createIRI(NAMESPACE, "system");
 
+    public static final IRI TRIPLE_GRAPH_CONTEXT = SVF.createIRI(NAMESPACE, "triples");
+
     public static final IRI NAMESPACE_PREFIX_PROPERTY = HALYARD.SVF.createIRI(NAMESPACE, "namespacePrefix");
 
     public final static IRI TABLE_NAME_PROPERTY = SVF.createIRI(NAMESPACE, "tableName");
@@ -67,9 +69,9 @@ public final class HALYARD implements Vocabulary {
 
 	public final static IRI IDENTIFIER_PROPERTY = SVF.createIRI(NAMESPACE, "identifier");
 
-	public final static IRI STATEMENT_PROPERTY = SVF.createIRI(NAMESPACE, "statement");
+	public final static IRI TRIPLE_PROPERTY = SVF.createIRI(NAMESPACE, "triple");
 
-    public static final Namespace VALUE_ID_NS = new SimpleNamespace("hvalues", "halyard:id:values/");
+    public static final Namespace VALUE_ID_NS = new SimpleNamespace("idv", "halyard:id:value:");
 
-    public static final Namespace STATEMENT_ID_NS = new SimpleNamespace("hstmts", "halyard:id:statements/");
+    public static final Namespace TRIPLE_ID_NS = new SimpleNamespace("id3", "halyard:id:triple:");
 }

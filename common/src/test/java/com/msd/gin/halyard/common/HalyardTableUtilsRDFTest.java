@@ -1,5 +1,6 @@
 package com.msd.gin.halyard.common;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -45,9 +46,9 @@ public class HalyardTableUtilsRDFTest {
 	}
 
 	@Test
-	public void testToAndFromBytes() {
+	public void testToAndFromBytes() throws IOException {
 		byte[] b = HalyardTableUtils.writeBytes(expected);
-		Value actual = HalyardTableUtils.readValue(ByteBuffer.wrap(b), vf);
+		Value actual = HalyardTableUtils.readValue(ByteBuffer.wrap(b), vf, null);
 		assertEquals(expected, actual);
 
 		// check readValue() works on a subsequence
@@ -58,7 +59,7 @@ public class HalyardTableUtilsRDFTest {
 		extbuf.put(b);
 		extbuf.limit(extbuf.position());
 		extbuf.reset();
-		actual = HalyardTableUtils.readValue(extbuf, vf);
+		actual = HalyardTableUtils.readValue(extbuf, vf, null);
 		assertEquals("Buffer position", extbuf.limit(), extbuf.position());
 		assertEquals(expected, actual);
 	}

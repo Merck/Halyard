@@ -19,11 +19,11 @@ import org.eclipse.rdf4j.spin.function.InverseMagicProperty;
 import org.kohsuke.MetaInfServices;
 
 @MetaInfServices(TupleFunction.class)
-public class StatementTupleFunction implements InverseMagicProperty {
+public class TripleTupleFunction implements InverseMagicProperty {
 
 	@Override
 	public String getURI() {
-		return HALYARD.STATEMENT_PROPERTY.toString();
+		return HALYARD.TRIPLE_PROPERTY.toString();
 	}
 
 	@Override
@@ -50,6 +50,6 @@ public class StatementTupleFunction implements InverseMagicProperty {
 			byte[] id = HalyardTableUtils.id(args[i]);
 			System.arraycopy(id, 0, stmtId, i * HalyardTableUtils.ID_SIZE, HalyardTableUtils.ID_SIZE);
 		}
-		return new SingletonIteration<>(Collections.singletonList(vf.createIRI(HALYARD.STATEMENT_ID_NS.getName(), HalyardTableUtils.encode(stmtId))));
+		return new SingletonIteration<>(Collections.singletonList(vf.createIRI(HALYARD.TRIPLE_ID_NS.getName(), HalyardTableUtils.encode(stmtId))));
 	}
 }
