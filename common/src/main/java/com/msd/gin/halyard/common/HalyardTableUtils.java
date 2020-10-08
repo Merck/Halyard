@@ -21,7 +21,9 @@ import com.google.common.collect.HashBiMap;
 import com.google.common.hash.Hashing;
 import com.msd.gin.halyard.vocab.HALYARD;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -45,6 +47,7 @@ import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeConstants;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
+import javax.xml.transform.TransformerException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
@@ -60,6 +63,7 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.client.TableDescriptor;
@@ -323,6 +327,7 @@ public final class HalyardTableUtils {
 	private static final byte TIME_TYPE = 't';
 	private static final byte DATE_TYPE = 'D';
 	private static final byte DATETIME_TYPE = 'T';
+	private static final byte XML_TYPE = 'x';
 
 	static {
 		BYTE_WRITERS.put(XSD.BOOLEAN, new ByteWriter() {
@@ -435,7 +440,11 @@ public final class HalyardTableUtils {
 		BYTE_WRITERS.put(XSD.STRING, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
-				return new StringBuilder().append((char)STRING_TYPE).append(l.getLabel()).toString().getBytes(StandardCharsets.UTF_8);
+				byte[] b = l.getLabel().getBytes(StandardCharsets.UTF_8);
+				byte[] zb = new byte[1+b.length];
+				zb[0] = STRING_TYPE;
+				System.arraycopy(b, 0, zb, 1, b.length);
+				return zb;
 			}
 		});
 		BYTE_READERS.put(STRING_TYPE, new ByteReader() {
@@ -512,6 +521,40 @@ public final class HalyardTableUtils {
 				}
 				cal.setTimezone(tz);
 				return vf.createLiteral(cal);
+			}
+		});
+
+		BYTE_WRITERS.put(RDF.XMLLITERAL, new ByteWriter() {
+			@Override
+			public byte[] writeBytes(Literal l) {
+				try {
+					ByteArrayOutputStream out = new ByteArrayOutputStream(1024);
+					out.write(XML_TYPE);
+					out.write(XML_TYPE); // mark xml as valid
+					XMLLiteral.writeInfoset(l.getLabel(), out);
+					return out.toByteArray();
+				} catch(TransformerException e) {
+					byte[] b = l.getLabel().getBytes(StandardCharsets.UTF_8);
+					byte[] xzb = new byte[2+b.length];
+					xzb[0] = XML_TYPE;
+					xzb[1] = STRING_TYPE; // mark xml as invalid
+					System.arraycopy(b, 0, xzb, 2, b.length);
+					return xzb;
+				}
+			}
+		});
+		BYTE_READERS.put(XML_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				if(b.get() == XML_TYPE) {
+					// valid xml
+					byte[] fiBytes = new byte[b.remaining()];
+					b.get(fiBytes);
+					return new XMLLiteral(fiBytes);
+				} else {
+					// invalid xml
+					return vf.createLiteral(StandardCharsets.UTF_8.decode(b).toString(), RDF.XMLLITERAL);
+				}
 			}
 		});
 	}
@@ -1096,11 +1139,13 @@ public final class HalyardTableUtils {
 	public static Resource getSubject(Table table, byte[] id, ValueFactory vf) throws IOException {
 		TripleFactory tf = new TripleFactory(table);
 		Scan scan = scan(RDFRole.SUBJECT, SPO_PREFIX, id, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY);
-		for(Result result : table.getScanner(scan)) {
-			Cell[] cells = result.rawCells();
-			if(cells != null && cells.length > 0) {
-				Statement stmt = parseStatement(null, null, null, null, cells[0], vf, tf);
-				return stmt.getSubject();
+		try (ResultScanner scanner = table.getScanner(scan)) {
+			for (Result result : scanner) {
+				Cell[] cells = result.rawCells();
+				if(cells != null && cells.length > 0) {
+					Statement stmt = parseStatement(null, null, null, null, cells[0], vf, tf);
+					return stmt.getSubject();
+				}
 			}
 		}
 		return null;
@@ -1108,11 +1153,13 @@ public final class HalyardTableUtils {
 
 	public static IRI getPredicate(Table table, byte[] id, ValueFactory vf) throws IOException {
 		Scan scan = scan(RDFRole.PREDICATE, POS_PREFIX, id, RDFObject.STOP_KEY, RDFSubject.END_STOP_KEY);
-		for(Result result : table.getScanner(scan)) {
-			Cell[] cells = result.rawCells();
-			if(cells != null && cells.length > 0) {
-				Statement stmt = parseStatement(null, null, null, null, cells[0], vf, null);
-				return stmt.getPredicate();
+		try (ResultScanner scanner = table.getScanner(scan)) {
+			for (Result result : scanner) {
+				Cell[] cells = result.rawCells();
+				if(cells != null && cells.length > 0) {
+					Statement stmt = parseStatement(null, null, null, null, cells[0], vf, null);
+					return stmt.getPredicate();
+				}
 			}
 		}
 		return null;
@@ -1121,11 +1168,13 @@ public final class HalyardTableUtils {
 	public static Value getObject(Table table, byte[] id, ValueFactory vf) throws IOException {
 		TripleFactory tf = new TripleFactory(table);
 		Scan scan = scan(RDFRole.OBJECT, OSP_PREFIX, id, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY);
-		for(Result result : table.getScanner(scan)) {
-			Cell[] cells = result.rawCells();
-			if(cells != null && cells.length > 0) {
-				Statement stmt = parseStatement(null, null, null, null, cells[0], vf, tf);
-				return stmt.getObject();
+		try (ResultScanner scanner = table.getScanner(scan)) {
+			for (Result result : scanner) {
+				Cell[] cells = result.rawCells();
+				if(cells != null && cells.length > 0) {
+					Statement stmt = parseStatement(null, null, null, null, cells[0], vf, tf);
+					return stmt.getObject();
+				}
 			}
 		}
 		return null;
@@ -1640,6 +1689,43 @@ public final class HalyardTableUtils {
 			assert result.rawCells().length == 1;
 			Statement stmt = parseStatement(null, null, null, ckey, result.rawCells()[0], vf, this);
 			return vf.createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
+		}
+	}
+
+	static final class ByteBufferInputStream extends InputStream {
+		private final ByteBuffer buf;
+
+		ByteBufferInputStream(ByteBuffer b) {
+			this.buf = b;
+		}
+
+		@Override
+		public int read() {
+			return buf.hasRemaining() ? (buf.get() & 0xff) : -1;
+		}
+
+		@Override
+		public int read(byte[] b, int off, int len) {
+			int remaining = buf.remaining();
+			if (remaining == 0) {
+				return -1;
+			}
+			len = Math.min(len, remaining);
+			buf.get(b, off, len);
+			return len;
+		}
+
+		@Override
+		public long skip(long n) {
+			n = Math.max(n, -buf.position());
+			n = Math.min(n, buf.remaining());
+			buf.position((int)(buf.position() + n));
+			return n;
+		}
+
+		@Override
+		public int available() {
+			return buf.remaining();
 		}
 	}
 }

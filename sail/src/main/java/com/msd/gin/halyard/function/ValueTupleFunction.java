@@ -14,6 +14,6 @@ public class ValueTupleFunction extends IdentifierTupleFunction implements Inver
 
 	@Override
 	public String getURI() {
-		return HALYARD.VALUE_PROPERTY.toString();
+		return HALYARD.VALUE_PROPERTY.stringValue();
 	}
 }

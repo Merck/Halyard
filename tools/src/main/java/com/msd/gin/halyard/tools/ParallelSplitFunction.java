@@ -45,7 +45,7 @@ public final class ParallelSplitFunction implements Function {
 
     @Override
     public String getURI() {
-        return PARALLEL_SPLIT_FUNCTION.toString();
+        return PARALLEL_SPLIT_FUNCTION.stringValue();
     }
 
     @Override

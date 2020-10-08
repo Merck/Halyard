@@ -29,7 +29,7 @@ import org.kohsuke.MetaInfServices;
 public class TimestampTupleFunction extends AbstractSpinFunction implements TupleFunction {
 
 	public TimestampTupleFunction() {
-		super(TIMESTAMP_PROPERTY.toString());
+		super(TIMESTAMP_PROPERTY.stringValue());
 	}
 
 	@Override

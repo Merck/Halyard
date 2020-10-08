@@ -23,7 +23,7 @@ public class IdentifierTupleFunction implements TupleFunction {
 
 	@Override
 	public String getURI() {
-		return HALYARD.IDENTIFIER_PROPERTY.toString();
+		return HALYARD.IDENTIFIER_PROPERTY.stringValue();
 	}
 
 	@Override

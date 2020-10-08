@@ -16,7 +16,7 @@ public final class ObjectTupleFunction extends AbstractReificationTupleFunction 
 
 	@Override
 	public String getURI() {
-		return RDF.OBJECT.toString();
+		return RDF.OBJECT.stringValue();
 	}
 
 	@Override

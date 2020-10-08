@@ -36,7 +36,9 @@ public class HalyardTableUtilsRDFTest {
 				{ vf.createIRI(RDF.NAMESPACE) }, { vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)) },
 				{ vf.createLiteral(new Date()) }, { vf.createLiteral("13:03:22.000", XSD.TIME) },
 				{ vf.createLiteral("1980-02-14", XSD.DATE)},
-				{ vf.createLiteral("foo", vf.createIRI("urn:bar:1"))}, { vf.createLiteral("foo", "en-gb") }});
+				{ vf.createLiteral("foo", vf.createIRI("urn:bar:1"))}, { vf.createLiteral("foo", "en-gb") },
+				{ vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL)},
+				{ vf.createLiteral("invalid xml still works", RDF.XMLLITERAL)}});
 	}
 
 	private Value expected;

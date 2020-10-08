@@ -71,6 +71,8 @@ public final class HALYARD implements Vocabulary {
 
 	public final static IRI VALUE_PROPERTY = SVF.createIRI(NAMESPACE, "value");
 
+	public final static IRI XPATH_PROPERTY = SVF.createIRI(NAMESPACE, "xpath");
+
     public static final Namespace VALUE_ID_NS = new SimpleNamespace("idv", "halyard:id:value:");
 
     public static final Namespace TRIPLE_ID_NS = new SimpleNamespace("id3", "halyard:id:triple:");

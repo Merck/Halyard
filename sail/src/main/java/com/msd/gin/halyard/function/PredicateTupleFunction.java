@@ -16,7 +16,7 @@ public final class PredicateTupleFunction extends AbstractReificationTupleFuncti
 
 	@Override
 	public String getURI() {
-		return RDF.PREDICATE.toString();
+		return RDF.PREDICATE.stringValue();
 	}
 
 	@Override

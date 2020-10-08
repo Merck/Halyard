@@ -119,6 +119,8 @@ public enum RDFRole {
 
 	final byte[] keyHash(byte prefix, byte[] id) {
 		int len = keyHashSize();
+		// rotate key so ordering is different for different prefixes
+		// this gives better load distribution when traversing between prefixes
 		return rotateRight(id, 0, len, prefix, new byte[len]);
 	}
 
