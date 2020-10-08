@@ -49,6 +49,31 @@ public class TimestampTupleFunctionTest {
 		iter.close();
 	}
 
+	@Test
+	public void testTripleTimestamp() {
+		long ts = System.currentTimeMillis();
+		ValueFactory SVF = SimpleValueFactory.getInstance();
+		Resource subj = SVF.createBNode();
+		IRI pred = SVF.createIRI(":prop");
+		Value obj = SVF.createBNode();
+		TripleSource tripleSource = new HBaseTripleSource(null, SVF, 0) {
+			TimestampedValueFactory TVF = TimestampedValueFactory.getInstance();
+
+			public CloseableIteration<? extends Statement, QueryEvaluationException> getTimestampedStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
+				Statement stmt = TVF.createStatement(subj, pred, obj);
+				((Timestamped) stmt).setTimestamp(ts);
+				return new SingletonIteration<Statement, QueryEvaluationException>(stmt);
+			}
+		};
+		CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> iter = new TimestampTupleFunction().evaluate(tripleSource, SVF, SVF.createTriple(subj, pred, obj));
+		assertTrue(iter.hasNext());
+		List<? extends Value> bindings = iter.next();
+		assertEquals(1, bindings.size());
+		assertEquals(ts, ((Literal) bindings.get(0)).calendarValue().toGregorianCalendar().getTimeInMillis());
+		assertFalse(iter.hasNext());
+		iter.close();
+	}
+
 	@Test(expected = ValueExprEvaluationException.class)
 	public void testIncorrectArgs() {
 		SimpleValueFactory SVF = SimpleValueFactory.getInstance();

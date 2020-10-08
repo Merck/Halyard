@@ -14,6 +14,7 @@ import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
@@ -41,6 +42,11 @@ public class TimestampTupleFunction extends AbstractSpinFunction implements Tupl
 	}
 
 	public CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> evaluate(TripleSource tripleSource, ValueFactory vf, Value... args) throws ValueExprEvaluationException {
+		if (args.length == 1 && args[0] instanceof Triple) {
+			Triple t = (Triple) args[0];
+			args = new Value[] { t.getSubject(), t.getPredicate(), t.getObject() };
+		}
+
 		if (args.length < 3 || args.length > 4) {
 			throw new ValueExprEvaluationException(String.format("%s requires 3 or 4 arguments, got %d", getURI(), args.length));
 		}

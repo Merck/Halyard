@@ -57,23 +57,29 @@ public class HBaseSailReificationTest {
         try(SailRepositoryConnection con = rep.getConnection()) {
 			// insert a stmt
             update(con,
-					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://s> <http://p> <http://o>. ?t <:from> \"source 1\"} where {(<http://s> <http://p> <http://o>) halyard:identifier ?t. ?t halyard:triple (<http://s> <http://p> <http://o>)}");
+					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ninsert {<http://s> <http://p> <http://o>. ?t <:from> \"source 1\"} where {(<http://s> <http://p> <http://o>) halyard:identifier ?t. ?t halyard:value (<http://s> <http://p> <http://o>)}");
 
 			List<BindingSet> result = select(con,
 					"prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {(<http://s> <http://p> <http://o>) halyard:identifier/<:from> ?s}");
 			assertEquals("source 1", ((Literal) result.get(0).getValue("s")).getLabel());
 
-			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:triple (<http://s> <http://p> <http://o>); <:from> ?s]}");
+			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:value (<http://s> <http://p> <http://o>); <:from> ?s]}");
 			assertEquals("source 1", ((Literal) result.get(0).getValue("s")).getLabel());
 
 			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {(<http://other> <http://other> <http://other>) halyard:identifier/<:from> ?s}");
 			assertEquals(Collections.emptyList(), result);
 
-			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:triple (<http://other> <http://other> <http://other>); <:from> ?s]}");
+			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:value (<http://other> <http://other> <http://other>); <:from> ?s]}");
 			assertEquals(Collections.emptyList(), result);
 
 			result = select(con,
 					"prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s ?p ?o {(<http://s> <http://p> <http://o>) halyard:identifier [rdf:subject ?s; rdf:predicate ?p; rdf:object ?o]}");
+			assertEquals("http://s", result.get(0).getValue("s").stringValue());
+			assertEquals("http://p", result.get(0).getValue("p").stringValue());
+			assertEquals("http://o", result.get(0).getValue("o").stringValue());
+
+			result = select(con,
+					"prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s ?p ?o {[rdf:subject ?s; rdf:predicate ?p; rdf:object ?o] halyard:value (<http://s> <http://p> <http://o>) }");
 			assertEquals("http://s", result.get(0).getValue("s").stringValue());
 			assertEquals("http://p", result.get(0).getValue("p").stringValue());
 			assertEquals("http://o", result.get(0).getValue("o").stringValue());
@@ -85,14 +91,21 @@ public class HBaseSailReificationTest {
 			result = select(con, "prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?o {<http://o> halyard:identifier/rdf:object ?o}");
 			assertEquals("http://o", result.get(0).getValue("o").stringValue());
 
+			result = select(con, "prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {<http://s> ^halyard:value/rdf:subject ?s}");
+			assertEquals("http://s", result.get(0).getValue("s").stringValue());
+			result = select(con, "prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?p {<http://p> ^halyard:value/rdf:predicate ?p}");
+			assertEquals("http://p", result.get(0).getValue("p").stringValue());
+			result = select(con, "prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?o {<http://o> ^halyard:value/rdf:object ?o}");
+			assertEquals("http://o", result.get(0).getValue("o").stringValue());
+
 			// delete the stmt
             update(con,
-					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://s> <http://p> <http://o>. ?t <:from> \"source 1\"} where {(<http://s> <http://p> <http://o>) halyard:identifier ?t. ?t halyard:triple (<http://s> <http://p> <http://o>) }");
+					"prefix halyard: <http://merck.github.io/Halyard/ns#>\ndelete {<http://s> <http://p> <http://o>. ?t <:from> \"source 1\"} where {(<http://s> <http://p> <http://o>) halyard:identifier ?t. ?t halyard:value (<http://s> <http://p> <http://o>) }");
 
 			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {(<http://s> <http://p> <http://o>) halyard:identifier/<:from> ?s}");
 			assertEquals(Collections.emptyList(), result);
 
-			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:triple (<http://s> <http://p> <http://o>); <:from> ?s]}");
+			result = select(con, "prefix halyard: <http://merck.github.io/Halyard/ns#>\nselect ?s {[halyard:value (<http://s> <http://p> <http://o>); <:from> ?s]}");
 			assertEquals(Collections.emptyList(), result);
         }
         rep.shutDown();
