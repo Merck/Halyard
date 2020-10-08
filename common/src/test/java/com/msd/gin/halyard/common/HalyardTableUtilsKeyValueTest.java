@@ -99,19 +99,15 @@ public class HalyardTableUtilsKeyValueTest {
 		assertEquals(ts, ((Timestamped)actual).getTimestamp());
 		if(s == null) {
 			assertArrayEquals(HalyardTableUtils.id(expected.getSubject()), ((Identifiable)actual.getSubject()).getId());
-			assertEquals(actual, ((StatementValue<?>)actual.getSubject()).getStatement());
 		}
 		if(p == null) {
 			assertArrayEquals(HalyardTableUtils.id(expected.getPredicate()), ((Identifiable)actual.getPredicate()).getId());
-			assertEquals(actual, ((StatementValue<?>)actual.getPredicate()).getStatement());
 		}
 		if(o == null) {
 			assertArrayEquals(HalyardTableUtils.id(expected.getObject()), ((Identifiable)actual.getObject()).getId());
-			assertEquals(actual, ((StatementValue<?>)actual.getObject()).getStatement());
 		}
 		if (c == null && (expected.getContext() != null || actual.getContext() != null)) {
 			assertArrayEquals(HalyardTableUtils.id(expected.getContext()), ((Identifiable)actual.getContext()).getId());
-			assertEquals(actual, ((StatementValue<?>)actual.getContext()).getStatement());
 		}
 	}
 }

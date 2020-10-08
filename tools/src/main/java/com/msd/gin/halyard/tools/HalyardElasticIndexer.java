@@ -18,9 +18,9 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.TimestampedValueFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -69,7 +69,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.elastic.source";
 
-    static final ValueFactory VF = TimestampedValueFactory.getInstance();
+    static final ValueFactory VF = IdValueFactory.getInstance();
 
     static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
 

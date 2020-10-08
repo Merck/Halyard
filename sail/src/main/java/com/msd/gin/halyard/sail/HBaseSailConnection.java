@@ -188,8 +188,7 @@ public class HBaseSailConnection implements SailConnection {
 	public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(final TupleExpr tupleExpr, final Dataset dataset, final BindingSet bindings, final boolean includeInferred) throws SailException {
 		flush();
 
-		RDFStarTripleSource baseSource = createTripleSource();
-		TripleSource tripleSource = new SpinAwareTripleSource(baseSource);
+		RDFStarTripleSource tripleSource = createTripleSource();
 		QueryContext queryContext = createQueryContext(tripleSource, includeInferred);
 		EvaluationStrategy strategy = createEvaluationStrategy(tripleSource, dataset, queryContext);
 

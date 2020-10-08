@@ -2,15 +2,21 @@ package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.common.TimestampedValueFactory;
+import com.msd.gin.halyard.sail.HBaseTripleSource;
 
 import java.util.List;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
+import org.eclipse.rdf4j.common.iteration.SingletonIteration;
+import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
+import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.junit.Test;
 
@@ -21,10 +27,20 @@ public class TimestampTupleFunctionTest {
 	@Test
 	public void testTimestampedStatements() {
 		long ts = System.currentTimeMillis();
-		TimestampedValueFactory TVF = TimestampedValueFactory.getInstance();
-		Statement stmt = TVF.createStatement(TVF.createBNode(), TVF.createIRI(":prop"), TVF.createBNode());
-		((Timestamped) stmt).setTimestamp(ts);
-		CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> iter = new TimestampTupleFunction().evaluate(TVF, stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
+		ValueFactory SVF = SimpleValueFactory.getInstance();
+		Resource subj = SVF.createBNode();
+		IRI pred = SVF.createIRI(":prop");
+		Value obj = SVF.createBNode();
+		TripleSource tripleSource = new HBaseTripleSource(null, SVF, 0) {
+			TimestampedValueFactory TVF = TimestampedValueFactory.getInstance();
+
+			public CloseableIteration<? extends Statement, QueryEvaluationException> getTimestampedStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
+				Statement stmt = TVF.createStatement(subj, pred, obj);
+				((Timestamped) stmt).setTimestamp(ts);
+				return new SingletonIteration<Statement, QueryEvaluationException>(stmt);
+			}
+		};
+		CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> iter = new TimestampTupleFunction().evaluate(tripleSource, SVF, subj, pred, obj);
 		assertTrue(iter.hasNext());
 		List<? extends Value> bindings = iter.next();
 		assertEquals(1, bindings.size());
@@ -36,6 +52,6 @@ public class TimestampTupleFunctionTest {
 	@Test(expected = ValueExprEvaluationException.class)
 	public void testIncorrectArgs() {
 		SimpleValueFactory SVF = SimpleValueFactory.getInstance();
-		new TimestampTupleFunction().evaluate(SVF, SVF.createBNode());
+		new TimestampTupleFunction().evaluate(null, SVF, SVF.createBNode());
 	}
 }

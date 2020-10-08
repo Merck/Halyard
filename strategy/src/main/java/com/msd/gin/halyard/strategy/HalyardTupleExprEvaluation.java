@@ -20,7 +20,6 @@ import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPush
 import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPushAsync;
 
 import com.msd.gin.halyard.algebra.StarJoin;
-import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.strategy.aggregators.Aggregator;
 import com.msd.gin.halyard.strategy.aggregators.AvgAggregator;
 import com.msd.gin.halyard.strategy.aggregators.ConcatAggregator;
@@ -40,7 +39,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -304,10 +302,10 @@ final class HalyardTupleExprEvaluation {
 	                    contexts[i++] = context;
 	                }
 	            }
-	
+
 	            //get an iterator over all triple statements that match the s, p, o specification in the contexts
 	            stIter = tripleSource.getStatements((Resource) subjValue, (IRI) predValue, objValue, contexts);
-	
+
 	            if (contexts.length == 0 && sp.getScope() == StatementPattern.Scope.NAMED_CONTEXTS) {
 	                // Named contexts are matched by retrieving all statements from
 	                // the store and filtering out the statements that do not have a
@@ -326,7 +324,6 @@ final class HalyardTupleExprEvaluation {
 	                    private Resource lastSubj;
 	                    private IRI lastPred;
 	                    private Value lastObj;
-	                    private Long lastTS;
 	                    @Override
 	                    public Statement next() throws QueryEvaluationException {
 	                        Statement st = super.next();
@@ -336,19 +333,14 @@ final class HalyardTupleExprEvaluation {
 	                    @Override
 	                    protected boolean accept(Statement st) {
 	                        //de-duplicate triples
-	                        if (st.getSubject().equals(lastSubj) && st.getPredicate().equals(lastPred) && st.getObject().equals(lastObj) && Objects.equals(getTimestamp(st), lastTS)) {
+	                        if (st.getSubject().equals(lastSubj) && st.getPredicate().equals(lastPred) && st.getObject().equals(lastObj)) {
 	                            return false;
 	                        } else {
 	                            lastSubj = st.getSubject();
 	                            lastPred = st.getPredicate();
 	                            lastObj = st.getObject();
-	                            lastTS = getTimestamp(st);
 	                            return true;
 	                        }
-	                    }
-	
-	                    private Long getTimestamp(Statement st) {
-	                    	return (st instanceof Timestamped) ? ((Timestamped)st).getTimestamp() : null;
 	                    }
 	                };
 	            }

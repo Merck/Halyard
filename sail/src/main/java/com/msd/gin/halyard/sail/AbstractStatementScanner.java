@@ -17,7 +17,7 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 
 public abstract class AbstractStatementScanner implements CloseableIteration<Statement, IOException> {
-	private final ValueFactory vf;
+	protected final ValueFactory vf;
 	private final TripleFactory tf;
 	protected RDFSubject subj;
 	protected RDFPredicate pred;
