@@ -24,6 +24,7 @@ import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.RDF4J;
 import org.eclipse.rdf4j.model.vocabulary.SESAME;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
@@ -173,6 +174,15 @@ public class HalyardStrategyExtendedTest {
     }
 
     @Test
+    public void testRdf4jNil() throws Exception {
+        SimpleValueFactory vf = SimpleValueFactory.getInstance();
+        con.add(vf.createIRI("http://a"), vf.createIRI("http://b"), vf.createIRI("http://c"));
+        con.add(vf.createIRI("http://a"), vf.createIRI("http://d"), vf.createIRI("http://e"), vf.createIRI("http://f"));
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, "PREFIX rdf4j: <" + RDF4J.NAMESPACE + ">\nSELECT (COUNT(*) AS ?count)\n" + "FROM rdf4j:nil WHERE {?s ?p ?o}").evaluate();
+        assertEquals(1, ((Literal) res.next().getBinding("count").getValue()).intValue());
+    }
+
+    @Test
     public void testEmptyOptional() throws Exception {
         String q = "SELECT * WHERE {" +
             "  OPTIONAL {<https://nonexisting> <https://nonexisting> <https://nonexisting> .}" +
@@ -227,5 +237,17 @@ public class HalyardStrategyExtendedTest {
         assertTrue(res.hasNext());
         BindingSet bs = res.next();
         assertEquals(0, bs.size());
+    }
+
+    @Test
+    public void testIdenticalTriplesDifferentGraphs() {
+        ValueFactory vf = con.getValueFactory();
+        con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));
+        con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1), vf.createIRI("http://whatever/graph"));
+    	String q ="SELECT (count(*) as ?c) { {?s ?p ?o} }";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+        BindingSet bs = res.next();
+        assertEquals(2, ((Literal)bs.getValue("c")).intValue());
     }
 }

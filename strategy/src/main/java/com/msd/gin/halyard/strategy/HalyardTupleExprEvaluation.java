@@ -318,31 +318,6 @@ final class HalyardTupleExprEvaluation {
 	                    }
 	
 	                }; // end anonymous class
-	            } else if (contexts.length == 0 && sp.getScope() == StatementPattern.Scope.DEFAULT_CONTEXTS) {
-	                // Filter out contexts (quads -> triples) and de-duplicate triples
-	                stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
-	                    private Resource lastSubj;
-	                    private IRI lastPred;
-	                    private Value lastObj;
-	                    @Override
-	                    public Statement next() throws QueryEvaluationException {
-	                        Statement st = super.next();
-	                        //Filter out contexts
-	                        return st.getContext() == null ? st : tripleSource.getValueFactory().createStatement(st.getSubject(), st.getPredicate(), st.getObject());
-	                    }
-	                    @Override
-	                    protected boolean accept(Statement st) {
-	                        //de-duplicate triples
-	                        if (st.getSubject().equals(lastSubj) && st.getPredicate().equals(lastPred) && st.getObject().equals(lastObj)) {
-	                            return false;
-	                        } else {
-	                            lastSubj = st.getSubject();
-	                            lastPred = st.getPredicate();
-	                            lastObj = st.getObject();
-	                            return true;
-	                        }
-	                    }
-	                };
 	            }
 	        } catch (ClassCastException e) {
 	            // Invalid value type for subject, predicate and/or context
