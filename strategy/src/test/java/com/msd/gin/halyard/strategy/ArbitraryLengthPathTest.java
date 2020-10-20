@@ -21,6 +21,7 @@ import static junit.framework.TestCase.assertTrue;
 import java.util.Arrays;
 import java.util.Collection;
 
+import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.repository.Repository;
@@ -39,7 +40,7 @@ import org.junit.runners.Parameterized;
 public class ArbitraryLengthPathTest {
     @Parameterized.Parameters
     public static Collection<Integer> data() {
-        return Arrays.asList(10, 100, 1000, 10000, 100000);
+        return Arrays.asList(10, 100, 1000);
     }
 
     private final int n;
@@ -66,10 +67,13 @@ public class ArbitraryLengthPathTest {
     @Test
     public void testN() throws Exception {
         ValueFactory vf = con.getValueFactory();
+        IRI node = vf.createIRI("urn:test:root");
         for (int i = 0; i < n; i++) {
-			con.add(vf.createIRI("urn:test:root"), vf.createIRI("urn:test:hasChild"), vf.createIRI("urn:test:node" + i));
+        	IRI nextNode = vf.createIRI("urn:test:node" + i);
+			con.add(node, vf.createIRI("urn:test:hasChild"), nextNode);
+			node = nextNode;
         }
-		con.add(vf.createIRI("urn:test:root"), vf.createIRI("urn:test:hasChild"), vf.createIRI("urn:test:node-end"));
+		con.add(node, vf.createIRI("urn:test:hasChild"), vf.createIRI("urn:test:node-end"));
         String sparql = "ASK { <urn:test:root> <urn:test:hasChild>* <urn:test:node-end> }";
         assertTrue(con.prepareBooleanQuery(QueryLanguage.SPARQL, sparql).evaluate());
     }
