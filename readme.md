@@ -3,7 +3,7 @@
 [![CI](https://api.travis-ci.org/pulquero/Halyard.svg?branch=latest)](https://travis-ci.org/pulquero/Halyard)
 [![Coverage](https://codecov.io/github/pulquero/Halyard/coverage.svg?branch=latest)](https://codecov.io/gh/pulquero/Halyard/)
 
-**Fork of [Halyard](https://github.com/Merck/Halyard) with support for RDF* (and other improvements/fixes).**
+**Fork of [Halyard](https://github.com/Merck/Halyard) with support for RDF\* (and other improvements/fixes).**
 
 Halyard is an extremely horizontally scalable triple store with support for named graphs, designed for integration of extremely large semantic data models and for storage and SPARQL 1.1 querying of complete Linked Data universe snapshots. Halyard implementation is based on Eclipse RDF4J framework and Apache HBase database, and it is completely written in Java.
 

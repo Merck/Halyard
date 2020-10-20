@@ -366,7 +366,7 @@ class HalyardValueExprEvaluation {
      * Evaluate a {@link Namespace} node
      * @param node the node to evaluate
      * @param bindings the set of named value bindings
-     * @return the {@link Literal} of the URI of {@link URI} returned by evaluating the argument of the {@code node}
+     * @return the {@link Literal} of the URI of {@link IRI} returned by evaluating the argument of the {@code node}
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
@@ -384,7 +384,7 @@ class HalyardValueExprEvaluation {
      * Evaluate a LocalName node
      * @param node the node to evaluate
      * @param bindings the set of named value bindings
-     * @return the {@link Literal} of the  {@link URI} returned by evaluating the argument of the {@code node}
+     * @return the {@link Literal} of the  {@link IRI} returned by evaluating the argument of the {@code node}
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */

@@ -16,6 +16,9 @@
  */
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.StarJoin;
+import com.msd.gin.halyard.vocab.HALYARD;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -30,27 +33,21 @@ import org.eclipse.rdf4j.query.algebra.EmptySet;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
-import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
-import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
-
-import com.msd.gin.halyard.algebra.StarJoin;
-import com.msd.gin.halyard.vocab.HALYARD;
 
 /**
  * Must be thread-safe.
  * @author Adam Sotona (MSD)
  */
-public final class HalyardEvaluationStatistics extends EvaluationStatistics {
+public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatistics {
 
     public static interface StatementPatternCardinalityCalculator {
 
@@ -90,9 +87,8 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
 		return new HalyardCardinalityCalculator(spcalc, srvProvider, Collections.emptySet(), Collections.emptySet(), null);
 	}
 
-    private static class HalyardCardinalityCalculator extends CardinalityCalculator {
+    private static class HalyardCardinalityCalculator extends ExtendedCardinalityCalculator {
 
-    	private static final double VAR_CARDINALITY = 10.0;
     	private StatementPatternCardinalityCalculator spcalc;
         private final ServiceStatsProvider srvProvider;
         private final Set<String> boundVars;
@@ -232,43 +228,13 @@ public final class HalyardEvaluationStatistics extends EvaluationStatistics {
             updateMap(node);
         }
 
-        @Override
-        protected void meetNode(QueryModelNode node) {
-        	if (node instanceof StarJoin) {
-        		meetStarJoin((StarJoin) node);
-        	} else if (node instanceof TupleFunctionCall) {
-        		meetTupleFunctionCall((TupleFunctionCall) node);
-			} else if (node instanceof ExternalSet) {
-                meetExternalSet((ExternalSet) node);
-            } else {
-                node.visitChildren(this);
-            }
-        }
-
         protected void meetStarJoin(StarJoin node) {
-        	double card = Double.POSITIVE_INFINITY;
-        	for (StatementPattern sp : node.getArgs()) {
-        		card = Math.min(card, getCardinality(sp));
-        	}
-        	Set<Var> vars = new HashSet<>();
-        	node.getVars(vars);
-        	vars.remove(node.getCommonVar());
-        	int constCount = countConstantVars(vars);
-            cardinality = card*Math.pow(VAR_CARDINALITY*VAR_CARDINALITY, (double)(vars.size()-constCount)/vars.size());
+        	super.meetStarJoin(node);
         	updateMap(node);
         }
 
         protected void meetTupleFunctionCall(TupleFunctionCall node) {
-			// must have all arguments bound to be able to evaluate
-			double argCard = 1.0;
-			for (ValueExpr expr : node.getArgs()) {
-				if (expr instanceof Var) {
-					argCard *= getCardinality(1000.0, (Var) expr);
-				} else {
-					argCard *= 1000.0;
-				}
-			}
-			cardinality = argCard * getCardinality(VAR_CARDINALITY, ((TupleFunctionCall) node).getResultVars());
+        	super.meetTupleFunctionCall(node);
 			updateMap(node);
 		}
 

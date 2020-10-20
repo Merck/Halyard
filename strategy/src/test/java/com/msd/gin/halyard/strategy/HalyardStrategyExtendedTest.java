@@ -240,6 +240,21 @@ public class HalyardStrategyExtendedTest {
     }
 
     @Test
+    public void testConstantAggregates() {
+    	String q ="SELECT (MAX(-2) as ?maxx) (MIN(3) as ?minx) (AVG(1) as ?avgx) (SUM(7) as ?sumx) (COUNT('foo') as ?countx) (SAMPLE('bar') as ?samplex) (GROUP_CONCAT('foobar') as ?concatx) { }";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+        BindingSet bs = res.next();
+        assertEquals(-2, ((Literal) bs.getValue("maxx")).intValue());
+        assertEquals(3, ((Literal) bs.getValue("minx")).intValue());
+        assertEquals(1, ((Literal) bs.getValue("avgx")).intValue());
+        assertEquals(1, ((Literal) bs.getValue("countx")).intValue());
+        assertEquals(7, ((Literal) bs.getValue("sumx")).intValue());
+        assertEquals("bar", ((Literal) bs.getValue("samplex")).getLabel());
+        assertEquals("foobar", ((Literal) bs.getValue("concatx")).getLabel());
+    }
+
+    @Test
     public void testIdenticalTriplesDifferentGraphs() {
         ValueFactory vf = con.getValueFactory();
         con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));

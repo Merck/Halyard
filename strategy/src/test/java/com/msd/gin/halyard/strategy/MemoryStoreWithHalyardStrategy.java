@@ -16,7 +16,9 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.optimizers.ExtendedEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -28,8 +30,6 @@ import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.StandardQueryOptimizerPipeline;
 import org.eclipse.rdf4j.sail.NotifyingSailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
@@ -76,7 +76,7 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
                         return tripleSource.getValueFactory();
                     }
                 }, dataset, null, new HalyardEvaluationStatistics(null, null));
-                es.setOptimizerPipeline(new StandardQueryOptimizerPipeline(es, tripleSource, new EvaluationStatistics()));
+                es.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(es, tripleSource.getValueFactory(), new ExtendedEvaluationStatistics()));
                 return es;
             }
 

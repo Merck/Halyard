@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.optimizers.ExtendedEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.HalyardConstantOptimizer;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
 import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
@@ -30,10 +32,11 @@ import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizerPipeline;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.BindingAssigner;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.CompareOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConstantOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.OrderLimitOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.RegexAsStringFunctionOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
@@ -44,11 +47,11 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 */
 public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeline {
 
-	private final HalyardEvaluationStatistics statistics;
+	private final ExtendedEvaluationStatistics statistics;
 	private final EvaluationStrategy strategy;
 	private final ValueFactory valueFactory;
 
-	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory, HalyardEvaluationStatistics statistics) {
+	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory, ExtendedEvaluationStatistics statistics) {
 		this.strategy = strategy;
 		this.valueFactory = valueFactory;
 		this.statistics = statistics;
@@ -58,7 +61,7 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 	public Iterable<QueryOptimizer> getOptimizers() {
 		return Arrays.asList(
 			new BindingAssigner(),
-			new ConstantOptimizer(strategy),
+			new HalyardConstantOptimizer(strategy),
 			new RegexAsStringFunctionOptimizer(valueFactory),
 			new CompareOptimizer(),
 			new ConjunctiveConstraintSplitter(),
@@ -66,7 +69,7 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 			new SameTermFilterOptimizer(),
 			new StarJoinOptimizer(),
 			new QueryModelNormalizer(),
-			new HalyardQueryJoinOptimizer(statistics),
+			(statistics instanceof HalyardEvaluationStatistics) ? new HalyardQueryJoinOptimizer((HalyardEvaluationStatistics) statistics) : new QueryJoinOptimizer(statistics),
 			// new SubSelectJoinOptimizer(),
 			new IterativeEvaluationOptimizer(),
 			new HalyardFilterOptimizer(), // apply filter optimizer twice (before and after Joins and Unions shaking)
