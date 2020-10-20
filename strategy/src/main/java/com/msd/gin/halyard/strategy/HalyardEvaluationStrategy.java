@@ -92,7 +92,6 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 	 * @param dataset {@code Dataset} A dataset consists of a default graph for read and using operations, which is the RDF merge of one or more graphs, a set of named graphs, and
 	 * a single update graph for INSERT and DELETE
 	 * @param serviceResolver {@code FederatedServiceResolver} resolver for any federated services (graphs) required for the evaluation
-	 * @param timeout {@code long} query evaluation timeout in seconds, negative values mean no timeout
 	 */
 	public HalyardEvaluationStrategy(TripleSource tripleSource, QueryContext queryContext,
 			TupleFunctionRegistry tupleFunctionRegistry,
