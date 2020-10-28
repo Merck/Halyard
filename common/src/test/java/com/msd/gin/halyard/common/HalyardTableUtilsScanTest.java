@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.common;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -199,6 +201,33 @@ public class HalyardTableUtilsScanTest {
             assertTrue(allStatements.containsAll(res));
             assertEquals(expRes, res.size());
         }
-    }
 
+        // check all complete combinations
+    	if (subj != null && pred != null & obj != null) {
+            List<Scan> scans = new ArrayList<>();
+            if (c != null) {
+                scans.add(StatementIndex.SPO.scan(subj, pred, obj, ctx));
+                scans.add(StatementIndex.POS.scan(pred, obj, subj, ctx));
+                scans.add(StatementIndex.OSP.scan(obj, subj, pred, ctx));
+                scans.add(StatementIndex.CSPO.scan(ctx, subj, pred, obj));
+                scans.add(StatementIndex.CPOS.scan(ctx, pred, obj, subj));
+                scans.add(StatementIndex.COSP.scan(ctx, obj, subj, pred));
+            } else {
+                scans.add(StatementIndex.SPO.scan(subj, pred, obj));
+                scans.add(StatementIndex.POS.scan(pred, obj, subj));
+                scans.add(StatementIndex.OSP.scan(obj, subj, pred));
+            }
+            for (Scan scan : scans) {
+                try (ResultScanner rs = table.getScanner(scan)) {
+                    Set<Statement> res = new HashSet<>();
+                    Result r;
+                    while ((r = rs.next()) != null) {
+                        res.addAll(HalyardTableUtils.parseStatements(null, null, null, null, r, vf, null));
+                    }
+                    assertTrue(allStatements.containsAll(res));
+                    assertEquals(expRes, res.size());
+                }
+            }
+    	}
+    }
 }

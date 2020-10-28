@@ -284,13 +284,14 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                 }
                 if (job.waitForCompletion(true)) {
     				BulkLoadHFiles.create(getConf()).bulkLoad(hTable.getName(), outPath);
-                    LOG.info("Stage #{} of {} completed..", stage, stages);
+                    LOG.info("Stage #{} of {} completed.", stage, stages);
                 } else {
+            		LOG.error("Stage #{} of {} failed to complete.");
                     return -1;
                 }
             }
         }
-        LOG.info("Bulk Update Completed..");
+        LOG.info("Bulk Update completed.");
         return 0;
     }
 }

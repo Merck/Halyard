@@ -170,10 +170,12 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
         job.setOutputFormatClass(NullOutputFormat.class);
         TableMapReduceUtil.initCredentials(job);
         if (job.waitForCompletion(true)) {
-            LOG.info("Bulk Export Completed..");
+            LOG.info("Bulk Export completed.");
             return 0;
+        } else {
+    		LOG.error("Bulk Export failed to complete.");
+            return -1;
         }
-        return -1;
     }
 
     private String addTmpFile(String file) throws IOException {

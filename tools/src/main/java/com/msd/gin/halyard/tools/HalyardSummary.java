@@ -17,7 +17,9 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.sail.HBaseSail;
@@ -449,7 +451,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
 	                            write(sliceRPred, RDFS.LABEL, SVF.createLiteral("slice rdfs:range with cardinality " + cardinality));
 	                            write(sliceRPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
 	                        }
-	                        IRI generatedRoot = SVF.createIRI(NAMESPACE, HalyardTableUtils.encode(HalyardTableUtils.hashUnique(key.get())));
+	                        IRI generatedRoot = SVF.createIRI(NAMESPACE, Hashes.encode(Hashes.hashUnique(key.get())));
 	                        write(generatedRoot, slicePPred, firstKey);
 	                        write(generatedRoot, sliceDPred, SVF.createIRI(dis.readUTF()));
 	                        write(generatedRoot, sliceRPred, SVF.createIRI(dis.readUTF()));
@@ -500,7 +502,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         job.setJarByClass(HalyardSummary.class);
         TableMapReduceUtil.initCredentials(job);
 
-        Scan scan = HalyardTableUtils.scan(new byte[]{HalyardTableUtils.POS_PREFIX}, new byte[]{HalyardTableUtils.POS_PREFIX + 1});
+        Scan scan = StatementIndex.POS.scan();
 
         TableMapReduceUtil.initTableMapperJob(source,
                 scan,
@@ -513,9 +515,11 @@ public final class HalyardSummary extends AbstractHalyardTool {
         job.setReducerClass(SummaryReducer.class);
         job.setOutputFormatClass(NullOutputFormat.class);
         if (job.waitForCompletion(true)) {
-            LOG.info("Summary Generation Completed..");
+            LOG.info("Summary Generation completed.");
             return 0;
+        } else {
+    		LOG.error("Summary Generation failed to complete.");
+            return -1;
         }
-        return -1;
     }
 }

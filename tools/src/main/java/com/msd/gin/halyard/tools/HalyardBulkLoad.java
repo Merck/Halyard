@@ -572,10 +572,12 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 					hTable.close();
                 }
 				BulkLoadHFiles.create(getConf()).bulkLoad(hTable.getName(), new Path(workdir));
-                LOG.info("Bulk Load Completed..");
+                LOG.info("Bulk Load completed.");
                 return 0;
+            } else {
+        		LOG.error("Bulk Load failed to complete.");
+                return -1;
             }
         }
-        return -1;
     }
 }

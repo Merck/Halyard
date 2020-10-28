@@ -1,6 +1,7 @@
 package com.msd.gin.halyard.function;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Hashes;
+import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.util.Collections;
@@ -35,7 +36,7 @@ public class IdentifierTupleFunction implements TupleFunction {
 		byte[] id;
 		if (args.length == 1) {
 			ns = HALYARD.VALUE_ID_NS;
-			id = HalyardTableUtils.id(args[0]);
+			id = Hashes.id(args[0]);
 		} else if (args.length == 3) {
 			if (!(args[0] instanceof Resource)) {
 				throw new ValueExprEvaluationException("First argument must be a subject");
@@ -47,12 +48,12 @@ public class IdentifierTupleFunction implements TupleFunction {
 				throw new ValueExprEvaluationException("Third argument must be an object");
 			}
 			ns = HALYARD.TRIPLE_ID_NS;
-			id = new byte[3 * HalyardTableUtils.ID_SIZE];
-			HalyardTableUtils.writeTripleIdentifier((Resource) args[0], (IRI) args[1], args[2], id, 0);
+			id = new byte[3 * Hashes.ID_SIZE];
+			ValueIO.writeTripleIdentifier((Resource) args[0], (IRI) args[1], args[2], id, 0);
 		} else {
 			throw new ValueExprEvaluationException(String.format("%s requires 1 or 3 arguments, got %d", getURI(), args.length));
 		}
 
-		return new SingletonIteration<>(Collections.singletonList(vf.createIRI(ns.getName(), HalyardTableUtils.encode(id))));
+		return new SingletonIteration<>(Collections.singletonList(vf.createIRI(ns.getName(), Hashes.encode(id))));
 	}
 }

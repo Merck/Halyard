@@ -17,11 +17,15 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.StatementIndex;
+import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFIdentifier;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
-import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.vocab.VOID_EXT;
@@ -37,6 +41,7 @@ import java.nio.ByteBuffer;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -49,11 +54,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.filter.MultiRowRangeFilter;
-import org.apache.hadoop.hbase.filter.MultiRowRangeFilter.RowRange;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
@@ -95,8 +99,8 @@ public final class HalyardStats extends AbstractHalyardTool {
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
 	private static final RDFPredicate RDF_TYPE_PREDICATE = RDFPredicate.create(RDF.TYPE);
-	private static final byte[] POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(HalyardTableUtils.POS_PREFIX);
-	private static final byte[] CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(HalyardTableUtils.CPOS_PREFIX);
+	private static final byte[] POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.POS);
+	private static final byte[] CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.CPOS);
 
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
@@ -110,7 +114,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         IRI statsContext, graphContext;
         byte[] cspoStatsContextHash;
         TripleFactory tf;
-        byte lastRegion = -1;
+        StatementIndex lastIndex;
         long counter = 0;
         boolean update;
 
@@ -131,7 +135,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             statsContext = SVF.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String gc = conf.get(GRAPH_CONTEXT);
             if (gc != null) graphContext = SVF.createIRI(gc);
-			cspoStatsContextHash = RDFContext.create(statsContext).getKeyHash(HalyardTableUtils.CSPO_PREFIX);
+			cspoStatsContextHash = RDFContext.create(statsContext).getKeyHash(StatementIndex.CSPO);
             Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             tf = new TripleFactory(table);
         }
@@ -158,20 +162,20 @@ public final class HalyardStats extends AbstractHalyardTool {
 
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
-            byte region = key.get()[key.getOffset()];
+            StatementIndex index = StatementIndex.toIndex(key.get()[key.getOffset()]);
 			List<Statement> stmts = HalyardTableUtils.parseStatements(null, null, null, null, value, SVF, tf);
             int hashShift;
-            if (region < HalyardTableUtils.CSPO_PREFIX) {
+            if (!index.isQuadIndex()) {
             	// triple region
                 hashShift = 1;
             } else {
             	// quad region
                 hashShift = RDFContext.KEY_SIZE + 1;
-                if (!matchAndCopyKey(key.get(), key.getOffset() + 1, RDFContext.KEY_SIZE, lastCtxFragment) || region != lastRegion) {
+                if (!matchAndCopyKey(key.get(), key.getOffset() + 1, RDFContext.KEY_SIZE, lastCtxFragment) || index != lastIndex) {
                     cleanup(output);
 					graph = (IRI) stmts.get(0).getContext();
                 }
-                if (update && region == HalyardTableUtils.CSPO_PREFIX) {
+                if (update && index == StatementIndex.CSPO) {
                     if (Arrays.equals(cspoStatsContextHash, lastCtxFragment)) {
                         if (sail == null) {
                             Configuration conf = output.getConfiguration();
@@ -185,7 +189,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                                 removed++;
                             }
                         }
-                        lastRegion = region;
+                        lastIndex = index;
                         return; //do no count removed statements
                     }
                 }
@@ -193,32 +197,32 @@ public final class HalyardStats extends AbstractHalyardTool {
 
             int keyLen;
             byte[] lastKeyFragment;
-            switch (region) {
-                case HalyardTableUtils.SPO_PREFIX:
-                case HalyardTableUtils.CSPO_PREFIX:
+            switch (index) {
+                case SPO:
+                case CSPO:
                 	keyLen = RDFSubject.KEY_SIZE;
                 	lastKeyFragment = lastSubjFragment;
                     break;
-                case HalyardTableUtils.POS_PREFIX:
-                case HalyardTableUtils.CPOS_PREFIX:
+                case POS:
+                case CPOS:
                 	keyLen = RDFPredicate.KEY_SIZE;
                 	lastKeyFragment = lastPredFragment;
                     break;
-                case HalyardTableUtils.OSP_PREFIX:
-                case HalyardTableUtils.COSP_PREFIX:
+                case OSP:
+                case COSP:
                 	keyLen = RDFObject.KEY_SIZE;
                 	lastKeyFragment = lastObjFragment;
                     break;
                 default:
-                    throw new IOException("Unknown region #" + region);
+                    throw new IOException("Unknown region #" + index);
             }
-            boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, keyLen, lastKeyFragment) || region != lastRegion || lastGraph != graph;
+            boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, keyLen, lastKeyFragment) || index != lastIndex || lastGraph != graph;
             if (hashChange) {
                 cleanupSubset(output);
 				Statement stmt = stmts.get(0);
-                switch (region) {
-                    case HalyardTableUtils.SPO_PREFIX:
-                    case HalyardTableUtils.CSPO_PREFIX:
+                switch (index) {
+                    case SPO:
+                    case CSPO:
                         distinctSubjects++;
                         Resource subj = stmt.getSubject();
                         if (subj instanceof IRI) {
@@ -229,14 +233,14 @@ public final class HalyardStats extends AbstractHalyardTool {
                         subsetType = VOID_EXT.SUBJECT;
                         subsetId = subj;
                         break;
-                    case HalyardTableUtils.POS_PREFIX:
-                    case HalyardTableUtils.CPOS_PREFIX:
+                    case POS:
+                    case CPOS:
                         properties++;
                         subsetType = VOID.PROPERTY;
                         subsetId = stmt.getPredicate();
                         break;
-                    case HalyardTableUtils.OSP_PREFIX:
-                    case HalyardTableUtils.COSP_PREFIX:
+                    case OSP:
+                    case COSP:
                         distinctObjects++;
                         Value obj = stmt.getObject();
                         if (obj instanceof IRI) {
@@ -250,21 +254,21 @@ public final class HalyardStats extends AbstractHalyardTool {
                         subsetId = obj;
                         break;
                     default:
-                        throw new IOException("Unknown region #" + region);
+                        throw new IOException("Unknown region #" + index);
                 }
             }
             int stmtCount = stmts.size();
-            switch (region) {
-                case HalyardTableUtils.SPO_PREFIX:
-                case HalyardTableUtils.CSPO_PREFIX:
+            switch (index) {
+                case SPO:
+                case CSPO:
                     triples += stmtCount;
                     break;
-                case HalyardTableUtils.POS_PREFIX:
+                case POS:
                     if (Arrays.equals(POS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + RDFPredicate.KEY_SIZE, RDFObject.KEY_SIZE, lastClassFragment) || hashChange)) {
                     	classes++;
                     }
                     break;
-                case HalyardTableUtils.CPOS_PREFIX:
+                case CPOS:
                     if (Arrays.equals(CPOS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + RDFPredicate.KEY_SIZE, RDFObject.KEY_SIZE, lastClassFragment) || hashChange)) {
                     	classes++;
                     }
@@ -273,10 +277,10 @@ public final class HalyardStats extends AbstractHalyardTool {
             }
             subsetCounter += stmtCount;
             setCounter += stmtCount;
-            lastRegion = region;
+            lastIndex = index;
             lastGraph = graph;
             if ((counter++ % 100000) == 0) {
-                output.setStatus(MessageFormat.format("reg:{0} {1} t:{2} s:{3} p:{4} o:{5} c:{6} r:{7}", region, counter, triples, distinctSubjects, properties, distinctObjects, classes, removed));
+                output.setStatus(MessageFormat.format("reg:{0} {1} t:{2} s:{3} p:{4} o:{5} c:{6} r:{7}", index, counter, triples, distinctSubjects, properties, distinctObjects, classes, removed));
             }
         }
 
@@ -289,7 +293,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                     if (partitionId == null) {
                         dos.writeInt(0);
                     } else {
-						byte b[] = HalyardTableUtils.writeBytes(partitionId);
+						byte b[] = ValueIO.writeBytes(partitionId);
                         dos.writeInt(b.length);
                         dos.write(b);
                     }
@@ -445,9 +449,9 @@ public final class HalyardStats extends AbstractHalyardTool {
                     }
                 }
                 if (partitionId.hasRemaining()) {
-					Value partition = HalyardTableUtils.readValue(partitionId, SVF, tf);
+					Value partition = ValueIO.readValue(partitionId, SVF, tf);
                     IRI pred = SVF.createIRI(predicate);
-					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.id(partition)));
+					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + Hashes.encode(Hashes.id(partition)));
                     writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);
                     writeStatement(subset, RDF.TYPE, VOID.DATASET);
 					writeStatement(subset, pred, partition);
@@ -494,8 +498,10 @@ public final class HalyardStats extends AbstractHalyardTool {
         addOption("g", "stats-named-graph", "target_graph", "Optional target named graph of the exported statistics (default value is '" + HALYARD.STATS_GRAPH_CONTEXT.stringValue() + "'), modification is recomended only for external export as internal Halyard optimizers expect the default value", false, true);
     }
 
-    private static RowRange rowRange(byte prefix, byte[] key1, byte[] stopKey2, byte[] stopKey3, byte[] stopKey4) {
-        return new RowRange(HalyardTableUtils.concat(prefix, false, key1), true, HalyardTableUtils.concat(prefix, false, key1, stopKey2, stopKey3, stopKey4), true);
+    private static Scan scan(TableName sourceTableName, StatementIndex index, RDFIdentifier key) {
+        Scan scan = index.scan(key);
+        scan.setAttribute(Scan.SCAN_ATTRIBUTES_TABLE_NAME, sourceTableName.toBytes());
+        return scan;
     }
 
     @Override
@@ -524,23 +530,26 @@ public final class HalyardStats extends AbstractHalyardTool {
         job.setJarByClass(HalyardStats.class);
         TableMapReduceUtil.initCredentials(job);
 
-        Scan scan = HalyardTableUtils.scan(null, null);
+        TableName sourceTableName = TableName.valueOf(source);
+        List<Scan> scans;
         if (graphContext != null) { //restricting stats to scan given graph context only
-            List<RowRange> ranges = new ArrayList<>(4);
+            scans = new ArrayList<>(4);
             RDFContext rdfGraphCtx = RDFContext.create(SVF.createIRI(graphContext));
-            ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX, rdfGraphCtx.getKeyHash(HalyardTableUtils.CSPO_PREFIX), RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY));
-            ranges.add(rowRange(HalyardTableUtils.CPOS_PREFIX, rdfGraphCtx.getKeyHash(HalyardTableUtils.CPOS_PREFIX), RDFPredicate.STOP_KEY, RDFObject.STOP_KEY, RDFSubject.END_STOP_KEY));
-            ranges.add(rowRange(HalyardTableUtils.COSP_PREFIX, rdfGraphCtx.getKeyHash(HalyardTableUtils.COSP_PREFIX), RDFObject.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY));
+            scans.add(scan(sourceTableName, StatementIndex.CSPO, rdfGraphCtx));
+            scans.add(scan(sourceTableName, StatementIndex.CPOS, rdfGraphCtx));
+            scans.add(scan(sourceTableName, StatementIndex.COSP, rdfGraphCtx));
             if (target == null) { //add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
-				ranges.add(rowRange(HalyardTableUtils.CSPO_PREFIX,
-						RDFContext.create(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SVF.createIRI(targetGraph)).getKeyHash(HalyardTableUtils.CSPO_PREFIX),
-						RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY));
+				scans.add(scan(sourceTableName, StatementIndex.CSPO,
+					RDFContext.create(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SVF.createIRI(targetGraph))
+				));
             }
-            scan.setFilter(new MultiRowRangeFilter(ranges));
+        } else {
+            Scan scan = HalyardTableUtils.scan(null, null);
+            scan.setAttribute(Scan.SCAN_ATTRIBUTES_TABLE_NAME, sourceTableName.toBytes());
+            scans = Collections.singletonList(scan);
         }
         TableMapReduceUtil.initTableMapperJob(
-                source,
-                scan,
+                scans,
                 StatsMapper.class,
                 ImmutableBytesWritable.class,
                 LongWritable.class,
@@ -549,9 +558,11 @@ public final class HalyardStats extends AbstractHalyardTool {
         job.setReducerClass(StatsReducer.class);
         job.setOutputFormatClass(NullOutputFormat.class);
         if (job.waitForCompletion(true)) {
-            LOG.info("Stats Generation Completed..");
+            LOG.info("Stats Generation completed.");
             return 0;
+        } else {
+    		LOG.error("Stats Generation failed to complete.");
+            return -1;
         }
-        return -1;
     }
 }

@@ -16,8 +16,12 @@
  */
 package com.msd.gin.halyard.tools;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.Hashes;
+import com.msd.gin.halyard.sail.HBaseSail;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -43,12 +47,7 @@ import org.json.JSONObject;
 import org.junit.Rule;
 import org.junit.Test;
 
-import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.sail.HBaseSail;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
+import static org.junit.Assert.*;
 
 /**
  *
@@ -248,7 +247,7 @@ public class HalyardElasticIndexerTest {
             String id = new JSONObject(bulkBody.get(i)).getJSONObject("index").getString("_id");
             JSONObject fields = new JSONObject(bulkBody.get(i+1));
             Literal literal = vf.createLiteral(fields.getString("label"), vf.createIRI(fields.getString("datatype")));
-            assertEquals("Invalid hash for literal " + literal, HalyardTableUtils.encode(HalyardTableUtils.id(literal)), id);
+            assertEquals("Invalid hash for literal " + literal, Hashes.encode(Hashes.id(literal)), id);
         }
     }
 

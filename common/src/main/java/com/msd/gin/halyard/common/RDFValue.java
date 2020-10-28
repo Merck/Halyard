@@ -18,12 +18,17 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 
 	public final byte[] getSerializedForm() {
 		if (ser == null) {
-			ser = HalyardTableUtils.writeBytes(val);
+			ser = ValueIO.writeBytes(val);
 		}
 		return ser;
 	}
 
 	protected final byte[] calculateHash() {
-		return HalyardTableUtils.id(val);
+		return Hashes.id(val);
+	}
+
+	@Override
+	public String toString() {
+		return val+" "+super.toString();
 	}
 }

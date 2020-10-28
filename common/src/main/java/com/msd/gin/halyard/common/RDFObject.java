@@ -14,9 +14,9 @@ public final class RDFObject extends RDFValue<Value> {
 	 * Key hash size in bytes
 	 */
 	public static final int KEY_SIZE = 8;
-	public static final int END_KEY_SIZE = 2;
-	public static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_64;
-	public static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
+	static final int END_KEY_SIZE = 2;
+	static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_64;
+	static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
 
 	private RDFObject(Value val) {
 		super(RDFRole.OBJECT, val);

@@ -11,8 +11,8 @@ import org.eclipse.rdf4j.model.impl.BooleanLiteral;
 
 public class IdValueFactory extends AbstractValueFactory {
 	private static final IdValueFactory VF = new IdValueFactory();
-	private static final Literal TRUE = new IdentifiableLiteral(HalyardTableUtils.id(BooleanLiteral.TRUE), BooleanLiteral.TRUE);
-	private static final Literal FALSE = new IdentifiableLiteral(HalyardTableUtils.id(BooleanLiteral.FALSE), BooleanLiteral.FALSE);
+	private static final Literal TRUE = new IdentifiableLiteral(Hashes.id(BooleanLiteral.TRUE), BooleanLiteral.TRUE);
+	private static final Literal FALSE = new IdentifiableLiteral(Hashes.id(BooleanLiteral.FALSE), BooleanLiteral.FALSE);
 
 	public static IdValueFactory getInstance() {
 		return VF;

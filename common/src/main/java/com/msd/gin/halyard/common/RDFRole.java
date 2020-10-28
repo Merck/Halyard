@@ -13,16 +13,16 @@ public enum RDFRole {
 		}
 
 		@Override
-		protected int toShift(byte prefix) {
-			switch(prefix) {
-				case HalyardTableUtils.SPO_PREFIX:
-				case HalyardTableUtils.CSPO_PREFIX:
+		protected int toShift(StatementIndex index) {
+			switch(index) {
+				case SPO:
+				case CSPO:
 					return 0;
-				case HalyardTableUtils.POS_PREFIX:
-				case HalyardTableUtils.CPOS_PREFIX:
+				case POS:
+				case CPOS:
 					return 2;
-				case HalyardTableUtils.OSP_PREFIX:
-				case HalyardTableUtils.COSP_PREFIX:
+				case OSP:
+				case COSP:
 					return 1;
 				default:
 					throw new AssertionError();
@@ -41,16 +41,16 @@ public enum RDFRole {
 		}
 
 		@Override
-		protected int toShift(byte prefix) {
-			switch(prefix) {
-				case HalyardTableUtils.SPO_PREFIX:
-				case HalyardTableUtils.CSPO_PREFIX:
+		protected int toShift(StatementIndex index) {
+			switch(index) {
+				case SPO:
+				case CSPO:
 					return 1;
-				case HalyardTableUtils.POS_PREFIX:
-				case HalyardTableUtils.CPOS_PREFIX:
+				case POS:
+				case CPOS:
 					return 0;
-				case HalyardTableUtils.OSP_PREFIX:
-				case HalyardTableUtils.COSP_PREFIX:
+				case OSP:
+				case COSP:
 					return 2;
 				default:
 					throw new AssertionError();
@@ -69,16 +69,16 @@ public enum RDFRole {
 		}
 
 		@Override
-		protected int toShift(byte prefix) {
-			switch(prefix) {
-				case HalyardTableUtils.SPO_PREFIX:
-				case HalyardTableUtils.CSPO_PREFIX:
+		protected int toShift(StatementIndex index) {
+			switch(index) {
+				case SPO:
+				case CSPO:
 					return 2;
-				case HalyardTableUtils.POS_PREFIX:
-				case HalyardTableUtils.CPOS_PREFIX:
+				case POS:
+				case CPOS:
 					return 1;
-				case HalyardTableUtils.OSP_PREFIX:
-				case HalyardTableUtils.COSP_PREFIX:
+				case OSP:
+				case COSP:
 					// NB: preserve non-literal flag for scanning
 					return 0;
 				default:
@@ -98,7 +98,7 @@ public enum RDFRole {
 		}
 
 		@Override
-		protected int toShift(byte prefix) {
+		protected int toShift(StatementIndex index) {
 			return 0;
 		}
 	};
@@ -110,23 +110,23 @@ public enum RDFRole {
 	abstract int endKeyHashSize();
 
 	final int qualifierHashSize() {
-		return HalyardTableUtils.ID_SIZE - keyHashSize();
+		return Hashes.ID_SIZE - keyHashSize();
 	}
 
 	final int endQualifierHashSize() {
-		return HalyardTableUtils.ID_SIZE - endKeyHashSize();
+		return Hashes.ID_SIZE - endKeyHashSize();
 	}
 
-	final byte[] keyHash(byte prefix, byte[] id) {
+	final byte[] keyHash(StatementIndex index, byte[] id) {
 		int len = keyHashSize();
 		// rotate key so ordering is different for different prefixes
 		// this gives better load distribution when traversing between prefixes
-		return rotateRight(id, 0, len, prefix, new byte[len]);
+		return rotateRight(id, 0, len, index, new byte[len]);
 	}
 
-	final byte[] endKeyHash(byte prefix, byte[] id) {
+	final byte[] endKeyHash(StatementIndex index, byte[] id) {
 		int len = endKeyHashSize();
-		return rotateRight(id, 0, len, prefix, new byte[len]);
+		return rotateRight(id, 0, len, index, new byte[len]);
 	}
 
 	final byte[] qualifierHash(byte[] id) {
@@ -137,10 +137,10 @@ public enum RDFRole {
 		return copy(id, endKeyHashSize(), endQualifierHashSize());
 	}
 
-	protected abstract int toShift(byte prefix);
+	protected abstract int toShift(StatementIndex index);
 
-	private final byte[] rotateRight(byte[] src, int offset, int len, byte prefix, byte[] dest) {
-		int shift = toShift(prefix);
+	private final byte[] rotateRight(byte[] src, int offset, int len, StatementIndex index, byte[] dest) {
+		int shift = toShift(index);
 		if(shift > len) {
 			shift = shift % len;
 		}
@@ -149,12 +149,12 @@ public enum RDFRole {
 		return dest;
 	}
 
-	final byte[] rotateLeft(byte[] src, int offset, int len, byte prefix) {
-		return rotateLeft(src, offset, len, prefix, new byte[len]);
+	final byte[] rotateLeft(byte[] src, int offset, int len, StatementIndex index) {
+		return rotateLeft(src, offset, len, index, new byte[len]);
 	}
 
-	final byte[] rotateLeft(byte[] src, int offset, int len, byte prefix, byte[] dest) {
-		int shift = toShift(prefix);
+	final byte[] rotateLeft(byte[] src, int offset, int len, StatementIndex index, byte[] dest) {
+		int shift = toShift(index);
 		if(shift > len) {
 			shift = shift % len;
 		}

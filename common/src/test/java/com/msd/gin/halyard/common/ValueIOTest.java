@@ -23,7 +23,7 @@ import org.junit.runners.Parameterized;
 import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
-public class HalyardTableUtilsRDFTest {
+public class ValueIOTest {
 	private static final ValueFactory vf = SimpleValueFactory.getInstance();
 
 	@Parameterized.Parameters(name = "{0}")
@@ -43,14 +43,14 @@ public class HalyardTableUtilsRDFTest {
 
 	private Value expected;
 
-	public HalyardTableUtilsRDFTest(Value v) {
+	public ValueIOTest(Value v) {
 		this.expected = v;
 	}
 
 	@Test
 	public void testToAndFromBytes() throws IOException {
-		byte[] b = HalyardTableUtils.writeBytes(expected);
-		Value actual = HalyardTableUtils.readValue(ByteBuffer.wrap(b), vf, null);
+		byte[] b = ValueIO.writeBytes(expected);
+		Value actual = ValueIO.readValue(ByteBuffer.wrap(b), vf, null);
 		assertEquals(expected, actual);
 
 		// check readValue() works on a subsequence
@@ -61,20 +61,20 @@ public class HalyardTableUtilsRDFTest {
 		extbuf.put(b);
 		extbuf.limit(extbuf.position());
 		extbuf.reset();
-		actual = HalyardTableUtils.readValue(extbuf, vf, null);
+		actual = ValueIO.readValue(extbuf, vf, null);
 		assertEquals("Buffer position", extbuf.limit(), extbuf.position());
 		assertEquals(expected, actual);
 	}
 
 	@Test
 	public void testRDFValue() {
-		byte[] id = HalyardTableUtils.id(expected);
+		byte[] id = Hashes.id(expected);
 		if (expected instanceof Literal) {
-			assertTrue(HalyardTableUtils.isLiteral(id));
+			assertTrue(Hashes.isLiteral(id));
 			RDFObject obj = RDFObject.create(expected);
 			assertRDFValueHashes(id, obj);
 		} else {
-			assertFalse(HalyardTableUtils.isLiteral(id));
+			assertFalse(Hashes.isLiteral(id));
 			if (expected instanceof IRI) {
 				RDFObject obj = RDFObject.create(expected);
 				assertRDFValueHashes(id, obj);
@@ -98,13 +98,10 @@ public class HalyardTableUtilsRDFTest {
 	}
 
 	private static void assertRDFValueHashes(byte[] id, RDFValue<?> v) {
-		for(int i=0; i<6; i++) {
-			/// non-literal flag means we can't rotate
-			if(!(v instanceof RDFObject)) {
-				assertArrayEquals(id, concat(v.getRole().rotateLeft(v.getKeyHash((byte)i), 0, v.keyHashSize(), (byte)i), v.getQualifierHash()));
-				if(!(v instanceof RDFContext)) {
-					assertArrayEquals(id, concat(v.getRole().rotateLeft(v.getEndKeyHash((byte)i), 0, v.endKeyHashSize(), (byte)i), v.getEndQualifierHash()));
-				}
+		for(StatementIndex idx : StatementIndex.values()) {
+			assertArrayEquals(id, concat(v.getRole().rotateLeft(v.getKeyHash(idx), 0, v.keyHashSize(), idx), v.getQualifierHash()));
+			if(!(v instanceof RDFContext)) { // context doesn't have end-hashes
+				assertArrayEquals(id, concat(v.getRole().rotateLeft(v.getEndKeyHash(idx), 0, v.endKeyHashSize(), idx), v.getEndQualifierHash()));
 			}
 		}
 	}

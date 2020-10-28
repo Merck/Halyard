@@ -16,9 +16,9 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Hashes;
+import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -71,7 +71,8 @@ public class LiteralSearchStatementScannerTest implements Runnable {
     @Test
     public void statementLiteralSearchTest() throws Exception {
         Literal val = SimpleValueFactory.getInstance().createLiteral("Whatever Text");
-        response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: 30\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + HalyardTableUtils.id(val) + "\",\"_source\":{\"label\":\""+val.getLabel()+"\",\"datatype\":\""+val.getDatatype()+"\"}}]}}";
+		response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: 30\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + Hashes.id(val) + "\",\"_source\":{\"label\":\"" + val.getLabel() + "\",\"datatype\":\""
+				+ val.getDatatype() + "\"}}]}}";
         Thread t = new Thread(this);
         t.setDaemon(true);
         t.start();

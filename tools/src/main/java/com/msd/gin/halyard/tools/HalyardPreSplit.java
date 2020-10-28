@@ -188,9 +188,11 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         job.setNumReduceTasks(1);
         job.setOutputFormatClass(NullOutputFormat.class);
         if (job.waitForCompletion(true)) {
-            LOG.info("PreSplit Calculation Completed..");
+            LOG.info("PreSplit Calculation completed.");
             return 0;
+        } else {
+    		LOG.error("PreSplit failed to complete.");
+            return -1;
         }
-        return -1;
     }
 }

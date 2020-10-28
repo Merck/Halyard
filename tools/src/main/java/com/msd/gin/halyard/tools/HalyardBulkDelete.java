@@ -199,10 +199,12 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
             TableMapReduceUtil.addDependencyJars(job);
             if (job.waitForCompletion(true)) {
 				BulkLoadHFiles.create(getConf()).bulkLoad(hTable.getName(), new Path(cmd.getOptionValue('f')));
-                LOG.info("Bulk Delete Completed..");
+                LOG.info("Bulk Delete completed.");
                 return 0;
+            } else {
+        		LOG.error("Bulk Delete failed to complete.");
+                return -1;
             }
         }
-        return -1;
     }
 }

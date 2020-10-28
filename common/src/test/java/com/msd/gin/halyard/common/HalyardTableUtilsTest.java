@@ -74,8 +74,8 @@ public class HalyardTableUtilsTest {
     public void testIdIsUnique() {
         ValueFactory vf = SimpleValueFactory.getInstance();
         assertNotEquals(
-        	HalyardTableUtils.id(vf.createLiteral("1", vf.createIRI("local:type1"))),
-        	HalyardTableUtils.id(vf.createLiteral("1", vf.createIRI("local:type2"))));
+        	Hashes.id(vf.createLiteral("1", vf.createIRI("local:type1"))),
+        	Hashes.id(vf.createLiteral("1", vf.createIRI("local:type2"))));
     }
 
     @Test
@@ -167,7 +167,7 @@ public class HalyardTableUtilsTest {
 
     @Test(expected = RuntimeException.class)
     public void testGetInvalidMessageDigest() {
-        HalyardTableUtils.getMessageDigest("invalid");
+        Hashes.getMessageDigest("invalid");
     }
 
     @Test
@@ -197,6 +197,6 @@ public class HalyardTableUtilsTest {
 
     @Test
     public void testEncode() {
-        assertEquals("AQIDBAU", HalyardTableUtils.encode(new byte[]{1, 2, 3, 4, 5}));
+        assertEquals("AQIDBAU", Hashes.encode(new byte[]{1, 2, 3, 4, 5}));
     }
 }

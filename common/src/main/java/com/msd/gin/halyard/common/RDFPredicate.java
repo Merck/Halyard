@@ -14,9 +14,9 @@ public final class RDFPredicate extends RDFValue<IRI> {
 	 * Key hash size in bytes
 	 */
 	public static final int KEY_SIZE = 4;
-	public static final int END_KEY_SIZE = 2;
-	public static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_32;
-	public static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
+	static final int END_KEY_SIZE = 2;
+	static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_32;
+	static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
 
 	private RDFPredicate(IRI val) {
 		super(RDFRole.PREDICATE, val);

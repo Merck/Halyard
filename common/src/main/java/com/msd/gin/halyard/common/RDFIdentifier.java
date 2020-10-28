@@ -28,12 +28,12 @@ public class RDFIdentifier {
 		return hash;
 	}
 
-	public final byte[] getKeyHash(byte prefix) {
-		return role.keyHash(prefix, getUniqueHash());
+	public final byte[] getKeyHash(StatementIndex index) {
+		return role.keyHash(index, getUniqueHash());
 	}
 
-	final byte[] getEndKeyHash(byte prefix) {
-		return role.endKeyHash(prefix, getUniqueHash());
+	final byte[] getEndKeyHash(StatementIndex index) {
+		return role.endKeyHash(index, getUniqueHash());
 	}
 
 	final byte[] getQualifierHash() {
@@ -58,5 +58,10 @@ public class RDFIdentifier {
 
 	final int endQualifierHashSize() {
 		return role.endQualifierHashSize();
+	}
+
+	@Override
+	public String toString() {
+		return "["+Hashes.encode(getUniqueHash())+", "+role+"]";
 	}
 }

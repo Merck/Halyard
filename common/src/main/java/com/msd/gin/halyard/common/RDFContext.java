@@ -14,7 +14,7 @@ public final class RDFContext extends RDFValue<Resource> {
 	 * Key hash size in bytes
 	 */
 	public static final int KEY_SIZE = 6;
-	public static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_48;
+	static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_48;
 
 	private RDFContext(Resource val) {
 		super(RDFRole.CONTEXT, val);

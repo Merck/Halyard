@@ -98,16 +98,16 @@ public class HalyardTableUtilsKeyValueTest {
 		assertEquals(msg, expected, actual);
 		assertEquals(ts, ((Timestamped)actual).getTimestamp());
 		if(s == null) {
-			assertArrayEquals(HalyardTableUtils.id(expected.getSubject()), ((Identifiable)actual.getSubject()).getId());
+			assertArrayEquals(Hashes.id(expected.getSubject()), ((Identifiable)actual.getSubject()).getId());
 		}
 		if(p == null) {
-			assertArrayEquals(HalyardTableUtils.id(expected.getPredicate()), ((Identifiable)actual.getPredicate()).getId());
+			assertArrayEquals(Hashes.id(expected.getPredicate()), ((Identifiable)actual.getPredicate()).getId());
 		}
 		if(o == null) {
-			assertArrayEquals(HalyardTableUtils.id(expected.getObject()), ((Identifiable)actual.getObject()).getId());
+			assertArrayEquals(Hashes.id(expected.getObject()), ((Identifiable)actual.getObject()).getId());
 		}
 		if (c == null && (expected.getContext() != null || actual.getContext() != null)) {
-			assertArrayEquals(HalyardTableUtils.id(expected.getContext()), ((Identifiable)actual.getContext()).getId());
+			assertArrayEquals(Hashes.id(expected.getContext()), ((Identifiable)actual.getContext()).getId());
 		}
 	}
 }

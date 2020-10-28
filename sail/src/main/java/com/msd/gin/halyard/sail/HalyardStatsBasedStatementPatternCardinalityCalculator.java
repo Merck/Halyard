@@ -16,7 +16,7 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.vocab.VOID_EXT;
@@ -119,6 +119,6 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
         if (partitionVar == null || !partitionVar.hasValue()) {
             return defaultCardinality;
         }
-		return getTriplesCount(statsSource.getValueFactory().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + HalyardTableUtils.encode(HalyardTableUtils.id(partitionVar.getValue()))), 100l);
+		return getTriplesCount(statsSource.getValueFactory().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + Hashes.encode(Hashes.id(partitionVar.getValue()))), 100l);
     }
 }

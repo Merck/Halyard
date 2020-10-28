@@ -17,7 +17,9 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
@@ -92,7 +94,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             }
 
             byte[] hash = new byte[RDFObject.KEY_SIZE];
-            System.arraycopy(key.get(), key.getOffset() + 1 + (key.get()[key.getOffset()] == HalyardTableUtils.OSP_PREFIX ? 0 : RDFContext.KEY_SIZE), hash, 0, RDFObject.KEY_SIZE);
+            System.arraycopy(key.get(), key.getOffset() + 1 + (StatementIndex.toIndex(key.get()[key.getOffset()]).isQuadIndex() ? RDFContext.KEY_SIZE : 0), hash, 0, RDFObject.KEY_SIZE);
             if (!Arrays.equals(hash, lastHash)) {
             	literals = new HashSet<>();
             	lastHash = hash;
@@ -104,7 +106,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 if (literals.add(l)) {
             		try(StringBuilderWriter json = new StringBuilderWriter(128)) {
 		                json.append("{\"id\":");
-		                JSONObject.quote(HalyardTableUtils.encode(HalyardTableUtils.id(l)), json);
+		                JSONObject.quote(Hashes.encode(Hashes.id(l)), json);
 		                json.append(",\"label\":");
 		                JSONObject.quote(l.getLabel(), json);
 		                if(l.getLanguage().isPresent()) {
@@ -216,16 +218,13 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         job.setJarByClass(HalyardElasticIndexer.class);
         TableMapReduceUtil.initCredentials(job);
 
-        Scan scan = HalyardTableUtils.scan(null, null);
+        Scan scan;
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP literal region(s)
-            byte[] graphHash = RDFContext.create(NTriplesUtil.parseResource(cmd.getOptionValue('g'), VF)).getKeyHash(HalyardTableUtils.COSP_PREFIX);
-            scan.withStartRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash));
-            scan.withStopRow(HalyardTableUtils.concat(HalyardTableUtils.COSP_PREFIX, false, graphHash, HalyardTableUtils.LITERAL_STOP_KEY));
+        	scan = StatementIndex.scanLiterals(RDFContext.create(NTriplesUtil.parseResource(cmd.getOptionValue('g'), VF)));
         } else {
             //scan OSP literal region(s)
-            scan.withStartRow(HalyardTableUtils.concat(HalyardTableUtils.OSP_PREFIX, false));
-            scan.withStopRow(HalyardTableUtils.concat(HalyardTableUtils.OSP_PREFIX, false, HalyardTableUtils.LITERAL_STOP_KEY));
+        	scan = StatementIndex.scanLiterals();
         }
         TableMapReduceUtil.initTableMapperJob(
                 source,
@@ -248,9 +247,11 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             HttpURLConnection http = (HttpURLConnection)new URL(target + "_refresh").openConnection();
             http.connect();
             http.disconnect();
-            LOG.info("Elastic Indexing Completed..");
+            LOG.info("Elastic Indexing completed.");
             return 0;
+        } else {
+    		LOG.error("Elastic Indexing failed to complete.");
+            return -1;
         }
-        return -1;
     }
 }

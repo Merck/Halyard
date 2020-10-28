@@ -19,11 +19,8 @@ package com.msd.gin.halyard.sail;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
-import com.msd.gin.halyard.common.RDFContext;
-import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.RDFPredicate;
-import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
@@ -47,7 +44,6 @@ import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
@@ -289,9 +285,7 @@ public class HBaseSailConnection implements SailConnection {
 
 					StatementScanner() throws IOException {
 						super(sail.getValueFactory(), new TripleFactory(table));
-						Scan scan = HalyardTableUtils.scan(HalyardTableUtils.concat(HalyardTableUtils.CSPO_PREFIX, false),
-								HalyardTableUtils.concat(HalyardTableUtils.CSPO_PREFIX, true, RDFContext.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY));
-						rs = table.getScanner(scan);
+						rs = table.getScanner(StatementIndex.CSPO.scan());
 					}
 
 					@Override
