@@ -1,6 +1,6 @@
 # Halyard*
 
-[![CI](https://api.travis-ci.org/pulquero/Halyard.svg?branch=latest)](https://travis-ci.org/pulquero/Halyard)
+![CI](https://github.com/pulquero/Halyard/actions/workflows/ci.yml/badge.svg)
 [![Coverage](https://codecov.io/github/pulquero/Halyard/coverage.svg?branch=latest)](https://codecov.io/gh/pulquero/Halyard/)
 
 **Fork of [Halyard](https://github.com/Merck/Halyard) with support for RDF\*, XPath 3 functions, SPIN functions (and many other improvements/fixes).**

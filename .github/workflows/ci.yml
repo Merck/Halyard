@@ -1,0 +1,29 @@
+name: Halyard* CI
+
+on:
+  push:
+    branches: [ latest ]
+  pull_request:
+    branches: [ latest ]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Java 1.8
+      uses: actions/setup-java@v2
+      with:
+        distribution: temurin
+        java-version: 8
+
+    - name: Build
+      run: mvn install -DskipTests=true -Dmaven.javadoc.skip=true -B -V --no-transfer-progress
+
+    - name: Tests
+      run: mvn test -B
+
+    - name: Upload code coverage
+      uses: codecov/codecov-action@v2

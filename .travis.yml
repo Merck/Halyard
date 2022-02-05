@@ -1,8 +1,0 @@
-language: java
-jdk:
-  - openjdk8
-install: mvn install -DskipTests=true -Dmaven.javadoc.skip=true -B -V --no-transfer-progress
-script: mvn test -B
-sudo: required
-after_success:
-  - bash <(curl -s https://codecov.io/bash)
