@@ -1627,27 +1627,31 @@ final class HalyardTupleExprEvaluation {
                     QueryBindingSet result = null;
                     while (result == null && iter.hasNext()) {
                         final BindingSet assignedBindings = iter.next();
-                        for (String name : assignedBindings.getBindingNames()) {
-                            final Value assignedValue = assignedBindings.getValue(name);
-                            if (assignedValue != null) { // can be null if set to UNDEF
-                                // check that the binding assignment does not overwrite
-                                // existing bindings.
-                                Value bValue = b.getValue(name);
-                                if (bValue == null || assignedValue.equals(bValue)) {
-                                    if (result == null) {
-                                        result = new QueryBindingSet(b);
-                                    }
-                                    if (bValue == null) {
-                                        // we are not overwriting an existing binding.
-                                        result.addBinding(name, assignedValue);
-                                    }
-                                } else {
-                                    // if values are not equal there is no compatible
-                                    // merge and we should return no next element.
-                                    result = null;
-                                    break;
-                                }
-                            }
+                        if (assignedBindings.size() == 0) {
+                            result = new QueryBindingSet(b);
+                        } else {
+	                        for (String name : assignedBindings.getBindingNames()) {
+	                            final Value assignedValue = assignedBindings.getValue(name);
+	                            if (assignedValue != null) { // can be null if set to UNDEF
+	                                // check that the binding assignment does not overwrite
+	                                // existing bindings.
+	                                Value bValue = b.getValue(name);
+	                                if (bValue == null || assignedValue.equals(bValue)) {
+	                                    if (result == null) {
+	                                        result = new QueryBindingSet(b);
+	                                    }
+	                                    if (bValue == null) {
+	                                        // we are not overwriting an existing binding.
+	                                        result.addBinding(name, assignedValue);
+	                                    }
+	                                } else {
+	                                    // if values are not equal there is no compatible
+	                                    // merge and we should return no next element.
+	                                    result = null;
+	                                    break;
+	                                }
+	                            }
+	                        }
                         }
                     }
                     return result;

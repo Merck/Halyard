@@ -200,9 +200,11 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 }
                 int response = http.getResponseCode();
                 String msg = http.getResponseMessage();
-                if (response != 200) {
+                if (response == 200) {
+                    LOG.info("Elastic index succesfully configured.");
+                } else {
                     String resp = IOUtils.toString(http.getErrorStream(), StandardCharsets.UTF_8);
-                    LOG.warn(resp);
+                    LOG.warn("Elastic index responded with {}: {}", response, resp);
                     boolean alreadyExist = false;
                     if (response == 400) try {
                         alreadyExist = new JSONObject(resp).getJSONObject("error").getString("type").contains("exists");
@@ -247,10 +249,10 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             HttpURLConnection http = (HttpURLConnection)new URL(target + "_refresh").openConnection();
             http.connect();
             http.disconnect();
-            LOG.info("Elastic Indexing completed.");
+            LOG.info("Elastic indexing completed.");
             return 0;
         } else {
-    		LOG.error("Elastic Indexing failed to complete.");
+    		LOG.error("Elastic indexing failed to complete.");
             return -1;
         }
     }

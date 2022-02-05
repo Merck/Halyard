@@ -38,6 +38,7 @@ import java.util.UUID;
 import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -54,7 +55,7 @@ import static org.junit.Assert.*;
  * @author Adam Sotona (MSD)
  */
 public class HalyardElasticIndexerTest {
-	private static final String ES_VERSION = "7.0.1";
+	private static final String ES_VERSION = "7.17.0";
 	private static final String NODE_ID = UUID.randomUUID().toString();
 	private static final String INDEX_NAME = "my_index";
 	private static final String INDEX_PATH = "/"+INDEX_NAME;
@@ -96,14 +97,17 @@ public class HalyardElasticIndexerTest {
                 		case "/":
 		                    JSONObject version = new JSONObject();
 		                    version.put("number", ES_VERSION);
-		                    version.put("lucene_version", "8.0.0");
-		                    version.put("minimum_wire_compatibility_version", "6.7.0");
+		                    version.put("lucene_version", "8.11.1");
+		                    version.put("minimum_wire_compatibility_version", "6.8.0");
 		                    version.put("minimum_index_compatibiltiy_version", "6.0.0-beta1");
 		                    response = new JSONObject();
 		                    response.put("name", "localhost");
 		                    response.put("cluster_name", "halyard-test");
 		                    response.put("cluster_uuid", "_na_");
 		                    response.put("version", version);
+		                    response.put("tagline", "You Know, for Search");
+		                    response.put("build_flavor", "default");
+		                    he.getResponseHeaders().set("X-elastic-product", "Elasticsearch");
 		                    break;
                 		case "/_nodes/http":
                 			JSONObject nodeInfo = new JSONObject();
@@ -230,11 +234,16 @@ public class HalyardElasticIndexerTest {
         });
         server.start();
         try {
-        	// fix elasticsearch classpath issues
-        	System.setProperty("exclude.es-hadoop", "true");
-            assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardElasticIndexer(),
-                namedGraphOnly ? new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + INDEX_PATH, "-c", "-g", "<http://whatever/graph#1>"}
-                               : new String[]{"-s", "elasticTable", "-t", "http://localhost:" + server.getAddress().getPort() + INDEX_PATH, "-c"}));
+            // fix elasticsearch classpath issues
+            System.setProperty("exclude.es-hadoop", "true");
+            int serverPort = server.getAddress().getPort();
+            String indexUrl = "http://localhost:" + serverPort + INDEX_PATH;
+            String[] cmdLineArgs = namedGraphOnly ? new String[]{"-s", "elasticTable", "-t", indexUrl, "-c", "-g", "<http://whatever/graph#1>"}
+            : new String[]{"-s", "elasticTable", "-t", indexUrl, "-c"};
+            Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+            HalyardElasticIndexer indexer = new HalyardElasticIndexer();
+            int rc = ToolRunner.run(conf, indexer, cmdLineArgs);
+            assertEquals(0, rc);
         } finally {
             server.stop(0);
         }
