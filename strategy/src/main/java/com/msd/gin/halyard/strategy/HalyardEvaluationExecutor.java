@@ -41,10 +41,10 @@ import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 
 final class HalyardEvaluationExecutor {
 
-    private static final int THREADS = Integer.parseInt(System.getProperty("halyard.evaluationThreads", "20"));
-    private static final int MAX_RETRIES = 3;
-    private static final int THREAD_INCREASE = 2;
-    private static final int MAX_THREADS = 100;
+    private static final int THREADS = Integer.parseInt(System.getProperty("halyard.evaluation.threads", "20"));
+    private static final int MAX_RETRIES = Integer.parseInt(System.getProperty("halyard.evaluation.maxRetries", "3"));
+    private static final int THREAD_GAIN = Integer.parseInt(System.getProperty("halyard.evaluation.threadGain", "2"));
+    private static final int MAX_THREADS = Integer.parseInt(System.getProperty("halyard.evaluation.maxThreads", "100"));
 
     private static ThreadPoolExecutor createExecutor(String groupName, String namePrefix) {
         ThreadGroup tg = new ThreadGroup(groupName);
@@ -61,6 +61,20 @@ final class HalyardEvaluationExecutor {
     private static final ThreadPoolExecutor EXECUTOR = createExecutor("Halyard Executors", "Halyard ");
     //a map of query model nodes and their priority
     private static final Cache<QueryModelNode, Integer> PRIORITY_MAP_CACHE = CacheBuilder.newBuilder().weakKeys().build();
+
+    private static boolean checkThreads(int retries) {
+		if (retries > MAX_RETRIES && EXECUTOR.getActiveCount() == EXECUTOR.getMaximumPoolSize()) {
+			// failed to pull a new BindingSet and all threads are busy - add some spare threads
+			if (EXECUTOR.getMaximumPoolSize() < MAX_THREADS) {
+				EXECUTOR.setMaximumPoolSize(Math.min(EXECUTOR.getMaximumPoolSize()+THREAD_GAIN, MAX_THREADS));
+				EXECUTOR.setCorePoolSize(Math.min(EXECUTOR.getCorePoolSize()+THREAD_GAIN, MAX_THREADS));
+				return true;
+			} else {
+				throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", MAX_THREADS));
+			}
+		}
+		return false;
+    }
 
     /**
      * Asynchronously pulls from an iteration of binding sets and pushes to a {@link BindingSetPipe}.
@@ -230,8 +244,8 @@ final class HalyardEvaluationExecutor {
 		}
     }
 
-    private static final int MAX_QUEUE_SIZE = 5000;
-	private static final int TIMEOUT_POLL_MILLIS = 1000;
+    private static final int MAX_QUEUE_SIZE = Integer.parseInt(System.getProperty("halyard.evaluation.maxQueueSize", "5000"));
+	private static final int POLL_TIMEOUT_MILLIS = Integer.parseInt(System.getProperty("halyard.evaluation.pollTimeoutMillis", "1000"));
     private static final BindingSet END = new EmptyBindingSet();
 
     static final class BindingSetPipeQueue {
@@ -254,18 +268,16 @@ final class HalyardEvaluationExecutor {
     			BindingSet bs = null;
     			try {
                     for (int retries = 0; bs == null && !isClosed(); retries++) {
-    					bs = queue.poll(TIMEOUT_POLL_MILLIS, TimeUnit.MILLISECONDS);
+    					bs = queue.poll(POLL_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
     					if (exception instanceof RuntimeException) {
     						throw (RuntimeException) exception;
     					} else if (exception != null) {
                         	throw new QueryEvaluationException(exception);
                         }
 
-    					if (retries > MAX_RETRIES && EXECUTOR.getActiveCount() == EXECUTOR.getMaximumPoolSize() && EXECUTOR.getMaximumPoolSize() < MAX_THREADS) {
-    						EXECUTOR.setMaximumPoolSize(Math.min(EXECUTOR.getMaximumPoolSize()+THREAD_INCREASE, MAX_THREADS));
-    						EXECUTOR.setCorePoolSize(Math.min(EXECUTOR.getCorePoolSize()+THREAD_INCREASE, MAX_THREADS));
-    						retries = 0;
-    					}
+						if (checkThreads(retries)) {
+							retries = 0;
+						}
                     }
                 } catch (InterruptedException ex) {
                     throw new QueryEvaluationException(ex);
@@ -296,11 +308,9 @@ final class HalyardEvaluationExecutor {
             private boolean addToQueue(BindingSet bs) throws InterruptedException {
             	boolean added = false;
             	for (int retries = 0; !added && !isClosed(); retries++) {
-            		added = queue.offer(bs, TIMEOUT_POLL_MILLIS, TimeUnit.MILLISECONDS);
+            		added = queue.offer(bs, POLL_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
 
-					if (retries > MAX_RETRIES && EXECUTOR.getActiveCount() == EXECUTOR.getMaximumPoolSize() && EXECUTOR.getMaximumPoolSize() < MAX_THREADS) {
-						EXECUTOR.setMaximumPoolSize(Math.min(EXECUTOR.getMaximumPoolSize()+THREAD_INCREASE, MAX_THREADS));
-						EXECUTOR.setCorePoolSize(Math.min(EXECUTOR.getCorePoolSize()+THREAD_INCREASE, MAX_THREADS));
+					if (checkThreads(retries)) {
 						retries = 0;
 					}
             	}
