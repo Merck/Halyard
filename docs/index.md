@@ -5,12 +5,12 @@ layout: page
 
 <div class="jumbotron">
 
-# Halyard*
+# Halyard-star
 
-[![CI](https://api.travis-ci.org/pulquero/Halyard.svg?branch=latest)](https://travis-ci.org/pulquero/Halyard)
+![CI](https://github.com/pulquero/Halyard/actions/workflows/ci.yml/badge.svg)
 [![Coverage](https://codecov.io/github/pulquero/Halyard/coverage.svg?branch=latest)](https://codecov.io/gh/pulquero/Halyard/)
 
-**Fork of [Halyard](https://github.com/Merck/Halyard) with support for RDF\*, XPath 3 functions, SPIN functions (and many other improvements/fixes).**
+**Fork of [Halyard](https://github.com/Merck/Halyard) with support for RDF-star, XPath 3 functions, SPIN functions (and many other improvements/fixes).**
 
 **NB: this fork is not data compatible with the original.**
 
@@ -37,8 +37,8 @@ Download and unzip the latest `halyard-sdk-<version>.zip` bundle from the [relea
 
 Halyard is expected to run on an Apache Hadoop cluster node with configured Apache HBase client. Apache Hadoop and Apache HBase components are not bundled with Halyard. The runtime requirements are:
 
-* Apache Hadoop version 2.5.1 or higher
-* Apache HBase version 1.1.2 or higher
+* Apache Hadoop version 2.10 or higher
+* Apache HBase version 2.4 or higher
 * Java 8 Runtime
 
 </div>
