@@ -6,13 +6,17 @@ public final class IdentifiableLiteral extends LiteralWrapper implements Identif
 	private static final long serialVersionUID = 4299930477670062440L;
 	private byte[] id;
 
-	public IdentifiableLiteral(Literal literal) {
-		super(literal);
+	static IdentifiableLiteral create(Literal literal) {
+		return new IdentifiableLiteral(Hashes.id(literal), literal);
 	}
 
-	public IdentifiableLiteral(byte[] id, Literal literal) {
+	private IdentifiableLiteral(byte[] id, Literal literal) {
 		super(literal);
 		this.id = id;
+	}
+
+	IdentifiableLiteral(Literal literal) {
+		super(literal);
 	}
 
 	@Override

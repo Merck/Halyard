@@ -235,19 +235,19 @@ public class HBaseSail implements Sail {
     }
 
 	private void registerSpinParsingFunctions() {
-		if (!(functionRegistry.get(FN.CONCAT.toString()).get() instanceof org.eclipse.rdf4j.spin.function.Concat)) {
+		if (!(functionRegistry.get(FN.CONCAT.stringValue()).get() instanceof org.eclipse.rdf4j.spin.function.Concat)) {
 			functionRegistry.add(new org.eclipse.rdf4j.spin.function.Concat());
 		}
-		if (!functionRegistry.has(SPIN.EVAL_FUNCTION.toString())) {
+		if (!functionRegistry.has(SPIN.EVAL_FUNCTION.stringValue())) {
 			functionRegistry.add(new EvalFunction(spinParser));
 		}
-		if (!functionRegistry.has(SPIN.ASK_FUNCTION.toString())) {
+		if (!functionRegistry.has(SPIN.ASK_FUNCTION.stringValue())) {
 			functionRegistry.add(new AskFunction(spinParser));
 		}
-		if (!functionRegistry.has(SPIF.CONVERT_SPIN_RDF_TO_STRING_FUNCTION.toString())) {
+		if (!functionRegistry.has(SPIF.CONVERT_SPIN_RDF_TO_STRING_FUNCTION.stringValue())) {
 			functionRegistry.add(new ConvertSpinRDFToString(spinParser));
 		}
-		if (!functionRegistry.has(SPIF.CAN_INVOKE_FUNCTION.toString())) {
+		if (!functionRegistry.has(SPIF.CAN_INVOKE_FUNCTION.stringValue())) {
 			functionRegistry.add(new CanInvoke(spinParser));
 		}
 	}

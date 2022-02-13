@@ -6,13 +6,17 @@ public final class IdentifiableTriple extends TripleWrapper implements Identifia
 	private static final long serialVersionUID = 228285959274911416L;
 	private byte[] id;
 
-	public IdentifiableTriple(Triple triple) {
-		super(triple);
+	static IdentifiableTriple create(Triple triple) {
+		return new IdentifiableTriple(Hashes.id(triple), triple);
 	}
 
-	public IdentifiableTriple(byte[] id, Triple triple) {
+	private IdentifiableTriple(byte[] id, Triple triple) {
 		super(triple);
 		this.id = id;
+	}
+
+	IdentifiableTriple(Triple triple) {
+		super(triple);
 	}
 
 	@Override

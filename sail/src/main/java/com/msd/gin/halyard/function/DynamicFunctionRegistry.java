@@ -1,5 +1,7 @@
 package com.msd.gin.halyard.function;
 
+import com.msd.gin.halyard.common.Values;
+
 import java.math.BigInteger;
 import java.net.URI;
 import java.time.Duration;
@@ -19,7 +21,6 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.model.util.Literals;
 import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
@@ -163,7 +164,7 @@ public class DynamicFunctionRegistry extends FunctionRegistry {
 				xargs.add(xarg);
 			}
 			try {
-				return Literals.createLiteral(vf, f.evaluate(xargs));
+				return Values.literal(vf, f.evaluate(xargs), true);
 			} catch (XPathFunctionException ex) {
 				throw new ValueExprEvaluationException(ex);
 			}

@@ -6,13 +6,17 @@ public final class IdentifiableIRI extends IRIWrapper implements Identifiable {
 	private static final long serialVersionUID = 8055405742401584331L;
 	private byte[] id;
 
-	public IdentifiableIRI(IRI iri) {
-		super(iri);
+	static IdentifiableIRI create(IRI iri) {
+		return new IdentifiableIRI(Hashes.id(iri), iri);
 	}
 
-	public IdentifiableIRI(byte[] id, IRI iri) {
+	private IdentifiableIRI(byte[] id, IRI iri) {
 		super(iri);
 		this.id = id;
+	}
+
+	IdentifiableIRI(IRI iri) {
+		super(iri);
 	}
 
 	@Override

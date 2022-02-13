@@ -1,4 +1,4 @@
-name: Halyard* CI
+name: Halyard-star CI
 
 on:
   push:

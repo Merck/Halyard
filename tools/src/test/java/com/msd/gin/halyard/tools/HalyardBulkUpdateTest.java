@@ -21,7 +21,6 @@ import com.msd.gin.halyard.sail.HBaseSail;
 import java.io.File;
 import java.io.PrintStream;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Random;
 import java.util.TreeMap;
 import org.apache.commons.cli.MissingOptionException;
@@ -257,16 +256,12 @@ public class HalyardBulkUpdateTest {
 
         //compare the models
         TreeMap<String,String> fail = new TreeMap<>();
-        Iterator<Statement> it = referenceModel.iterator();
-        while (it.hasNext()) {
-            Statement st = it.next();
+        for (Statement st : (Iterable<Statement>) referenceModel) {
             if (!resultModel.contains(st)) {
                 fail.put(st.toString(), "-" + st.toString());
             }
         }
-        it = resultModel.iterator();
-        while (it.hasNext()) {
-            Statement st = it.next();
+        for (Statement st : (Iterable<Statement>) resultModel) {
             if (!referenceModel.contains(st)) {
                 fail.put(st.toString(), "+" + st.toString());
             }

@@ -16,9 +16,9 @@
  */
 package com.msd.gin.halyard.rio;
 
-import java.io.StringReader;
 import java.util.Iterator;
 import java.util.TreeMap;
+
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.impl.LinkedHashModel;

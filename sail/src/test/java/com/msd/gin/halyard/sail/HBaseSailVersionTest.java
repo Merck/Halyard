@@ -22,7 +22,6 @@ import com.msd.gin.halyard.repository.HBaseRepository;
 
 import java.util.Date;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
@@ -332,16 +331,12 @@ public class HBaseSailVersionTest {
 
         //compare the models
         TreeMap<String,String> fail = new TreeMap<>();
-        Iterator<Statement> it = referenceModel.iterator();
-        while (it.hasNext()) {
-            Statement st = it.next();
+		for (Statement st : (Iterable<Statement>) referenceModel) {
             if (!resultModel.contains(st)) {
                 fail.put(st.toString(), "-" + st.toString());
             }
         }
-        it = resultModel.iterator();
-        while (it.hasNext()) {
-            Statement st = it.next();
+		for (Statement st : (Iterable<Statement>) resultModel) {
             if (!referenceModel.contains(st)) {
                 fail.put(st.toString(), "+" + st.toString());
             }

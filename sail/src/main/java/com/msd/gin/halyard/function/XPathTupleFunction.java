@@ -2,6 +2,7 @@ package com.msd.gin.halyard.function;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.common.Values;
 import com.msd.gin.halyard.common.XMLLiteral;
 import com.msd.gin.halyard.vocab.HALYARD;
 
@@ -20,7 +21,6 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.model.util.Literals;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
@@ -124,7 +124,7 @@ public class XPathTupleFunction implements TupleFunction, InverseMagicProperty {
 
 				};
 			} else {
-				return new SingletonIteration<>(Collections.singletonList(Literals.createLiteral(vf, result)));
+				return new SingletonIteration<>(Collections.singletonList(Values.literal(vf, result, true)));
 			}
 		} catch (Exception e) {
 			throw new QueryEvaluationException(e);

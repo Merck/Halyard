@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -64,8 +63,8 @@ public final class ValueIO {
 
 		Set<IRI> iris = Vocabularies.getIRIs(vocab);
 		for (IRI iri : iris) {
-			byte[] id = Hashes.id(iri);
-			IdentifiableIRI idIri = new IdentifiableIRI(id, iri);
+			IdentifiableIRI idIri = IdentifiableIRI.create(iri);
+			byte[] id = idIri.getId();
 
 			ByteBuffer idbb = ByteBuffer.wrap(id).asReadOnlyBuffer();
 			if (WELL_KNOWN_IRI_IDS.putIfAbsent(idbb, idIri) != null) {
