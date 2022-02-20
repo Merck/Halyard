@@ -32,23 +32,18 @@ import java.util.Iterator;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Statement;
-import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.OWL;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.RDFS;
 import org.eclipse.rdf4j.model.vocabulary.XSD;
-import org.eclipse.rdf4j.rio.ParseErrorListener;
-import org.eclipse.rdf4j.rio.ParseLocationListener;
-import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
-import org.eclipse.rdf4j.rio.RDFHandler;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.RDFParserFactory;
 import org.eclipse.rdf4j.rio.RioSetting;
-import org.eclipse.rdf4j.rio.helpers.RioSettingImpl;
+import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
+import org.eclipse.rdf4j.rio.helpers.BooleanRioSetting;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -63,7 +58,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * @author Adam Sotona (MSD)
  */
-public final class JSONParser implements RDFParser {
+public final class JSONParser extends AbstractRDFParser {
 
     public static class Factory implements RDFParserFactory {
 
@@ -80,8 +75,8 @@ public final class JSONParser implements RDFParser {
     }
 
     public static final RDFFormat JSON = new RDFFormat("JSON", Arrays.asList("application/json"), StandardCharsets.UTF_8, Collections.singletonList("json"), RDFFormat.NO_NAMESPACES, RDFFormat.NO_CONTEXTS, RDFFormat.NO_RDF_STAR);
-    public static final RioSetting<Boolean> GENERATE_ONTOLOGY = new RioSettingImpl<>(JSONParser.class.getCanonicalName() + ".GENERATE_ONTOLOGY", "Generate ontology statements while parsing", Boolean.FALSE);
-    public static final RioSetting<Boolean> GENERATE_DATA = new RioSettingImpl<>(JSONParser.class.getCanonicalName() + ".GENERATE_DATA", "Generate data statements while parsing", Boolean.TRUE);
+    public static final RioSetting<Boolean> GENERATE_ONTOLOGY = new BooleanRioSetting(JSONParser.class.getCanonicalName() + ".GENERATE_ONTOLOGY", "Generate ontology statements while parsing", Boolean.FALSE);
+    public static final RioSetting<Boolean> GENERATE_DATA = new BooleanRioSetting(JSONParser.class.getCanonicalName() + ".GENERATE_DATA", "Generate data statements while parsing", Boolean.TRUE);
 
     private static final String MD_ALGORITHM = "SHA-512";
 
@@ -89,9 +84,6 @@ public final class JSONParser implements RDFParser {
     private final MessageDigest md;
 
 
-    private ValueFactory vf = SimpleValueFactory.getInstance();
-    private RDFHandler rdfHandler;
-    private ParserConfig config = new ParserConfig();
     private boolean generateOntology, generateData;
     private IRI baseURI;
 
@@ -114,60 +106,11 @@ public final class JSONParser implements RDFParser {
 
     @Override
     public Collection<RioSetting<?>> getSupportedSettings() {
-            return Arrays.asList(GENERATE_DATA, GENERATE_ONTOLOGY);
+        Collection<RioSetting<?>> supportedSettings = super.getSupportedSettings();
+        supportedSettings.add(GENERATE_DATA);
+        supportedSettings.add(GENERATE_ONTOLOGY);
+        return supportedSettings;
     }
-
-    @Override
-    public RDFParser setValueFactory(ValueFactory valueFactory) {
-        this.vf = valueFactory;
-        return this;
-    }
-
-    @Override
-    public RDFParser setRDFHandler(RDFHandler handler) {
-        this.rdfHandler = handler;
-        return this;
-    }
-
-    @Override
-    public RDFParser setParseErrorListener(ParseErrorListener el) {
-        return this;
-    }
-
-    @Override
-    public RDFParser setParseLocationListener(ParseLocationListener ll) {
-        return this;
-    }
-
-    @Override
-    public RDFParser setParserConfig(ParserConfig config) {
-        this.config = config;
-        return this;
-    }
-
-    @Override
-    public ParserConfig getParserConfig() {
-        return this.config;
-    }
-
-    @Override
-    public <T> RDFParser set(RioSetting<T> setting, T value) {
-        this.config.set(setting, value);
-        return this;
-    }
-
-    @Override
-    public void setVerifyData(boolean verifyData) {}
-
-    @Override
-    public void setPreserveBNodeIDs(boolean preserveBNodeIDs) {}
-
-    @Override
-    public void setStopAtFirstError(boolean stopAtFirstError) {}
-
-    @Override
-    @SuppressWarnings({"deprecation"})
-    public void setDatatypeHandling(DatatypeHandling datatypeHandling) {}
 
     @Override
     public void parse(InputStream in, String baseURI) throws IOException, RDFParseException, RDFHandlerException {
@@ -180,7 +123,8 @@ public final class JSONParser implements RDFParser {
     }
 
     private void parse(JsonParser jsonSource, String baseURI) throws IOException {
-        this.baseURI = vf.createIRI(baseURI);
+        this.baseURI = valueFactory.createIRI(baseURI);
+        setBaseURI(baseURI);
         generateOntology = getParserConfig().get(GENERATE_ONTOLOGY);
         generateData = getParserConfig().get(GENERATE_DATA);
         try (JsonParser parser = new JsonParserDelegate(jsonSource) {
@@ -210,7 +154,7 @@ public final class JSONParser implements RDFParser {
                 handleNamespace(RDF.PREFIX, RDF.NAMESPACE);
                 handleNamespace(RDFS.PREFIX, RDFS.NAMESPACE);
                 handleNamespace(OWL.PREFIX, OWL.NAMESPACE);
-                handleStatement(vf.createStatement(this.baseURI, RDF.TYPE, OWL.ONTOLOGY));
+                handleStatement(valueFactory.createStatement(this.baseURI, RDF.TYPE, OWL.ONTOLOGY));
             }
             handleNamespace("", this.baseURI.stringValue());
             TreeNode root = parser.readValueAsTree();
@@ -293,7 +237,7 @@ public final class JSONParser implements RDFParser {
         } finally {
             md.reset();
         }
-        treeWalk(null, null, vf.createIRI(baseURI + hash).stringValue(), "", null, null, node);
+        treeWalk(null, null, valueFactory.createIRI(baseURI + hash).stringValue(), "", null, null, node);
     }
 
     private void treeWalk(IRI parentIRI, IRI parentClass, String path, String predicatePath, String label, Integer index, TreeNode node) throws URISyntaxException {
@@ -302,35 +246,35 @@ public final class JSONParser implements RDFParser {
                 treeWalk(parentIRI, parentClass, path + ":" + i, predicatePath, label, i, node.get(i));
             }
         } else if (node.isObject()) {
-            IRI pkIRI = vf.createIRI((parentIRI == null ? "" : parentIRI.stringValue()) + path);
-            IRI classIRI = vf.createIRI(baseURI + predicatePath + ":Node");
+            IRI pkIRI = valueFactory.createIRI((parentIRI == null ? "" : parentIRI.stringValue()) + path);
+            IRI classIRI = valueFactory.createIRI(baseURI + predicatePath + ":Node");
             if (parentIRI != null) {
-                IRI predicate = vf.createIRI(baseURI + predicatePath);
+                IRI predicate = valueFactory.createIRI(baseURI + predicatePath);
                 if (generateData) {
-                    handleStatement(vf.createStatement(parentIRI, predicate, pkIRI));
+                    handleStatement(createStatement(parentIRI, predicate, pkIRI));
                 }
                 if (generateOntology) {
-                    handleStatement(vf.createStatement(predicate, RDF.TYPE, OWL.OBJECTPROPERTY));
-                    handleStatement(vf.createStatement(predicate, RDFS.LABEL, vf.createLiteral(label)));
-                    handleStatement(vf.createStatement(predicate, RDFS.DOMAIN, parentClass));
-                    handleStatement(vf.createStatement(predicate, RDFS.RANGE, classIRI));
+                    handleStatement(createStatement(predicate, RDF.TYPE, OWL.OBJECTPROPERTY));
+                    handleStatement(createStatement(predicate, RDFS.LABEL, valueFactory.createLiteral(label)));
+                    handleStatement(createStatement(predicate, RDFS.DOMAIN, parentClass));
+                    handleStatement(createStatement(predicate, RDFS.RANGE, classIRI));
                 }
             }
             if (generateData) {
-                handleStatement(vf.createStatement(pkIRI, RDF.TYPE, classIRI));
+                handleStatement(createStatement(pkIRI, RDF.TYPE, classIRI));
             }
             if (generateOntology) {
-                handleStatement(vf.createStatement(classIRI, RDF.TYPE, RDFS.CLASS));
+                handleStatement(createStatement(classIRI, RDF.TYPE, RDFS.CLASS));
             }
             if (index != null) {
-                IRI indexIRI = vf.createIRI(baseURI + predicatePath + ":index");
+                IRI indexIRI = valueFactory.createIRI(baseURI + predicatePath + ":index");
                 if (generateData) {
-                    handleStatement(vf.createStatement(pkIRI, indexIRI, vf.createLiteral(index.toString(), XSD.INTEGER)));
+                    handleStatement(createStatement(pkIRI, indexIRI, valueFactory.createLiteral(index.toString(), XSD.INTEGER)));
                 }
                 if (generateOntology) {
-                    handleStatement(vf.createStatement(indexIRI, RDF.TYPE, OWL.DATATYPEPROPERTY));
-                    handleStatement(vf.createStatement(indexIRI, RDFS.LABEL, vf.createLiteral("index")));
-                    handleStatement(vf.createStatement(indexIRI, RDFS.DOMAIN, classIRI));
+                    handleStatement(createStatement(indexIRI, RDF.TYPE, OWL.DATATYPEPROPERTY));
+                    handleStatement(createStatement(indexIRI, RDFS.LABEL, valueFactory.createLiteral("index")));
+                    handleStatement(createStatement(indexIRI, RDFS.DOMAIN, classIRI));
                 }
             }
             Iterator<String> fieldNames = node.fieldNames();
@@ -343,17 +287,17 @@ public final class JSONParser implements RDFParser {
             if (parentIRI == null) {
                 throw new IllegalArgumentException("Value without parent IRI");
             }
-            IRI predicate = vf.createIRI(baseURI + predicatePath);
+            IRI predicate = valueFactory.createIRI(baseURI + predicatePath);
             if (generateData) {
                 String value = ((JsonNode)node).textValue();
                 if (value != null) {
-                    handleStatement(vf.createStatement(parentIRI, predicate, vf.createLiteral(value)));
+                    handleStatement(createStatement(parentIRI, predicate, valueFactory.createLiteral(value)));
                 }
             }
             if (generateOntology) {
-                handleStatement(vf.createStatement(predicate, RDF.TYPE, OWL.DATATYPEPROPERTY));
-                handleStatement(vf.createStatement(predicate, RDFS.LABEL, vf.createLiteral(label)));
-                handleStatement(vf.createStatement(predicate, RDFS.DOMAIN, parentClass));
+                handleStatement(createStatement(predicate, RDF.TYPE, OWL.DATATYPEPROPERTY));
+                handleStatement(createStatement(predicate, RDFS.LABEL, valueFactory.createLiteral(label)));
+                handleStatement(createStatement(predicate, RDFS.DOMAIN, parentClass));
             }
         } else {
                 throw new IllegalArgumentException("Illegal node type");

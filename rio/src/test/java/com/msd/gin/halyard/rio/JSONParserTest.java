@@ -16,9 +16,12 @@
  */
 package com.msd.gin.halyard.rio;
 
+import static org.junit.Assert.assertNotNull;
+
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.Collection;
+
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.impl.LinkedHashModel;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -28,7 +31,6 @@ import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.RioSetting;
 import org.eclipse.rdf4j.rio.helpers.ContextStatementCollector;
 import org.junit.Assert;
-import static org.junit.Assert.assertNotNull;
 import org.junit.Test;
 
 /**
@@ -52,17 +54,6 @@ public class JSONParserTest {
         Collection<RioSetting<?>> set = new JSONParser().getSupportedSettings();
         Assert.assertTrue(set.contains(JSONParser.GENERATE_DATA));
         Assert.assertTrue(set.contains(JSONParser.GENERATE_ONTOLOGY));
-    }
-
-    @Test
-    public void testMethodsThatDoNothing() {
-        RDFParser p = new JSONParser();
-        p.setVerifyData(true);
-        p.setPreserveBNodeIDs(true);
-        p.setStopAtFirstError(true);
-        p.setDatatypeHandling(RDFParser.DatatypeHandling.NORMALIZE);
-        p.setParseErrorListener(null);
-        p.setParseLocationListener(null);
     }
 
     @Test

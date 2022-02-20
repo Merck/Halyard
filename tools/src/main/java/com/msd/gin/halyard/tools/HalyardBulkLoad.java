@@ -407,11 +407,12 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                     RDFParser parser = Rio.createParser(Rio.getParserFormatForFileName(localBaseUri).get());
                     parser.setRDFHandler(this);
                     parser.setParseErrorListener(this);
-                    parser.setStopAtFirstError(!skipInvalid);
                     if (skipInvalid) {
                         parser.set(BasicParserSettings.VERIFY_URI_SYNTAX, false);
                         parser.set(BasicParserSettings.VERIFY_RELATIVE_URIS, false);
                         parser.set(BasicParserSettings.VERIFY_LANGUAGE_TAGS, false);
+                        parser.set(NTriplesParserSettings.FAIL_ON_INVALID_LINES, false);
+                        parser.getParserConfig().addNonFatalError(NTriplesParserSettings.FAIL_ON_INVALID_LINES);
                     }
                     parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
                     if (defaultRdfContextPattern != null || overrideRdfContext) {
