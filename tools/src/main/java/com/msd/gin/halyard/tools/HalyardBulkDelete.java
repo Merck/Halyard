@@ -70,7 +70,8 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 
     static final class DeleteMapper extends TableMapper<ImmutableBytesWritable, KeyValue> {
 
-    	TripleFactory tf;
+        final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
+        TripleFactory tf;
         long total = 0, deleted = 0;
         Resource subj;
         IRI pred;
@@ -117,7 +118,8 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
                         c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength(),
                         c.getTimestamp(), KeyValue.Type.DeleteColumn, c.getValueArray(), c.getValueOffset(),
                         c.getValueLength());
-                    output.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
+                    rowKey.set(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength());
+                    output.write(rowKey, kv);
                     deleted++;
                 } else {
                     output.progress();

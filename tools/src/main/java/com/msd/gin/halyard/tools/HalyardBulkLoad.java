@@ -197,6 +197,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
      */
     public static final class RDFMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, KeyValue> {
 
+        private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
         private long timestamp;
 
         @Override
@@ -208,7 +209,8 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         @Override
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
             for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, timestamp)) {
-                context.write(new ImmutableBytesWritable(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength()), keyValue);
+                rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
+                context.write(rowKey, keyValue);
             }
         }
     }

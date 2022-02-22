@@ -146,10 +146,13 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 						@Override
 						public SailConnection createConnection(HBaseSail sail) {
 							return new HBaseSailConnection(sail) {
+								private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
+
 								@Override
 								protected void put(KeyValue kv) throws IOException {
+									rowKey.set(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength());
 									try {
-										context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
+										context.write(rowKey, kv);
 									} catch (InterruptedException ex) {
 										throw new IOException(ex);
 									}
@@ -166,8 +169,9 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 								            kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength(),
 								            kv.getTimestamp(), KeyValue.Type.DeleteColumn, kv.getValueArray(), kv.getValueOffset(),
 								            kv.getValueLength());
+								    rowKey.set(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength());
 									try {
-										context.write(new ImmutableBytesWritable(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()), kv);
+										context.write(rowKey, kv);
 									} catch (InterruptedException ex) {
 										throw new IOException(ex);
 									}

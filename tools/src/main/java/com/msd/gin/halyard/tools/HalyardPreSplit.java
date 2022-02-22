@@ -70,6 +70,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
      */
     public final static class RDFDecimatingMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, LongWritable> {
 
+        private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
         private final Random random = new Random(0);
         private long counter = 0, next = 0;
         private int decimationFactor;
@@ -90,7 +91,8 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
             if (counter++ == next) {
                 next = counter + random.nextInt(decimationFactor);
                 for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, timestamp)) {
-                    context.write(new ImmutableBytesWritable(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength()), new LongWritable(keyValue.getLength()));
+                    rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
+                    context.write(rowKey, new LongWritable(keyValue.getLength()));
                 }
             }
         }
