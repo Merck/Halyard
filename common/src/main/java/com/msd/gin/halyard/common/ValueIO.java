@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -134,6 +135,14 @@ public final class ValueIO {
 		catch (DatatypeConfigurationException e) {
 			throw new AssertionError(e);
 		}
+	}
+
+	private static final Date GREGORIAN_ONLY = new Date(Long.MIN_VALUE);
+
+	private static GregorianCalendar newGregorianCalendar() {
+		GregorianCalendar cal = new GregorianCalendar();
+		cal.setGregorianChange(GREGORIAN_ONLY);
+		return cal;
 	}
 
 	private static final byte IRI_TYPE = '<';
@@ -293,7 +302,7 @@ public final class ValueIO {
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				long millis = b.getLong();
 				int tz = b.getShort();
-				GregorianCalendar c = new GregorianCalendar();
+				GregorianCalendar c = newGregorianCalendar();
 				c.setTimeInMillis(millis);
 				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
 				cal.setYear(null);
@@ -318,7 +327,7 @@ public final class ValueIO {
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				long millis = b.getLong();
 				int tz = b.getShort();
-				GregorianCalendar c = new GregorianCalendar();
+				GregorianCalendar c = newGregorianCalendar();
 				c.setTimeInMillis(millis);
 				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
 				cal.setTime(DatatypeConstants.FIELD_UNDEFINED, DatatypeConstants.FIELD_UNDEFINED, DatatypeConstants.FIELD_UNDEFINED, null);
@@ -341,7 +350,7 @@ public final class ValueIO {
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				long millis = b.getLong();
 				int tz = b.getShort();
-				GregorianCalendar c = new GregorianCalendar();
+				GregorianCalendar c = newGregorianCalendar();
 				c.setTimeInMillis(millis);
 				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
 				if(tz == Short.MIN_VALUE) {
@@ -398,50 +407,41 @@ public final class ValueIO {
 		return b;
 	}
 
+	private static final ByteWriter DEFAULT_BYTE_WRITER = new ByteWriter() {
+		@Override
+		public byte[] writeBytes(Literal l) {
+			byte[] labelBytes = l.getLabel().getBytes(StandardCharsets.UTF_8);
+			byte[] datatypeBytes = ValueIO.writeBytes(l.getDatatype());
+			byte[] lBytes = new byte[1+labelBytes.length+1+datatypeBytes.length];
+			lBytes[0] = '\"';
+			System.arraycopy(labelBytes, 0, lBytes, 1, labelBytes.length);
+			int pos = 1+labelBytes.length;
+			lBytes[pos++] = '\"';
+			System.arraycopy(datatypeBytes, 0, lBytes, lBytes.length-datatypeBytes.length, datatypeBytes.length);
+			return lBytes;
+		}
+	};
+
 	public static byte[] writeBytes(Value v) {
-    	if (v instanceof IRI) {
-    		ByteBuffer hash = WELL_KNOWN_IRIS.inverse().get(v);
-    		if (hash != null) {
-    			byte[] b = new byte[1 + hash.remaining()];
-    			b[0] = IRI_HASH_TYPE;
-    			// NB: do not alter original hash buffer which is shared across threads
-    			hash.duplicate().get(b, 1, hash.remaining());
-    			return b;
-    		} else {
-    			IRI iri = (IRI) v;
-    			hash = WELL_KNOWN_NAMESPACES.inverse().get(iri.getNamespace());
-    			if (hash != null) {
-    				byte[] localBytes = iri.getLocalName().getBytes(StandardCharsets.UTF_8);
-    				byte[] b = new byte[1 + hash.remaining() + localBytes.length];
-    				b[0] = NAMESPACE_HASH_TYPE;
-        			// NB: do not alter original hash buffer which is shared across threads
-        			hash.duplicate().get(b, 1, hash.remaining());
-        			System.arraycopy(localBytes, 0, b, b.length-localBytes.length, localBytes.length);
-        			return b;
-    			} else {
-    				return ("<"+v.stringValue()+">").getBytes(StandardCharsets.UTF_8);
-    			}
-    		}
-    	} else if (v instanceof BNode) {
-    		return v.toString().getBytes(StandardCharsets.UTF_8);
-    	} else if (v instanceof Literal) {
+		if (v instanceof IRI) {
+			return writeBytes((IRI)v);
+		} else if (v instanceof BNode) {
+			return v.toString().getBytes(StandardCharsets.UTF_8);
+		} else if (v instanceof Literal) {
 			Literal l = (Literal) v;
 			if(l.getLanguage().isPresent()) {
 				return l.toString().getBytes(StandardCharsets.UTF_8);
 			} else {
 				ByteWriter writer = BYTE_WRITERS.get(l.getDatatype());
 				if (writer != null) {
-					return writer.writeBytes(l);
+					try {
+						return writer.writeBytes(l);
+					} catch (Exception e) {
+						// if the dedicated writer fails then fallback to the generic writer
+						return DEFAULT_BYTE_WRITER.writeBytes(l);
+					}
 				} else {
-					byte[] labelBytes = l.getLabel().getBytes(StandardCharsets.UTF_8);
-					byte[] datatypeBytes = writeBytes(l.getDatatype());
-					byte[] lBytes = new byte[1+labelBytes.length+1+datatypeBytes.length];
-					lBytes[0] = '\"';
-					System.arraycopy(labelBytes, 0, lBytes, 1, labelBytes.length);
-					int pos = 1+labelBytes.length;
-					lBytes[pos++] = '\"';
-					System.arraycopy(datatypeBytes, 0, lBytes, lBytes.length-datatypeBytes.length, datatypeBytes.length);
-					return lBytes;
+					return DEFAULT_BYTE_WRITER.writeBytes(l);
 				}
 			}
     	} else if (v instanceof Triple) {
@@ -452,6 +452,31 @@ public final class ValueIO {
     		return b;
 		} else {
 			throw new AssertionError(String.format("Unexpected RDF value: %s (%s)", v, v.getClass().getName()));
+		}
+    }
+
+	private static byte[] writeBytes(IRI v) {
+		ByteBuffer hash = WELL_KNOWN_IRIS.inverse().get(v);
+		if (hash != null) {
+			byte[] b = new byte[1 + hash.remaining()];
+			b[0] = IRI_HASH_TYPE;
+			// NB: do not alter original hash buffer which is shared across threads
+			hash.duplicate().get(b, 1, hash.remaining());
+			return b;
+		} else {
+			IRI iri = (IRI) v;
+			hash = WELL_KNOWN_NAMESPACES.inverse().get(iri.getNamespace());
+			if (hash != null) {
+				byte[] localBytes = iri.getLocalName().getBytes(StandardCharsets.UTF_8);
+				byte[] b = new byte[1 + hash.remaining() + localBytes.length];
+				b[0] = NAMESPACE_HASH_TYPE;
+				// NB: do not alter original hash buffer which is shared across threads
+				hash.duplicate().get(b, 1, hash.remaining());
+				System.arraycopy(localBytes, 0, b, b.length-localBytes.length, localBytes.length);
+				return b;
+			} else {
+				return ("<"+v.stringValue()+">").getBytes(StandardCharsets.UTF_8);
+			}
 		}
     }
 
