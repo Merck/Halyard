@@ -23,6 +23,11 @@ public final class SCHEMA_ORG implements Vocabulary {
     public static final IRI IMAGE_OBJECT = SVF.createIRI(NAMESPACE, "ImageObject");
     public static final IRI VIDEO_OBJECT = SVF.createIRI(NAMESPACE, "VideoObject");
 
+    public static final IRI DATE_MODIFIED = SVF.createIRI(NAMESPACE, "dateModified");
+    public static final IRI DESCRIPTION = SVF.createIRI(NAMESPACE, "description");
+    public static final IRI IN_LANGUAGE = SVF.createIRI(NAMESPACE, "inLanguage");
+    public static final IRI VERSION = SVF.createIRI(NAMESPACE, "version");
+
     public static final IRI ABOUT = SVF.createIRI(NAMESPACE, "about");
     public static final IRI CONTENT_SIZE = SVF.createIRI(NAMESPACE, "contentSize");
     public static final IRI CONTENT_URL = SVF.createIRI(NAMESPACE, "contentUrl");

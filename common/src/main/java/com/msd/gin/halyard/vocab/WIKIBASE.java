@@ -22,4 +22,11 @@ public final class WIKIBASE implements Vocabulary {
     public static final IRI REFERENCE = SVF.createIRI(NAMESPACE, "Reference");
     public static final IRI STATEMENT = SVF.createIRI(NAMESPACE, "Statement");
     public static final IRI VALUE = SVF.createIRI(NAMESPACE, "Value");
+
+    public static final IRI CLAIM = SVF.createIRI(NAMESPACE, "claim");
+    public static final IRI IDENTIFIERS = SVF.createIRI(NAMESPACE, "identifiers");
+    public static final IRI RANK = SVF.createIRI(NAMESPACE, "rank");
+    public static final IRI SITELINKS = SVF.createIRI(NAMESPACE, "sitelinks");
+    public static final IRI STATEMENTS = SVF.createIRI(NAMESPACE, "statements");
+    public static final IRI WIKI_GROUP = SVF.createIRI(NAMESPACE, "wikiGroup");
 }
