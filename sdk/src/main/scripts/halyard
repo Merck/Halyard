@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 halyard_home="$(dirname "${0}")"
 libjars="$(echo "$halyard_home"/lib/*.jar | tr ' ' ',')"
 export HADOOP_CLASSPATH="$halyard_home/lib/*:`hadoop classpath`:`hbase classpath`"
