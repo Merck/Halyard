@@ -1139,7 +1139,7 @@ final class HalyardTupleExprEvaluation {
                 }
                 // otherwise: perform a SELECT query
                 CloseableIteration<BindingSet, QueryEvaluationException> result = fs.select(service, freeVars, bindings, baseUri);
-				pullAndPushAsync(parent, service.isSilent() ? new SilentIteration(result) : result, service);
+				pullAndPushAsync(parent, service.isSilent() ? new SilentIteration<>(result) : result, service);
             } catch (QueryEvaluationException e) {
                 // suppress exceptions if silent
                 if (service.isSilent()) {

@@ -431,7 +431,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                 partitionId = ByteBuffer.allocate(dis.readInt());
                 dis.readFully(partitionId.array());
             }
-            if (SD.NAMED_GRAPH_PROPERTY.toString().equals(predicate)) { //workaround to at least count all small named graph that are below the treshold
+            if (SD.NAMED_GRAPH_PROPERTY.stringValue().equals(predicate)) { //workaround to at least count all small named graph that are below the treshold
                 writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, SVF.createIRI(graph));
             } else {
                 IRI graphNode;

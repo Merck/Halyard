@@ -416,10 +416,11 @@ public final class HttpSparqlHandler implements HttpHandler {
      * @throws IOException
      */
     private void sendResponse(HttpExchange exchange, int code, String message) throws IOException {
-        exchange.sendResponseHeaders(code, message.length());
-        OutputStream os = exchange.getResponseBody();
-        os.write(message.getBytes());
-        os.close();
+        byte[] payload = message.getBytes(CHARSET);
+        exchange.sendResponseHeaders(code, payload.length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(payload);
+        }
     }
 
     /**

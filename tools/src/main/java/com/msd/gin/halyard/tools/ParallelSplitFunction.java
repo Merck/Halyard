@@ -86,7 +86,7 @@ public final class ParallelSplitFunction implements Function {
         int forks = 0;
         @Override
         public void meet(FunctionCall node) throws IllegalArgumentException {
-            if (PARALLEL_SPLIT_FUNCTION.toString().equals(node.getURI())) {
+            if (PARALLEL_SPLIT_FUNCTION.stringValue().equals(node.getURI())) {
                 List<ValueExpr> args = node.getArgs();
                 if (args.size() < 2) throw new IllegalArgumentException(PARALLEL_SPLIT_FUNCTION.getLocalName() + " function has at least two mandatory arguments: <constant number of parallel forks> and <binding variable(s) to filter by>");
                 try {
