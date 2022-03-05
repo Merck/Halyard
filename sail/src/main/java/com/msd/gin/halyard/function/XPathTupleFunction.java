@@ -2,7 +2,6 @@ package com.msd.gin.halyard.function;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.msd.gin.halyard.common.Values;
 import com.msd.gin.halyard.common.XMLLiteral;
 import com.msd.gin.halyard.vocab.HALYARD;
 

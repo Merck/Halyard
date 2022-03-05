@@ -20,9 +20,10 @@ public final class WIKIDATA implements Vocabulary {
     public static final Namespace WDREF_NS = new SimpleNamespace("wdref", "http://www.wikidata.org/reference/");
     public static final Namespace WDT_NS = new SimpleNamespace("wdt", "http://www.wikidata.org/prop/direct/");
     public static final Namespace WDTN_NS = new SimpleNamespace("wdtn", "http://www.wikidata.org/prop/direct-normalized/");
+    public static final Namespace WDNO_NS = new SimpleNamespace("wdno", "http://www.wikidata.org/prop/novalue/");
+
     public static final String P_NAMESPACE = "http://www.wikidata.org/prop/";
     public static final Namespace P_NS = new SimpleNamespace("p", P_NAMESPACE);
-    public static final Namespace WDNO_NS = new SimpleNamespace("wdno", "http://www.wikidata.org/prop/novalue/");
     public static final Namespace PS_NS = new SimpleNamespace("ps", "http://www.wikidata.org/prop/statement/");
     public static final Namespace PSV_NS = new SimpleNamespace("psv", "http://www.wikidata.org/prop/statement/value/");
     public static final Namespace PSN_NS = new SimpleNamespace("psn", "http://www.wikidata.org/prop/statement/value-normalized/");
