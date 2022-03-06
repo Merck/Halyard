@@ -50,7 +50,7 @@ public class ValueIOTest {
 
 	@Test
 	public void testToAndFromBytes() throws IOException {
-		byte[] b = ValueIO.writeBytes(expected);
+		byte[] b = ValueIO.writeBytes(expected, null);
 		Value actual = ValueIO.readValue(ByteBuffer.wrap(b), vf, null);
 		assertEquals(expected, actual);
 

@@ -1,8 +1,12 @@
 package com.msd.gin.halyard.common;
 
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleWriter;
+
 import org.eclipse.rdf4j.model.Value;
 
 public abstract class RDFValue<V extends Value> extends RDFIdentifier {
+	private static final TableTripleWriter TW = new TableTripleWriter();
+
 	final V val;
 	private byte[] ser;
 
@@ -18,7 +22,7 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 
 	public final byte[] getSerializedForm() {
 		if (ser == null) {
-			ser = ValueIO.writeBytes(val);
+			ser = ValueIO.writeBytes(val, TW);
 		}
 		return ser;
 	}

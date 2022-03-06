@@ -1,2 +1,3 @@
 com.msd.gin.halyard.rio.JSONParser$Factory
 com.msd.gin.halyard.rio.NDJSONLDParser$Factory
+com.msd.gin.halyard.rio.HRDFParser$Factory

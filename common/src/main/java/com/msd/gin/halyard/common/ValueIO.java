@@ -2,7 +2,6 @@ package com.msd.gin.halyard.common;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -27,7 +26,6 @@ import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Namespace;
-import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -422,7 +420,7 @@ public final class ValueIO {
 		}
 	};
 
-	public static byte[] writeBytes(Value v) {
+	public static byte[] writeBytes(Value v, TripleWriter tw) {
 		if (v instanceof IRI) {
 			return writeBytes((IRI)v);
 		} else if (v instanceof BNode) {
@@ -444,12 +442,13 @@ public final class ValueIO {
 					return DEFAULT_BYTE_WRITER.writeBytes(l);
 				}
 			}
-    	} else if (v instanceof Triple) {
-    		byte[] b = new byte[1+3*Hashes.ID_SIZE];
-    		b[0] = TRIPLE_TYPE;
-    		Triple t = (Triple) v;
-    		writeTripleIdentifier(t.getSubject(), t.getPredicate(), t.getObject(), b, 1);
-    		return b;
+		} else if (v instanceof Triple) {
+			Triple t = (Triple) v;
+			byte[] tripleBytes = tw.writeTriple(t.getSubject(), t.getPredicate(), t.getObject());
+			byte[] b = new byte[1+tripleBytes.length];
+			b[0] = TRIPLE_TYPE;
+			System.arraycopy(tripleBytes, 0, b, 1, tripleBytes.length);
+			return b;
 		} else {
 			throw new AssertionError(String.format("Unexpected RDF value: %s (%s)", v, v.getClass().getName()));
 		}
@@ -480,20 +479,8 @@ public final class ValueIO {
 		}
     }
 
-    public static void writeTripleIdentifier(Resource subj, IRI pred, Value obj, byte[] b, int offset) {
-    	int i = offset;
-		byte[] sid = Hashes.id(subj);
-		System.arraycopy(sid, 0, b, i, Hashes.ID_SIZE);
-		i += Hashes.ID_SIZE;
-		byte[] pid = Hashes.id(pred);
-		System.arraycopy(pid, 0, b, i, Hashes.ID_SIZE);
-		i += Hashes.ID_SIZE;
-		byte[] oid = Hashes.id(obj);
-		System.arraycopy(oid, 0, b, i, Hashes.ID_SIZE);
-    }
-
-    public static Value readValue(ByteBuffer b, ValueFactory vf, TripleFactory tf) throws IOException {
-    	int originalLimit = b.limit();
+	public static Value readValue(ByteBuffer b, ValueFactory vf, TripleFactory tf) throws IOException {
+		int originalLimit = b.limit();
 		b.mark();
 		byte type = b.get();
 		switch(type) {
@@ -540,11 +527,7 @@ public final class ValueIO {
 				if (tf == null) {
 					throw new IllegalStateException("Unexpected triple value or missing TripleFactory");
 				}
-				byte[] sid = new byte[Hashes.ID_SIZE];
-				byte[] pid = new byte[Hashes.ID_SIZE];
-				byte[] oid = new byte[Hashes.ID_SIZE];
-				b.get(sid).get(pid).get(oid);
-				return tf.readTriple(sid, pid, oid, vf);
+				return tf.readTriple(b, vf);
 			default:
 				ByteReader reader = BYTE_READERS.get(type);
 				if (reader == null) {

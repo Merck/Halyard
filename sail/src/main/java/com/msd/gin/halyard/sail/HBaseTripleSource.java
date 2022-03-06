@@ -17,7 +17,7 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
@@ -63,7 +63,7 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 
 	private final Table table;
 	private final ValueFactory vf;
-	private final TripleFactory tf;
+	private final TableTripleFactory tf;
 	private final long timeoutSecs;
 	private final HBaseSail.ScanSettings settings;
 	private final HBaseSail.Ticker ticker;
@@ -75,7 +75,7 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 	public HBaseTripleSource(Table table, ValueFactory vf, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
 		this.table = table;
 		this.vf = vf;
-		this.tf = new TripleFactory(table);
+		this.tf = new TableTripleFactory(table);
 		this.timeoutSecs = timeoutSecs;
 		this.settings = settings;
 		this.ticker = ticker;

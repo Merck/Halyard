@@ -1,7 +1,7 @@
 package com.msd.gin.halyard.function;
 
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleWriter;
 import com.msd.gin.halyard.common.Hashes;
-import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.util.Collections;
@@ -21,6 +21,7 @@ import org.kohsuke.MetaInfServices;
 
 @MetaInfServices(TupleFunction.class)
 public class IdentifierTupleFunction implements TupleFunction {
+	private static final TableTripleWriter TW = new TableTripleWriter();
 
 	@Override
 	public String getURI() {
@@ -48,8 +49,7 @@ public class IdentifierTupleFunction implements TupleFunction {
 				throw new ValueExprEvaluationException("Third argument must be an object");
 			}
 			ns = HALYARD.TRIPLE_ID_NS;
-			id = new byte[3 * Hashes.ID_SIZE];
-			ValueIO.writeTripleIdentifier((Resource) args[0], (IRI) args[1], args[2], id, 0);
+			id = TW.writeTriple((Resource) args[0], (IRI) args[1], args[2]);
 		} else {
 			throw new ValueExprEvaluationException(String.format("%s requires 1 or 3 arguments, got %d", getURI(), args.length));
 		}

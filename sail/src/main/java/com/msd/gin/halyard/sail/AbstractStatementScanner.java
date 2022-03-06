@@ -1,7 +1,7 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
@@ -18,7 +18,7 @@ import org.eclipse.rdf4j.model.ValueFactory;
 
 public abstract class AbstractStatementScanner implements CloseableIteration<Statement, IOException> {
 	protected final ValueFactory vf;
-	private final TripleFactory tf;
+	private final TableTripleFactory tf;
 	protected RDFSubject subj;
 	protected RDFPredicate pred;
 	protected RDFObject obj;
@@ -26,7 +26,7 @@ public abstract class AbstractStatementScanner implements CloseableIteration<Sta
 	private Statement next = null;
 	private Iterator<Statement> iter = null;
 
-	protected AbstractStatementScanner(ValueFactory vf, TripleFactory tf) {
+	protected AbstractStatementScanner(ValueFactory vf, TableTripleFactory tf) {
 		this.vf = vf;
 		this.tf = tf;
 	}

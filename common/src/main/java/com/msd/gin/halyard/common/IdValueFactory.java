@@ -5,6 +5,7 @@ import java.math.BigInteger;
 import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAmount;
 import java.util.Date;
+import java.util.UUID;
 
 import javax.xml.datatype.XMLGregorianCalendar;
 
@@ -40,7 +41,7 @@ public class IdValueFactory implements ValueFactory {
 
 	@Override
 	public BNode createBNode() {
-		return new IdentifiableBNode(DELEGATE.createBNode());
+		return new IdentifiableBNode(DELEGATE.createBNode(UUID.randomUUID().toString()));
 	}
 
 	@Override

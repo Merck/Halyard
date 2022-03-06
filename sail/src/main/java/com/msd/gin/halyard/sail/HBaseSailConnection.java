@@ -20,7 +20,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.StatementIndex;
-import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
@@ -284,7 +284,7 @@ public class HBaseSailConnection implements SailConnection {
 					final ResultScanner rs;
 
 					StatementScanner() throws IOException {
-						super(sail.getValueFactory(), new TripleFactory(table));
+						super(sail.getValueFactory(), new TableTripleFactory(table));
 						rs = table.getScanner(StatementIndex.CSPO.scan());
 					}
 

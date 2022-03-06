@@ -60,7 +60,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public final class JSONParser extends AbstractRDFParser {
 
-    public static class Factory implements RDFParserFactory {
+    public static final class Factory implements RDFParserFactory {
 
         @Override
         public RDFFormat getRDFFormat() {
@@ -177,6 +177,8 @@ public final class JSONParser extends AbstractRDFParser {
             }
         } catch (URISyntaxException ex) {
             throw new RDFParseException(ex);
+        } finally {
+            clear();
         }
     }
     private void hash(TreeNode node) {

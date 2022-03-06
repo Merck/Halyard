@@ -18,7 +18,7 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.StatementIndex;
-import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
 import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.RDFContext;
@@ -75,7 +75,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
 
-    	TripleFactory tf;
+    	TableTripleFactory tf;
         long counter = 0, exports = 0, statements = 0;
         byte[] lastHash = new byte[RDFObject.KEY_SIZE];
         Set<Literal> literals;
@@ -84,7 +84,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException {
             Configuration conf = context.getConfiguration();
             Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            tf = new TripleFactory(table);
+            tf = new TableTripleFactory(table);
         }
 
         @Override

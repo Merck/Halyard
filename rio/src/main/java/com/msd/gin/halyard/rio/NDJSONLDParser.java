@@ -36,9 +36,9 @@ import org.eclipse.rdf4j.rio.jsonld.JSONLDParser;
  *
  * @author Adam Sotona (MSD)
  */
-public class NDJSONLDParser extends JSONLDParser {
+public final class NDJSONLDParser extends JSONLDParser {
 
-    public static class Factory implements RDFParserFactory {
+    public static final class Factory implements RDFParserFactory {
 
         @Override
         public RDFFormat getRDFFormat() {

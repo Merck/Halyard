@@ -18,7 +18,8 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.StatementIndex;
-import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleWriter;
 import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFIdentifier;
@@ -103,6 +104,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 	private static final byte[] CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.CPOS);
 
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
+    static final TableTripleWriter TW = new TableTripleWriter();
 
     static final class StatsMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
 
@@ -113,7 +115,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         final byte[] lastClassFragment = new byte[RDFObject.KEY_SIZE];
         IRI statsContext, graphContext;
         byte[] cspoStatsContextHash;
-        TripleFactory tf;
+        TableTripleFactory tf;
         StatementIndex lastIndex;
         long counter = 0;
         boolean update;
@@ -137,7 +139,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             if (gc != null) graphContext = SVF.createIRI(gc);
 			cspoStatsContextHash = RDFContext.create(statsContext).getKeyHash(StatementIndex.CSPO);
             Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            tf = new TripleFactory(table);
+            tf = new TableTripleFactory(table);
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, int len, byte[] target) {
@@ -293,7 +295,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                     if (partitionId == null) {
                         dos.writeInt(0);
                     } else {
-						byte b[] = ValueIO.writeBytes(partitionId);
+						byte b[] = ValueIO.writeBytes(partitionId, TW);
                         dos.writeInt(b.length);
                         dos.write(b);
                     }
@@ -364,7 +366,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         RDFWriter writer;
         Map<String, Boolean> graphs;
         IRI statsGraphContext;
-        TripleFactory tf;
+        TableTripleFactory tf;
         HBaseSail sail;
 		SailConnection conn;
         long removed = 0, added = 0;
@@ -374,7 +376,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             statsGraphContext = SVF.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            tf = new TripleFactory(table);
+            tf = new TableTripleFactory(table);
             String targetUrl = conf.get(TARGET);
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);

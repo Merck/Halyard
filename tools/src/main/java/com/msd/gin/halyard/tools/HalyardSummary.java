@@ -18,7 +18,7 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.StatementIndex;
-import com.msd.gin.halyard.common.HalyardTableUtils.TripleFactory;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
 import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
@@ -116,7 +116,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         private int decimationFactor;
         private final Random random = new Random(0);
         private Table table;
-        private TripleFactory tf;
+        private TableTripleFactory tf;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -124,7 +124,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             this.table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            this.tf = new TripleFactory(table);
+            this.tf = new TableTripleFactory(table);
         }
 
         private Set<IRI> queryForClasses(Value instance) throws IOException {

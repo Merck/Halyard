@@ -494,7 +494,7 @@ public final class HalyardTableUtils {
     }
 
 	public static Resource getSubject(Table table, byte[] id, ValueFactory vf) throws IOException {
-		TripleFactory tf = new TripleFactory(table);
+		TableTripleFactory tf = new TableTripleFactory(table);
 		Scan scan = scan(StatementIndex.SPO, id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
@@ -523,7 +523,7 @@ public final class HalyardTableUtils {
 	}
 
 	public static Value getObject(Table table, byte[] id, ValueFactory vf) throws IOException {
-		TripleFactory tf = new TripleFactory(table);
+		TableTripleFactory tf = new TableTripleFactory(table);
 		Scan scan = scan(StatementIndex.OSP, id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
@@ -554,7 +554,7 @@ public final class HalyardTableUtils {
 	 * @param vf ValueFactory
 	 * @return List of Statements
 	 */
-    public static List<Statement> parseStatements(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, Result res, ValueFactory vf, TripleFactory tf) throws IOException {
+    public static List<Statement> parseStatements(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, Result res, ValueFactory vf, TableTripleFactory tf) throws IOException {
     	// multiple triples may have the same hash (i.e. row key)
 		List<Statement> st;
 		Cell[] cells = res.rawCells();
@@ -584,7 +584,7 @@ public final class HalyardTableUtils {
 	 * @param vf ValueFactory
 	 * @return Statements
 	 */
-    public static Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, Cell cell, ValueFactory vf, TripleFactory tf) throws IOException {
+    public static Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, Cell cell, ValueFactory vf, TableTripleFactory tf) throws IOException {
     	ByteBuffer key = ByteBuffer.wrap(cell.getRowArray(), cell.getRowOffset(), cell.getRowLength());
         ByteBuffer cn = ByteBuffer.wrap(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
         ByteBuffer cv = ByteBuffer.wrap(cell.getValueArray(), cell.getValueOffset(), cell.getValueLength());
@@ -631,14 +631,20 @@ public final class HalyardTableUtils {
 				.build();
     }
 
-	public static final class TripleFactory {
+	public static final class TableTripleFactory implements TripleFactory {
 		private final Table table;
 
-		public TripleFactory(Table table) {
+		public TableTripleFactory(Table table) {
 			this.table = table;
 		}
 
-		public Triple readTriple(byte[] sid, byte[] pid, byte[] oid, ValueFactory vf) throws IOException {
+		@Override
+		public Triple readTriple(ByteBuffer b, ValueFactory vf) throws IOException {
+			byte[] sid = new byte[Hashes.ID_SIZE];
+			byte[] pid = new byte[Hashes.ID_SIZE];
+			byte[] oid = new byte[Hashes.ID_SIZE];
+			b.get(sid).get(pid).get(oid);
+
 			RDFContext ckey = RDFContext.create(HALYARD.TRIPLE_GRAPH_CONTEXT);
 			RDFIdentifier skey = new RDFIdentifier(RDFRole.SUBJECT, sid);
 			RDFIdentifier pkey = new RDFIdentifier(RDFRole.PREDICATE, pid);
@@ -646,12 +652,29 @@ public final class HalyardTableUtils {
 			Scan scan = StatementIndex.CSPO.scan(ckey, skey, pkey, okey);
 			Get get = new Get(scan.getStartRow())
 				.setFilter(new FilterList(scan.getFilter(), new FirstKeyOnlyFilter()));
-	        get.addFamily(CF_NAME);
+			get.addFamily(CF_NAME);
 			get.readVersions(READ_VERSIONS);
 			Result result = table.get(get);
 			assert result.rawCells().length == 1;
 			Statement stmt = parseStatement(null, null, null, ckey, result.rawCells()[0], vf, this);
 			return vf.createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
+		}
+	}
+
+	public static final class TableTripleWriter implements TripleWriter {
+		@Override
+		public byte[] writeTriple(Resource subj, IRI pred, Value obj) {
+			byte[] b = new byte[3*Hashes.ID_SIZE];
+			int i = 0;
+			byte[] sid = Hashes.id(subj);
+			System.arraycopy(sid, 0, b, i, Hashes.ID_SIZE);
+			i += Hashes.ID_SIZE;
+			byte[] pid = Hashes.id(pred);
+			System.arraycopy(pid, 0, b, i, Hashes.ID_SIZE);
+			i += Hashes.ID_SIZE;
+			byte[] oid = Hashes.id(obj);
+			System.arraycopy(oid, 0, b, i, Hashes.ID_SIZE);
+			return b;
 		}
 	}
 
