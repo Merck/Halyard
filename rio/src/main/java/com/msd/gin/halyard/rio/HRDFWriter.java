@@ -111,14 +111,11 @@ public final class HRDFWriter extends AbstractRDFWriter {
 			byte[] obytes = ValueIO.writeBytes(obj, this);
 			byte[] b = new byte[2+sbytes.length+2+pbytes.length+4+obytes.length];
 			ByteBuffer buf = ByteBuffer.wrap(b);
-			buf.asShortBuffer().put((short) sbytes.length);
-			buf.position(buf.position()+2);
+			buf.putShort((short) sbytes.length);
 			buf.put(sbytes);
-			buf.asShortBuffer().put((short) pbytes.length);
-			buf.position(buf.position()+2);
+			buf.putShort((short) pbytes.length);
 			buf.put(pbytes);
-			buf.asIntBuffer().put(obytes.length);
-			buf.position(buf.position()+4);
+			buf.putInt(obytes.length);
 			buf.put(obytes);
 			return b;
 		}

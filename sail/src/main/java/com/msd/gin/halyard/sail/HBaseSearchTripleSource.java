@@ -62,7 +62,7 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 
 	@Override
 	protected CloseableIteration<? extends Statement, IOException> createStatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contexts, ValueFactory vf) throws QueryEvaluationException {
-		if ((obj instanceof Literal) && (HALYARD.SEARCH_TYPE.equals(((Literal) obj).getDatatype()))) {
+		if (obj.isLiteral() && (HALYARD.SEARCH_TYPE.equals(((Literal) obj).getDatatype()))) {
 			return new LiteralSearchStatementScanner(subj, pred, obj.stringValue(), contexts, vf);
 		} else {
 			return super.createStatementScanner(subj, pred, obj, contexts, vf);

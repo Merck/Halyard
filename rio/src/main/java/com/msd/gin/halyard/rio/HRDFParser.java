@@ -118,7 +118,7 @@ public final class HRDFParser extends AbstractRDFParser {
 
 	private Value readValue(ByteBuffer b) throws IOException {
 		Value v = ValueIO.readValue(b, valueFactory, TRIPLE_FACTORY);
-		if (v instanceof BNode) {
+		if (v.isBNode()) {
 			v = createNode(((BNode)v).getID());
 		}
 		return v;
@@ -129,20 +129,17 @@ public final class HRDFParser extends AbstractRDFParser {
 		@Override
 		public Triple readTriple(ByteBuffer b, ValueFactory vf) throws IOException {
 			int originalLimit = b.limit();
-			int len = b.asShortBuffer().get();
-			b.position(b.position()+2);
+			int len = b.getShort();
 			b.limit(b.position()+len);
 			Resource s = (Resource) readValue(b);
 			b.limit(originalLimit);
 
-			len = b.asShortBuffer().get();
-			b.position(b.position()+2);
+			len = b.getShort();
 			b.limit(b.position()+len);
 			IRI p = (IRI) readValue(b);
 			b.limit(originalLimit);
 
-			len = b.asIntBuffer().get();
-			b.position(b.position()+4);
+			len = b.getInt();
 			b.limit(b.position()+len);
 			Value o = readValue(b);
 			b.limit(originalLimit);

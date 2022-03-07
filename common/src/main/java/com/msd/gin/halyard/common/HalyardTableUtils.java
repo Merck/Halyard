@@ -369,7 +369,7 @@ public final class HalyardTableUtils {
     	if(subj == null || pred == null || obj == null) {
     		throw new NullPointerException();
     	}
-    	if(context instanceof Triple) {
+    	if(context.isTriple()) {
     		throw new UnsupportedOperationException("Context cannot be a triple value");
     	}
 
@@ -388,12 +388,12 @@ public final class HalyardTableUtils {
         	kvs.add(new KeyValue(StatementIndex.COSP.row(cb, ob, sb, pb), CF_NAME, StatementIndex.COSP.qualifier(cb, ob, sb, pb), timestamp, type, StatementIndex.COSP.value(cb, ob, sb, pb)));
         }
 
-		if (subj instanceof Triple) {
+		if (subj.isTriple()) {
 			Triple t = (Triple) subj;
 			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, kvs);
 		}
 
-		if (obj instanceof Triple) {
+		if (obj.isTriple()) {
 			Triple t = (Triple) obj;
 			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, kvs);
 		}

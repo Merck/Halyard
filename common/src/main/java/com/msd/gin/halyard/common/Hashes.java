@@ -8,7 +8,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
-import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
 
 public final class Hashes {
@@ -99,7 +98,7 @@ public final class Hashes {
 		if (!alreadyHasHash) {
 			hash = Hashes.hashUnique(v.toString().getBytes(StandardCharsets.UTF_8));
 			// literal prefix
-			if (v instanceof Literal) {
+			if (v.isLiteral()) {
 				hash[0] &= 0x7F; // 0 msb
 			} else {
 				hash[0] |= NON_LITERAL_FLAG; // 1 msb

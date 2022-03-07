@@ -29,6 +29,7 @@ public final class SCHEMA_ORG implements Vocabulary {
     public static final IRI VERSION = SVF.createIRI(NAMESPACE, "version");
 
     public static final IRI THING = SVF.createIRI(NAMESPACE, "Thing");
+    public static final IRI ARTICLE = SVF.createIRI(NAMESPACE, "Article");
 
     public static final IRI ABOUT = SVF.createIRI(NAMESPACE, "about");
     public static final IRI CONTENT_SIZE = SVF.createIRI(NAMESPACE, "contentSize");

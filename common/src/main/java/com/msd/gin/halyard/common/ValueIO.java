@@ -6,8 +6,11 @@ import com.google.common.collect.HashBiMap;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -55,7 +58,39 @@ public final class ValueIO {
 	private static final BiMap<ByteBuffer, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);
 
 	private static void loadNamespacesAndIRIs(Class<?> vocab) {
-		Set<Namespace> namespaces = getNamespace(vocab);
+		Collection<Namespace> namespaces = getNamespace(vocab);
+		addNamespaces(namespaces);
+
+		Collection<IRI> iris = Vocabularies.getIRIs(vocab);
+		addIRIs(iris);
+
+		try {
+			Method getIRIs = vocab.getMethod("getIRIs");
+			iris = (Collection<IRI>) getIRIs.invoke(null);
+			addIRIs(iris);
+		} catch (NoSuchMethodException e) {
+		} catch (IllegalAccessException e) {
+			throw new RuntimeException(e);
+		} catch (InvocationTargetException e) {
+			throw new RuntimeException(e.getCause());
+		}
+	}
+
+	private static Set<Namespace> getNamespace(Class<?> vocabulary) {
+		Set<Namespace> namespaces = new HashSet<>();
+		for (Field f : vocabulary.getFields()) {
+			if (f.getType() == Namespace.class) {
+				try {
+					namespaces.add((Namespace) f.get(null));
+				} catch (IllegalAccessException ex) {
+					throw new AssertionError(ex);
+				}
+			}
+		}
+		return namespaces;
+	}
+
+	private static void addNamespaces(Collection<Namespace> namespaces) {
 		for (Namespace namespace : namespaces) {
 			String name = namespace.getName();
 			ByteBuffer hash = ByteBuffer.wrap(Hashes.hash16(name.getBytes(StandardCharsets.UTF_8)));
@@ -64,8 +99,9 @@ public final class ValueIO {
 						WELL_KNOWN_NAMESPACES.get(hash), name));
 			}
 		}
+	}
 
-		Set<IRI> iris = Vocabularies.getIRIs(vocab);
+	private static void addIRIs(Collection<IRI> iris) {
 		for (IRI iri : iris) {
 			IdentifiableIRI idIri = IdentifiableIRI.create(iri);
 			byte[] id = idIri.getId();
@@ -82,20 +118,6 @@ public final class ValueIO {
 						WELL_KNOWN_IRIS.get(hash), idIri));
 			}
 		}
-	}
-
-	private static Set<Namespace> getNamespace(Class<?> vocabulary) {
-		Set<Namespace> namespaces = new HashSet<>();
-		for (Field f : vocabulary.getFields()) {
-			if (f.getType() == Namespace.class) {
-				try {
-					namespaces.add((Namespace) f.get(null));
-				} catch (IllegalAccessException ex) {
-					throw new AssertionError(ex);
-				}
-			}
-		}
-		return namespaces;
 	}
 
 	static {
@@ -147,8 +169,8 @@ public final class ValueIO {
 	private static final byte IRI_HASH_TYPE = '#';
 	private static final byte NAMESPACE_HASH_TYPE = ':';
 	private static final byte BNODE_TYPE = '_';
-	private static final byte FULL_LITERAL_TYPE = '\"';
-	private static final byte LANGUAGE_TAG = '@';
+	private static final byte DATATYPE_LITERAL_TYPE = '\"';
+	private static final byte LANGUAGE_LITERAL_TYPE = '@';
 	private static final byte TRIPLE_TYPE = '*';
 	private static final byte FALSE_TYPE = '0';
 	private static final byte TRUE_TYPE = '1';
@@ -275,7 +297,7 @@ public final class ValueIO {
 		BYTE_WRITERS.put(XSD.STRING, new ByteWriter() {
 			@Override
 			public byte[] writeBytes(Literal l) {
-				byte[] b = l.getLabel().getBytes(StandardCharsets.UTF_8);
+				byte[] b = writeString(l.getLabel());
 				byte[] zb = new byte[1+b.length];
 				zb[0] = STRING_TYPE;
 				System.arraycopy(b, 0, zb, 1, b.length);
@@ -285,7 +307,7 @@ public final class ValueIO {
 		BYTE_READERS.put(STRING_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				return vf.createLiteral(StandardCharsets.UTF_8.decode(b).toString());
+				return vf.createLiteral(readString(b));
 			}
 		});
 
@@ -369,7 +391,7 @@ public final class ValueIO {
 					XMLLiteral.writeInfoset(l.getLabel(), out);
 					return out.toByteArray();
 				} catch(TransformerException e) {
-					byte[] b = l.getLabel().getBytes(StandardCharsets.UTF_8);
+					byte[] b = writeString(l.getLabel());
 					byte[] xzb = new byte[2+b.length];
 					xzb[0] = XML_TYPE;
 					xzb[1] = STRING_TYPE; // mark xml as invalid
@@ -381,17 +403,26 @@ public final class ValueIO {
 		BYTE_READERS.put(XML_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				if(b.get() == XML_TYPE) {
+				int xmlContentType = b.get();
+				if(xmlContentType == XML_TYPE) {
 					// valid xml
 					byte[] fiBytes = new byte[b.remaining()];
 					b.get(fiBytes);
 					return new XMLLiteral(fiBytes);
 				} else {
 					// invalid xml
-					return vf.createLiteral(StandardCharsets.UTF_8.decode(b).toString(), RDF.XMLLITERAL);
+					return vf.createLiteral(readString(b), RDF.XMLLITERAL);
 				}
 			}
 		});
+	}
+
+	private static byte[] writeString(String s) {
+		return s.getBytes(StandardCharsets.UTF_8);
+	}
+
+	private static String readString(ByteBuffer b) {
+		return StandardCharsets.UTF_8.decode(b).toString();
 	}
 
 	private static byte[] calendarTypeToBytes(byte type, XMLGregorianCalendar cal) {
@@ -408,41 +439,26 @@ public final class ValueIO {
 	private static final ByteWriter DEFAULT_BYTE_WRITER = new ByteWriter() {
 		@Override
 		public byte[] writeBytes(Literal l) {
-			byte[] labelBytes = l.getLabel().getBytes(StandardCharsets.UTF_8);
-			byte[] datatypeBytes = ValueIO.writeBytes(l.getDatatype());
-			byte[] lBytes = new byte[1+labelBytes.length+1+datatypeBytes.length];
-			lBytes[0] = '\"';
-			System.arraycopy(labelBytes, 0, lBytes, 1, labelBytes.length);
-			int pos = 1+labelBytes.length;
-			lBytes[pos++] = '\"';
-			System.arraycopy(datatypeBytes, 0, lBytes, lBytes.length-datatypeBytes.length, datatypeBytes.length);
+			byte[] labelBytes = writeString(l.getLabel());
+			byte[] datatypeBytes = ValueIO.writeIRI(l.getDatatype());
+			byte[] lBytes = new byte[3+labelBytes.length+datatypeBytes.length];
+			ByteBuffer b = ByteBuffer.wrap(lBytes);
+			b.put(DATATYPE_LITERAL_TYPE);
+			b.putShort((short)datatypeBytes.length);
+			b.put(datatypeBytes);
+			b.put(labelBytes);
 			return lBytes;
 		}
 	};
 
 	public static byte[] writeBytes(Value v, TripleWriter tw) {
-		if (v instanceof IRI) {
-			return writeBytes((IRI)v);
-		} else if (v instanceof BNode) {
-			return v.toString().getBytes(StandardCharsets.UTF_8);
-		} else if (v instanceof Literal) {
-			Literal l = (Literal) v;
-			if(l.getLanguage().isPresent()) {
-				return l.toString().getBytes(StandardCharsets.UTF_8);
-			} else {
-				ByteWriter writer = BYTE_WRITERS.get(l.getDatatype());
-				if (writer != null) {
-					try {
-						return writer.writeBytes(l);
-					} catch (Exception e) {
-						// if the dedicated writer fails then fallback to the generic writer
-						return DEFAULT_BYTE_WRITER.writeBytes(l);
-					}
-				} else {
-					return DEFAULT_BYTE_WRITER.writeBytes(l);
-				}
-			}
-		} else if (v instanceof Triple) {
+		if (v.isIRI()) {
+			return writeIRI((IRI)v);
+		} else if (v.isBNode()) {
+			return writeBNode((BNode)v);
+		} else if (v.isLiteral()) {
+			return writeLiteral((Literal)v);
+		} else if (v.isTriple()) {
 			Triple t = (Triple) v;
 			byte[] tripleBytes = tw.writeTriple(t.getSubject(), t.getPredicate(), t.getObject());
 			byte[] b = new byte[1+tripleBytes.length];
@@ -454,7 +470,7 @@ public final class ValueIO {
 		}
     }
 
-	private static byte[] writeBytes(IRI v) {
+	private static byte[] writeIRI(IRI v) {
 		ByteBuffer hash = WELL_KNOWN_IRIS.inverse().get(v);
 		if (hash != null) {
 			byte[] b = new byte[1 + hash.remaining()];
@@ -466,7 +482,7 @@ public final class ValueIO {
 			IRI iri = (IRI) v;
 			hash = WELL_KNOWN_NAMESPACES.inverse().get(iri.getNamespace());
 			if (hash != null) {
-				byte[] localBytes = iri.getLocalName().getBytes(StandardCharsets.UTF_8);
+				byte[] localBytes = writeString(iri.getLocalName());
 				byte[] b = new byte[1 + hash.remaining() + localBytes.length];
 				b[0] = NAMESPACE_HASH_TYPE;
 				// NB: do not alter original hash buffer which is shared across threads
@@ -474,19 +490,57 @@ public final class ValueIO {
 				System.arraycopy(localBytes, 0, b, b.length-localBytes.length, localBytes.length);
 				return b;
 			} else {
-				return ("<"+v.stringValue()+">").getBytes(StandardCharsets.UTF_8);
+				byte[] iriBytes = writeString(v.stringValue());
+				byte[] b = new byte[1+iriBytes.length+1];
+				b[0] = IRI_TYPE;
+				System.arraycopy(iriBytes, 0, b, 1, iriBytes.length);
+				b[1+iriBytes.length] = '>';
+				return b;
 			}
 		}
     }
 
+	private static byte[] writeBNode(BNode n) {
+		byte[] idBytes = writeString(n.getID());
+		byte[] b = new byte[1+idBytes.length];
+		b[0] = BNODE_TYPE;
+		System.arraycopy(idBytes, 0, b, 1, idBytes.length);
+		return b;
+	}
+
+	private static byte[] writeLiteral(Literal l) {
+		if(l.getLanguage().isPresent()) {
+			byte[] labelBytes = writeString(l.getLabel());
+			byte[] langBytes = writeString(l.getLanguage().get());
+			byte[] b = new byte[2+langBytes.length+labelBytes.length];
+			b[0] = LANGUAGE_LITERAL_TYPE;
+			b[1] = (byte) langBytes.length;
+			System.arraycopy(langBytes, 0, b, 2, langBytes.length);
+			System.arraycopy(labelBytes, 0, b, langBytes.length+2, labelBytes.length);
+			return b;
+		} else {
+			ByteWriter writer = BYTE_WRITERS.get(l.getDatatype());
+			if (writer != null) {
+				try {
+					return writer.writeBytes(l);
+				} catch (Exception e) {
+					// if the dedicated writer fails then fallback to the generic writer
+					return DEFAULT_BYTE_WRITER.writeBytes(l);
+				}
+			} else {
+				return DEFAULT_BYTE_WRITER.writeBytes(l);
+			}
+		}
+	}
+
 	public static Value readValue(ByteBuffer b, ValueFactory vf, TripleFactory tf) throws IOException {
-		int originalLimit = b.limit();
+		final int originalLimit = b.limit();
 		b.mark();
 		byte type = b.get();
 		switch(type) {
 			case IRI_TYPE:
 				b.limit(originalLimit-1); // ignore trailing '>'
-				IRI iri = vf.createIRI(StandardCharsets.UTF_8.decode(b).toString());
+				IRI iri = vf.createIRI(readString(b));
 				b.limit(originalLimit);
 				b.position(originalLimit);
 				return iri;
@@ -505,24 +559,23 @@ public final class ValueIO {
 				}
 				b.limit(originalLimit);
 				b.position(b.position()+2);
-				return vf.createIRI(namespace, StandardCharsets.UTF_8.decode(b).toString());
+				return vf.createIRI(namespace, readString(b));
 			case BNODE_TYPE:
-				b.get(); // skip ':'
-				return vf.createBNode(StandardCharsets.UTF_8.decode(b).toString());
-			case FULL_LITERAL_TYPE:
-				int endOfLabel = lastIndexOf(b, (byte) '\"');
-				b.limit(endOfLabel);
-				String label = StandardCharsets.UTF_8.decode(b).toString();
+				return vf.createBNode(readString(b));
+			case LANGUAGE_LITERAL_TYPE:
+				int langSize = b.get();
+				b.limit(b.position()+langSize);
+				String lang = readString(b);
 				b.limit(originalLimit);
-				b.position(endOfLabel+1);
-				byte sep = b.get(endOfLabel+1); // peak
-				if(sep == LANGUAGE_TAG) { // lang tag
-					b.position(b.position()+1);
-					return vf.createLiteral(label, StandardCharsets.UTF_8.decode(b).toString());
-				} else {
-					IRI datatype = (IRI) readValue(b, vf, null);
-					return vf.createLiteral(label, datatype);
-				}
+				String label = readString(b);
+				return vf.createLiteral(label, lang);
+			case DATATYPE_LITERAL_TYPE:
+				int dtSize = b.getShort();
+				b.limit(b.position()+dtSize);
+				IRI datatype = (IRI) readValue(b, vf, null);
+				b.limit(originalLimit);
+				label = readString(b);
+				return vf.createLiteral(label, datatype);
 			case TRIPLE_TYPE:
 				if (tf == null) {
 					throw new IllegalStateException("Unexpected triple value or missing TripleFactory");
@@ -536,15 +589,4 @@ public final class ValueIO {
 				return reader.readBytes((ByteBuffer) b, vf);
 		}
     }
-
-	private static int lastIndexOf(ByteBuffer buf, byte b) {
-		int start = buf.position();
-		int end = buf.limit();
-		for (int i = end - 1; i >= start; i--) {
-			if (buf.get(i) == b) {
-				return i;
-			}
-		}
-		return -1;
-	}
 }

@@ -95,7 +95,7 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
 		try (CloseableIteration<? extends Statement, QueryEvaluationException> ci = statsSource.getStatements(subjectNode, VOID.TRIPLES, null, HALYARD.STATS_GRAPH_CONTEXT)) {
             if (ci.hasNext()) {
                 Value v = ci.next().getObject();
-                if (v instanceof Literal) {
+				if (v.isLiteral()) {
                     try {
                         long l = ((Literal) v).longValue();
 						LOG.trace("triple stats for {} = {}", subjectNode, l);
