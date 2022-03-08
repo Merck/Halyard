@@ -4,6 +4,7 @@ import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleWriter;
 import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.vocab.HALYARD;
 
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
 
@@ -49,7 +50,11 @@ public class IdentifierTupleFunction implements TupleFunction {
 				throw new ValueExprEvaluationException("Third argument must be an object");
 			}
 			ns = HALYARD.TRIPLE_ID_NS;
-			id = TW.writeTriple((Resource) args[0], (IRI) args[1], args[2]);
+			id = new byte[3 * Hashes.ID_SIZE];
+			ByteBuffer buf = ByteBuffer.wrap(id);
+			buf = TW.writeTriple((Resource) args[0], (IRI) args[1], args[2], buf);
+			buf.flip();
+			buf.get(id);
 		} else {
 			throw new ValueExprEvaluationException(String.format("%s requires 1 or 3 arguments, got %d", getURI(), args.length));
 		}

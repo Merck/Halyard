@@ -216,7 +216,7 @@ public enum StatementIndex {
 		if (ValueIO.WELL_KNOWN_IRIS.containsValue(v.val)) {
 			return 1;
 		} else {
-			return sizeLen + v.getSerializedForm().length;
+			return sizeLen + v.getSerializedForm().remaining();
 		}
 	}
 
@@ -224,8 +224,8 @@ public enum StatementIndex {
 		if (ValueIO.WELL_KNOWN_IRIS.containsValue(v.val)) {
 			cv.put(WELL_KNOWN_IRI_MARKER);
 		} else {
-			byte[] ser = v.getSerializedForm();
-			cv.putShort((short) ser.length).put(ser);
+			ByteBuffer ser = v.getSerializedForm();
+			cv.putShort((short) ser.remaining()).put(ser);
 		}
 	}
 
@@ -233,8 +233,8 @@ public enum StatementIndex {
 		if (ValueIO.WELL_KNOWN_IRIS.containsValue(v.val)) {
 			cv.put(WELL_KNOWN_IRI_MARKER);
 		} else {
-			byte[] ser = v.getSerializedForm();
-			cv.putInt(ser.length).put(ser);
+			ByteBuffer ser = v.getSerializedForm();
+			cv.putInt(ser.remaining()).put(ser);
 		}
 	}
 
@@ -242,7 +242,7 @@ public enum StatementIndex {
 		if (ValueIO.WELL_KNOWN_IRIS.containsValue(v.val)) {
 			cv.put(WELL_KNOWN_IRI_MARKER);
 		} else {
-			byte[] ser = v.getSerializedForm();
+			ByteBuffer ser = v.getSerializedForm();
 			cv.put(ser);
 		}
 	}

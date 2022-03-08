@@ -422,12 +422,12 @@ public class HBaseUpdate extends SailUpdate {
 
 			if (pattern.getPredicateVar().hasValue()) {
 				patternValue = pattern.getPredicateVar().getValue();
-				if (patternValue.isIRI()) {
+				if (patternValue instanceof IRI) {
 					predicate = (IRI) patternValue;
 				}
 			} else {
 				patternValue = sourceBinding.getValue(pattern.getPredicateVar().getName());
-				if (patternValue.isIRI()) {
+				if (patternValue instanceof IRI) {
 					predicate = (IRI) patternValue;
 				}
 			}

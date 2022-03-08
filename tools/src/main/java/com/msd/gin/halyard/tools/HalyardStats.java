@@ -295,9 +295,11 @@ public final class HalyardStats extends AbstractHalyardTool {
                     if (partitionId == null) {
                         dos.writeInt(0);
                     } else {
-						byte b[] = ValueIO.writeBytes(partitionId, TW);
-                        dos.writeInt(b.length);
-                        dos.write(b);
+                    	ByteBuffer b = ByteBuffer.allocate(256);
+						b = ValueIO.writeBytes(partitionId, b, TW);
+						int len = b.position();
+                        dos.writeInt(len);
+                        dos.write(b.array(), b.arrayOffset(), len);
                     }
                 }
                 output.write(new ImmutableBytesWritable(baos.toByteArray()), new LongWritable(value));

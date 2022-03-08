@@ -63,26 +63,40 @@ public final class HRDFWriter extends AbstractRDFWriter {
 	@Override
 	protected void consumeStatement(Statement st) {
 		Resource c = st.getContext();
+		ByteBuffer buf = ByteBuffer.allocate(256);
 		int numValues = (c != null) ? HRDF.QUADS : HRDF.TRIPLES;
 		try {
 			out.write(numValues);
-			byte[] b = ValueIO.writeBytes(st.getSubject(), TRIPLE_WRITER);
-			out.writeShort(b.length);
-			out.write(b);
-			b = ValueIO.writeBytes(st.getPredicate(), TRIPLE_WRITER);
-			out.writeShort(b.length);
-			out.write(b);
-			b = ValueIO.writeBytes(st.getObject(), TRIPLE_WRITER);
-			out.writeInt(b.length);
-			out.write(b);
+			buf = writeValue(st.getSubject(), buf, 2);
+			buf = writeValue(st.getPredicate(), buf, 2);
+			buf = writeValue(st.getObject(), buf, 4);
 			if (c != null) {
-				b = ValueIO.writeBytes(c, TRIPLE_WRITER);
-				out.writeShort(b.length);
-				out.write(b);
+				buf = writeValue(c, buf, 2);
 			}
+			out.write(buf.array(), buf.arrayOffset(), buf.position());
 		} catch(IOException e) {
 			throw new RDFHandlerException(e);
 		}
+	}
+
+	private ByteBuffer writeValue(Value v, ByteBuffer buf, int sizeBytes) {
+		buf = ValueIO.ensureCapacity(buf, sizeBytes);
+		int sizePos = buf.position();
+		int startPos = buf.position() + sizeBytes;
+		buf.position(startPos);
+		buf = ValueIO.writeBytes(v, buf, TRIPLE_WRITER);
+		int endPos = buf.position();
+		int len = endPos - startPos;
+		buf.position(sizePos);
+		if (sizeBytes == 2) {
+			buf.putShort((short) len);
+		} else if (sizeBytes == 4) {
+			buf.putInt(len);
+		} else {
+			throw new AssertionError();
+		}
+		buf.position(endPos);
+		return buf;
 	}
 
 	@Override
@@ -105,19 +119,11 @@ public final class HRDFWriter extends AbstractRDFWriter {
 
 	private final TripleWriter TRIPLE_WRITER = new TripleWriter() {
 		@Override
-		public byte[] writeTriple(Resource subj, IRI pred, Value obj) {
-			byte[] sbytes = ValueIO.writeBytes(subj, this);
-			byte[] pbytes = ValueIO.writeBytes(pred, this);
-			byte[] obytes = ValueIO.writeBytes(obj, this);
-			byte[] b = new byte[2+sbytes.length+2+pbytes.length+4+obytes.length];
-			ByteBuffer buf = ByteBuffer.wrap(b);
-			buf.putShort((short) sbytes.length);
-			buf.put(sbytes);
-			buf.putShort((short) pbytes.length);
-			buf.put(pbytes);
-			buf.putInt(obytes.length);
-			buf.put(obytes);
-			return b;
+		public ByteBuffer writeTriple(Resource subj, IRI pred, Value obj, ByteBuffer buf) {
+			buf = writeValue(subj, buf, 2);
+			buf = writeValue(pred, buf, 2);
+			buf = writeValue(obj, buf, 4);
+			return buf;
 		}
 	};
 }

@@ -137,7 +137,7 @@ public final class ValueIO {
 	}
 
 	interface ByteWriter {
-		byte[] writeBytes(Literal l);
+		ByteBuffer writeBytes(Literal l, ByteBuffer b);
 	}
 
 	interface ByteReader {
@@ -189,8 +189,9 @@ public final class ValueIO {
 	static {
 		BYTE_WRITERS.put(XSD.BOOLEAN, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
-				return new byte[] { l.booleanValue() ? TRUE_TYPE : FALSE_TYPE };
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				b = ensureCapacity(b, 1);
+				return b.put(l.booleanValue() ? TRUE_TYPE : FALSE_TYPE);
 			}
 		});
 		BYTE_READERS.put(FALSE_TYPE, new ByteReader() {
@@ -208,8 +209,9 @@ public final class ValueIO {
 
 		BYTE_WRITERS.put(XSD.BYTE, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
-				return new byte[] { BYTE_TYPE, l.byteValue() };
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				b = ensureCapacity(b, 2);
+				return b.put(BYTE_TYPE).put(l.byteValue());
 			}
 		});
 		BYTE_READERS.put(BYTE_TYPE, new ByteReader() {
@@ -221,10 +223,9 @@ public final class ValueIO {
 
 		BYTE_WRITERS.put(XSD.SHORT, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
-				byte[] b = new byte[3];
-				ByteBuffer.wrap(b).put(SHORT_TYPE).putShort(l.shortValue());
-				return b;
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				b = ensureCapacity(b, 3);
+				return b.put(SHORT_TYPE).putShort(l.shortValue());
 			}
 		});
 		BYTE_READERS.put(SHORT_TYPE, new ByteReader() {
@@ -236,10 +237,9 @@ public final class ValueIO {
 
 		BYTE_WRITERS.put(XSD.INT, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
-				byte[] b = new byte[5];
-				ByteBuffer.wrap(b).put(INT_TYPE).putInt(l.intValue());
-				return b;
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				b = ensureCapacity(b, 5);
+				return b.put(INT_TYPE).putInt(l.intValue());
 			}
 		});
 		BYTE_READERS.put(INT_TYPE, new ByteReader() {
@@ -251,10 +251,9 @@ public final class ValueIO {
 
 		BYTE_WRITERS.put(XSD.LONG, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
-				byte[] b = new byte[9];
-				ByteBuffer.wrap(b).put(LONG_TYPE).putLong(l.longValue());
-				return b;
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				b = ensureCapacity(b, 9);
+				return b.put(LONG_TYPE).putLong(l.longValue());
 			}
 		});
 		BYTE_READERS.put(LONG_TYPE, new ByteReader() {
@@ -266,10 +265,9 @@ public final class ValueIO {
 
 		BYTE_WRITERS.put(XSD.FLOAT, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
-				byte[] b = new byte[5];
-				ByteBuffer.wrap(b).put(FLOAT_TYPE).putFloat(l.floatValue());
-				return b;
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				b = ensureCapacity(b, 5);
+				return b.put(FLOAT_TYPE).putFloat(l.floatValue());
 			}
 		});
 		BYTE_READERS.put(FLOAT_TYPE, new ByteReader() {
@@ -281,10 +279,9 @@ public final class ValueIO {
 
 		BYTE_WRITERS.put(XSD.DOUBLE, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
-				byte[] b = new byte[9];
-				ByteBuffer.wrap(b).put(DOUBLE_TYPE).putDouble(l.doubleValue());
-				return b;
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				b = ensureCapacity(b, 9);
+				return b.put(DOUBLE_TYPE).putDouble(l.doubleValue());
 			}
 		});
 		BYTE_READERS.put(DOUBLE_TYPE, new ByteReader() {
@@ -296,12 +293,10 @@ public final class ValueIO {
 
 		BYTE_WRITERS.put(XSD.STRING, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
-				byte[] b = writeString(l.getLabel());
-				byte[] zb = new byte[1+b.length];
-				zb[0] = STRING_TYPE;
-				System.arraycopy(b, 0, zb, 1, b.length);
-				return zb;
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				ByteBuffer zb = writeString(l.getLabel());
+				b = ensureCapacity(b, 1 + zb.remaining());
+				return b.put(STRING_TYPE).put(zb);
 			}
 		});
 		BYTE_READERS.put(STRING_TYPE, new ByteReader() {
@@ -313,8 +308,8 @@ public final class ValueIO {
 
 		BYTE_WRITERS.put(XSD.TIME, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
-				return calendarTypeToBytes(TIME_TYPE, l.calendarValue());
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				return calendarTypeToBytes(TIME_TYPE, l.calendarValue(), b);
 			}
 		});
 		BYTE_READERS.put(TIME_TYPE, new ByteReader() {
@@ -338,8 +333,8 @@ public final class ValueIO {
 
 		BYTE_WRITERS.put(XSD.DATE, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
-				return calendarTypeToBytes(DATE_TYPE, l.calendarValue());
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				return calendarTypeToBytes(DATE_TYPE, l.calendarValue(), b);
 			}
 		});
 		BYTE_READERS.put(DATE_TYPE, new ByteReader() {
@@ -361,8 +356,8 @@ public final class ValueIO {
 
 		BYTE_WRITERS.put(XSD.DATETIME, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
-				return calendarTypeToBytes(DATETIME_TYPE, l.calendarValue());
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				return calendarTypeToBytes(DATETIME_TYPE, l.calendarValue(), b);
 			}
 		});
 		BYTE_READERS.put(DATETIME_TYPE, new ByteReader() {
@@ -383,20 +378,21 @@ public final class ValueIO {
 
 		BYTE_WRITERS.put(RDF.XMLLITERAL, new ByteWriter() {
 			@Override
-			public byte[] writeBytes(Literal l) {
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				try {
 					ByteArrayOutputStream out = new ByteArrayOutputStream(1024);
-					out.write(XML_TYPE);
-					out.write(XML_TYPE); // mark xml as valid
 					XMLLiteral.writeInfoset(l.getLabel(), out);
-					return out.toByteArray();
+					byte[] xb = out.toByteArray();
+					b = ensureCapacity(b, 2 + xb.length);
+					b.put(XML_TYPE);
+					b.put(XML_TYPE); // mark xml as valid
+					return b.put(xb);
 				} catch(TransformerException e) {
-					byte[] b = writeString(l.getLabel());
-					byte[] xzb = new byte[2+b.length];
-					xzb[0] = XML_TYPE;
-					xzb[1] = STRING_TYPE; // mark xml as invalid
-					System.arraycopy(b, 0, xzb, 2, b.length);
-					return xzb;
+					ByteBuffer zb = writeString(l.getLabel());
+					b = ensureCapacity(b, 2 + zb.remaining());
+					b.put(XML_TYPE);
+					b.put(STRING_TYPE); // mark xml as invalid
+					return b.put(zb);
 				}
 			}
 		});
@@ -417,118 +413,130 @@ public final class ValueIO {
 		});
 	}
 
-	private static byte[] writeString(String s) {
-		return s.getBytes(StandardCharsets.UTF_8);
+	private static ByteBuffer writeString(String s) {
+		return StandardCharsets.UTF_8.encode(s);
 	}
 
 	private static String readString(ByteBuffer b) {
 		return StandardCharsets.UTF_8.decode(b).toString();
 	}
 
-	private static byte[] calendarTypeToBytes(byte type, XMLGregorianCalendar cal) {
-		byte[] b = new byte[11];
-		ByteBuffer buf = ByteBuffer.wrap(b).put(type).putLong(cal.toGregorianCalendar().getTimeInMillis());
+	private static ByteBuffer calendarTypeToBytes(byte type, XMLGregorianCalendar cal, ByteBuffer b) {
+		b = ensureCapacity(b, 11);
+		b.put(type).putLong(cal.toGregorianCalendar().getTimeInMillis());
 		if(cal.getTimezone() != DatatypeConstants.FIELD_UNDEFINED) {
-			buf.putShort((short) cal.getTimezone());
+			b.putShort((short) cal.getTimezone());
 		} else {
-			buf.putShort(Short.MIN_VALUE);
+			b.putShort(Short.MIN_VALUE);
 		}
 		return b;
 	}
 
 	private static final ByteWriter DEFAULT_BYTE_WRITER = new ByteWriter() {
 		@Override
-		public byte[] writeBytes(Literal l) {
-			byte[] labelBytes = writeString(l.getLabel());
-			byte[] datatypeBytes = ValueIO.writeIRI(l.getDatatype());
-			byte[] lBytes = new byte[3+labelBytes.length+datatypeBytes.length];
-			ByteBuffer b = ByteBuffer.wrap(lBytes);
+		public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+			b = ensureCapacity(b, 1+2);
 			b.put(DATATYPE_LITERAL_TYPE);
-			b.putShort((short)datatypeBytes.length);
-			b.put(datatypeBytes);
+			int sizePos = b.position();
+			int startPos = b.position()+2;
+			b.position(startPos);
+			b = ValueIO.writeIRI(l.getDatatype(), b);
+			int endPos = b.position();
+			b.position(sizePos);
+			b.putShort((short) (endPos-startPos));
+			b.position(endPos);
+			ByteBuffer labelBytes = writeString(l.getLabel());
+			b = ensureCapacity(b, labelBytes.remaining());
 			b.put(labelBytes);
-			return lBytes;
+			return b;
 		}
 	};
 
-	public static byte[] writeBytes(Value v, TripleWriter tw) {
+	public static ByteBuffer writeBytes(Value v, ByteBuffer b, TripleWriter tw) {
 		if (v.isIRI()) {
-			return writeIRI((IRI)v);
+			return writeIRI((IRI)v, b);
 		} else if (v.isBNode()) {
-			return writeBNode((BNode)v);
+			return writeBNode((BNode)v, b);
 		} else if (v.isLiteral()) {
-			return writeLiteral((Literal)v);
+			return writeLiteral((Literal)v, b);
 		} else if (v.isTriple()) {
 			Triple t = (Triple) v;
-			byte[] tripleBytes = tw.writeTriple(t.getSubject(), t.getPredicate(), t.getObject());
-			byte[] b = new byte[1+tripleBytes.length];
-			b[0] = TRIPLE_TYPE;
-			System.arraycopy(tripleBytes, 0, b, 1, tripleBytes.length);
+			b = ensureCapacity(b, 1);
+			b.put(TRIPLE_TYPE);
+			b = tw.writeTriple(t.getSubject(), t.getPredicate(), t.getObject(), b);
 			return b;
 		} else {
 			throw new AssertionError(String.format("Unexpected RDF value: %s (%s)", v, v.getClass().getName()));
 		}
     }
 
-	private static byte[] writeIRI(IRI v) {
+	private static ByteBuffer writeIRI(IRI v, ByteBuffer b) {
 		ByteBuffer hash = WELL_KNOWN_IRIS.inverse().get(v);
 		if (hash != null) {
-			byte[] b = new byte[1 + hash.remaining()];
-			b[0] = IRI_HASH_TYPE;
+			b = ensureCapacity(b, 1 + hash.remaining());
+			b.put(IRI_HASH_TYPE);
 			// NB: do not alter original hash buffer which is shared across threads
-			hash.duplicate().get(b, 1, hash.remaining());
+			b.put(hash.duplicate());
 			return b;
 		} else {
 			IRI iri = (IRI) v;
 			hash = WELL_KNOWN_NAMESPACES.inverse().get(iri.getNamespace());
 			if (hash != null) {
-				byte[] localBytes = writeString(iri.getLocalName());
-				byte[] b = new byte[1 + hash.remaining() + localBytes.length];
-				b[0] = NAMESPACE_HASH_TYPE;
+				ByteBuffer localBytes = writeString(iri.getLocalName());
+				b = ensureCapacity(b, 1 + hash.remaining() + localBytes.remaining());
+				b.put(NAMESPACE_HASH_TYPE);
 				// NB: do not alter original hash buffer which is shared across threads
-				hash.duplicate().get(b, 1, hash.remaining());
-				System.arraycopy(localBytes, 0, b, b.length-localBytes.length, localBytes.length);
+				b.put(hash.duplicate());
+				b.put(localBytes);
 				return b;
 			} else {
-				byte[] iriBytes = writeString(v.stringValue());
-				byte[] b = new byte[1+iriBytes.length+1];
-				b[0] = IRI_TYPE;
-				System.arraycopy(iriBytes, 0, b, 1, iriBytes.length);
-				b[1+iriBytes.length] = '>';
+				ByteBuffer iriBytes = writeString(v.stringValue());
+				b = ensureCapacity(b, 1+iriBytes.remaining());
+				b.put(IRI_TYPE);
+				b.put(iriBytes);
 				return b;
 			}
 		}
     }
 
-	private static byte[] writeBNode(BNode n) {
-		byte[] idBytes = writeString(n.getID());
-		byte[] b = new byte[1+idBytes.length];
-		b[0] = BNODE_TYPE;
-		System.arraycopy(idBytes, 0, b, 1, idBytes.length);
+	private static ByteBuffer writeBNode(BNode n, ByteBuffer b) {
+		ByteBuffer idBytes = writeString(n.getID());
+		b = ensureCapacity(b, 1+idBytes.remaining());
+		b.put(BNODE_TYPE);
+		b.put(idBytes);
 		return b;
 	}
 
-	private static byte[] writeLiteral(Literal l) {
+	private static ByteBuffer writeLiteral(Literal l, ByteBuffer b) {
 		if(l.getLanguage().isPresent()) {
-			byte[] labelBytes = writeString(l.getLabel());
-			byte[] langBytes = writeString(l.getLanguage().get());
-			byte[] b = new byte[2+langBytes.length+labelBytes.length];
-			b[0] = LANGUAGE_LITERAL_TYPE;
-			b[1] = (byte) langBytes.length;
-			System.arraycopy(langBytes, 0, b, 2, langBytes.length);
-			System.arraycopy(labelBytes, 0, b, langBytes.length+2, labelBytes.length);
+			ByteBuffer labelBytes = writeString(l.getLabel());
+			String langTag = l.getLanguage().get();
+			if (langTag.length() > Short.MAX_VALUE) {
+				int truncatePos = langTag.lastIndexOf('-', Short.MAX_VALUE-1);
+				// check for single tag
+				if (langTag.charAt(truncatePos-2) == '-') {
+					truncatePos -= 2;
+				}
+				langTag = langTag.substring(0, truncatePos);
+			}
+			ByteBuffer langBytes = writeString(langTag);
+			b = ensureCapacity(b, 2+langBytes.remaining()+labelBytes.remaining());
+			b.put(LANGUAGE_LITERAL_TYPE);
+			b.put((byte) langBytes.remaining());
+			b.put(langBytes);
+			b.put(labelBytes);
 			return b;
 		} else {
 			ByteWriter writer = BYTE_WRITERS.get(l.getDatatype());
 			if (writer != null) {
 				try {
-					return writer.writeBytes(l);
+					return writer.writeBytes(l, b);
 				} catch (Exception e) {
 					// if the dedicated writer fails then fallback to the generic writer
-					return DEFAULT_BYTE_WRITER.writeBytes(l);
+					return DEFAULT_BYTE_WRITER.writeBytes(l, b);
 				}
 			} else {
-				return DEFAULT_BYTE_WRITER.writeBytes(l);
+				return DEFAULT_BYTE_WRITER.writeBytes(l, b);
 			}
 		}
 	}
@@ -539,9 +547,7 @@ public final class ValueIO {
 		byte type = b.get();
 		switch(type) {
 			case IRI_TYPE:
-				b.limit(originalLimit-1); // ignore trailing '>'
 				IRI iri = vf.createIRI(readString(b));
-				b.limit(originalLimit);
 				b.position(originalLimit);
 				return iri;
 			case IRI_HASH_TYPE:
@@ -589,4 +595,16 @@ public final class ValueIO {
 				return reader.readBytes((ByteBuffer) b, vf);
 		}
     }
+
+	public static ByteBuffer ensureCapacity(ByteBuffer b, int requiredSize) {
+		if (b.remaining() < requiredSize) {
+			// leave some spare capacity
+			ByteBuffer newb = ByteBuffer.allocate(3*b.capacity()/2 + 2*requiredSize);
+			b.flip();
+			newb.put(b);
+			return newb;
+		} else {
+			return b;
+		}
+	}
 }

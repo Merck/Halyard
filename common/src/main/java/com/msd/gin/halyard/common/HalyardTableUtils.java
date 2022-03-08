@@ -369,7 +369,7 @@ public final class HalyardTableUtils {
     	if(subj == null || pred == null || obj == null) {
     		throw new NullPointerException();
     	}
-    	if(context.isTriple()) {
+    	if(context != null && context.isTriple()) {
     		throw new UnsupportedOperationException("Context cannot be a triple value");
     	}
 
@@ -663,18 +663,12 @@ public final class HalyardTableUtils {
 
 	public static final class TableTripleWriter implements TripleWriter {
 		@Override
-		public byte[] writeTriple(Resource subj, IRI pred, Value obj) {
-			byte[] b = new byte[3*Hashes.ID_SIZE];
-			int i = 0;
+		public ByteBuffer writeTriple(Resource subj, IRI pred, Value obj, ByteBuffer buf) {
+			buf = ValueIO.ensureCapacity(buf, 3*Hashes.ID_SIZE);
 			byte[] sid = Hashes.id(subj);
-			System.arraycopy(sid, 0, b, i, Hashes.ID_SIZE);
-			i += Hashes.ID_SIZE;
 			byte[] pid = Hashes.id(pred);
-			System.arraycopy(pid, 0, b, i, Hashes.ID_SIZE);
-			i += Hashes.ID_SIZE;
 			byte[] oid = Hashes.id(obj);
-			System.arraycopy(oid, 0, b, i, Hashes.ID_SIZE);
-			return b;
+			return buf.put(sid).put(pid).put(oid);
 		}
 	}
 

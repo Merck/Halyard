@@ -50,20 +50,25 @@ public class ValueIOTest {
 
 	@Test
 	public void testToAndFromBytes() throws IOException {
-		byte[] b = ValueIO.writeBytes(expected, null);
-		Value actual = ValueIO.readValue(ByteBuffer.wrap(b), vf, null);
+		ByteBuffer buf = ByteBuffer.allocate(0);
+		buf = ValueIO.writeBytes(expected, buf, null);
+		buf.flip();
+		int size = buf.limit();
+		Value actual = ValueIO.readValue(buf, vf, null);
 		assertEquals(expected, actual);
 
 		// check readValue() works on a subsequence
-		ByteBuffer extbuf = ByteBuffer.allocate(3 + b.length + 7);
+		ByteBuffer extbuf = ByteBuffer.allocate(3 + size + 7);
 		// place b somewhere in the middle
 		extbuf.position(extbuf.position() + 3);
 		extbuf.mark();
-		extbuf.put(b);
+		buf.flip();
+		extbuf.put(buf);
 		extbuf.limit(extbuf.position());
 		extbuf.reset();
 		actual = ValueIO.readValue(extbuf, vf, null);
-		assertEquals("Buffer position", extbuf.limit(), extbuf.position());
+		assertEquals("Buffer position", 3 + size, extbuf.position());
+		assertEquals("Buffer state", extbuf.limit(), extbuf.position());
 		assertEquals(expected, actual);
 	}
 
