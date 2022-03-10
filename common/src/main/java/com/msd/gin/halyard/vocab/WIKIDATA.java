@@ -17,7 +17,7 @@ import java.util.List;
 public final class WIKIDATA implements Vocabulary {
     private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
-    public static final Namespace WDATA_NS = new SimpleNamespace("wdata", "http://www.wikidata.org/wiki/Special:EntityData/");
+    public static final Namespace WDATA_NS = new SimpleNamespace("wdata", "https://www.wikidata.org/wiki/Special:EntityData/");
     public static final String WD_NAMESPACE = "http://www.wikidata.org/entity/";
     public static final String WDT_NAMESPACE = "http://www.wikidata.org/prop/direct/";
     public static final String WDTN_NAMESPACE = "http://www.wikidata.org/prop/direct-normalized/";
@@ -52,6 +52,8 @@ public final class WIKIDATA implements Vocabulary {
     public static final Namespace PRV_NS = new SimpleNamespace("prv", PRV_NAMESPACE);
     public static final Namespace PRN_NS = new SimpleNamespace("prn", PRN_NAMESPACE);
 
+    public static final Namespace DOI_NS = new SimpleNamespace("doi", "http://dx.doi.org/");
+
     // popular items
     public static final IRI HUMAN = SVF.createIRI(WD_NAMESPACE, "Q5");
     public static final IRI UNITED_STATES = SVF.createIRI(WD_NAMESPACE, "Q30");
@@ -72,24 +74,39 @@ public final class WIKIDATA implements Vocabulary {
         // popular properties
         public static final String COUNTRY = "P17";
         public static final String IMAGE = "P18";
+        public static final String PLACE_OF_BIRTH = "P19";
+        public static final String PLACE_OF_DEATH = "P20";
+        public static final String SEX_OR_GENDER = "P21";
         public static final String INSTANCE_OF = "P31";
         public static final String AUTHOR = "P50";
+        public static final String FAMILY = "P53";
+        public static final String EDUCATED_AT = "P69";
         public static final String OCCUPATION = "P106";
+        public static final String FOLLOWS = "P155";
+        public static final String FOLLOWED_BY= "P156";
         public static final String STATED_IN = "P248";
+        public static final String SUBCLASS_OF = "P279";
         public static final String PAGES = "P304";
         public static final String DOI = "P356";
+        public static final String PART_OF = "P361";
         public static final String ISSUE = "P433";
         public static final String VOLUME = "P478";
+        public static final String ORCID = "P496";
         public static final String CATALOG_CODE = "P528";
+        public static final String DATE_OF_BIRTH = "P569";
         public static final String PUBLICATION_DATE = "P577";
         public static final String POINT_IN_TIME = "P585";
         public static final String OF = "P642";
+        public static final String STREET_NUMBER = "P670";
         public static final String PUBMED_ID = "P698";
         public static final String FAMILY_NAME = "P734";
         public static final String GIVEN_NAME = "P735";
         public static final String RETRIEVED = "P813";
+        public static final String ARXIV_ID = "P818";
         public static final String REFERENCE_URL = "P854";
         public static final String MAIN_SUBJECT = "P921";
+        public static final String PMCID = "P932";
+        public static final String WORK_LOCATION = "P937";
         public static final String CATALOG = "P972";
         public static final String POPULATION = "P1082";
         public static final String APPARENT_MAGNITUDE = "P1215";
@@ -99,8 +116,15 @@ public final class WIKIDATA implements Vocabulary {
         public static final String SERIES_ORDINAL = "P1545";
         public static final String SEE_ALSO = "P1659";
         public static final String NATIVE_LABEL = "P1705";
+        public static final String SHORT_NAME = "P1813";
+        public static final String LENGTH = "P2043";
+        public static final String AREA = "P2046";
+        public static final String DURATION = "P2047";
+        public static final String HEIGHT = "P2048";
+        public static final String WIDTH = "P2049";
         public static final String AUTHOR_NAME_STRING = "P2093";
         public static final String CITES_WORK = "P2860";
+        public static final String STREET_ADDRESS = "P6375";
     }
 
 	public static Collection<IRI> getIRIs() {
