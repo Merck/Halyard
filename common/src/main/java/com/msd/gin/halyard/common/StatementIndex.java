@@ -213,7 +213,7 @@ public enum StatementIndex {
 	 * @param sizeLen length of size field, 2 for short, 4 for int.
 	 */
 	private static int len(RDFValue<?> v, int sizeLen) {
-		if (ValueIO.WELL_KNOWN_IRIS.containsValue(v.val)) {
+		if (ValueIO.isWellKnownIRI(v.val)) {
 			return 1;
 		} else {
 			return sizeLen + v.getSerializedForm().remaining();
@@ -221,7 +221,7 @@ public enum StatementIndex {
 	}
 
 	private static void putShortRDFValue(ByteBuffer cv, RDFValue<?> v) {
-		if (ValueIO.WELL_KNOWN_IRIS.containsValue(v.val)) {
+		if (ValueIO.isWellKnownIRI(v.val)) {
 			cv.put(WELL_KNOWN_IRI_MARKER);
 		} else {
 			ByteBuffer ser = v.getSerializedForm();
@@ -230,7 +230,7 @@ public enum StatementIndex {
 	}
 
 	private static void putIntRDFValue(ByteBuffer cv, RDFValue<?> v) {
-		if (ValueIO.WELL_KNOWN_IRIS.containsValue(v.val)) {
+		if (ValueIO.isWellKnownIRI(v.val)) {
 			cv.put(WELL_KNOWN_IRI_MARKER);
 		} else {
 			ByteBuffer ser = v.getSerializedForm();
@@ -239,7 +239,7 @@ public enum StatementIndex {
 	}
 
 	private static void putLastRDFValue(ByteBuffer cv, RDFValue<?> v) {
-		if (ValueIO.WELL_KNOWN_IRIS.containsValue(v.val)) {
+		if (ValueIO.isWellKnownIRI(v.val)) {
 			cv.put(WELL_KNOWN_IRI_MARKER);
 		} else {
 			ByteBuffer ser = v.getSerializedForm();

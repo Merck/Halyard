@@ -51,18 +51,18 @@ public final class Hashes {
 		(byte)221, 31,(byte)209,(byte)182,(byte)143,92,(byte)149,(byte)184,(byte)148,62,113,65,37,27,106,(byte)166
 	};
 
-	static byte[] hash16(byte[] key) {
+	static short hash16(byte[] key) {
 		byte h1 = PEARSON_HASH_TABLE[(key[0] & 0xFF) % 256];
 		byte h2 = PEARSON_HASH_TABLE[(key[key.length-1] & 0xFF) % 256];
 		for(int j = 1; j < key.length; j++) {
 			h1 = PEARSON_HASH_TABLE[(h1 & 0xFF) ^ (key[j] & 0xFF)];
 			h2 = PEARSON_HASH_TABLE[(h2 & 0xFF) ^ (key[key.length - 1 - j] & 0xFF)];
 		}
-		return new byte[] {h1, h2};
+		return (short)((h1 << 8) | (h2 & 0xff));
     }
 
-    static byte[] hash32(byte[] key) {
-    	return Hashing.murmur3_32().hashBytes(key).asBytes();
+    static int hash32(byte[] key) {
+    	return Hashing.murmur3_32().hashBytes(key).asInt();
     }
 
     public static byte[] hashUnique(byte[] key) {

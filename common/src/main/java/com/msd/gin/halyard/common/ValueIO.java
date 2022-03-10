@@ -53,9 +53,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class ValueIO {
-	static final BiMap<ByteBuffer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(256);
 	static final BiMap<ByteBuffer, IRI> WELL_KNOWN_IRI_IDS = HashBiMap.create(256);
-	private static final BiMap<ByteBuffer, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);
+	private static final BiMap<Integer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(1024);
+	private static final BiMap<Short, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);
+	private static final int IRI_HASH_SIZE = 4;
+	private static final int NAMESPACE_HASH_SIZE = 2;
 
 	private static void loadNamespacesAndIRIs(Class<?> vocab) {
 		Collection<Namespace> namespaces = getNamespace(vocab);
@@ -93,7 +95,7 @@ public final class ValueIO {
 	private static void addNamespaces(Collection<Namespace> namespaces) {
 		for (Namespace namespace : namespaces) {
 			String name = namespace.getName();
-			ByteBuffer hash = ByteBuffer.wrap(Hashes.hash16(name.getBytes(StandardCharsets.UTF_8)));
+			Short hash = Hashes.hash16(name.getBytes(StandardCharsets.UTF_8));
 			if (WELL_KNOWN_NAMESPACES.putIfAbsent(hash, name) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
 						WELL_KNOWN_NAMESPACES.get(hash), name));
@@ -112,7 +114,7 @@ public final class ValueIO {
 						WELL_KNOWN_IRI_IDS.get(idbb), idIri));
 			}
 
-			ByteBuffer hash = ByteBuffer.wrap(Hashes.hash32(idIri.toString().getBytes(StandardCharsets.UTF_8))).asReadOnlyBuffer();
+			Integer hash = Hashes.hash32(idIri.toString().getBytes(StandardCharsets.UTF_8));
 			if (WELL_KNOWN_IRIS.putIfAbsent(hash, idIri) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
 						WELL_KNOWN_IRIS.get(hash), idIri));
@@ -134,6 +136,10 @@ public final class ValueIO {
 			logger.info("Loading vocabulary {}", vocab.getClass());
 			loadNamespacesAndIRIs(vocab.getClass());
 		}
+	}
+
+	static boolean isWellKnownIRI(Value v) {
+		return WELL_KNOWN_IRIS.containsValue(v);
 	}
 
 	interface ByteWriter {
@@ -471,22 +477,20 @@ public final class ValueIO {
     }
 
 	private static ByteBuffer writeIRI(IRI v, ByteBuffer b) {
-		ByteBuffer hash = WELL_KNOWN_IRIS.inverse().get(v);
-		if (hash != null) {
-			b = ensureCapacity(b, 1 + hash.remaining());
+		Integer irihash = WELL_KNOWN_IRIS.inverse().get(v);
+		if (irihash != null) {
+			b = ensureCapacity(b, 1 + IRI_HASH_SIZE);
 			b.put(IRI_HASH_TYPE);
-			// NB: do not alter original hash buffer which is shared across threads
-			b.put(hash.duplicate());
+			b.putInt(irihash);
 			return b;
 		} else {
 			IRI iri = (IRI) v;
-			hash = WELL_KNOWN_NAMESPACES.inverse().get(iri.getNamespace());
-			if (hash != null) {
+			Short nshash = WELL_KNOWN_NAMESPACES.inverse().get(iri.getNamespace());
+			if (nshash != null) {
 				ByteBuffer localBytes = writeString(iri.getLocalName());
-				b = ensureCapacity(b, 1 + hash.remaining() + localBytes.remaining());
+				b = ensureCapacity(b, 1 + NAMESPACE_HASH_SIZE + localBytes.remaining());
 				b.put(NAMESPACE_HASH_TYPE);
-				// NB: do not alter original hash buffer which is shared across threads
-				b.put(hash.duplicate());
+				b.putShort(nshash);
 				b.put(localBytes);
 				return b;
 			} else {
@@ -543,7 +547,6 @@ public final class ValueIO {
 
 	public static Value readValue(ByteBuffer b, ValueFactory vf, TripleFactory tf) throws IOException {
 		final int originalLimit = b.limit();
-		b.mark();
 		byte type = b.get();
 		switch(type) {
 			case IRI_TYPE:
@@ -551,20 +554,22 @@ public final class ValueIO {
 				b.position(originalLimit);
 				return iri;
 			case IRI_HASH_TYPE:
-				iri = WELL_KNOWN_IRIS.get(b);
+				b.mark();
+				Integer irihash = b.getInt(); // 32-bit hash
+				iri = WELL_KNOWN_IRIS.get(irihash);
 				if (iri == null) {
+					b.reset();
 					throw new IllegalStateException(String.format("Unknown IRI hash: %s", Hashes.encode(b)));
 				}
-				b.position(originalLimit);
 				return iri;
 			case NAMESPACE_HASH_TYPE:
-				b.limit(b.position()+2); // 16-byte hash
-				String namespace = WELL_KNOWN_NAMESPACES.get(b);
+				b.mark();
+				Short nshash = b.getShort(); // 16-bit hash
+				String namespace = WELL_KNOWN_NAMESPACES.get(nshash);
 				if (namespace == null) {
+					b.reset();
 					throw new IllegalStateException(String.format("Unknown namespace hash: %s", Hashes.encode(b)));
 				}
-				b.limit(originalLimit);
-				b.position(b.position()+2);
 				return vf.createIRI(namespace, readString(b));
 			case BNODE_TYPE:
 				return vf.createBNode(readString(b));
