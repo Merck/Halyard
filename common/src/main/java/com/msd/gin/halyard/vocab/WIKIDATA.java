@@ -52,7 +52,14 @@ public final class WIKIDATA implements Vocabulary {
     public static final Namespace PRV_NS = new SimpleNamespace("prv", PRV_NAMESPACE);
     public static final Namespace PRN_NS = new SimpleNamespace("prn", PRN_NAMESPACE);
 
+    // common ID namespaces
     public static final Namespace DOI_NS = new SimpleNamespace("doi", "http://dx.doi.org/");
+    public static final Namespace ORCID_NS = new SimpleNamespace("orcid", "https://orcid.org/");
+    public static final Namespace GKG_NS = new SimpleNamespace("gkg", "http://g.co/kg/g/");
+    public static final Namespace GEONAMES_NS = new SimpleNamespace("geonames", "http://sws.geonames.org/");
+    public static final Namespace ENTREZ_NS = new SimpleNamespace("entrez", "http://purl.uniprot.org/geneid/");
+    public static final Namespace UNIPROT_NS = new SimpleNamespace("uniprot", "http://purl.uniprot.org/uniprot/");
+    public static final Namespace GND_NS = new SimpleNamespace("gnd", "https://d-nb.info/gnd/");
 
     // popular items
     public static final IRI HUMAN = SVF.createIRI(WD_NAMESPACE, "Q5");
@@ -84,9 +91,12 @@ public final class WIKIDATA implements Vocabulary {
         public static final String OCCUPATION = "P106";
         public static final String FOLLOWS = "P155";
         public static final String FOLLOWED_BY= "P156";
+        public static final String GND_ID = "P227";
         public static final String STATED_IN = "P248";
         public static final String SUBCLASS_OF = "P279";
         public static final String PAGES = "P304";
+        public static final String ENTREZ_GENE_ID = "P351";
+        public static final String UNIPROT_PROTEIN_ID = "P352";
         public static final String DOI = "P356";
         public static final String PART_OF = "P361";
         public static final String ISSUE = "P433";
@@ -114,6 +124,7 @@ public final class WIKIDATA implements Vocabulary {
         public static final String PUBLISHED_IN = "P1433";
         public static final String TITLE = "P1476";
         public static final String SERIES_ORDINAL = "P1545";
+        public static final String GEONAMES_ID = "P1566";
         public static final String SEE_ALSO = "P1659";
         public static final String NATIVE_LABEL = "P1705";
         public static final String SHORT_NAME = "P1813";
@@ -123,6 +134,7 @@ public final class WIKIDATA implements Vocabulary {
         public static final String HEIGHT = "P2048";
         public static final String WIDTH = "P2049";
         public static final String AUTHOR_NAME_STRING = "P2093";
+        public static final String GOOGLE_KNOWLEDGE_GRAPH_ID = "P2671";
         public static final String CITES_WORK = "P2860";
         public static final String STREET_ADDRESS = "P6375";
     }
