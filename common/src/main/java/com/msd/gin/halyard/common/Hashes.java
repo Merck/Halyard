@@ -8,12 +8,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
-import org.eclipse.rdf4j.model.Value;
-
 public final class Hashes {
-	public static final int ID_SIZE = 20;
-	static final byte NON_LITERAL_FLAG = (byte) 0x80;
-    private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
+	private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
     private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
 
 	static MessageDigest getMessageDigest(String algorithm) {
@@ -58,7 +54,7 @@ public final class Hashes {
 			h1 = PEARSON_HASH_TABLE[(h1 & 0xFF) ^ (key[j] & 0xFF)];
 			h2 = PEARSON_HASH_TABLE[(h2 & 0xFF) ^ (key[key.length - 1 - j] & 0xFF)];
 		}
-		return (short)((h1 << 8) | (h2 & 0xff));
+		return (short) (((h1 & 0xFF) << 8) | (h2 & 0xFF));
     }
 
     static int hash32(byte[] key) {
@@ -74,46 +70,6 @@ public final class Hashes {
             md.reset();
         }
     }
-
-	public static byte[] id(Value v) {
-		byte[] hash;
-		Identifiable idValue;
-
-		if (v instanceof Identifiable) {
-			idValue = (Identifiable) v;
-			hash = idValue.getId();
-		} else {
-			idValue = null;
-			ByteBuffer id = ValueIO.WELL_KNOWN_IRI_IDS.inverse().get(v);
-			if (id != null) {
-				hash = new byte[ID_SIZE];
-    			// NB: do not alter original hash buffer which is shared across threads
-				id.duplicate().get(hash);
-			} else {
-				hash = null;
-			}
-		}
-
-		boolean alreadyHasHash = (hash != null);
-		if (!alreadyHasHash) {
-			hash = Hashes.hashUnique(v.toString().getBytes(StandardCharsets.UTF_8));
-			// literal prefix
-			if (v.isLiteral()) {
-				hash[0] &= 0x7F; // 0 msb
-			} else {
-				hash[0] |= NON_LITERAL_FLAG; // 1 msb
-			}
-		}
-
-		if (idValue != null && !alreadyHasHash) {
-			idValue.setId(hash);
-		}
-		return hash;
-	}
-
-	static boolean isLiteral(byte[] hash) {
-		return (hash[0] & NON_LITERAL_FLAG) == 0;
-	}
 
     public static String encode(byte b[]) {
         return ENCODER.encodeToString(b);

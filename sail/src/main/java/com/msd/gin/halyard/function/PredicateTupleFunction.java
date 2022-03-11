@@ -1,6 +1,7 @@
 package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Identifier;
 
 import java.io.IOException;
 
@@ -25,7 +26,7 @@ public final class PredicateTupleFunction extends AbstractReificationTupleFuncti
 	}
 
 	@Override
-	protected Value getValue(Table table, byte[] id, ValueFactory vf) throws IOException {
+	protected Value getValue(Table table, Identifier id, ValueFactory vf) throws IOException {
 		return HalyardTableUtils.getPredicate(table, id, vf);
 	}
 }

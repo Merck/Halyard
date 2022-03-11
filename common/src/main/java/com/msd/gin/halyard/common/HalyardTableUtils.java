@@ -261,7 +261,7 @@ public final class HalyardTableUtils {
 		addSplitsLiterals(splitKeys, prefix, litSplitBits);
 		if (needDivider) {
 			byte[] prefixLiteralSplit = Arrays.copyOf(prefix, prefix.length + 2);
-			prefixLiteralSplit[prefix.length] = Hashes.NON_LITERAL_FLAG;
+			prefixLiteralSplit[prefix.length] = Identifier.NON_LITERAL_FLAG;
 			splitKeys.add(prefixLiteralSplit);
 		}
 	}
@@ -493,7 +493,7 @@ public final class HalyardTableUtils {
         }
     }
 
-	public static Resource getSubject(Table table, byte[] id, ValueFactory vf) throws IOException {
+	public static Resource getSubject(Table table, Identifier id, ValueFactory vf) throws IOException {
 		TableTripleFactory tf = new TableTripleFactory(table);
 		Scan scan = scan(StatementIndex.SPO, id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
@@ -508,7 +508,7 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static IRI getPredicate(Table table, byte[] id, ValueFactory vf) throws IOException {
+	public static IRI getPredicate(Table table, Identifier id, ValueFactory vf) throws IOException {
 		Scan scan = scan(StatementIndex.POS, id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
@@ -522,7 +522,7 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static Value getObject(Table table, byte[] id, ValueFactory vf) throws IOException {
+	public static Value getObject(Table table, Identifier id, ValueFactory vf) throws IOException {
 		TableTripleFactory tf = new TableTripleFactory(table);
 		Scan scan = scan(StatementIndex.OSP, id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
@@ -537,7 +537,7 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	private static Scan scan(StatementIndex index, byte[] id) {
+	private static Scan scan(StatementIndex index, Identifier id) {
 		Scan scanAll = index.scan(id);
 		return scan(scanAll.getStartRow(), scanAll.getStopRow())
 			.setFilter(new FilterList(scanAll.getFilter(), new FirstKeyOnlyFilter())).setOneRowLimit();
@@ -640,15 +640,15 @@ public final class HalyardTableUtils {
 
 		@Override
 		public Triple readTriple(ByteBuffer b, ValueFactory vf) throws IOException {
-			byte[] sid = new byte[Hashes.ID_SIZE];
-			byte[] pid = new byte[Hashes.ID_SIZE];
-			byte[] oid = new byte[Hashes.ID_SIZE];
+			byte[] sid = new byte[Identifier.ID_SIZE];
+			byte[] pid = new byte[Identifier.ID_SIZE];
+			byte[] oid = new byte[Identifier.ID_SIZE];
 			b.get(sid).get(pid).get(oid);
 
 			RDFContext ckey = RDFContext.create(HALYARD.TRIPLE_GRAPH_CONTEXT);
-			RDFIdentifier skey = new RDFIdentifier(RDFRole.SUBJECT, sid);
-			RDFIdentifier pkey = new RDFIdentifier(RDFRole.PREDICATE, pid);
-			RDFIdentifier okey = new RDFIdentifier(RDFRole.OBJECT, oid);
+			RDFIdentifier skey = RDFIdentifier.create(RDFRole.SUBJECT, sid);
+			RDFIdentifier pkey = RDFIdentifier.create(RDFRole.PREDICATE, pid);
+			RDFIdentifier okey = RDFIdentifier.create(RDFRole.OBJECT, oid);
 			Scan scan = StatementIndex.CSPO.scan(ckey, skey, pkey, okey);
 			Get get = new Get(scan.getStartRow())
 				.setFilter(new FilterList(scan.getFilter(), new FirstKeyOnlyFilter()));
@@ -664,11 +664,11 @@ public final class HalyardTableUtils {
 	public static final class TableTripleWriter implements TripleWriter {
 		@Override
 		public ByteBuffer writeTriple(Resource subj, IRI pred, Value obj, ByteBuffer buf) {
-			buf = ValueIO.ensureCapacity(buf, 3*Hashes.ID_SIZE);
-			byte[] sid = Hashes.id(subj);
-			byte[] pid = Hashes.id(pred);
-			byte[] oid = Hashes.id(obj);
-			return buf.put(sid).put(pid).put(oid);
+			buf = ValueIO.ensureCapacity(buf, 3*Identifier.ID_SIZE);
+			Identifier.id(subj).writeTo(buf);
+			Identifier.id(pred).writeTo(buf);
+			Identifier.id(obj).writeTo(buf);
+			return buf;
 		}
 	}
 

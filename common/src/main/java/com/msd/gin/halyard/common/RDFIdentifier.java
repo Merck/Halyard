@@ -1,12 +1,18 @@
 package com.msd.gin.halyard.common;
 
+import java.nio.ByteBuffer;
+
 public class RDFIdentifier {
 	private final RDFRole role;
-	private byte[] hash;
+	private Identifier id;
 
-	public RDFIdentifier(RDFRole role, byte[] id) {
+	public static RDFIdentifier create(RDFRole role, byte[] idBytes) {
+		return new RDFIdentifier(role, new Identifier(idBytes));
+	}
+
+	RDFIdentifier(RDFRole role, Identifier id) {
 		this(role);
-		this.hash = id;
+		this.id = id;
 	}
 
 	protected RDFIdentifier(RDFRole role) {
@@ -17,31 +23,31 @@ public class RDFIdentifier {
 		return role;
 	}
 
-	protected byte[] calculateHash() {
-		throw new UnsupportedOperationException("Hash must be provided");
+	protected Identifier calculateId() {
+		throw new UnsupportedOperationException("ID must be provided");
 	}
 
-	private byte[] getUniqueHash() {
-		if (hash == null) {
-			hash = calculateHash();
+	private Identifier getId() {
+		if (id == null) {
+			id = calculateId();
 		}
-		return hash;
+		return id;
 	}
 
 	public final byte[] getKeyHash(StatementIndex index) {
-		return role.keyHash(index, getUniqueHash());
+		return role.keyHash(index, getId());
 	}
 
 	final byte[] getEndKeyHash(StatementIndex index) {
-		return role.endKeyHash(index, getUniqueHash());
+		return role.endKeyHash(index, getId());
 	}
 
-	final byte[] getQualifierHash() {
-		return role.qualifierHash(getUniqueHash());
+	final ByteBuffer writeQualifierHashTo(ByteBuffer bb) {
+		return role.writeQualifierHashTo(getId(), bb);
 	}
 
-	final byte[] getEndQualifierHash() {
-		return role.endQualifierHash(getUniqueHash());
+	final ByteBuffer writeEndQualifierHashTo(ByteBuffer bb) {
+		return role.writeEndQualifierHashTo(getId(), bb);
 	}
 
 	final int keyHashSize() {
@@ -62,6 +68,6 @@ public class RDFIdentifier {
 
 	@Override
 	public String toString() {
-		return "["+Hashes.encode(getUniqueHash())+", "+role+"]";
+		return "["+getId()+", "+role+"]";
 	}
 }

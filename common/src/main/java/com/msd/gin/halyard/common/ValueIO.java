@@ -54,7 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class ValueIO {
-	static final BiMap<ByteBuffer, IRI> WELL_KNOWN_IRI_IDS = HashBiMap.create(256);
+	static final BiMap<Identifier, IRI> WELL_KNOWN_IRI_IDS = HashBiMap.create(256);
 	private static final BiMap<Integer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(1024);
 	private static final BiMap<Short, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);
 	private static final BiMap<Short, String> WELL_KNOWN_LANGS = HashBiMap.create(256);
@@ -109,12 +109,10 @@ public final class ValueIO {
 	private static void addIRIs(Collection<IRI> iris) {
 		for (IRI iri : iris) {
 			IdentifiableIRI idIri = IdentifiableIRI.create(iri);
-			byte[] id = idIri.getId();
-
-			ByteBuffer idbb = ByteBuffer.wrap(id).asReadOnlyBuffer();
-			if (WELL_KNOWN_IRI_IDS.putIfAbsent(idbb, idIri) != null) {
+			Identifier id = idIri.getId();
+			if (WELL_KNOWN_IRI_IDS.putIfAbsent(id, idIri) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
-						WELL_KNOWN_IRI_IDS.get(idbb), idIri));
+						WELL_KNOWN_IRI_IDS.get(id), idIri));
 			}
 
 			Integer hash = Hashes.hash32(idIri.toString().getBytes(StandardCharsets.UTF_8));

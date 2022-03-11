@@ -20,7 +20,7 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleWriter;
-import com.msd.gin.halyard.common.Hashes;
+import com.msd.gin.halyard.common.Identifier;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFIdentifier;
 import com.msd.gin.halyard.common.RDFObject;
@@ -455,7 +455,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                 if (partitionId.hasRemaining()) {
 					Value partition = ValueIO.readValue(partitionId, SVF, tf);
                     IRI pred = SVF.createIRI(predicate);
-					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + Hashes.encode(Hashes.id(partition)));
+					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + Identifier.id(partition));
                     writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);
                     writeStatement(subset, RDF.TYPE, VOID.DATASET);
 					writeStatement(subset, pred, partition);

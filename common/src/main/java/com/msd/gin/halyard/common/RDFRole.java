@@ -1,5 +1,7 @@
 package com.msd.gin.halyard.common;
 
+import java.nio.ByteBuffer;
+
 public enum RDFRole {
 	SUBJECT() {
 		@Override
@@ -110,51 +112,54 @@ public enum RDFRole {
 	abstract int endKeyHashSize();
 
 	final int qualifierHashSize() {
-		return Hashes.ID_SIZE - keyHashSize();
+		return Identifier.ID_SIZE - keyHashSize();
 	}
 
 	final int endQualifierHashSize() {
-		return Hashes.ID_SIZE - endKeyHashSize();
+		return Identifier.ID_SIZE - endKeyHashSize();
 	}
 
-	final byte[] keyHash(StatementIndex index, byte[] id) {
+	final byte[] keyHash(StatementIndex index, Identifier id) {
 		int len = keyHashSize();
 		// rotate key so ordering is different for different prefixes
 		// this gives better load distribution when traversing between prefixes
-		return rotateRight(id, 0, len, index, new byte[len]);
+		return rotate(id, 0, len, index, new byte[len]);
 	}
 
-	final byte[] endKeyHash(StatementIndex index, byte[] id) {
+	final byte[] endKeyHash(StatementIndex index, Identifier id) {
 		int len = endKeyHashSize();
-		return rotateRight(id, 0, len, index, new byte[len]);
+		return rotate(id, 0, len, index, new byte[len]);
 	}
 
-	final byte[] qualifierHash(byte[] id) {
-		return copy(id, keyHashSize(), qualifierHashSize());
+	byte[] qualifierHash(Identifier id) {
+		byte[] b = new byte[qualifierHashSize()];
+		writeQualifierHashTo(id, ByteBuffer.wrap(b));
+		return b;
 	}
 
-	final byte[] endQualifierHash(byte[] id) {
-		return copy(id, endKeyHashSize(), endQualifierHashSize());
+	final ByteBuffer writeQualifierHashTo(Identifier id, ByteBuffer bb) {
+		return id.writeSliceTo(keyHashSize(), qualifierHashSize(), bb);
+	}
+
+	final ByteBuffer writeEndQualifierHashTo(Identifier id, ByteBuffer bb) {
+		return id.writeSliceTo(endKeyHashSize(), endQualifierHashSize(), bb);
 	}
 
 	protected abstract int toShift(StatementIndex index);
 
-	private final byte[] rotateRight(byte[] src, int offset, int len, StatementIndex index, byte[] dest) {
-		int shift = toShift(index);
-		if(shift > len) {
-			shift = shift % len;
-		}
-		System.arraycopy(src, offset+len-shift, dest, 0, shift);
-		System.arraycopy(src, offset, dest, shift, len-shift);
-		return dest;
+	private final byte[] rotate(Identifier id, int offset, int len, StatementIndex index, byte[] dest) {
+		return id.rotate(offset, len, toShift(index), dest);
 	}
 
-	final byte[] rotateLeft(byte[] src, int offset, int len, StatementIndex index) {
-		return rotateLeft(src, offset, len, index, new byte[len]);
+	final byte[] unrotate(byte[] src, StatementIndex index) {
+		return unrotate(src, 0, src.length, index, new byte[src.length]);
 	}
 
-	final byte[] rotateLeft(byte[] src, int offset, int len, StatementIndex index, byte[] dest) {
-		int shift = toShift(index);
+	final byte[] unrotate(byte[] src, int offset, int len, StatementIndex index, byte[] dest) {
+		return rotateLeft(src, offset, len, toShift(index), dest);
+	}
+
+	static byte[] rotateLeft(byte[] src, int offset, int len, int shift, byte[] dest) {
 		if(shift > len) {
 			shift = shift % len;
 		}
@@ -163,9 +168,12 @@ public enum RDFRole {
 		return dest;
 	}
 
-	private static byte[] copy(byte[] src, int offset, int len) {
-		byte[] dest = new byte[len];
-		System.arraycopy(src, offset, dest, 0, len);
+	static byte[] rotateRight(byte[] src, int offset, int len, int shift, byte[] dest) {
+		if(shift > len) {
+			shift = shift % len;
+		}
+		System.arraycopy(src, offset+len-shift, dest, 0, shift);
+		System.arraycopy(src, offset, dest, shift, len-shift);
 		return dest;
 	}
 }

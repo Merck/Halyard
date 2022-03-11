@@ -18,6 +18,7 @@ import org.eclipse.rdf4j.model.ValueFactory;
  */
 public enum StatementIndex {
 	SPO(0, IndexType.TRIPLE) {
+		@Override
 		byte[] value(RDFValue<?> v1, RDFValue<?> v2, RDFValue<?> v3, RDFValue<?> v4) {
 			ByteBuffer cv = ByteBuffer.allocate(len(v1, 2) + len(v2, 2) + len(v3, 4) + (v4 != null ? len(v4, 0) : 0));
 			putShortRDFValue(cv, v1);
@@ -28,6 +29,7 @@ public enum StatementIndex {
 			}
 			return cv.array();
 		}
+		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
     		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, vf, tf);
     		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf, null);
@@ -35,17 +37,21 @@ public enum StatementIndex {
     		Resource c = parseLastRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
     		return createStatement(s, p, o, c, vf);
     	}
+		@Override
     	byte[][] newStopKeys() {
     		return new byte[][] {RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY, RDFContext.STOP_KEY};
     	}
-    	byte[] keyHash(byte[] id) {
+		@Override
+    	byte[] keyHash(Identifier id) {
     		return RDFRole.SUBJECT.keyHash(this, id);
     	}
-    	byte[] qualifierHash(byte[] id) {
-    		return RDFRole.SUBJECT.qualifierHash(id);
-    	}
+		@Override
+		byte[] qualifierHash(Identifier id) {
+			return RDFRole.SUBJECT.qualifierHash(id);
+		}
 	},
 	POS(1, IndexType.TRIPLE) {
+		@Override
 		byte[] value(RDFValue<?> v1, RDFValue<?> v2, RDFValue<?> v3, RDFValue<?> v4) {
 			ByteBuffer cv = ByteBuffer.allocate(len(v1, 2) + len(v2, 4) + len(v3, 2) + (v4 != null ? len(v4, 0) : 0));
 			putShortRDFValue(cv, v1);
@@ -56,6 +62,7 @@ public enum StatementIndex {
 			}
 			return cv.array();
 		}
+		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
     		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf, null);
     		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, vf, tf);
@@ -63,17 +70,21 @@ public enum StatementIndex {
     		Resource c = parseLastRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
     		return createStatement(s, p, o, c, vf);
     	}
+		@Override
     	byte[][] newStopKeys() {
     		return new byte[][] {RDFPredicate.STOP_KEY, RDFObject.STOP_KEY, RDFSubject.END_STOP_KEY, RDFContext.STOP_KEY};
     	}
-    	byte[] keyHash(byte[] id) {
+		@Override
+    	byte[] keyHash(Identifier id) {
     		return RDFRole.PREDICATE.keyHash(this, id);
     	}
-    	byte[] qualifierHash(byte[] id) {
-    		return RDFRole.PREDICATE.qualifierHash(id);
-    	}
+		@Override
+		byte[] qualifierHash(Identifier id) {
+			return RDFRole.PREDICATE.qualifierHash(id);
+		}
 	},
 	OSP(2, IndexType.TRIPLE) {
+		@Override
 		byte[] value(RDFValue<?> v1, RDFValue<?> v2, RDFValue<?> v3, RDFValue<?> v4) {
 			ByteBuffer cv = ByteBuffer.allocate(len(v1, 4) + len(v2, 2) + len(v3, 2) + (v4 != null ? len(v4, 0) : 0));
 			putIntRDFValue(cv, v1);
@@ -84,6 +95,7 @@ public enum StatementIndex {
 			}
 			return cv.array();
 		}
+		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
     		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, vf, tf);
     		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, vf, tf);
@@ -91,17 +103,21 @@ public enum StatementIndex {
     		Resource c = parseLastRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
     		return createStatement(s, p, o, c, vf);
     	}
+		@Override
     	byte[][] newStopKeys() {
     		return new byte[][] {RDFObject.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY, RDFContext.STOP_KEY};
     	}
-    	byte[] keyHash(byte[] id) {
+		@Override
+    	byte[] keyHash(Identifier id) {
     		return RDFRole.OBJECT.keyHash(this, id);
     	}
-    	byte[] qualifierHash(byte[] id) {
-    		return RDFRole.OBJECT.qualifierHash(id);
-    	}
+		@Override
+		byte[] qualifierHash(Identifier id) {
+			return RDFRole.OBJECT.qualifierHash(id);
+		}
 	},
 	CSPO(3, IndexType.QUAD) {
+		@Override
 		byte[] value(RDFValue<?> v1, RDFValue<?> v2, RDFValue<?> v3, RDFValue<?> v4) {
 			ByteBuffer cv = ByteBuffer.allocate(len(v1, 2) + len(v2, 2) + len(v3, 2) + len(v4, 0));
 			putShortRDFValue(cv, v1);
@@ -110,6 +126,7 @@ public enum StatementIndex {
 			putLastRDFValue(cv, v4);
 			return cv.array();
 		}
+		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
     		Resource c = parseShortRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
     		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, vf, tf);
@@ -117,17 +134,21 @@ public enum StatementIndex {
     		Value o = parseLastRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.END_KEY_SIZE, vf, tf);
     		return createStatement(s, p, o, c, vf);
     	}
+		@Override
     	byte[][] newStopKeys() {
     		return new byte[][] {RDFContext.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY};
     	}
-    	byte[] keyHash(byte[] id) {
+		@Override
+    	byte[] keyHash(Identifier id) {
     		return RDFRole.CONTEXT.keyHash(this, id);
     	}
-    	byte[] qualifierHash(byte[] id) {
-    		return RDFRole.CONTEXT.qualifierHash(id);
-    	}
+		@Override
+		byte[] qualifierHash(Identifier id) {
+			return RDFRole.CONTEXT.qualifierHash(id);
+		}
 	},
 	CPOS(4, IndexType.QUAD) {
+		@Override
 		byte[] value(RDFValue<?> v1, RDFValue<?> v2, RDFValue<?> v3, RDFValue<?> v4) {
 			ByteBuffer cv = ByteBuffer.allocate(len(v1, 2) + len(v2, 2) + len(v3, 4) + len(v4, 0));
 			putShortRDFValue(cv, v1);
@@ -136,6 +157,7 @@ public enum StatementIndex {
 			putLastRDFValue(cv, v4);
 			return cv.array();
 		}
+		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
     		Resource c = parseShortRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
     		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf, null);
@@ -143,17 +165,21 @@ public enum StatementIndex {
     		Resource s = parseLastRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.END_KEY_SIZE, vf, tf);
     		return createStatement(s, p, o, c, vf);
     	}
+		@Override
     	byte[][] newStopKeys() {
     		return new byte[][] {RDFContext.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.STOP_KEY, RDFSubject.END_STOP_KEY};
     	}
-    	byte[] keyHash(byte[] id) {
+		@Override
+    	byte[] keyHash(Identifier id) {
     		return RDFRole.CONTEXT.keyHash(this, id);
     	}
-    	byte[] qualifierHash(byte[] id) {
-    		return RDFRole.CONTEXT.qualifierHash(id);
-    	}
+		@Override
+		byte[] qualifierHash(Identifier id) {
+			return RDFRole.CONTEXT.qualifierHash(id);
+		}
 	},
 	COSP(5, IndexType.QUAD) {
+		@Override
 		byte[] value(RDFValue<?> v1, RDFValue<?> v2, RDFValue<?> v3, RDFValue<?> v4) {
 			ByteBuffer cv = ByteBuffer.allocate(len(v1, 2) + len(v2, 4) + len(v3, 2) + len(v4, 0));
 			putShortRDFValue(cv, v1);
@@ -162,6 +188,7 @@ public enum StatementIndex {
 			putLastRDFValue(cv, v4);
 			return cv.array();
 		}
+		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
     		Resource c = parseShortRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
     		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, vf, tf);
@@ -169,15 +196,18 @@ public enum StatementIndex {
     		IRI p = parseLastRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, vf, null);
     		return createStatement(s, p, o, c, vf);
     	}
+		@Override
     	byte[][] newStopKeys() {
     		return new byte[][] {RDFContext.STOP_KEY, RDFObject.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY};
     	}
-    	byte[] keyHash(byte[] id) {
+		@Override
+    	byte[] keyHash(Identifier id) {
     		return RDFRole.CONTEXT.keyHash(this, id);
     	}
-    	byte[] qualifierHash(byte[] id) {
-    		return RDFRole.CONTEXT.qualifierHash(id);
-    	}
+		@Override
+		byte[] qualifierHash(Identifier id) {
+			return RDFRole.CONTEXT.qualifierHash(id);
+		}
 	};
 
 	private static final byte WELL_KNOWN_IRI_MARKER = (byte) ('#' | 0x80);  // marker must be negative (msb set) so it is distinguishable from a length (>=0)
@@ -255,7 +285,7 @@ public enum StatementIndex {
     	} else {
     		len = cv.getShort();
     	}
-   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, Hashes.ID_SIZE, len, vf, tf);
+   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, vf, tf);
     }
 
     private static <V extends Value> V parseIntRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf, TableTripleFactory tf) throws IOException {
@@ -266,7 +296,7 @@ public enum StatementIndex {
     	} else {
     		len = cv.getInt();
     	}
-   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, Hashes.ID_SIZE, len, vf, tf);
+   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, vf, tf);
     }
 
     private static <V extends Value> V parseLastRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf, TableTripleFactory tf) throws IOException {
@@ -277,33 +307,33 @@ public enum StatementIndex {
     	} else {
     		len = cv.remaining();
     	}
-   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, Hashes.ID_SIZE, len, vf, tf);
+   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, vf, tf);
     }
 
     @SuppressWarnings("unchecked")
-	private static <V extends Value> V parseRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, int idSize, int len, ValueFactory vf, TableTripleFactory tf) throws IOException {
+	private static <V extends Value> V parseRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, int len, ValueFactory vf, TableTripleFactory tf) throws IOException {
     	if(pattern != null) {
     		// if we have been given the value then don't bother to read it and skip to the next
-    		skipId(key, cn, keySize, idSize);
+    		skipId(key, cn, keySize);
     		if (len > 0) {
     			cv.position(cv.position() + len);
     		}
 			return pattern.val;
     	} else if(len == WELL_KNOWN_IRI_MARKER) {
-			ByteBuffer id = parseId(index, role, key, cn, keySize, idSize);
+			Identifier id = parseId(index, role, key, cn, keySize);
 			IRI iri = ValueIO.WELL_KNOWN_IRI_IDS.get(id);
 			if (iri == null) {
-				throw new IllegalStateException(String.format("Unknown IRI hash: %s", Hashes.encode(id)));
+				throw new IllegalStateException(String.format("Unknown IRI hash: %s", id));
 			}
 			return (V) iri;
 		} else if(len > 0) {
-			ByteBuffer id = parseId(index, role, key, cn, keySize, idSize);
+			Identifier id = parseId(index, role, key, cn, keySize);
 			int limit = cv.limit();
 			cv.limit(cv.position() + len);
 			V value = (V) ValueIO.readValue(cv, vf, tf);
 			cv.limit(limit);
 			if (value instanceof Identifiable) {
-				((Identifiable)value).setId(id.array());
+				((Identifiable)value).setId(id);
 			}
 			return value;
 		} else if(len == 0) {
@@ -313,21 +343,17 @@ public enum StatementIndex {
 		}
     }
 
-	private static ByteBuffer parseId(StatementIndex index, RDFRole role, ByteBuffer key, ByteBuffer cn, int keySize, int idSize) {
-		ByteBuffer id = ByteBuffer.allocate(idSize);
-		role.rotateLeft(key.array(), key.arrayOffset()+key.position(), keySize, index, id.array());
+	private static Identifier parseId(StatementIndex index, RDFRole role, ByteBuffer key, ByteBuffer cn, int keySize) {
+		byte[] idBytes = new byte[Identifier.ID_SIZE];
+		role.unrotate(key.array(), key.arrayOffset()+key.position(), keySize, index, idBytes);
 		key.position(key.position()+keySize);
-		int cnLimit = cn.limit();
-		cn.limit(cn.position() + idSize - keySize);
-		id.position(keySize);
-		id.put(cn).flip();
-		cn.limit(cnLimit);
-		return id;
+		cn.get(idBytes, keySize, idBytes.length - keySize);
+		return new Identifier(idBytes);
 	}
 
-	private static void skipId(ByteBuffer key, ByteBuffer cn, int keySize, int idSize) {
+	private static void skipId(ByteBuffer key, ByteBuffer cn, int keySize) {
 		key.position(key.position() + keySize);
-		cn.position(cn.position() + idSize - keySize);
+		cn.position(cn.position() + Identifier.ID_SIZE - keySize);
 	}
 
 	protected final byte prefix;
@@ -353,12 +379,12 @@ public enum StatementIndex {
 	abstract byte[] value(RDFValue<?> v1, RDFValue<?> v2, RDFValue<?> v3, RDFValue<?> v4);
 	abstract Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException;
 	abstract byte[][] newStopKeys();
-	abstract byte[] keyHash(byte[] id);
-	abstract byte[] qualifierHash(byte[] id);
+	abstract byte[] keyHash(Identifier id);
+	abstract byte[] qualifierHash(Identifier id);
 	public final Scan scan() {
 		return indexType.scan(this);
 	}
-	final Scan scan(byte[] id) {
+	final Scan scan(Identifier id) {
 		return indexType.scan(this, id);
 	}
 	public final Scan scan(RDFIdentifier k) {

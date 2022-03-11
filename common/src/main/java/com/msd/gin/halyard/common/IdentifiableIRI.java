@@ -4,13 +4,13 @@ import org.eclipse.rdf4j.model.IRI;
 
 public final class IdentifiableIRI extends IRIWrapper implements Identifiable {
 	private static final long serialVersionUID = 8055405742401584331L;
-	private byte[] id;
+	private Identifier id;
 
 	static IdentifiableIRI create(IRI iri) {
-		return new IdentifiableIRI(Hashes.id(iri), iri);
+		return new IdentifiableIRI(Identifier.id(iri), iri);
 	}
 
-	private IdentifiableIRI(byte[] id, IRI iri) {
+	private IdentifiableIRI(Identifier id, IRI iri) {
 		super(iri);
 		this.id = id;
 	}
@@ -20,12 +20,12 @@ public final class IdentifiableIRI extends IRIWrapper implements Identifiable {
 	}
 
 	@Override
-	public byte[] getId() {
+	public Identifier getId() {
 		return id;
 	}
 
 	@Override
-	public void setId(byte[] id) {
+	public void setId(Identifier id) {
 		this.id = id;
 	}
 }

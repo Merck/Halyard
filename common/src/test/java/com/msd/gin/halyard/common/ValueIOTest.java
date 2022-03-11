@@ -4,9 +4,11 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -24,22 +26,29 @@ import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class ValueIOTest {
-	private static final ValueFactory vf = SimpleValueFactory.getInstance();
+	private static final ValueFactory SVF = SimpleValueFactory.getInstance();
+
+	public static Collection<Object[]> createData(ValueFactory vf) {
+		return Arrays.asList(new Object[][] { { RDF.TYPE }, { vf.createLiteral("foo") }, { vf.createBNode() },
+			{ vf.createIRI("test:/foo") }, { vf.createLiteral("5423") }, { vf.createLiteral("\u98DF") },
+			{ vf.createLiteral(true) }, { vf.createLiteral((byte) 6) }, { vf.createLiteral((short) 7843) }, { vf.createLiteral(34) }, { vf.createLiteral(87.232) },
+			{ vf.createLiteral(74234l) }, { vf.createLiteral(4.809f) },
+			{ vf.createLiteral(BigInteger.valueOf(96)) }, { vf.createLiteral(BigDecimal.valueOf(856.03)) },
+			{ vf.createIRI(RDF.NAMESPACE) }, { vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)) },
+			{ vf.createLiteral(new Date()) }, { vf.createLiteral("13:03:22.000", XSD.TIME) },
+			{ vf.createLiteral("1980-02-14", XSD.DATE)},
+			{ vf.createLiteral("foo", vf.createIRI("urn:bar:1"))}, { vf.createLiteral("foo", "en-GB")}, { vf.createLiteral("bar", "zx-XY") },
+			{ vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL)},
+			{ vf.createLiteral("invalid xml still works", RDF.XMLLITERAL) },
+			{ vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME) }});
+	}
 
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> data() {
-		return Arrays.asList(new Object[][] { { RDF.TYPE }, { vf.createLiteral("foo") }, { vf.createBNode() },
-				{ vf.createIRI("test:/foo") }, { vf.createLiteral("5423") }, { vf.createLiteral("\u98DF") },
-				{ vf.createLiteral(true) }, { vf.createLiteral((byte) 6) }, { vf.createLiteral((short) 7843) }, { vf.createLiteral(34) }, { vf.createLiteral(87.232) },
-				{ vf.createLiteral(74234l) }, { vf.createLiteral(4.809f) },
-				{ vf.createLiteral(BigInteger.valueOf(96)) }, { vf.createLiteral(BigDecimal.valueOf(856.03)) },
-				{ vf.createIRI(RDF.NAMESPACE) }, { vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)) },
-				{ vf.createLiteral(new Date()) }, { vf.createLiteral("13:03:22.000", XSD.TIME) },
-				{ vf.createLiteral("1980-02-14", XSD.DATE)},
-				{ vf.createLiteral("foo", vf.createIRI("urn:bar:1"))}, { vf.createLiteral("foo", "en-GB")}, { vf.createLiteral("bar", "zx-XY") },
-				{ vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL)},
-				{ vf.createLiteral("invalid xml still works", RDF.XMLLITERAL) },
-				{ vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME) }});
+		List<Object[]> testValues = new ArrayList<>();
+		testValues.addAll(createData(SimpleValueFactory.getInstance()));
+		testValues.addAll(createData(IdValueFactory.getInstance()));
+		return testValues;
 	}
 
 	private Value expected;
@@ -54,7 +63,7 @@ public class ValueIOTest {
 		buf = ValueIO.writeBytes(expected, buf, null);
 		buf.flip();
 		int size = buf.limit();
-		Value actual = ValueIO.readValue(buf, vf, null);
+		Value actual = ValueIO.readValue(buf, SVF, null);
 		assertEquals(expected, actual);
 
 		// check readValue() works on a subsequence
@@ -66,7 +75,7 @@ public class ValueIOTest {
 		extbuf.put(buf);
 		extbuf.limit(extbuf.position());
 		extbuf.reset();
-		actual = ValueIO.readValue(extbuf, vf, null);
+		actual = ValueIO.readValue(extbuf, SVF, null);
 		assertEquals("Buffer position", 3 + size, extbuf.position());
 		assertEquals("Buffer state", extbuf.limit(), extbuf.position());
 		assertEquals(expected, actual);
@@ -74,13 +83,17 @@ public class ValueIOTest {
 
 	@Test
 	public void testRDFValue() {
-		byte[] id = Hashes.id(expected);
+		Identifier id = Identifier.id(expected);
+		if (expected instanceof Identifiable) {
+			assertEquals(id, ((Identifiable)expected).getId());
+		}
+
 		if (expected instanceof Literal) {
-			assertTrue(Hashes.isLiteral(id));
+			assertTrue(id.isLiteral());
 			RDFObject obj = RDFObject.create(expected);
 			assertRDFValueHashes(id, obj);
 		} else {
-			assertFalse(Hashes.isLiteral(id));
+			assertFalse(id.isLiteral());
 			if (expected instanceof IRI) {
 				RDFObject obj = RDFObject.create(expected);
 				assertRDFValueHashes(id, obj);
@@ -103,19 +116,25 @@ public class ValueIOTest {
 		}
 	}
 
-	private static void assertRDFValueHashes(byte[] id, RDFValue<?> v) {
+	private static void assertRDFValueHashes(Identifier id, RDFValue<?> v) {
 		for(StatementIndex idx : StatementIndex.values()) {
-			assertArrayEquals(id, concat(v.getRole().rotateLeft(v.getKeyHash(idx), 0, v.keyHashSize(), idx), v.getQualifierHash()));
+			byte[] keyHash = v.getKeyHash(idx);
+			assertEquals(v.keyHashSize(), keyHash.length);
+
+			ByteBuffer idxId = ByteBuffer.allocate(Identifier.ID_SIZE);
+			idxId.put(v.getRole().unrotate(keyHash, idx));
+			v.writeQualifierHashTo(idxId);
+			assertEquals(id, new Identifier(idxId.array()));
+
 			if(!(v instanceof RDFContext)) { // context doesn't have end-hashes
-				assertArrayEquals(id, concat(v.getRole().rotateLeft(v.getEndKeyHash(idx), 0, v.endKeyHashSize(), idx), v.getEndQualifierHash()));
+				byte[] endKeyHash = v.getEndKeyHash(idx);
+				assertEquals(v.endKeyHashSize(), endKeyHash.length);
+
+				ByteBuffer cidxId = ByteBuffer.allocate(Identifier.ID_SIZE);
+				cidxId.put(v.getRole().unrotate(endKeyHash, idx));
+				v.writeEndQualifierHashTo(cidxId);
+				assertEquals(id, new Identifier(cidxId.array()));
 			}
 		}
-	}
-
-	private static byte[] concat(byte[] b1, byte[] b2) {
-		byte[] arr = new byte[b1.length+b2.length];
-		System.arraycopy(b1, 0, arr, 0, b1.length);
-		System.arraycopy(b2, 0, arr, b1.length, b2.length);
-		return arr;
 	}
 }

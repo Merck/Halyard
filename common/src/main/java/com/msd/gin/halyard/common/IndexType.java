@@ -7,6 +7,7 @@ import org.apache.hadoop.hbase.filter.ColumnPrefixFilter;
 
 enum IndexType {
 	TRIPLE {
+		@Override
 		byte[] row(StatementIndex index, RDFIdentifier v1, RDFIdentifier v2, RDFIdentifier v3, RDFIdentifier v4) {
 			ByteBuffer r = ByteBuffer.allocate(1 + v1.keyHashSize() + v2.keyHashSize() + v3.endKeyHashSize() + (v4 != null ? v4.keyHashSize() : 0));
 			r.put(index.prefix);
@@ -19,21 +20,23 @@ enum IndexType {
     		return r.array();
 		}
 
+		@Override
 		byte[] qualifier(StatementIndex index, RDFIdentifier v1, RDFIdentifier v2, RDFIdentifier v3, RDFIdentifier v4) {
 			ByteBuffer cq = ByteBuffer.allocate(v1.qualifierHashSize() + (v2 != null ? v2.qualifierHashSize() : 0) + (v3 != null ? v3.endQualifierHashSize() : 0) + (v4 != null ? v4.qualifierHashSize() : 0));
-			cq.put(v1.getQualifierHash());
+			v1.writeQualifierHashTo(cq);
     		if(v2 != null) {
-				cq.put(v2.getQualifierHash());
+				v2.writeQualifierHashTo(cq);
         		if(v3 != null) {
-					cq.put(v3.getEndQualifierHash());
+					v3.writeEndQualifierHashTo(cq);
 	        		if(v4 != null) {
-						cq.put(v4.getQualifierHash());
+						v4.writeQualifierHashTo(cq);
 	        		}
         		}
     		}
     		return cq.array();
     	}
 
+		@Override
 		Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3) {
 			byte[] k1b = k1.getKeyHash(index);
 			byte[] k2b = k2.getKeyHash(index);
@@ -45,6 +48,7 @@ enum IndexType {
 			return HalyardTableUtils.scan(concat(index, false, k1b, k2b, k3b), concat(index, true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, null)));
 		}
 
+		@Override
 		Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3, RDFIdentifier k4) {
 			byte[] k1b = k1.getKeyHash(index);
 			byte[] k2b = k2.getKeyHash(index);
@@ -55,6 +59,7 @@ enum IndexType {
 	},
 
 	QUAD {
+		@Override
 		byte[] row(StatementIndex index, RDFIdentifier v1, RDFIdentifier v2, RDFIdentifier v3, RDFIdentifier v4) {
     		ByteBuffer r = ByteBuffer.allocate(1 + v1.keyHashSize() + v2.keyHashSize() + v3.keyHashSize() + v4.endKeyHashSize());
 			r.put(index.prefix);
@@ -65,21 +70,23 @@ enum IndexType {
    			return r.array();
 		}
 
+		@Override
 		byte[] qualifier(StatementIndex index, RDFIdentifier v1, RDFIdentifier v2, RDFIdentifier v3, RDFIdentifier v4) {
     		ByteBuffer cq = ByteBuffer.allocate(v1.qualifierHashSize() + (v2 != null ? v2.qualifierHashSize() : 0) + (v3 != null ? v3.qualifierHashSize() : 0) + (v4 != null ? v4.endQualifierHashSize() : 0));
-    		cq.put(v1.getQualifierHash());
+    		v1.writeQualifierHashTo(cq);
     		if(v2 != null) {
-        		cq.put(v2.getQualifierHash());
+        		v2.writeQualifierHashTo(cq);
         		if(v3 != null) {
-	        		cq.put(v3.getQualifierHash());
+	        		v3.writeQualifierHashTo(cq);
 	        		if(v4 != null) {
-	        			cq.put(v4.getEndQualifierHash());
+	        			v4.writeEndQualifierHashTo(cq);
 	        		}
         		}
     		}
     		return cq.array();
 		}
 
+		@Override
 		Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3) {
 			byte[] k1b = k1.getKeyHash(index);
 			byte[] k2b = k2.getKeyHash(index);
@@ -91,6 +98,7 @@ enum IndexType {
 			return HalyardTableUtils.scan(concat(index, false, k1b, k2b, k3b), concat(index, true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, null)));
 		}
 
+		@Override
 		Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3, RDFIdentifier k4) {
 			byte[] k1b = k1.getKeyHash(index);
 			byte[] k2b = k2.getKeyHash(index);
@@ -141,7 +149,7 @@ enum IndexType {
 	final Scan scan(StatementIndex index) {
 		return HalyardTableUtils.scan(concat(index, false), concat(index, true, index.newStopKeys()));
 	}
-	final Scan scan(StatementIndex index, byte[] id) {
+	final Scan scan(StatementIndex index, Identifier id) {
 		byte[] kb = index.keyHash(id);
 		byte[][] stopKeys = index.newStopKeys();
 		stopKeys[0] = kb;

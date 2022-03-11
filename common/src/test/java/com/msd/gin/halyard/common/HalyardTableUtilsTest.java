@@ -74,8 +74,8 @@ public class HalyardTableUtilsTest {
     public void testIdIsUnique() {
         ValueFactory vf = SimpleValueFactory.getInstance();
         assertNotEquals(
-        	Hashes.id(vf.createLiteral("1", vf.createIRI("local:type1"))),
-        	Hashes.id(vf.createLiteral("1", vf.createIRI("local:type2"))));
+        	Identifier.id(vf.createLiteral("1", vf.createIRI("local:type1"))),
+        	Identifier.id(vf.createLiteral("1", vf.createIRI("local:type2"))));
     }
 
     @Test

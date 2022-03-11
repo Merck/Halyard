@@ -19,8 +19,8 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
-import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.IdValueFactory;
+import com.msd.gin.halyard.common.Identifier;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
 
@@ -106,7 +106,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 if (literals.add(l)) {
             		try(StringBuilderWriter json = new StringBuilderWriter(128)) {
 		                json.append("{\"id\":");
-		                JSONObject.quote(Hashes.encode(Hashes.id(l)), json);
+		                JSONObject.quote(Identifier.id(l).toString(), json);
 		                json.append(",\"label\":");
 		                JSONObject.quote(l.getLabel(), json);
 		                if(l.getLanguage().isPresent()) {

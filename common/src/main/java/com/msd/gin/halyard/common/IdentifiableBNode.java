@@ -4,13 +4,13 @@ import org.eclipse.rdf4j.model.BNode;
 
 public final class IdentifiableBNode extends BNodeWrapper implements Identifiable {
 	private static final long serialVersionUID = -6212507967580561560L;
-	private byte[] id;
+	private Identifier id;
 
 	static IdentifiableBNode create(BNode bnode) {
-		return new IdentifiableBNode(Hashes.id(bnode), bnode);
+		return new IdentifiableBNode(Identifier.id(bnode), bnode);
 	}
 
-	private IdentifiableBNode(byte[] id, BNode bnode) {
+	private IdentifiableBNode(Identifier id, BNode bnode) {
 		super(bnode);
 		this.id = id;
 	}
@@ -20,12 +20,12 @@ public final class IdentifiableBNode extends BNodeWrapper implements Identifiabl
 	}
 
 	@Override
-	public byte[] getId() {
+	public Identifier getId() {
 		return id;
 	}
 
 	@Override
-	public void setId(byte[] id) {
+	public void setId(Identifier id) {
 		this.id = id;
 	}
 }

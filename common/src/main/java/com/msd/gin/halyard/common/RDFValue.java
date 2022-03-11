@@ -35,8 +35,9 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 		return ser.duplicate();
 	}
 
-	protected final byte[] calculateHash() {
-		return Hashes.id(val);
+	@Override
+	protected final Identifier calculateId() {
+		return Identifier.id(val);
 	}
 
 	@Override

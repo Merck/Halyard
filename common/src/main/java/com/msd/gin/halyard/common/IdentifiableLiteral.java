@@ -4,13 +4,13 @@ import org.eclipse.rdf4j.model.Literal;
 
 public final class IdentifiableLiteral extends LiteralWrapper implements Identifiable {
 	private static final long serialVersionUID = 4299930477670062440L;
-	private byte[] id;
+	private Identifier id;
 
 	static IdentifiableLiteral create(Literal literal) {
-		return new IdentifiableLiteral(Hashes.id(literal), literal);
+		return new IdentifiableLiteral(Identifier.id(literal), literal);
 	}
 
-	private IdentifiableLiteral(byte[] id, Literal literal) {
+	private IdentifiableLiteral(Identifier id, Literal literal) {
 		super(literal);
 		this.id = id;
 	}
@@ -20,12 +20,12 @@ public final class IdentifiableLiteral extends LiteralWrapper implements Identif
 	}
 
 	@Override
-	public byte[] getId() {
+	public Identifier getId() {
 		return id;
 	}
 
 	@Override
-	public void setId(byte[] id) {
+	public void setId(Identifier id) {
 		this.id = id;
 	}
 }
