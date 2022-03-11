@@ -36,7 +36,7 @@ public class ValueIOTest {
 				{ vf.createIRI(RDF.NAMESPACE) }, { vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)) },
 				{ vf.createLiteral(new Date()) }, { vf.createLiteral("13:03:22.000", XSD.TIME) },
 				{ vf.createLiteral("1980-02-14", XSD.DATE)},
-				{ vf.createLiteral("foo", vf.createIRI("urn:bar:1"))}, { vf.createLiteral("foo", "en-gb") },
+				{ vf.createLiteral("foo", vf.createIRI("urn:bar:1"))}, { vf.createLiteral("foo", "en-GB")}, { vf.createLiteral("bar", "zx-XY") },
 				{ vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL)},
 				{ vf.createLiteral("invalid xml still works", RDF.XMLLITERAL) },
 				{ vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME) }});

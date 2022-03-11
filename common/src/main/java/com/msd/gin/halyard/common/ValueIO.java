@@ -15,6 +15,7 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -56,8 +57,10 @@ public final class ValueIO {
 	static final BiMap<ByteBuffer, IRI> WELL_KNOWN_IRI_IDS = HashBiMap.create(256);
 	private static final BiMap<Integer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(1024);
 	private static final BiMap<Short, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);
+	private static final BiMap<Short, String> WELL_KNOWN_LANGS = HashBiMap.create(256);
 	private static final int IRI_HASH_SIZE = 4;
 	private static final int NAMESPACE_HASH_SIZE = 2;
+	private static final int LANG_HASH_SIZE = 2;
 
 	private static void loadNamespacesAndIRIs(Class<?> vocab) {
 		Collection<Namespace> namespaces = getNamespace(vocab);
@@ -122,6 +125,17 @@ public final class ValueIO {
 		}
 	}
 
+	private static void loadLanguageTags() {
+		for (Locale l : Locale.getAvailableLocales()) {
+			String langTag = l.toLanguageTag();
+			Short hash = Hashes.hash16(langTag.getBytes(StandardCharsets.UTF_8));
+			if (WELL_KNOWN_LANGS.putIfAbsent(hash, langTag) != null) {
+				throw new AssertionError(String.format("Hash collision between %s and %s",
+						WELL_KNOWN_LANGS.get(hash), langTag));
+			}
+		}
+	}
+
 	static {
 		Class<?>[] defaultVocabs = { RDF.class, RDFS.class, XSD.class, SD.class, VOID.class, FOAF.class,
 				OWL.class, DC.class, DCTERMS.class, SKOS.class, SKOSXL.class, ORG.class, GEO.class,
@@ -136,6 +150,8 @@ public final class ValueIO {
 			logger.info("Loading vocabulary {}", vocab.getClass());
 			loadNamespacesAndIRIs(vocab.getClass());
 		}
+
+		loadLanguageTags();
 	}
 
 	static boolean isWellKnownIRI(Value v) {
@@ -176,6 +192,7 @@ public final class ValueIO {
 	private static final byte NAMESPACE_HASH_TYPE = ':';
 	private static final byte BNODE_TYPE = '_';
 	private static final byte DATATYPE_LITERAL_TYPE = '\"';
+	private static final byte LANGUAGE_HASH_LITERAL_TYPE = 'a';
 	private static final byte LANGUAGE_LITERAL_TYPE = '@';
 	private static final byte TRIPLE_TYPE = '*';
 	private static final byte FALSE_TYPE = '0';
@@ -515,19 +532,26 @@ public final class ValueIO {
 		if(l.getLanguage().isPresent()) {
 			ByteBuffer labelBytes = writeString(l.getLabel());
 			String langTag = l.getLanguage().get();
-			if (langTag.length() > Short.MAX_VALUE) {
-				int truncatePos = langTag.lastIndexOf('-', Short.MAX_VALUE-1);
-				// check for single tag
-				if (langTag.charAt(truncatePos-2) == '-') {
-					truncatePos -= 2;
+			Short hash = WELL_KNOWN_LANGS.inverse().get(langTag);
+			if (hash != null) {
+				b = ensureCapacity(b, 1+LANG_HASH_SIZE+labelBytes.remaining());
+				b.put(LANGUAGE_HASH_LITERAL_TYPE);
+				b.putShort(hash);
+			} else {
+				if (langTag.length() > Short.MAX_VALUE) {
+					int truncatePos = langTag.lastIndexOf('-', Short.MAX_VALUE-1);
+					// check for single tag
+					if (langTag.charAt(truncatePos-2) == '-') {
+						truncatePos -= 2;
+					}
+					langTag = langTag.substring(0, truncatePos);
 				}
-				langTag = langTag.substring(0, truncatePos);
+				ByteBuffer langBytes = writeString(langTag);
+				b = ensureCapacity(b, 2+langBytes.remaining()+labelBytes.remaining());
+				b.put(LANGUAGE_LITERAL_TYPE);
+				b.put((byte) langBytes.remaining());
+				b.put(langBytes);
 			}
-			ByteBuffer langBytes = writeString(langTag);
-			b = ensureCapacity(b, 2+langBytes.remaining()+labelBytes.remaining());
-			b.put(LANGUAGE_LITERAL_TYPE);
-			b.put((byte) langBytes.remaining());
-			b.put(langBytes);
 			b.put(labelBytes);
 			return b;
 		} else {
@@ -558,7 +582,7 @@ public final class ValueIO {
 				Integer irihash = b.getInt(); // 32-bit hash
 				iri = WELL_KNOWN_IRIS.get(irihash);
 				if (iri == null) {
-					b.reset();
+					b.limit(b.position()).reset();
 					throw new IllegalStateException(String.format("Unknown IRI hash: %s", Hashes.encode(b)));
 				}
 				return iri;
@@ -567,26 +591,33 @@ public final class ValueIO {
 				Short nshash = b.getShort(); // 16-bit hash
 				String namespace = WELL_KNOWN_NAMESPACES.get(nshash);
 				if (namespace == null) {
-					b.reset();
+					b.limit(b.position()).reset();
 					throw new IllegalStateException(String.format("Unknown namespace hash: %s", Hashes.encode(b)));
 				}
 				return vf.createIRI(namespace, readString(b));
 			case BNODE_TYPE:
 				return vf.createBNode(readString(b));
+			case LANGUAGE_HASH_LITERAL_TYPE:
+				b.mark();
+				Short langHash = b.getShort(); // 16-bit hash
+				String lang = WELL_KNOWN_LANGS.get(langHash);
+				if (lang == null) {
+					b.limit(b.position()).reset();
+					throw new IllegalStateException(String.format("Unknown language tag hash: %s", Hashes.encode(b)));
+				}
+				return vf.createLiteral(readString(b), lang);
 			case LANGUAGE_LITERAL_TYPE:
 				int langSize = b.get();
 				b.limit(b.position()+langSize);
-				String lang = readString(b);
+				lang = readString(b);
 				b.limit(originalLimit);
-				String label = readString(b);
-				return vf.createLiteral(label, lang);
+				return vf.createLiteral(readString(b), lang);
 			case DATATYPE_LITERAL_TYPE:
 				int dtSize = b.getShort();
 				b.limit(b.position()+dtSize);
 				IRI datatype = (IRI) readValue(b, vf, null);
 				b.limit(originalLimit);
-				label = readString(b);
-				return vf.createLiteral(label, datatype);
+				return vf.createLiteral(readString(b), datatype);
 			case TRIPLE_TYPE:
 				if (tf == null) {
 					throw new IllegalStateException("Unexpected triple value or missing TripleFactory");
