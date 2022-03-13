@@ -56,40 +56,60 @@ public final class HRDFParser extends AbstractRDFParser {
 			if (rdfHandler != null) {
 				rdfHandler.startRDF();
 			}
-			int numValues;
-			while((numValues = dataIn.read()) != -1) {
-				int len = dataIn.readShort();
-				buffer = ensureCapacity(buffer, len);
-				dataIn.readFully(buffer, 0, len);
-				Resource s = (Resource) readValue(ByteBuffer.wrap(buffer, 0, len));
-	
-				len = dataIn.readShort();
-				buffer = ensureCapacity(buffer, len);
-				dataIn.readFully(buffer, 0, len);
-				IRI p = (IRI) readValue(ByteBuffer.wrap(buffer, 0, len));
-	
-				len = dataIn.readInt();
+			Resource prevContext = null;
+			Resource prevSubject = null;
+			IRI prevPredicate = null;
+			int type;
+			while((type = dataIn.read()) != -1) {
+				int numValues = (type > HRDF.QUADS) ? type-HRDF.QUADS : type;
+				Resource c;
+				if (numValues >= HRDF.CSPO) {
+					int len = dataIn.readShort();
+					buffer = ensureCapacity(buffer, len);
+					dataIn.readFully(buffer, 0, len);
+					c = (Resource) readValue(ByteBuffer.wrap(buffer, 0, len));
+				} else if (type > HRDF.QUADS) {
+					c = prevContext;
+				} else {
+					c = null;
+				}
+				Resource s;
+				if (numValues >= HRDF.SPO) { 
+					int len = dataIn.readShort();
+					buffer = ensureCapacity(buffer, len);
+					dataIn.readFully(buffer, 0, len);
+					s = (Resource) readValue(ByteBuffer.wrap(buffer, 0, len));
+				} else {
+					s = prevSubject;
+				}
+				IRI p;
+				if (numValues >= HRDF.PO) { 
+					int len = dataIn.readShort();
+					buffer = ensureCapacity(buffer, len);
+					dataIn.readFully(buffer, 0, len);
+					p = (IRI) readValue(ByteBuffer.wrap(buffer, 0, len));
+				} else {
+					p = prevPredicate;
+				}
+				int len = dataIn.readInt();
 				buffer = ensureCapacity(buffer, len);
 				dataIn.readFully(buffer, 0, len);
 				Value o = readValue(ByteBuffer.wrap(buffer, 0, len));
-	
+
 				Statement stmt;
-				if (numValues == HRDF.TRIPLES) {
-					stmt = createStatement(s, p, o);
-				} else if (numValues == HRDF.QUADS) {
-					len = dataIn.readShort();
-					buffer = ensureCapacity(buffer, len);
-					dataIn.readFully(buffer, 0, len);
-					Resource c = (Resource) readValue(ByteBuffer.wrap(buffer, 0, len));
-	
+				if (c != null) {
 					stmt = createStatement(s, p, o, c);
 				} else {
-					throw new RDFParseException("Invalid number of values: "+numValues);
+					stmt = createStatement(s, p, o);
 				}
-	
+
 				if (rdfHandler != null) {
 					rdfHandler.handleStatement(stmt);
 				}
+
+				prevContext = c;
+				prevSubject = s;
+				prevPredicate = p;
 			}
 			if (rdfHandler != null) {
 				rdfHandler.endRDF();

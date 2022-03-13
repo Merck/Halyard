@@ -125,7 +125,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		try(InputStream in = decompress(isGzipped, inCounter)) {
 			totalStmts = split(parser, in, outHandlers, bnodeOutHandler);
 		}
-		LOGGER.info("Finished writing {} statements", totalStmts);
+		LOGGER.info("Finished writing a total of {} statements", totalStmts);
 
 		return totalStmts;
 	}
@@ -145,7 +145,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 
 		readStartTime = System.currentTimeMillis();
 		parser.parse(in);
-		LOGGER.info("Finished reading {} statements in {}mins", totalStmtReadCount, TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis()-readStartTime));
+		LOGGER.info("Finished reading a total of {} statements in {}mins", totalStmtReadCount, TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis()-readStartTime));
 
 		long stmtCount = 0L;
 		for (int i=0; i<tasks.length; i++) {

@@ -60,23 +60,56 @@ public final class HRDFWriter extends AbstractRDFWriter {
 		this.out = new DataOutputStream(out);
 	}
 
+	private Resource prevContext;
+	private Resource prevSubject;
+	private IRI prevPredicate;
+
+	@Override
+	public RDFFormat getRDFFormat() {
+		return HRDF.FORMAT;
+	}
+
 	@Override
 	protected void consumeStatement(Statement st) {
+		Resource subj = st.getSubject();
+		IRI pred = st.getPredicate();
 		Resource c = st.getContext();
 		ByteBuffer buf = ByteBuffer.allocate(256);
-		int numValues = (c != null) ? HRDF.QUADS : HRDF.TRIPLES;
-		try {
-			out.write(numValues);
-			buf = writeValue(st.getSubject(), buf, 2);
-			buf = writeValue(st.getPredicate(), buf, 2);
-			buf = writeValue(st.getObject(), buf, 4);
-			if (c != null) {
-				buf = writeValue(c, buf, 2);
+		int type = HRDF.CSPO;
+		if (c == null || c.equals(prevContext)) {
+			type--;
+			if (subj.equals(prevSubject)) {
+				type--;
+				if (pred.equals(prevPredicate)) {
+					type--;
+				}
 			}
+		}
+		if (c != null) {
+			type += HRDF.QUADS;
+		}
+		buf.put((byte) type);
+		boolean skip = (c == null) || c.equals(prevContext);
+		if (!skip) {
+			buf = writeValue(c, buf, 2);
+		}
+		skip = subj.equals(prevSubject) && skip;
+		if (!skip) {
+			buf = writeValue(subj, buf, 2);
+		}
+		skip = pred.equals(prevPredicate) && skip;
+		if (!skip) {
+			buf = writeValue(pred, buf, 2);
+		}
+		buf = writeValue(st.getObject(), buf, 4);
+		try {
 			out.write(buf.array(), buf.arrayOffset(), buf.position());
 		} catch(IOException e) {
 			throw new RDFHandlerException(e);
 		}
+		prevContext = c;
+		prevSubject = subj;
+		prevPredicate = pred;
 	}
 
 	private ByteBuffer writeValue(Value v, ByteBuffer buf, int sizeBytes) {
@@ -100,11 +133,6 @@ public final class HRDFWriter extends AbstractRDFWriter {
 	}
 
 	@Override
-	public RDFFormat getRDFFormat() {
-		return HRDF.FORMAT;
-	}
-
-	@Override
 	public void handleComment(String comment)
 		throws RDFHandlerException
 	{
@@ -114,6 +142,9 @@ public final class HRDFWriter extends AbstractRDFWriter {
 	public void endRDF()
 		throws RDFHandlerException
 	{
+		prevContext = null;
+		prevSubject = null;
+		prevPredicate = null;
 	}
 
 
