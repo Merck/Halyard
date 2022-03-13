@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
@@ -165,7 +167,19 @@ public final class ValueIO {
 	}
 
 	private static final Map<IRI, ByteWriter> BYTE_WRITERS = new HashMap<>(32);
-	private static final Map<Byte, ByteReader> BYTE_READERS = new HashMap<>(32);
+	private static final Map<Integer, ByteReader> BYTE_READERS = new HashMap<>(32);
+
+	private static void addByteWriter(IRI datatype, ByteWriter bw) {
+		if (BYTE_WRITERS.putIfAbsent(datatype, bw) != null) {
+			throw new AssertionError(String.format("%s already exists for %s", ByteWriter.class.getSimpleName(), datatype));
+		}
+	}
+
+	private static void addByteReader(int valueType, ByteReader br) {
+		if (BYTE_READERS.putIfAbsent(valueType, br) != null) {
+			throw new AssertionError(String.format("%s already exists for %s", ByteReader.class.getSimpleName(), (char)valueType));
+		}
+	}
 
 	private static final DatatypeFactory DATATYPE_FACTORY;
 	static {
@@ -190,11 +204,11 @@ public final class ValueIO {
 	private static final byte NAMESPACE_HASH_TYPE = ':';
 	private static final byte BNODE_TYPE = '_';
 	private static final byte DATATYPE_LITERAL_TYPE = '\"';
-	private static final byte LANGUAGE_HASH_LITERAL_TYPE = 'a';
 	private static final byte LANGUAGE_LITERAL_TYPE = '@';
 	private static final byte TRIPLE_TYPE = '*';
 	private static final byte FALSE_TYPE = '0';
 	private static final byte TRUE_TYPE = '1';
+	private static final byte LANGUAGE_HASH_LITERAL_TYPE = 'a';
 	private static final byte BYTE_TYPE = 'b';
 	private static final byte SHORT_TYPE = 's';
 	private static final byte INT_TYPE = 'i';
@@ -204,115 +218,154 @@ public final class ValueIO {
 	private static final byte STRING_TYPE = 'z';
 	private static final byte TIME_TYPE = 't';
 	private static final byte DATE_TYPE = 'D';
+	private static final byte BIG_FLOAT_TYPE = 'F';
+	private static final byte BIG_INT_TYPE = 'I';
 	private static final byte DATETIME_TYPE = 'T';
 	private static final byte XML_TYPE = 'x';
 
 	static {
-		BYTE_WRITERS.put(XSD.BOOLEAN, new ByteWriter() {
+		addByteWriter(XSD.BOOLEAN, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				b = ensureCapacity(b, 1);
 				return b.put(l.booleanValue() ? TRUE_TYPE : FALSE_TYPE);
 			}
 		});
-		BYTE_READERS.put(FALSE_TYPE, new ByteReader() {
+		addByteReader(FALSE_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return vf.createLiteral(false);
 			}
 		});
-		BYTE_READERS.put(TRUE_TYPE, new ByteReader() {
+		addByteReader(TRUE_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return vf.createLiteral(true);
 			}
 		});
 
-		BYTE_WRITERS.put(XSD.BYTE, new ByteWriter() {
+		addByteWriter(XSD.BYTE, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				b = ensureCapacity(b, 2);
 				return b.put(BYTE_TYPE).put(l.byteValue());
 			}
 		});
-		BYTE_READERS.put(BYTE_TYPE, new ByteReader() {
+		addByteReader(BYTE_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return vf.createLiteral(b.get());
 			}
 		});
 
-		BYTE_WRITERS.put(XSD.SHORT, new ByteWriter() {
+		addByteWriter(XSD.SHORT, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				b = ensureCapacity(b, 3);
 				return b.put(SHORT_TYPE).putShort(l.shortValue());
 			}
 		});
-		BYTE_READERS.put(SHORT_TYPE, new ByteReader() {
+		addByteReader(SHORT_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return vf.createLiteral(b.getShort());
 			}
 		});
 
-		BYTE_WRITERS.put(XSD.INT, new ByteWriter() {
+		addByteWriter(XSD.INT, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				b = ensureCapacity(b, 5);
 				return b.put(INT_TYPE).putInt(l.intValue());
 			}
 		});
-		BYTE_READERS.put(INT_TYPE, new ByteReader() {
+		addByteReader(INT_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return vf.createLiteral(b.getInt());
 			}
 		});
 
-		BYTE_WRITERS.put(XSD.LONG, new ByteWriter() {
+		addByteWriter(XSD.LONG, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				b = ensureCapacity(b, 9);
 				return b.put(LONG_TYPE).putLong(l.longValue());
 			}
 		});
-		BYTE_READERS.put(LONG_TYPE, new ByteReader() {
+		addByteReader(LONG_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return vf.createLiteral(b.getLong());
 			}
 		});
 
-		BYTE_WRITERS.put(XSD.FLOAT, new ByteWriter() {
+		addByteWriter(XSD.FLOAT, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				b = ensureCapacity(b, 5);
 				return b.put(FLOAT_TYPE).putFloat(l.floatValue());
 			}
 		});
-		BYTE_READERS.put(FLOAT_TYPE, new ByteReader() {
+		addByteReader(FLOAT_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return vf.createLiteral(b.getFloat());
 			}
 		});
 
-		BYTE_WRITERS.put(XSD.DOUBLE, new ByteWriter() {
+		addByteWriter(XSD.DOUBLE, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				b = ensureCapacity(b, 9);
 				return b.put(DOUBLE_TYPE).putDouble(l.doubleValue());
 			}
 		});
-		BYTE_READERS.put(DOUBLE_TYPE, new ByteReader() {
+		addByteReader(DOUBLE_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return vf.createLiteral(b.getDouble());
 			}
 		});
 
-		BYTE_WRITERS.put(XSD.STRING, new ByteWriter() {
+		addByteWriter(XSD.INTEGER, new ByteWriter() {
+			@Override
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				byte[] bytes = l.integerValue().toByteArray();
+				b = ensureCapacity(b, 1 + bytes.length);
+				return b.put(BIG_INT_TYPE).put(bytes);
+			}
+		});
+		addByteReader(BIG_INT_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				byte[] bytes = new byte[b.remaining()];
+				b.get(bytes);
+				return vf.createLiteral(new BigInteger(bytes));
+			}
+		});
+
+		addByteWriter(XSD.DECIMAL, new ByteWriter() {
+			@Override
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				BigDecimal x = l.decimalValue();
+				byte[] bytes = x.unscaledValue().toByteArray();
+				int scale = x.scale();
+				b = ensureCapacity(b, 1 + bytes.length + 4);
+				return b.put(BIG_FLOAT_TYPE).putInt(scale).put(bytes);
+			}
+		});
+		addByteReader(BIG_FLOAT_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				int scale = b.getInt();
+				byte[] bytes = new byte[b.remaining()];
+				b.get(bytes);
+				return vf.createLiteral(new BigDecimal(new BigInteger(bytes), scale));
+			}
+		});
+
+		addByteWriter(XSD.STRING, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				ByteBuffer zb = writeString(l.getLabel());
@@ -320,20 +373,20 @@ public final class ValueIO {
 				return b.put(STRING_TYPE).put(zb);
 			}
 		});
-		BYTE_READERS.put(STRING_TYPE, new ByteReader() {
+		addByteReader(STRING_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return vf.createLiteral(readString(b));
 			}
 		});
 
-		BYTE_WRITERS.put(XSD.TIME, new ByteWriter() {
+		addByteWriter(XSD.TIME, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				return calendarTypeToBytes(TIME_TYPE, l.calendarValue(), b);
 			}
 		});
-		BYTE_READERS.put(TIME_TYPE, new ByteReader() {
+		addByteReader(TIME_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				long millis = b.getLong();
@@ -352,13 +405,13 @@ public final class ValueIO {
 			}
 		});
 
-		BYTE_WRITERS.put(XSD.DATE, new ByteWriter() {
+		addByteWriter(XSD.DATE, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				return calendarTypeToBytes(DATE_TYPE, l.calendarValue(), b);
 			}
 		});
-		BYTE_READERS.put(DATE_TYPE, new ByteReader() {
+		addByteReader(DATE_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				long millis = b.getLong();
@@ -375,13 +428,13 @@ public final class ValueIO {
 			}
 		});
 
-		BYTE_WRITERS.put(XSD.DATETIME, new ByteWriter() {
+		addByteWriter(XSD.DATETIME, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				return calendarTypeToBytes(DATETIME_TYPE, l.calendarValue(), b);
 			}
 		});
-		BYTE_READERS.put(DATETIME_TYPE, new ByteReader() {
+		addByteReader(DATETIME_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				long millis = b.getLong();
@@ -397,7 +450,7 @@ public final class ValueIO {
 			}
 		});
 
-		BYTE_WRITERS.put(RDF.XMLLITERAL, new ByteWriter() {
+		addByteWriter(RDF.XMLLITERAL, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
 				try {
@@ -417,7 +470,7 @@ public final class ValueIO {
 				}
 			}
 		});
-		BYTE_READERS.put(XML_TYPE, new ByteReader() {
+		addByteReader(XML_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				int xmlContentType = b.get();
@@ -569,7 +622,7 @@ public final class ValueIO {
 
 	public static Value readValue(ByteBuffer b, ValueFactory vf, TripleFactory tf) throws IOException {
 		final int originalLimit = b.limit();
-		byte type = b.get();
+		int type = b.get();
 		switch(type) {
 			case IRI_TYPE:
 				IRI iri = vf.createIRI(readString(b));
@@ -628,7 +681,7 @@ public final class ValueIO {
 				}
 				return reader.readBytes((ByteBuffer) b, vf);
 		}
-    }
+	}
 
 	public static ByteBuffer ensureCapacity(ByteBuffer b, int requiredSize) {
 		if (b.remaining() < requiredSize) {

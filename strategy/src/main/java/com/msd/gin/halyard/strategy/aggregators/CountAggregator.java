@@ -17,11 +17,11 @@
 package com.msd.gin.halyard.strategy.aggregators;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.Count;
@@ -76,7 +76,7 @@ public class CountAggregator extends Aggregator {
 
 	@Override
 	public Value getValue() {
-		return vf.createLiteral(Long.toString(count.get()), XSD.INTEGER);
+		return vf.createLiteral(BigInteger.valueOf(count.get()));
 	}
 
 	@Override
