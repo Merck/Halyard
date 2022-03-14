@@ -108,11 +108,14 @@ public final class HalyardStats extends AbstractHalyardTool {
 
     static final class StatsMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
 
+        final ImmutableBytesWritable outputKey = new ImmutableBytesWritable();
+        final LongWritable outputValue = new LongWritable();
         final byte[] lastSubjFragment = new byte[RDFSubject.KEY_SIZE];
         final byte[] lastPredFragment = new byte[RDFPredicate.KEY_SIZE];
         final byte[] lastObjFragment = new byte[RDFObject.KEY_SIZE];
         final byte[] lastCtxFragment = new byte[RDFContext.KEY_SIZE];
         final byte[] lastClassFragment = new byte[RDFObject.KEY_SIZE];
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream(128);
         IRI statsContext, graphContext;
         byte[] cspoStatsContextHash;
         TableTripleFactory tf;
@@ -286,9 +289,9 @@ public final class HalyardStats extends AbstractHalyardTool {
             }
         }
 
-		private void report(Context output, IRI property, Value partitionId, long value) throws IOException, InterruptedException {
-            if (value > 0 && (graphContext == null || graphContext.equals(graph))) {
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		private void report(Context output, IRI property, Value partitionId, long count) throws IOException, InterruptedException {
+            if (count > 0 && (graphContext == null || graphContext.equals(graph))) {
+            	baos.reset();
                 try (DataOutputStream dos = new DataOutputStream(baos)) {
                     dos.writeUTF(graph.stringValue());
                     dos.writeUTF(property.stringValue());
@@ -302,7 +305,9 @@ public final class HalyardStats extends AbstractHalyardTool {
                         dos.write(b.array(), b.arrayOffset(), len);
                     }
                 }
-                output.write(new ImmutableBytesWritable(baos.toByteArray()), new LongWritable(value));
+                outputKey.set(baos.toByteArray());
+                outputValue.set(count);
+                output.write(outputKey, outputValue);
             }
         }
 

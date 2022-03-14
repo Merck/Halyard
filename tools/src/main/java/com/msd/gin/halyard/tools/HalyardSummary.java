@@ -113,14 +113,15 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
     static final class SummaryMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
 
-        private int decimationFactor;
+        private final ImmutableBytesWritable outputKey = new ImmutableBytesWritable();
+        private final LongWritable outputValue = new LongWritable();
         private final Random random = new Random(0);
+        private int decimationFactor;
         private Table table;
         private TableTripleFactory tf;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
-            this.mapContext = context;
             Configuration conf = context.getConfiguration();
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             this.table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
@@ -152,37 +153,36 @@ public final class HalyardSummary extends AbstractHalyardTool {
         long objectCardinality = 0;
         long classCardinality = 0;
         Set<IRI> rangeClasses = null;
-        Context mapContext = null;
 
         long counter = 0, ccCounter = 0, pcCounter = 0, pdCounter = 0, prCounter = 0, pdrCounter = 0;
 
-        private void reportClassCardinality(IRI clazz, long cardinality) throws IOException, InterruptedException {
-            report(SummaryType.ClassSummary, clazz, cardinality);
+        private void reportClassCardinality(Context output, IRI clazz, long cardinality) throws IOException, InterruptedException {
+            report(output, SummaryType.ClassSummary, clazz, cardinality);
             ccCounter+=cardinality;
         }
 
-        private void reportPredicateCardinality(IRI predicate, long cardinality) throws IOException, InterruptedException {
-            report(SummaryType.PredicateSummary, predicate, cardinality);
+        private void reportPredicateCardinality(Context output, IRI predicate, long cardinality) throws IOException, InterruptedException {
+            report(output, SummaryType.PredicateSummary, predicate, cardinality);
             pcCounter+=cardinality;
         }
 
-        private void reportPredicateDomain(IRI predicate, IRI domainClass) throws IOException, InterruptedException {
-            report(SummaryType.DomainSummary, predicate, 1l, domainClass);
+        private void reportPredicateDomain(Context output, IRI predicate, IRI domainClass) throws IOException, InterruptedException {
+            report(output, SummaryType.DomainSummary, predicate, 1l, domainClass);
             pdCounter++;
         }
 
-        private void reportPredicateRange(IRI predicate, IRI rangeClass, long cardinality) throws IOException, InterruptedException {
-            report(SummaryType.RangeSummary, predicate, cardinality, rangeClass);
+        private void reportPredicateRange(Context output, IRI predicate, IRI rangeClass, long cardinality) throws IOException, InterruptedException {
+            report(output, SummaryType.RangeSummary, predicate, cardinality, rangeClass);
             prCounter += cardinality;
         }
 
-        private void reportPredicateDomainAndRange(IRI predicate, IRI domainClass, IRI rangeClass) throws IOException, InterruptedException {
-            report(SummaryType.DomainAndRangeSummary, predicate, 1l, domainClass, rangeClass);
+        private void reportPredicateDomainAndRange(Context output, IRI predicate, IRI domainClass, IRI rangeClass) throws IOException, InterruptedException {
+            report(output, SummaryType.DomainAndRangeSummary, predicate, 1l, domainClass, rangeClass);
             pdrCounter++;
         }
 
         private final ByteArrayOutputStream baos = new ByteArrayOutputStream(100000);
-        private void report(SummaryType type, IRI firstKey, long cardinality, IRI ... otherKeys) throws IOException, InterruptedException {
+        private void report(Context output, SummaryType type, IRI firstKey, long cardinality, IRI ... otherKeys) throws IOException, InterruptedException {
             baos.reset();
             try (DataOutputStream dos = new DataOutputStream(baos)) {
                 dos.writeByte(type.ordinal());
@@ -191,10 +191,12 @@ public final class HalyardSummary extends AbstractHalyardTool {
                     dos.writeUTF(key.stringValue());
                 }
             }
-            mapContext.write(new ImmutableBytesWritable(baos.toByteArray()), new LongWritable(cardinality));
+            outputKey.set(baos.toByteArray());
+            outputValue.set(cardinality);
+            output.write(outputKey, outputValue);
         }
 
-        private void statementChange(Statement newStatement) throws IOException, InterruptedException {
+        private void statementChange(Context output, Statement newStatement) throws IOException, InterruptedException {
             if (oldStatement != null && !HALYARD.STATS_GRAPH_CONTEXT.equals(oldStatement.getContext())) {
                 boolean predicateChange = newStatement == null || !oldStatement.getPredicate().equals(newStatement.getPredicate());
                 boolean objectChange = predicateChange || !oldStatement.getObject().equals(newStatement.getObject());
@@ -205,7 +207,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                         if (objectChange) {
                             //object change
                             if (oldStatement.getObject() instanceof IRI) {
-                                reportClassCardinality((IRI)oldStatement.getObject(), classCardinality);
+                                reportClassCardinality(output, (IRI)oldStatement.getObject(), classCardinality);
                             }
                             classCardinality = 0;
                         }
@@ -218,30 +220,30 @@ public final class HalyardSummary extends AbstractHalyardTool {
                             rangeClasses = queryForClasses(oldStatement.getObject());
                         }
                         for (IRI domainClass : queryForClasses(oldStatement.getSubject())) {
-                            reportPredicateDomain(oldStatement.getPredicate(), domainClass);
+                            reportPredicateDomain(output, oldStatement.getPredicate(), domainClass);
                             for (IRI rangeClass : rangeClasses) {
-                                reportPredicateDomainAndRange(oldStatement.getPredicate(), domainClass, rangeClass);
+                                reportPredicateDomainAndRange(output, oldStatement.getPredicate(), domainClass, rangeClass);
                             }
                             if (oldStatement.getObject() instanceof Literal) {
                                 IRI lt = ((Literal)oldStatement.getObject()).getDatatype();
-                                reportPredicateDomainAndRange(oldStatement.getPredicate(), domainClass, lt == null ? XSD.STRING : lt);
+                                reportPredicateDomainAndRange(output, oldStatement.getPredicate(), domainClass, lt == null ? XSD.STRING : lt);
                             }
                         }
                         if (objectChange) {
                             //object change
                             for (IRI objClass : rangeClasses) {
-                                reportPredicateRange(oldStatement.getPredicate(), objClass, objectCardinality);
+                                reportPredicateRange(output, oldStatement.getPredicate(), objClass, objectCardinality);
                             }
                             if (oldStatement.getObject() instanceof Literal) {
                                 IRI lt = ((Literal)oldStatement.getObject()).getDatatype();
-                                reportPredicateRange(oldStatement.getPredicate(), lt == null ? XSD.STRING : lt, objectCardinality);
+                                reportPredicateRange(output, oldStatement.getPredicate(), lt == null ? XSD.STRING : lt, objectCardinality);
                             }
                             objectCardinality = 0;
                             rangeClasses = null;
                         }
                         if (predicateChange) {
                             //predicate change
-                            reportPredicateCardinality(oldStatement.getPredicate(), predicateCardinality);
+                            reportPredicateCardinality(output, oldStatement.getPredicate(), predicateCardinality);
                             predicateCardinality = 0;
                         }
                     }
@@ -253,7 +255,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             if (random.nextInt(decimationFactor) == 0) {
-                statementChange(HalyardTableUtils.parseStatement(null, null, null, null, value.rawCells()[0], SVF, tf));
+                statementChange(output, HalyardTableUtils.parseStatement(null, null, null, null, value.rawCells()[0], SVF, tf));
             }
             if (++counter % 10000 == 0) {
                 output.setStatus(MessageFormat.format("{0} cc:{1} pc:{2} pd:{3} pr:{4} pdr:{5}", counter, ccCounter, pcCounter, pdCounter, prCounter, pdrCounter));
@@ -262,7 +264,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
         @Override
         protected void cleanup(Context output) throws IOException, InterruptedException {
-            statementChange(null);
+            statementChange(output, null);
             if (table != null) {
                 table.close();;
                 table = null;

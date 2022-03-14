@@ -271,7 +271,8 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                 private final AtomicLong key = new AtomicLong();
 
                 private ParserPump pump = null;
-                private Statement current = null;
+                private LongWritable currentKey = new LongWritable();
+                private Statement currentValue = null;
                 private Thread pumpThread = null;
 
                 @Override
@@ -285,20 +286,26 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
                 @Override
                 public boolean nextKeyValue() throws IOException, InterruptedException {
-                    if (pump == null) return false;
-                    current = pump.getNext();
-                    key.incrementAndGet();
-                    return current != null;
+                    if (pump != null) {
+                        currentValue = pump.getNext();
+                        if (currentValue != null) {
+                            currentKey.set(key.incrementAndGet());
+                            return true;
+                        }
+                    }
+                    currentKey = null;
+                    currentValue = null;
+                    return false;
                 }
 
                 @Override
                 public LongWritable getCurrentKey() throws IOException, InterruptedException {
-                    return current == null ? null : new LongWritable(key.get());
+                    return currentKey;
                 }
 
                 @Override
                 public Statement getCurrentValue() throws IOException, InterruptedException {
-                    return current;
+                    return currentValue;
                 }
 
                 @Override
@@ -335,7 +342,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         private final String defaultRdfContextPattern;
         private final boolean overrideRdfContext;
         private final long maxSize;
-        private Exception ex = null;
+        private volatile Exception ex = null;
         private long finishedSize = 0;
         private int offset, count;
 
@@ -358,8 +365,9 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         }
 
         public Statement getNext() throws IOException, InterruptedException {
+            // empties queue on error
             Statement s = queue.take();
-            if (ex != null) synchronized (this) {
+            if (ex != null) {
                 throw new IOException("Exception while parsing: " + baseUri, ex);
             }
             return s == END_STATEMENT ? null : s;
@@ -409,6 +417,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                     RDFParser parser = Rio.createParser(Rio.getParserFormatForFileName(localBaseUri).get());
                     parser.setRDFHandler(this);
                     parser.setParseErrorListener(this);
+                    parser.set(BasicParserSettings.PRESERVE_BNODE_IDS, true);
                     if (skipInvalid) {
                         parser.set(BasicParserSettings.VERIFY_URI_SYNTAX, false);
                         parser.set(BasicParserSettings.VERIFY_RELATIVE_URIS, false);

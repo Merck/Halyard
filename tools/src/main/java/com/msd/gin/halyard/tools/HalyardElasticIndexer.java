@@ -75,6 +75,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
 
+    	final Text outputJson = new Text();
     	TableTripleFactory tf;
         long counter = 0, exports = 0, statements = 0;
         byte[] lastHash = new byte[RDFObject.KEY_SIZE];
@@ -117,7 +118,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 			                JSONObject.quote(l.getDatatype().stringValue(), json);
 		                }
 		                json.append("}\n");
-		                output.write(NullWritable.get(), new Text(json.toString()));
+		                outputJson.set(json.toString());
+		                output.write(NullWritable.get(), outputJson);
             		}
 	                exports++;
                 }

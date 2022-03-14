@@ -19,6 +19,7 @@ package com.msd.gin.halyard.tools;
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.*;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.tools.HalyardBulkLoad.RioFileInputFormat;
 
 import java.io.IOException;
@@ -71,6 +72,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
     public final static class RDFDecimatingMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, LongWritable> {
 
         private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
+        private final LongWritable keyValueLength = new LongWritable();
         private final Random random = new Random(0);
         private long counter = 0, next = 0;
         private int decimationFactor;
@@ -80,7 +82,8 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             decimationFactor = conf.getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
-            for (byte b = 1; b < 6; b++) {
+            // prefix splits
+            for (byte b = 1; b < StatementIndex.values().length; b++) {
                 context.write(new ImmutableBytesWritable(new byte[] {b}), new LongWritable(1));
             }
             timestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
@@ -92,7 +95,8 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
                 next = counter + random.nextInt(decimationFactor);
                 for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, timestamp)) {
                     rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
-                    context.write(rowKey, new LongWritable(keyValue.getLength()));
+                    keyValueLength.set(keyValue.getLength());
+                    context.write(rowKey, keyValueLength);
                 }
             }
         }
