@@ -61,7 +61,7 @@ public final class Hashes {
     	return Hashing.murmur3_32().hashBytes(key).asInt();
     }
 
-    public static byte[] hashUnique(byte[] key) {
+    public static byte[] hashUnique(ByteBuffer key) {
 		MessageDigest md = MD.get();
         try {
             md.update(key);
@@ -69,6 +69,11 @@ public final class Hashes {
         } finally {
             md.reset();
         }
+    }
+
+    public static int hashUniqueSize() {
+        MessageDigest md = MD.get();
+        return md.getDigestLength();
     }
 
     public static String encode(byte b[]) {

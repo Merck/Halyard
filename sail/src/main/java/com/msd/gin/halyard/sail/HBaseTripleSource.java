@@ -17,12 +17,13 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.common.TimestampedValueFactory;
+import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
@@ -62,8 +63,9 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseTripleSource.class);
 
 	private final Table table;
-	private final ValueFactory vf;
-	private final TableTripleFactory tf;
+	private final ValueFactory valueFactory;
+	private final ValueIO.Reader valueReader;
+	private final ValueIO.Reader tsValueReader;
 	private final long timeoutSecs;
 	private final HBaseSail.ScanSettings settings;
 	private final HBaseSail.Ticker ticker;
@@ -74,8 +76,10 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 
 	public HBaseTripleSource(Table table, ValueFactory vf, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
 		this.table = table;
-		this.vf = vf;
-		this.tf = new TableTripleFactory(table);
+		this.valueFactory = vf;
+		TableTripleReader tf = new TableTripleReader(table);
+		this.valueReader = new ValueIO.Reader(vf, tf);
+		this.tsValueReader = new ValueIO.Reader(TimestampedValueFactory.getInstance(), tf);
 		this.timeoutSecs = timeoutSecs;
 		this.settings = settings;
 		this.ticker = ticker;
@@ -87,15 +91,15 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 			// cache magic property definitions here
 			return new EmptyIteration<>();
 		} else {
-			return getStatementsInternal(subj, pred, obj, contexts, vf);
+			return getStatementsInternal(subj, pred, obj, contexts, valueReader);
 		}
 	}
 
 	public CloseableIteration<? extends Statement, QueryEvaluationException> getTimestampedStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
-		return getStatementsInternal(subj, pred, obj, contexts, TimestampedValueFactory.getInstance());
+		return getStatementsInternal(subj, pred, obj, contexts, tsValueReader);
 	}
 
-	private CloseableIteration<? extends Statement, QueryEvaluationException> getStatementsInternal(Resource subj, IRI pred, Value obj, Resource[] contexts, ValueFactory vf) {
+	private CloseableIteration<? extends Statement, QueryEvaluationException> getStatementsInternal(Resource subj, IRI pred, Value obj, Resource[] contexts, ValueIO.Reader reader) {
 		List<Resource> contextsToScan;
 		if (contexts == null || contexts.length == 0) {
 			// if all contexts then scan the default context
@@ -106,7 +110,7 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 		} else {
 			contextsToScan = Arrays.asList(contexts);
 		}
-		CloseableIteration<? extends Statement, QueryEvaluationException> iter = timeLimit(new ExceptionConvertingIteration<Statement, QueryEvaluationException>(createStatementScanner(subj, pred, obj, contextsToScan, vf)) {
+		CloseableIteration<? extends Statement, QueryEvaluationException> iter = timeLimit(new ExceptionConvertingIteration<Statement, QueryEvaluationException>(createStatementScanner(subj, pred, obj, contextsToScan, reader)) {
 			@Override
 			protected QueryEvaluationException convert(Exception e) {
 				return new QueryEvaluationException(e);
@@ -126,13 +130,13 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 		return iter;
 	}
 
-	protected CloseableIteration<? extends Statement, IOException> createStatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contexts, ValueFactory vf) {
-		return new StatementScanner(subj, pred, obj, contexts, vf);
+	protected CloseableIteration<? extends Statement, IOException> createStatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contexts, ValueIO.Reader reader) {
+		return new StatementScanner(subj, pred, obj, contexts, reader);
 	}
 
 	@Override
 	public final ValueFactory getValueFactory() {
-		return vf;
+		return valueFactory;
 	}
 
 	protected class StatementScanner extends AbstractStatementScanner {
@@ -141,8 +145,8 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 		protected Iterator<Resource> contexts;
 		private ResultScanner rs = null;
 
-		public StatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contextsList, ValueFactory vf) {
-			super(vf, tf);
+		public StatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contextsList, ValueIO.Reader reader) {
+			super(reader);
 			this.subj = RDFSubject.create(subj);
 			this.pred = RDFPredicate.create(pred);
 			this.obj = RDFObject.create(obj);
@@ -191,7 +195,7 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 	@Override
 	public final CloseableIteration<? extends Triple, QueryEvaluationException> getRdfStarTriples(Resource subj, IRI pred, Value obj) throws QueryEvaluationException {
 		CloseableIteration<? extends Triple, QueryEvaluationException> iter = new ConvertingIteration<Statement, Triple, QueryEvaluationException>(
-				new ExceptionConvertingIteration<Statement, QueryEvaluationException>(createStatementScanner(subj, pred, obj, Collections.singletonList(HALYARD.TRIPLE_GRAPH_CONTEXT), vf)) {
+				new ExceptionConvertingIteration<Statement, QueryEvaluationException>(createStatementScanner(subj, pred, obj, Collections.singletonList(HALYARD.TRIPLE_GRAPH_CONTEXT), valueReader)) {
 				@Override
 				protected QueryEvaluationException convert(Exception e) {
 					return new QueryEvaluationException(e);
@@ -199,7 +203,7 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 			}) {
 			@Override
 			protected Triple convert(Statement stmt) {
-				return vf.createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
+				return valueFactory.createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
 			}
 		};
 		return timeLimit(iter, timeoutSecs);

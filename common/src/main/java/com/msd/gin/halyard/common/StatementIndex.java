@@ -1,8 +1,5 @@
 package com.msd.gin.halyard.common;
 
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
-
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop.hbase.client.Scan;
@@ -30,12 +27,12 @@ public enum StatementIndex {
 			return cv.array();
 		}
 		@Override
-    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
-    		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, vf, tf);
-    		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf, null);
-    		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.END_KEY_SIZE, vf, tf);
-    		Resource c = parseLastRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
-    		return createStatement(s, p, o, c, vf);
+    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader) {
+    		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, reader);
+    		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, reader);
+    		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.END_KEY_SIZE, reader);
+    		Resource c = parseLastRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader);
+    		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
     	byte[][] newStopKeys() {
@@ -63,12 +60,12 @@ public enum StatementIndex {
 			return cv.array();
 		}
 		@Override
-    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
-    		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf, null);
-    		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, vf, tf);
-    		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.END_KEY_SIZE, vf, tf);
-    		Resource c = parseLastRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
-    		return createStatement(s, p, o, c, vf);
+    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader) {
+    		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, reader);
+    		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, reader);
+    		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.END_KEY_SIZE, reader);
+    		Resource c = parseLastRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader);
+    		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
     	byte[][] newStopKeys() {
@@ -96,12 +93,12 @@ public enum StatementIndex {
 			return cv.array();
 		}
 		@Override
-    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
-    		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, vf, tf);
-    		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, vf, tf);
-    		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, vf, null);
-    		Resource c = parseLastRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
-    		return createStatement(s, p, o, c, vf);
+    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader) {
+    		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, reader);
+    		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, reader);
+    		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, reader);
+    		Resource c = parseLastRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader);
+    		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
     	byte[][] newStopKeys() {
@@ -127,12 +124,12 @@ public enum StatementIndex {
 			return cv.array();
 		}
 		@Override
-    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
-    		Resource c = parseShortRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
-    		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, vf, tf);
-    		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf, null);
-    		Value o = parseLastRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.END_KEY_SIZE, vf, tf);
-    		return createStatement(s, p, o, c, vf);
+    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader) {
+    		Resource c = parseShortRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader);
+    		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, reader);
+    		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, reader);
+    		Value o = parseLastRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.END_KEY_SIZE, reader);
+    		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
     	byte[][] newStopKeys() {
@@ -158,12 +155,12 @@ public enum StatementIndex {
 			return cv.array();
 		}
 		@Override
-    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
-    		Resource c = parseShortRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
-    		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, vf, null);
-    		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, vf, tf);
-    		Resource s = parseLastRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.END_KEY_SIZE, vf, tf);
-    		return createStatement(s, p, o, c, vf);
+    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader) {
+    		Resource c = parseShortRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader);
+    		IRI p = parseShortRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.KEY_SIZE, reader);
+    		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, reader);
+    		Resource s = parseLastRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.END_KEY_SIZE, reader);
+    		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
     	byte[][] newStopKeys() {
@@ -189,12 +186,12 @@ public enum StatementIndex {
 			return cv.array();
 		}
 		@Override
-    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException {
-    		Resource c = parseShortRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, vf, null);
-    		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, vf, tf);
-    		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, vf, tf);
-    		IRI p = parseLastRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, vf, null);
-    		return createStatement(s, p, o, c, vf);
+    	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader) {
+    		Resource c = parseShortRDFValue(this, RDFRole.CONTEXT, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader);
+    		Value o = parseIntRDFValue(this, RDFRole.OBJECT, obj, key, cn, cv, RDFObject.KEY_SIZE, reader);
+    		Resource s = parseShortRDFValue(this, RDFRole.SUBJECT, subj, key, cn, cv, RDFSubject.KEY_SIZE, reader);
+    		IRI p = parseLastRDFValue(this, RDFRole.PREDICATE, pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, reader);
+    		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
     	byte[][] newStopKeys() {
@@ -277,7 +274,7 @@ public enum StatementIndex {
 		}
 	}
 
-    private static <V extends Value> V parseShortRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf, TableTripleFactory tf) throws IOException {
+    private static <V extends Value> V parseShortRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader) {
     	byte marker = cv.get(cv.position()); // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -285,10 +282,10 @@ public enum StatementIndex {
     	} else {
     		len = cv.getShort();
     	}
-   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, vf, tf);
+   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, reader);
     }
 
-    private static <V extends Value> V parseIntRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf, TableTripleFactory tf) throws IOException {
+    private static <V extends Value> V parseIntRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader) {
     	byte marker = cv.get(cv.position()); // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -296,10 +293,10 @@ public enum StatementIndex {
     	} else {
     		len = cv.getInt();
     	}
-   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, vf, tf);
+   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, reader);
     }
 
-    private static <V extends Value> V parseLastRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueFactory vf, TableTripleFactory tf) throws IOException {
+    private static <V extends Value> V parseLastRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader) {
     	byte marker = cv.hasRemaining() ? cv.get(cv.position()) : 0; // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -307,11 +304,11 @@ public enum StatementIndex {
     	} else {
     		len = cv.remaining();
     	}
-   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, vf, tf);
+   		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, reader);
     }
 
     @SuppressWarnings("unchecked")
-	private static <V extends Value> V parseRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, int len, ValueFactory vf, TableTripleFactory tf) throws IOException {
+	private static <V extends Value> V parseRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, int len, ValueIO.Reader reader) {
     	if(pattern != null) {
     		// if we have been given the value then don't bother to read it and skip to the next
     		skipId(key, cn, keySize);
@@ -330,7 +327,7 @@ public enum StatementIndex {
 			Identifier id = parseId(index, role, key, cn, keySize);
 			int limit = cv.limit();
 			cv.limit(cv.position() + len);
-			V value = (V) ValueIO.readValue(cv, vf, tf);
+			V value = (V) reader.readValue(cv);
 			cv.limit(limit);
 			if (value instanceof Identifiable) {
 				((Identifiable)value).setId(id);
@@ -377,7 +374,7 @@ public enum StatementIndex {
 	}
 
 	abstract byte[] value(RDFValue<?> v1, RDFValue<?> v2, RDFValue<?> v3, RDFValue<?> v4);
-	abstract Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueFactory vf, TableTripleFactory tf) throws IOException;
+	abstract Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader);
 	abstract byte[][] newStopKeys();
 	abstract byte[] keyHash(Identifier id);
 	abstract byte[] qualifierHash(Identifier id);

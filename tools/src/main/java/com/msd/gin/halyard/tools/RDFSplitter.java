@@ -51,7 +51,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 			files[i] = new RDFFile(outFormat, gzipOutput, outputDir.resolve(outBaseName+"_"+(i+1)+outExt));
 		}
 		RDFFile bnodeFile;
-		if (numThreads > 1) {
+		if (numParts > 1 || numThreads > 1) {
 			bnodeFile = new RDFFile(outFormat, gzipOutput, outputDir.resolve(outBaseName+"_bnodes"+outExt));
 		} else {
 			bnodeFile = null;

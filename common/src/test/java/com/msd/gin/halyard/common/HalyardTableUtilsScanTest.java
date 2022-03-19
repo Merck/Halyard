@@ -185,7 +185,7 @@ public class HalyardTableUtilsScanTest {
 
     @Test
     public void testScan() throws Exception {
-        ValueFactory vf = SimpleValueFactory.getInstance();
+        ValueFactory vf = ValueIO.SIMPLE_READER.getValueFactory();
 
         RDFSubject subj = RDFSubject.create(s == null ? null : vf.createIRI(s));
         RDFPredicate pred = RDFPredicate.create(p == null ? null : vf.createIRI(p));
@@ -195,7 +195,7 @@ public class HalyardTableUtilsScanTest {
             Set<Statement> res = new HashSet<>();
             Result r;
             while ((r = rs.next()) != null) {
-                res.addAll(HalyardTableUtils.parseStatements(subj, pred, obj, ctx, r, vf, null));
+                res.addAll(HalyardTableUtils.parseStatements(subj, pred, obj, ctx, r, ValueIO.SIMPLE_READER));
             }
             assertTrue(allStatements.containsAll(res));
             assertEquals(expRes, res.size());
@@ -221,7 +221,7 @@ public class HalyardTableUtilsScanTest {
                     Set<Statement> res = new HashSet<>();
                     Result r;
                     while ((r = rs.next()) != null) {
-                        res.addAll(HalyardTableUtils.parseStatements(null, null, null, null, r, vf, null));
+                        res.addAll(HalyardTableUtils.parseStatements(null, null, null, null, r, ValueIO.SIMPLE_READER));
                     }
                     assertTrue(allStatements.containsAll(res));
                     assertEquals(expRes, res.size());

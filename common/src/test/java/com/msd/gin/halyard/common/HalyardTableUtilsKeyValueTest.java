@@ -93,8 +93,8 @@ public class HalyardTableUtilsKeyValueTest {
 		}
 	}
 
-	private void testParseStatement(String msg, Statement expected, RDFSubject s, RDFPredicate p, RDFObject o, RDFContext c, Cell kv, long ts) throws IOException {
-		Statement actual = HalyardTableUtils.parseStatement(s, p, o, c, kv, vf, null);
+	private void testParseStatement(String msg, Statement expected, RDFSubject s, RDFPredicate p, RDFObject o, RDFContext c, Cell kv, long ts) {
+		Statement actual = HalyardTableUtils.parseStatement(s, p, o, c, kv, new ValueIO.Reader(vf, null));
 		assertEquals(msg, expected, actual);
 		assertEquals(ts, ((Timestamped)actual).getTimestamp());
 		if(s == null) {

@@ -1,45 +1,45 @@
 package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 
 import org.eclipse.rdf4j.model.Value;
 
 public final class Identifier {
-	public static final int ID_SIZE = 20;
+	public static final int ID_SIZE = Hashes.hashUniqueSize();
 	static final byte NON_LITERAL_FLAG = (byte) 0x80;
 
 	private final byte[] value;
 	private final int hashcode;
 
 	public static Identifier id(Value v) {
-		Identifier id;
-		Identifiable idValue;
-	
 		if (v instanceof Identifiable) {
-			idValue = (Identifiable) v;
-			id = idValue.getId();
+			return ((Identifiable) v).getId();
+		}
+
+		Identifier id = ValueIO.WELL_KNOWN_IRI_IDS.inverse().get(v);
+		if (id != null) {
+			return id;
+		}
+
+		return create(v);
+	}
+
+	private static Identifier create(Value v) {
+		ByteBuffer ser = ByteBuffer.allocate(128);
+		ser = ValueIO.CELL_WRITER.writeTo(v, ser);
+		ser.flip();
+		return create(v, ser);
+	}
+
+	static Identifier create(Value v, ByteBuffer ser) {
+		byte[] hash = Hashes.hashUnique(ser);
+		// literal prefix
+		if (v.isLiteral()) {
+			hash[0] &= 0x7F; // 0 msb
 		} else {
-			idValue = null;
-			id = ValueIO.WELL_KNOWN_IRI_IDS.inverse().get(v);
+			hash[0] |= NON_LITERAL_FLAG; // 1 msb
 		}
-	
-		boolean alreadyHasHash = (id != null);
-		if (!alreadyHasHash) {
-			byte[] hash = Hashes.hashUnique(v.toString().getBytes(StandardCharsets.UTF_8));
-			// literal prefix
-			if (v.isLiteral()) {
-				hash[0] &= 0x7F; // 0 msb
-			} else {
-				hash[0] |= NON_LITERAL_FLAG; // 1 msb
-			}
-			id = new Identifier(hash);
-		}
-	
-		if (idValue != null && !alreadyHasHash) {
-			idValue.setId(id);
-		}
-		return id;
+		return new Identifier(hash);
 	}
 
 	public Identifier(byte[] value) {

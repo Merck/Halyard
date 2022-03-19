@@ -18,7 +18,8 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.StatementIndex;
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
+import com.msd.gin.halyard.common.ValueIO;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
@@ -33,6 +34,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.text.MessageFormat;
 import java.util.BitSet;
 import java.util.Collections;
@@ -103,11 +105,11 @@ public final class HalyardSummary extends AbstractHalyardTool {
     private static final String DECIMATION_FACTOR = "halyard.summary.decimation";
     private static final int DEFAULT_DECIMATION_FACTOR = 100;
 
-    static byte toCardinality(long count) {
-        return (byte)(63 - Long.numberOfLeadingZeros(count));
+    static int toCardinality(long count) {
+        return (63 - Long.numberOfLeadingZeros(count));
     }
 
-    static IRI cardinalityIRI(String type, byte cardinality) {
+    static IRI cardinalityIRI(String type, int cardinality) {
         return SVF.createIRI(NAMESPACE, type + cardinality);
     }
 
@@ -118,14 +120,14 @@ public final class HalyardSummary extends AbstractHalyardTool {
         private final Random random = new Random(0);
         private int decimationFactor;
         private Table table;
-        private TableTripleFactory tf;
+        private ValueIO.Reader valueReader;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             this.table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            this.tf = new TableTripleFactory(table);
+            this.valueReader = new ValueIO.Reader(SVF, new TableTripleReader(table));
         }
 
         private Set<IRI> queryForClasses(Value instance) throws IOException {
@@ -136,7 +138,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 Scan scan = HalyardTableUtils.scan(s, p, null, null);
                 try (ResultScanner scanner = table.getScanner(scan)) {
                     for (Result r : scanner) {
-                        for (Statement st : HalyardTableUtils.parseStatements(s, p, null, null, r, SVF, tf)) {
+                        for (Statement st : HalyardTableUtils.parseStatements(s, p, null, null, r, valueReader)) {
 	                        if (st.getSubject().equals(instance) && st.getPredicate().equals(RDF.TYPE) && (st.getObject() instanceof IRI)) {
 	                            res.add((IRI)st.getObject());
 	                        }
@@ -255,7 +257,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             if (random.nextInt(decimationFactor) == 0) {
-                statementChange(output, HalyardTableUtils.parseStatement(null, null, null, null, value.rawCells()[0], SVF, tf));
+                statementChange(output, HalyardTableUtils.parseStatement(null, null, null, null, value.rawCells()[0], valueReader));
             }
             if (++counter % 10000 == 0) {
                 output.setStatus(MessageFormat.format("{0} cc:{1} pc:{2} pd:{3} pr:{4} pdr:{5}", counter, ccCounter, pcCounter, pdCounter, prCounter, pdrCounter));
@@ -391,7 +393,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             }
             if (count > 0) {
             	try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
-	                byte cardinality = toCardinality(count * decimationFactor);
+	                int cardinality = toCardinality(count * decimationFactor);
 	                SummaryType reportType = SummaryType.values()[dis.readByte()];
 	                IRI firstKey = SVF.createIRI(dis.readUTF());
 	                switch (reportType) {
@@ -453,7 +455,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
 	                            write(sliceRPred, RDFS.LABEL, SVF.createLiteral("slice rdfs:range with cardinality " + cardinality));
 	                            write(sliceRPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
 	                        }
-	                        IRI generatedRoot = SVF.createIRI(NAMESPACE, Hashes.encode(Hashes.hashUnique(key.get())));
+	                        IRI generatedRoot = SVF.createIRI(NAMESPACE, Hashes.encode(Hashes.hashUnique(ByteBuffer.wrap(key.get(), key.getOffset(), key.getLength()))));
 	                        write(generatedRoot, slicePPred, firstKey);
 	                        write(generatedRoot, sliceDPred, SVF.createIRI(dis.readUTF()));
 	                        write(generatedRoot, sliceRPred, SVF.createIRI(dis.readUTF()));

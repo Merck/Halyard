@@ -20,8 +20,9 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.StatementIndex;
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.Timestamped;
+import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
@@ -110,7 +111,10 @@ public class HBaseSailConnection implements SailConnection {
     }
 
     private BufferedMutator getBufferedMutator() {
-    	if (mutator == null) {
+		if (table == null) {
+			throw new SailException("Table closed");
+		}
+		if (mutator == null) {
     		mutator = sail.getBufferedMutator(table);
     	}
     	return mutator;
@@ -128,15 +132,18 @@ public class HBaseSailConnection implements SailConnection {
 				mutator.close();
 			} catch (IOException e) {
 				throw new SailException(e);
+			} finally {
+				mutator = null;
 			}
 		}
 
 		if (table != null) {
 			try {
 				table.close();
-				table = null;
 			} catch (IOException e) {
 				throw new SailException(e);
+			} finally {
+				table = null;
 			}
 		}
     }
@@ -284,7 +291,7 @@ public class HBaseSailConnection implements SailConnection {
 					final ResultScanner rs;
 
 					StatementScanner() throws IOException {
-						super(sail.getValueFactory(), new TableTripleFactory(table));
+						super(new ValueIO.Reader(sail.getValueFactory(), new TableTripleReader(table)));
 						rs = table.getScanner(StatementIndex.CSPO.scan());
 					}
 

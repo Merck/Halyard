@@ -6,13 +6,10 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.nio.ByteBuffer;
 
-import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
-import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
-import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
@@ -20,7 +17,6 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.RDFParserFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
 
-import com.msd.gin.halyard.common.TripleFactory;
 import com.msd.gin.halyard.common.ValueIO;
 
 public final class HRDFParser extends AbstractRDFParser {
@@ -39,7 +35,7 @@ public final class HRDFParser extends AbstractRDFParser {
 
     }
 
-	@Override
+    @Override
 	public RDFFormat getRDFFormat() {
 		return com.msd.gin.halyard.rio.HRDF.FORMAT;
 	}
@@ -50,6 +46,8 @@ public final class HRDFParser extends AbstractRDFParser {
 		RDFParseException,
 		RDFHandlerException
 	{
+		clear();
+		ValueIO.Reader valueReader = new ValueIO.Reader(valueFactory, new ValueIO.StreamTripleReader(), (id,vf) -> createNode(id));
 		try {
 			byte[] buffer = new byte[1024];
 			DataInputStream dataIn = new DataInputStream(in);
@@ -67,7 +65,7 @@ public final class HRDFParser extends AbstractRDFParser {
 					int len = dataIn.readShort();
 					buffer = ensureCapacity(buffer, len);
 					dataIn.readFully(buffer, 0, len);
-					c = (Resource) readValue(ByteBuffer.wrap(buffer, 0, len));
+					c = (Resource) valueReader.readValue(ByteBuffer.wrap(buffer, 0, len));
 				} else if (type > HRDF.QUADS) {
 					c = prevContext;
 				} else {
@@ -78,7 +76,7 @@ public final class HRDFParser extends AbstractRDFParser {
 					int len = dataIn.readShort();
 					buffer = ensureCapacity(buffer, len);
 					dataIn.readFully(buffer, 0, len);
-					s = (Resource) readValue(ByteBuffer.wrap(buffer, 0, len));
+					s = (Resource) valueReader.readValue(ByteBuffer.wrap(buffer, 0, len));
 				} else {
 					s = prevSubject;
 				}
@@ -87,14 +85,14 @@ public final class HRDFParser extends AbstractRDFParser {
 					int len = dataIn.readShort();
 					buffer = ensureCapacity(buffer, len);
 					dataIn.readFully(buffer, 0, len);
-					p = (IRI) readValue(ByteBuffer.wrap(buffer, 0, len));
+					p = (IRI) valueReader.readValue(ByteBuffer.wrap(buffer, 0, len));
 				} else {
 					p = prevPredicate;
 				}
 				int len = dataIn.readInt();
 				buffer = ensureCapacity(buffer, len);
 				dataIn.readFully(buffer, 0, len);
-				Value o = readValue(ByteBuffer.wrap(buffer, 0, len));
+				Value o = valueReader.readValue(ByteBuffer.wrap(buffer, 0, len));
 
 				Statement stmt;
 				if (c != null) {
@@ -135,36 +133,4 @@ public final class HRDFParser extends AbstractRDFParser {
 	{
 		throw new UnsupportedOperationException();
 	}
-
-	private Value readValue(ByteBuffer b) throws IOException {
-		Value v = ValueIO.readValue(b, valueFactory, TRIPLE_FACTORY);
-		if (v.isBNode()) {
-			v = createNode(((BNode)v).getID());
-		}
-		return v;
-	}
-
-
-	private final TripleFactory TRIPLE_FACTORY = new TripleFactory() {
-		@Override
-		public Triple readTriple(ByteBuffer b, ValueFactory vf) throws IOException {
-			int originalLimit = b.limit();
-			int len = b.getShort();
-			b.limit(b.position()+len);
-			Resource s = (Resource) readValue(b);
-			b.limit(originalLimit);
-
-			len = b.getShort();
-			b.limit(b.position()+len);
-			IRI p = (IRI) readValue(b);
-			b.limit(originalLimit);
-
-			len = b.getInt();
-			b.limit(b.position()+len);
-			Value o = readValue(b);
-			b.limit(originalLimit);
-
-			return vf.createTriple(s, p, o);
-		}
-	};
 }

@@ -1,14 +1,10 @@
 package com.msd.gin.halyard.common;
 
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleWriter;
-
 import java.nio.ByteBuffer;
 
 import org.eclipse.rdf4j.model.Value;
 
 public abstract class RDFValue<V extends Value> extends RDFIdentifier {
-	private static final TableTripleWriter TW = new TableTripleWriter();
-
 	final V val;
 	private ByteBuffer ser;
 
@@ -24,13 +20,11 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 
 	public final ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			ByteBuffer tmp = ByteBuffer.allocate(128);
-			tmp = ValueIO.writeBytes(val, tmp, TW);
-			tmp.flip();
-			ByteBuffer b = ByteBuffer.allocate(tmp.remaining());
-			b.put(tmp);
-			b.flip();
-			ser = b.asReadOnlyBuffer();
+			if (val instanceof SerializableValue) {
+				ser = ((SerializableValue) val).getSerializedForm();
+			} else {
+				ser = ValueIO.CELL_WRITER.toBytes(val);
+			}
 		}
 		return ser.duplicate();
 	}

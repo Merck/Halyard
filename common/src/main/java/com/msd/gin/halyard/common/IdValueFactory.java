@@ -22,8 +22,8 @@ import org.eclipse.rdf4j.model.base.AbstractValueFactory;
 public class IdValueFactory implements ValueFactory {
 	private static final IdValueFactory VF = new IdValueFactory();
 	private static final ValueFactory DELEGATE = new AbstractValueFactory() {};
-	private static final Literal TRUE = IdentifiableLiteral.create(DELEGATE.createLiteral(true));
-	private static final Literal FALSE = IdentifiableLiteral.create(DELEGATE.createLiteral(false));
+	private static final Literal TRUE = new IdentifiableLiteral(DELEGATE.createLiteral(true));
+	private static final Literal FALSE = new IdentifiableLiteral(DELEGATE.createLiteral(false));
 
 	public static IdValueFactory getInstance() {
 		return VF;

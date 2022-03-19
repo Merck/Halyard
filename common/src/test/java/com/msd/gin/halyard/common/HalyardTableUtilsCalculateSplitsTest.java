@@ -49,8 +49,8 @@ public class HalyardTableUtilsCalculateSplitsTest {
 				{ 2, false, null, 0.0f, new String[] { "00a000", "00c000", "00e000", "01", "01a000", "01c000", "01e000", "02", "02a000", "02c000", "02e000" } },
 				{ 2, false, null, 1.0f, new String[] { "00a000", "00c000", "00e000", "01", "01a000", "01c000", "01e000", "02", "022000", "024000", "026000" } },
 				{ 2, false, null, 0.8f, new String[] { "00a000", "00c000", "00e000", "01", "01a000", "01c000", "01e000", "02", "022000", "024000", "026000" } },
-				{ 2, false, Collections.singletonMap(RDF.VALUE, 0.5f), 0.0f, new String[] { "00a000", "00c000", "00e000", "01", "01b2f9c7f2", "01b2f9c7f28000", "01c000", "02", "02a000", "02c000", "02e000" } },
-				{ 2, false, Collections.singletonMap(RDF.VALUE, 0.8f), 0.0f, new String[] { "00a000", "00c000", "00e000", "01", "01b2f9c7f24000", "01b2f9c7f28000", "01b2f9c7f2c000", "02", "02a000", "02c000", "02e000" } },
+				{ 2, false, Collections.singletonMap(RDF.VALUE, 0.5f), 0.0f, new String[] { "00a000", "00c000", "00e000", "01", "01c000", "01df3029d0", "01df3029d08000", "02", "02a000", "02c000", "02e000" } },
+				{ 2, false, Collections.singletonMap(RDF.VALUE, 0.8f), 0.0f, new String[] { "00a000", "00c000", "00e000", "01", "01df3029d04000", "01df3029d08000", "01df3029d0c000", "02", "02a000", "02c000", "02e000" } },
         });
     }
 
@@ -76,7 +76,7 @@ public class HalyardTableUtilsCalculateSplitsTest {
         } else {
             assertEquals(expected.length, bb.length);
             for (int i = 0; i < expected.length; i++) {
-                assertEquals(expected[i], Hex.encodeHexString(bb[i]));
+                assertEquals("Split "+i, expected[i], Hex.encodeHexString(bb[i]));
             }
         }
     }

@@ -1,11 +1,10 @@
 package com.msd.gin.halyard.function;
 
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleWriter;
 import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.Identifier;
+import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.vocab.HALYARD;
 
-import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
 
@@ -23,8 +22,6 @@ import org.kohsuke.MetaInfServices;
 
 @MetaInfServices(TupleFunction.class)
 public class IdentifierTupleFunction implements TupleFunction {
-	private static final TableTripleWriter TW = new TableTripleWriter();
-
 	@Override
 	public String getURI() {
 		return HALYARD.IDENTIFIER_PROPERTY.stringValue();
@@ -50,13 +47,9 @@ public class IdentifierTupleFunction implements TupleFunction {
 			if (!(args[2] instanceof Value)) {
 				throw new ValueExprEvaluationException("Third argument must be an object");
 			}
-			ns = HALYARD.TRIPLE_ID_NS;
-			byte[] tripleId = new byte[3 * Identifier.ID_SIZE];
-			ByteBuffer buf = ByteBuffer.wrap(tripleId);
-			buf = TW.writeTriple((Resource) args[0], (IRI) args[1], args[2], buf);
-			buf.flip();
-			buf.get(tripleId);
-			id = Hashes.encode(tripleId);
+			ns = HALYARD.STATEMENT_ID_NS;
+			byte[] stmtId = ValueIO.statementId((Resource) args[0], (IRI) args[1], args[2]);
+			id = Hashes.encode(stmtId);
 		} else {
 			throw new ValueExprEvaluationException(String.format("%s requires 1 or 3 arguments, got %d", getURI(), args.length));
 		}

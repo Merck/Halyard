@@ -80,7 +80,7 @@ public class HalyardTableUtilsTest {
 
     @Test
     public void testBigLiteral() throws Exception {
-        ValueFactory vf = SimpleValueFactory.getInstance();
+        ValueFactory vf = ValueIO.SIMPLE_READER.getValueFactory();
         Resource subj = vf.createIRI("http://testBigLiteral/subject/");
         IRI pred = vf.createIRI("http://testBigLiteral/pred/");
         Value obj = vf.createLiteral(RandomStringUtils.random(100000));
@@ -94,16 +94,16 @@ public class HalyardTableUtilsTest {
         RDFPredicate p = RDFPredicate.create(pred);
         RDFObject o = RDFObject.create(obj);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
-            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, o, null, rs.next(), vf, null).iterator().next().getObject());
+            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, o, null, rs.next(), ValueIO.SIMPLE_READER).iterator().next().getObject());
         }
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, null, null))) {
-            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, null, null, rs.next(), vf, null).iterator().next().getObject());
+            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, null, null, rs.next(), ValueIO.SIMPLE_READER).iterator().next().getObject());
         }
     }
 
     @Test
     public void testConflictingHash() throws Exception {
-        ValueFactory vf = SimpleValueFactory.getInstance();
+        ValueFactory vf = ValueIO.SIMPLE_READER.getValueFactory();
         Resource subj = vf.createIRI("http://testConflictingHash/subject/");
         IRI pred1 = vf.createIRI("http://testConflictingHash/pred1/");
         IRI pred2 = vf.createIRI("http://testConflictingHash/pred2/");
@@ -131,7 +131,7 @@ public class HalyardTableUtilsTest {
         RDFPredicate p1 = RDFPredicate.create(pred1);
         RDFObject o1 = RDFObject.create(obj1);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p1, o1, null))) {
-            List<Statement> res = HalyardTableUtils.parseStatements(s, p1, o1, null, rs.next(), vf, null);
+            List<Statement> res = HalyardTableUtils.parseStatements(s, p1, o1, null, rs.next(), ValueIO.SIMPLE_READER);
             assertEquals(1, res.size());
             assertTrue(res.contains(SimpleValueFactory.getInstance().createStatement(subj, pred1, obj1)));
         }
@@ -172,7 +172,7 @@ public class HalyardTableUtilsTest {
 
     @Test
     public void testNoResult() throws Exception {
-        assertEquals(0, HalyardTableUtils.parseStatements(null, null, null, null, Result.EMPTY_RESULT, SimpleValueFactory.getInstance(), null).size());
+        assertEquals(0, HalyardTableUtils.parseStatements(null, null, null, null, Result.EMPTY_RESULT, ValueIO.SIMPLE_READER).size());
     }
 
     @Test(expected = IllegalArgumentException.class)

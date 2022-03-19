@@ -38,7 +38,7 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 
 		IRI idIri = (IRI) args[0];
 		Identifier id;
-		if (HALYARD.TRIPLE_ID_NS.getName().equals(idIri.getNamespace())) {
+		if (HALYARD.STATEMENT_ID_NS.getName().equals(idIri.getNamespace())) {
 			byte[] stmtId = Hashes.decode(idIri.getLocalName());
 			byte[] idBytes = new byte[Identifier.ID_SIZE];
 			System.arraycopy(stmtId, statementPosition() * Identifier.ID_SIZE, idBytes, 0, Identifier.ID_SIZE);

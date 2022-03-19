@@ -75,5 +75,5 @@ public final class HALYARD implements Vocabulary {
 
     public static final Namespace VALUE_ID_NS = new SimpleNamespace("idv", "halyard:id:value:");
 
-    public static final Namespace TRIPLE_ID_NS = new SimpleNamespace("id3", "halyard:id:triple:");
+    public static final Namespace STATEMENT_ID_NS = new SimpleNamespace("id3", "halyard:id:statement:");
 }

@@ -19,6 +19,7 @@ package com.msd.gin.halyard.sail;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
@@ -61,11 +62,11 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 	}
 
 	@Override
-	protected CloseableIteration<? extends Statement, IOException> createStatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contexts, ValueFactory vf) throws QueryEvaluationException {
+	protected CloseableIteration<? extends Statement, IOException> createStatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contexts, ValueIO.Reader reader) throws QueryEvaluationException {
 		if (obj != null && obj.isLiteral() && (HALYARD.SEARCH_TYPE.equals(((Literal) obj).getDatatype()))) {
-			return new LiteralSearchStatementScanner(subj, pred, obj.stringValue(), contexts, vf);
+			return new LiteralSearchStatementScanner(subj, pred, obj.stringValue(), contexts, reader);
 		} else {
-			return super.createStatementScanner(subj, pred, obj, contexts, vf);
+			return super.createStatementScanner(subj, pred, obj, contexts, reader);
 		}
 	}
 
@@ -77,8 +78,8 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 		Iterator<RDFObject> objects = null;
 		private final String literalSearchQuery;
 
-		public LiteralSearchStatementScanner(Resource subj, IRI pred, String literalSearchQuery, List<Resource> contexts, ValueFactory vf) throws SailException {
-			super(subj, pred, null, contexts, vf);
+		public LiteralSearchStatementScanner(Resource subj, IRI pred, String literalSearchQuery, List<Resource> contexts, ValueIO.Reader reader) throws SailException {
+			super(subj, pred, null, contexts, reader);
 			if (elasticSearchURL == null || elasticSearchURL.length() == 0) {
 				throw new SailException("ElasticSearch Index URL is not properly configured.");
 			}

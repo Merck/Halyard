@@ -53,7 +53,7 @@ public final class HalyardQueryJoinOptimizer extends QueryJoinOptimizer {
         tupleExpr.visit(new AbstractQueryModelVisitor<IncompatibleOperationException>() {
             @Override
             public void meet(FunctionCall node) throws IncompatibleOperationException {
-                if (HALYARD.PARALLEL_SPLIT_FUNCTION.toString().equals(node.getURI())) {
+                if (HALYARD.PARALLEL_SPLIT_FUNCTION.stringValue().equals(node.getURI())) {
                     for (ValueExpr arg : node.getArgs()) {
                         if (arg instanceof Var) parallelSplitBounds.add(((Var)arg).getName());
                     }

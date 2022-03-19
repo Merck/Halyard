@@ -18,7 +18,8 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.StatementIndex;
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
+import com.msd.gin.halyard.common.ValueIO;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.Identifier;
 import com.msd.gin.halyard.common.RDFContext;
@@ -76,7 +77,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
     static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
 
     	final Text outputJson = new Text();
-    	TableTripleFactory tf;
+        ValueIO.Reader valueReader;
         long counter = 0, exports = 0, statements = 0;
         byte[] lastHash = new byte[RDFObject.KEY_SIZE];
         Set<Literal> literals;
@@ -85,7 +86,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException {
             Configuration conf = context.getConfiguration();
             Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            tf = new TableTripleFactory(table);
+            valueReader = new ValueIO.Reader(VF, new TableTripleReader(table));
         }
 
         @Override
@@ -101,7 +102,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             	lastHash = hash;
             }
 
-            for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, VF, tf)) {
+            for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, valueReader)) {
                 statements++;
             	Literal l = (Literal) st.getObject();
                 if (literals.add(l)) {

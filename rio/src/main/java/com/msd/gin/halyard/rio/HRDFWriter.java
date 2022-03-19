@@ -10,14 +10,12 @@ import java.nio.ByteBuffer;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
-import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.RDFWriterFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFWriter;
 
-import com.msd.gin.halyard.common.TripleWriter;
 import com.msd.gin.halyard.common.ValueIO;
 
 public final class HRDFWriter extends AbstractRDFWriter {
@@ -53,6 +51,7 @@ public final class HRDFWriter extends AbstractRDFWriter {
 			throw new UnsupportedOperationException();
 		}
 	}
+
 
 	private final DataOutputStream out;
 
@@ -91,17 +90,17 @@ public final class HRDFWriter extends AbstractRDFWriter {
 		buf.put((byte) type);
 		boolean skip = (c == null) || c.equals(prevContext);
 		if (!skip) {
-			buf = writeValue(c, buf, 2);
+			buf = ValueIO.writeValue(c, ValueIO.STREAM_WRITER, buf, 2);
 		}
 		skip = subj.equals(prevSubject) && skip;
 		if (!skip) {
-			buf = writeValue(subj, buf, 2);
+			buf = ValueIO.writeValue(subj, ValueIO.STREAM_WRITER, buf, 2);
 		}
 		skip = pred.equals(prevPredicate) && skip;
 		if (!skip) {
-			buf = writeValue(pred, buf, 2);
+			buf = ValueIO.writeValue(pred, ValueIO.STREAM_WRITER, buf, 2);
 		}
-		buf = writeValue(st.getObject(), buf, 4);
+		buf = ValueIO.writeValue(st.getObject(), ValueIO.STREAM_WRITER, buf, 4);
 		try {
 			out.write(buf.array(), buf.arrayOffset(), buf.position());
 		} catch(IOException e) {
@@ -110,26 +109,6 @@ public final class HRDFWriter extends AbstractRDFWriter {
 		prevContext = c;
 		prevSubject = subj;
 		prevPredicate = pred;
-	}
-
-	private ByteBuffer writeValue(Value v, ByteBuffer buf, int sizeBytes) {
-		buf = ValueIO.ensureCapacity(buf, sizeBytes);
-		int sizePos = buf.position();
-		int startPos = buf.position() + sizeBytes;
-		buf.position(startPos);
-		buf = ValueIO.writeBytes(v, buf, TRIPLE_WRITER);
-		int endPos = buf.position();
-		int len = endPos - startPos;
-		buf.position(sizePos);
-		if (sizeBytes == 2) {
-			buf.putShort((short) len);
-		} else if (sizeBytes == 4) {
-			buf.putInt(len);
-		} else {
-			throw new AssertionError();
-		}
-		buf.position(endPos);
-		return buf;
 	}
 
 	@Override
@@ -146,15 +125,4 @@ public final class HRDFWriter extends AbstractRDFWriter {
 		prevSubject = null;
 		prevPredicate = null;
 	}
-
-
-	private final TripleWriter TRIPLE_WRITER = new TripleWriter() {
-		@Override
-		public ByteBuffer writeTriple(Resource subj, IRI pred, Value obj, ByteBuffer buf) {
-			buf = writeValue(subj, buf, 2);
-			buf = writeValue(pred, buf, 2);
-			buf = writeValue(obj, buf, 4);
-			return buf;
-		}
-	};
 }

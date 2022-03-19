@@ -17,7 +17,8 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleFactory;
+import com.msd.gin.halyard.common.ValueIO;
+import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -71,7 +72,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
     static final class DeleteMapper extends TableMapper<ImmutableBytesWritable, KeyValue> {
 
         final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
-        TableTripleFactory tf;
+        ValueIO.Reader valueReader;
         long total = 0, deleted = 0;
         Resource subj;
         IRI pred;
@@ -82,7 +83,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            tf = new TableTripleFactory(table);
+            valueReader = new ValueIO.Reader(SVF, new TableTripleReader(table));
             String s = conf.get(SUBJECT);
             if (s!= null) {
                 subj = NTriplesUtil.parseResource(s, SVF);
@@ -111,7 +112,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             for (Cell c : value.rawCells()) {
-                Statement st = HalyardTableUtils.parseStatement(null, null, null, null, c, SVF, tf);
+                Statement st = HalyardTableUtils.parseStatement(null, null, null, null, c, valueReader);
                 if ((subj == null || subj.equals(st.getSubject())) && (pred == null || pred.equals(st.getPredicate())) && (obj == null || obj.equals(st.getObject())) && (ctx == null || ctx.contains(st.getContext()))) {
                     KeyValue kv = new KeyValue(c.getRowArray(), c.getRowOffset(), (int) c.getRowLength(),
                         c.getFamilyArray(), c.getFamilyOffset(), (int) c.getFamilyLength(),
