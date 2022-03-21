@@ -45,7 +45,7 @@ enum IndexType {
 			stopKeys[0] = k1b;
 			stopKeys[1] = k2b;
 			stopKeys[2] = k3b;
-			return HalyardTableUtils.scan(concat(index, false, k1b, k2b, k3b), concat(index, true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, null)));
+			return HalyardTableUtils.scan(index.concat(false, k1b, k2b, k3b), index.concat(true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, null)));
 		}
 
 		@Override
@@ -54,7 +54,7 @@ enum IndexType {
 			byte[] k2b = k2.getKeyHash(index);
 			byte[] k3b = k3.getEndKeyHash(index);
 			byte[] k4b = k4.getKeyHash(index);
-			return HalyardTableUtils.scan(concat(index, false, k1b, k2b, k3b, k4b), concat(index, true, k1b, k2b, k3b, k4b)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, k4)));
+			return HalyardTableUtils.scan(index.concat(false, k1b, k2b, k3b, k4b), index.concat(true, k1b, k2b, k3b, k4b)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, k4)));
 		}
 	},
 
@@ -95,7 +95,7 @@ enum IndexType {
 			stopKeys[0] = k1b;
 			stopKeys[1] = k2b;
 			stopKeys[2] = k3b;
-			return HalyardTableUtils.scan(concat(index, false, k1b, k2b, k3b), concat(index, true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, null)));
+			return HalyardTableUtils.scan(index.concat(false, k1b, k2b, k3b), index.concat(true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, null)));
 		}
 
 		@Override
@@ -104,62 +104,26 @@ enum IndexType {
 			byte[] k2b = k2.getKeyHash(index);
 			byte[] k3b = k3.getKeyHash(index);
 			byte[] k4b = k4.getEndKeyHash(index);
-			return HalyardTableUtils.scan(concat(index, false, k1b, k2b, k3b, k4b), concat(index, true, k1b, k2b, k3b, k4b)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, k4)));
+			return HalyardTableUtils.scan(index.concat(false, k1b, k2b, k3b, k4b), index.concat(true, k1b, k2b, k3b, k4b)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, k4)));
 		}
 	};
-
-	/** exclusive */
-	private static final byte[] LITERAL_STOP_KEY = new byte[] { (byte) 0x80 };
-
-	static Scan scanLiterals() {
-		StatementIndex index = StatementIndex.OSP;
-		return HalyardTableUtils.scan(concat(index, false), concat(index, false, LITERAL_STOP_KEY));
-	}
-
-	static Scan scanLiterals(RDFContext ctx) {
-		StatementIndex index = StatementIndex.COSP;
-		byte[] ctxb = ctx.getKeyHash(index);
-		return HalyardTableUtils.scan(concat(index, false, ctxb), concat(index, false, ctxb, LITERAL_STOP_KEY)).setFilter(new ColumnPrefixFilter(index.qualifier(ctx, null, null, null)));
-	}
-
-    /**
-     * Helper method concatenating keys
-     * @param prefix key prefix byte
-     * @param trailingZero boolean switch adding trailing zero to the resulting key
-     * @param fragments variable number of the key fragments as byte arrays
-     * @return concatenated key as byte array
-     */
-    private static byte[] concat(StatementIndex index, boolean trailingZero, byte[]... fragments) {
-        int i = 1;
-        for (byte[] fr : fragments) {
-            i += fr.length;
-        }
-        byte[] res = new byte[trailingZero ? i + 1 : i];
-        res[0] = index.prefix;
-        i = 1;
-        for (byte[] fr : fragments) {
-            System.arraycopy(fr, 0, res, i, fr.length);
-            i += fr.length;
-        }
-        return res;
-    }
 
 	abstract byte[] row(StatementIndex index, RDFIdentifier v1, RDFIdentifier v2, RDFIdentifier v3, RDFIdentifier v4);
 	abstract byte[] qualifier(StatementIndex index, RDFIdentifier v1, RDFIdentifier v2, RDFIdentifier v3, RDFIdentifier v4);
 	final Scan scan(StatementIndex index) {
-		return HalyardTableUtils.scan(concat(index, false), concat(index, true, index.newStopKeys()));
+		return HalyardTableUtils.scan(index.concat(false), index.concat(true, index.newStopKeys()));
 	}
 	final Scan scan(StatementIndex index, Identifier id) {
 		byte[] kb = index.keyHash(id);
 		byte[][] stopKeys = index.newStopKeys();
 		stopKeys[0] = kb;
-		return HalyardTableUtils.scan(concat(index, false, kb), concat(index, true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifierHash(id)));
+		return HalyardTableUtils.scan(index.concat(false, kb), index.concat(true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifierHash(id)));
 	}
 	final Scan scan(StatementIndex index, RDFIdentifier k) {
 		byte[] kb = k.getKeyHash(index);
 		byte[][] stopKeys = index.newStopKeys();
 		stopKeys[0] = kb;
-		return HalyardTableUtils.scan(concat(index, false, kb), concat(index, true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k, null, null, null)));
+		return HalyardTableUtils.scan(index.concat(false, kb), index.concat(true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k, null, null, null)));
 	}
 	final Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2) {
 		byte[] k1b = k1.getKeyHash(index);
@@ -167,7 +131,7 @@ enum IndexType {
 		byte[][] stopKeys = index.newStopKeys();
 		stopKeys[0] = k1b;
 		stopKeys[1] = k2b;
-		return HalyardTableUtils.scan(concat(index, false, k1b, k2b), concat(index, true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, null, null)));
+		return HalyardTableUtils.scan(index.concat(false, k1b, k2b), index.concat(true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, null, null)));
 	}
 	abstract Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3);
 	abstract Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3, RDFIdentifier k4);

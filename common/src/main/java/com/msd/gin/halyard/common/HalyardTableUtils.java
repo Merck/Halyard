@@ -205,9 +205,9 @@ public final class HalyardTableUtils {
 	 * @return An array of keys represented as {@code byte[]}s
 	 */
 	static byte[][] calculateSplits(final int splitBits, boolean quads) {
-		return calculateSplits(splitBits, quads, null, 0.5f);
+		return calculateSplits(splitBits, quads, null);
 	}
-	static byte[][] calculateSplits(final int splitBits, boolean quads, Map<IRI,Float> predicateRatios, float literalRatio) {
+	static byte[][] calculateSplits(final int splitBits, boolean quads, Map<IRI,Float> predicateRatios) {
         TreeSet<byte[]> splitKeys = new TreeSet<>(Bytes.BYTES_COMPARATOR);
         //basic presplits
         splitKeys.add(new byte[]{StatementIndex.POS.prefix});
@@ -218,13 +218,13 @@ public final class HalyardTableUtils {
 			splitKeys.add(new byte[] { StatementIndex.COSP.prefix });
 		}
         //common presplits
-		addSplitsNoLiterals(splitKeys, new byte[] { StatementIndex.SPO.prefix }, splitBits, null);
-		addSplitsNoLiterals(splitKeys, new byte[] { StatementIndex.POS.prefix }, splitBits, transformKeys(predicateRatios, iri -> RDFPredicate.create(iri)));
-        addObjectSplits(splitKeys, new byte[]{StatementIndex.OSP.prefix}, splitBits, literalRatio);
+		addSplits(splitKeys, StatementIndex.SPO.prefix, splitBits, null);
+		addSplits(splitKeys, StatementIndex.POS.prefix, splitBits, transformKeys(predicateRatios, iri -> RDFPredicate.create(iri)));
+        addSplits(splitKeys, StatementIndex.OSP.prefix, splitBits, null);
         if (quads) {
-			addSplitsNoLiterals(splitKeys, new byte[] { StatementIndex.CSPO.prefix }, splitBits/2, null);
-			addSplitsNoLiterals(splitKeys, new byte[] { StatementIndex.CPOS.prefix }, splitBits/2, null);
-			addSplitsNoLiterals(splitKeys, new byte[] { StatementIndex.COSP.prefix }, splitBits/2, null);
+			addSplits(splitKeys, StatementIndex.CSPO.prefix, splitBits/2, null);
+			addSplits(splitKeys, StatementIndex.CPOS.prefix, splitBits/2, null);
+			addSplits(splitKeys, StatementIndex.COSP.prefix, splitBits/2, null);
         }
         return splitKeys.toArray(new byte[splitKeys.size()][]);
     }
@@ -241,39 +241,13 @@ public final class HalyardTableUtils {
 	}
 
 	/**
-	 * Generate the split key and add it to the collection.
-	 * 
-	 * @param splitKeys the {@code TreeSet} to add the collection to.
-	 * @param prefix the prefix to calculate the key for
-	 * @param splitBits between 0 and 16, larger values generate smaller split steps
-	 */
-	private static void addObjectSplits(TreeSet<byte[]> splitKeys, byte[] prefix, final int splitBits, float literalRatio) {
-		int noLitSplitBits = (int)Math.round((1.0f-literalRatio)*splitBits);
-		int litSplitBits = (int)Math.round(literalRatio*splitBits);
-		boolean needDivider = (noLitSplitBits > 0) && (litSplitBits > 0);
-		// adjust for rounding errors
-		if (noLitSplitBits + litSplitBits > splitBits) {
-			float scale = (float)splitBits/(float)(noLitSplitBits + litSplitBits);
-			noLitSplitBits *= scale;
-			litSplitBits *= scale;
-		}
-		addSplitsNoLiterals(splitKeys, prefix, noLitSplitBits, null);
-		addSplitsLiterals(splitKeys, prefix, litSplitBits);
-		if (needDivider) {
-			byte[] prefixLiteralSplit = Arrays.copyOf(prefix, prefix.length + 2);
-			prefixLiteralSplit[prefix.length] = Identifier.NON_LITERAL_FLAG;
-			splitKeys.add(prefixLiteralSplit);
-		}
-	}
-
-	/**
-	 * Generate the split key (for non-literals) and add it to the collection.
+	 * Generate the split keys and add it to the collection.
 	 * 
 	 * @param splitKeys the {@code TreeSet} to add the collection to.
 	 * @param prefix the prefix to calculate the key for
 	 * @param splitBits between 0 and 15, larger values generate smaller split steps
 	 */
-	private static void addSplitsNoLiterals(TreeSet<byte[]> splitKeys, byte[] prefix, final int splitBits, Map<? extends RDFIdentifier,Float> keyFractions) {
+	private static void addSplits(TreeSet<byte[]> splitKeys, byte prefix, final int splitBits, Map<? extends RDFIdentifier,Float> keyFractions) {
         if (splitBits == 0) return;
 		if (splitBits < 0 || splitBits > 15) {
 			throw new IllegalArgumentException("Illegal nunmber of split bits");
@@ -301,9 +275,9 @@ public final class HalyardTableUtils {
 		fractionSum = 0.0f;
 		if (keyFractions != null && !keyFractions.isEmpty()) {
 			for (Map.Entry<? extends RDFIdentifier, Float> entry : keyFractions.entrySet()) {
-				byte[] keyHash = entry.getKey().getKeyHash(StatementIndex.toIndex(prefix[0]));
+				byte[] keyHash = entry.getKey().getKeyHash(StatementIndex.toIndex(prefix));
 				byte[] keyPrefix = new byte[1+keyHash.length];
-				keyPrefix[0] = prefix[0];
+				keyPrefix[0] = prefix;
 				System.arraycopy(keyHash, 0, keyPrefix, 1, keyHash.length);
 				if (nonZeroSplitCount > 1) {
 					// add divider
@@ -311,41 +285,25 @@ public final class HalyardTableUtils {
 				}
 				float fraction = entry.getValue();
 				int keySplitBits = (int)(scale*Math.round(fraction*splitBits));
-				final int splitStep = 1 << (16 - keySplitBits);
-				for (int i = splitStep; i <= 0xFFFF; i += splitStep) {
-		            byte bb[] = Arrays.copyOf(keyPrefix, keyPrefix.length + 2);
-					bb[keyPrefix.length] = (byte) ((i >> 8) & 0xff); // 0xff = 255.
-		            bb[keyPrefix.length + 1] = (byte)(i & 0xff);
-		            splitKeys.add(bb);
-				}
+				splitKey(splitKeys, keyPrefix, keySplitBits);
 				fractionSum += fraction;
 			}
 		}
 
 		otherSplitBits *= scale;
-		final int splitStep = 1 << (15 - otherSplitBits); // 1 splitBit gives a split step of 16384, 8 splitBits gives a split step of 128
-		for (int i = splitStep; i <= 0x7FFF; i += splitStep) { // 0x7FFF is 32767 so a split step of 16384 will give 2 iterations, larger split bits give more iterations
-            byte bb[] = Arrays.copyOf(prefix, prefix.length + 2);
-			bb[prefix.length] = (byte) (0x80 + ((i >> 8) & 0xff)); // 0xff = 255.
-            bb[prefix.length + 1] = (byte)(i & 0xff);
-            splitKeys.add(bb);
-        }
+		splitKey(splitKeys, new byte[] {prefix}, otherSplitBits);
     }
 
-	private static void addSplitsLiterals(TreeSet<byte[]> splitKeys, byte[] prefix, final int splitBits) {
-        if (splitBits == 0) return;
-		if (splitBits < 0 || splitBits > 15) {
-			throw new IllegalArgumentException("Illegal nunmber of split bits");
+	private static void splitKey(TreeSet<byte[]> splitKeys, byte[] prefix, final int splitBits) {
+		final int splitStep = 1 << (16 - splitBits);
+		for (int i = splitStep; i <= 0xFFFF; i += splitStep) {
+            byte bb[] = Arrays.copyOf(prefix, prefix.length + 2);
+            // write unsigned short
+			bb[prefix.length] = (byte) ((i >> 8) & 0xFF);
+            bb[prefix.length + 1] = (byte) (i & 0xFF);
+            splitKeys.add(bb);
 		}
-
-		final int splitStep = 1 << (15 - splitBits); // 1 splitBit gives a split step of 16384, 8 splitBits gives a split step of 128
-		for (int i = splitStep; i <= 0x7FFF; i += splitStep) { // 0x7FFF is 32767 so a split step of 16384 will give 2 iterations, larger split bits give more iterations
-            byte bb[] = Arrays.copyOf(prefix, prefix.length + 2);
-			bb[prefix.length] = (byte) ((i >> 8) & 0xff); // 0xff = 255.
-            bb[prefix.length + 1] = (byte)(i & 0xff);
-            splitKeys.add(bb);
-        }
-    }
+	}
 
 	/**
      * Conversion method from Subj, Pred, Obj and optional Context into an array of HBase keys
@@ -554,7 +512,7 @@ public final class HalyardTableUtils {
      * @param obj object if known
      * @param ctx context if known
 	 * @param res HBase Scan Result
-	 * @param vf ValueFactory
+	 * @param valueReader ValueIO.Reader
 	 * @return List of Statements
 	 */
     public static List<Statement> parseStatements(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, Result res, ValueIO.Reader valueReader) {
@@ -584,7 +542,7 @@ public final class HalyardTableUtils {
      * @param obj object if known
      * @param ctx context if known
 	 * @param cell HBase Result Cell
-	 * @param vf ValueFactory
+	 * @param valueReader ValueIO.Reader
 	 * @return Statements
 	 */
     public static Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, Cell cell, ValueIO.Reader valueReader) {

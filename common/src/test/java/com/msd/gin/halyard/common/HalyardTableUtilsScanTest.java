@@ -153,8 +153,8 @@ public class HalyardTableUtilsScanTest {
     public static void setup() throws Exception {
         table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testScan", true, 0);
 
-        allStatements = new HashSet<>();
         SimpleValueFactory vf = SimpleValueFactory.getInstance();
+        allStatements = new HashSet<>();
         allStatements.add(vf.createStatement(vf.createIRI(SUBJ1), vf.createIRI(PRED1), vf.createLiteral(EXPL1), vf.createIRI(CTX1)));
         allStatements.add(vf.createStatement(vf.createIRI(SUBJ2), vf.createIRI(PRED2), vf.createLiteral(EXPL2), vf.createIRI(CTX2)));
         long timestamp = System.currentTimeMillis();

@@ -40,37 +40,32 @@ public class HalyardTableUtilsCalculateSplitsTest {
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][] {
-				{ 0, true, null, 0.5f, new String[] { "01", "02", "03", "04", "05" } },
-				{ 1, true, null, 0.5f, new String[] { "00c000", "01", "01c000", "02", "028000", "03", "04", "05" } },
-				{ 2, true, null, 0.5f, new String[] { "00a000", "00c000", "00e000", "01", "01a000", "01c000", "01e000", "02", "024000", "028000", "02c000", "03", "03c000", "04", "04c000", "05", "05c000" } },
-				{ 0, false, null, 0.5f, new String[] { "01", "02" } },
-				{ 1, false, null, 0.5f, new String[] { "00c000", "01", "01c000", "02", "028000" } },
-				{ 2, false, null, 0.5f, new String[] { "00a000", "00c000", "00e000", "01", "01a000", "01c000", "01e000", "02", "024000", "028000", "02c000" } },
-				{ 2, false, null, 0.0f, new String[] { "00a000", "00c000", "00e000", "01", "01a000", "01c000", "01e000", "02", "02a000", "02c000", "02e000" } },
-				{ 2, false, null, 1.0f, new String[] { "00a000", "00c000", "00e000", "01", "01a000", "01c000", "01e000", "02", "022000", "024000", "026000" } },
-				{ 2, false, null, 0.8f, new String[] { "00a000", "00c000", "00e000", "01", "01a000", "01c000", "01e000", "02", "022000", "024000", "026000" } },
-				{ 2, false, Collections.singletonMap(RDF.VALUE, 0.5f), 0.0f, new String[] { "00a000", "00c000", "00e000", "01", "01c000", "01df3029d0", "01df3029d08000", "02", "02a000", "02c000", "02e000" } },
-				{ 2, false, Collections.singletonMap(RDF.VALUE, 0.8f), 0.0f, new String[] { "00a000", "00c000", "00e000", "01", "01df3029d04000", "01df3029d08000", "01df3029d0c000", "02", "02a000", "02c000", "02e000" } },
+				{ 0, true, null, new String[] { "01", "02", "03", "04", "05" } },
+				{ 1, true, null, new String[] { "008000", "01", "018000", "02", "028000", "03", "04", "05" } },
+				{ 2, true, null, new String[] { "004000", "008000", "00c000", "01", "014000", "018000", "01c000", "02", "024000", "028000", "02c000", "03", "038000", "04", "048000", "05", "058000" } },
+				{ 0, false, null, new String[] { "01", "02" } },
+				{ 1, false, null, new String[] { "008000", "01", "018000", "02", "028000" } },
+				{ 2, false, null, new String[] { "004000", "008000", "00c000", "01", "014000", "018000", "01c000", "02", "024000", "028000", "02c000" } },
+				{ 2, false, Collections.singletonMap(RDF.VALUE, 0.5f), new String[] { "004000", "008000", "00c000", "01", "015fb029d0", "015fb029d08000", "018000", "02", "024000", "028000", "02c000" } },
+				{ 2, false, Collections.singletonMap(RDF.VALUE, 0.8f), new String[] { "004000", "008000", "00c000", "01", "015fb029d04000", "015fb029d08000", "015fb029d0c000", "02", "024000", "028000", "02c000" } },
         });
     }
 
     private final int splits;
 	private final boolean quads;
 	private final Map<IRI,Float> predicateFractions;
-	private final float literalRatio;
     private final String[] expected;
 
-	public HalyardTableUtilsCalculateSplitsTest(int splits, boolean quads, Map<IRI,Float> predicateFractions, float literalRatio, String[] expected) {
+	public HalyardTableUtilsCalculateSplitsTest(int splits, boolean quads, Map<IRI,Float> predicateFractions, String[] expected) {
         this.splits = splits;
 		this.quads = quads;
 		this.predicateFractions = predicateFractions;
-		this.literalRatio = literalRatio;
         this.expected = expected;
     }
 
     @Test
     public void testCalculateSplits() {
-		byte bb[][] = HalyardTableUtils.calculateSplits(splits, quads, predicateFractions, literalRatio);
+		byte bb[][] = HalyardTableUtils.calculateSplits(splits, quads, predicateFractions);
         if (expected == null) {
             assertNull(bb);
         } else {

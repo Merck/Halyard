@@ -62,8 +62,8 @@ public final class ValueIO {
 	public static final ValueIO.Writer STREAM_WRITER = new ValueIO.Writer(new StreamTripleWriter());
 	public static final ValueIO.Reader STREAM_READER = new ValueIO.Reader(IdValueFactory.getInstance(),  new StreamTripleReader());
 	public static final ValueIO.Reader SIMPLE_READER = new ValueIO.Reader(SimpleValueFactory.getInstance(), null);
+	public static final int DEFAULT_BUFFER_SIZE = 128;
 
-	static final int DEFAULT_BUFFER_SIZE = 128;
 	static final BiMap<Identifier, IRI> WELL_KNOWN_IRI_IDS = HashBiMap.create(256);
 	private static final BiMap<Integer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(1024);
 	private static final BiMap<Short, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);

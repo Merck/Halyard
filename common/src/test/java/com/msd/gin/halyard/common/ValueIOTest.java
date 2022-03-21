@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
@@ -29,7 +30,7 @@ import static org.junit.Assert.*;
 public class ValueIOTest {
 	private static final Date NOW = new Date();
 
-	public static List<Value> createData(ValueFactory vf) {
+	private static List<Value> createData(ValueFactory vf) {
 		return Arrays.asList(RDF.TYPE, vf.createLiteral("foo"), vf.createBNode("__foobar__"),
 			vf.createIRI("test:/foo"), vf.createLiteral("5423"), vf.createLiteral("\u98DF"),
 			vf.createLiteral(true), vf.createLiteral((byte) 6), vf.createLiteral((short) 7843),
@@ -90,12 +91,15 @@ public class ValueIOTest {
 			assertEquals(id, ((Identifiable)expected).getId());
 		}
 
+		assertEquals("isIRI", expected.isIRI(), id.isIRI());
+		assertEquals("isLiteral", expected.isLiteral(), id.isLiteral());
+		assertEquals("isBNode", expected.isBNode(), id.isBNode());
+		assertEquals("isTriple", expected.isTriple(), id.isTriple());
+
 		if (expected instanceof Literal) {
-			assertTrue(id.isLiteral());
 			RDFObject obj = RDFObject.create(expected);
 			assertRDFValueHashes(id, obj);
 		} else {
-			assertFalse(id.isLiteral());
 			if (expected instanceof IRI) {
 				RDFObject obj = RDFObject.create(expected);
 				assertRDFValueHashes(id, obj);
@@ -105,7 +109,7 @@ public class ValueIOTest {
 				assertRDFValueHashes(id, ctx);
 				RDFPredicate pred = RDFPredicate.create((IRI) expected);
 				assertRDFValueHashes(id, pred);
-			} else if (expected instanceof Resource) {
+			} else if (expected instanceof BNode) {
 				RDFObject obj = RDFObject.create(expected);
 				assertRDFValueHashes(id, obj);
 				RDFSubject subj = RDFSubject.create((Resource) expected);

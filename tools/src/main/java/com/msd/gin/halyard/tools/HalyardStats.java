@@ -296,7 +296,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                     if (partitionId == null) {
                         dos.writeInt(0);
                     } else {
-                    	ByteBuffer b = ByteBuffer.allocate(128);
+                    	ByteBuffer b = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
 						b = ValueIO.CELL_WRITER.writeTo(partitionId, b);
 						int len = b.position();
                         dos.writeInt(len);

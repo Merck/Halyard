@@ -6,7 +6,15 @@ import org.eclipse.rdf4j.model.Value;
 
 public final class Identifier {
 	public static final int ID_SIZE = Hashes.hashUniqueSize();
-	static final byte NON_LITERAL_FLAG = (byte) 0x80;
+	private static final byte LITERAL_TYPE_BITS = (byte) 0x00;
+	private static final byte TRIPLE_TYPE_BITS = (byte) 0x40;
+	private static final byte IRI_TYPE_BITS = (byte) 0x80;
+	private static final byte BNODE_TYPE_BITS = (byte) 0xC0;
+	private static final byte TYPE_MASK = (byte) 0xC0;
+	private static final byte CLEAR_TYPE_MASK = ~TYPE_MASK;
+	private static final int TYPE_INDEX = 1;
+	static final int TYPE_SALT_SIZE = 1<<(8*TYPE_INDEX);
+	static final byte LITERAL_STOP_BITS = (byte) 0x40;
 
 	private final byte[] value;
 	private final int hashcode;
@@ -25,7 +33,7 @@ public final class Identifier {
 	}
 
 	private static Identifier create(Value v) {
-		ByteBuffer ser = ByteBuffer.allocate(128);
+		ByteBuffer ser = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
 		ser = ValueIO.CELL_WRITER.writeTo(v, ser);
 		ser.flip();
 		return create(v, ser);
@@ -33,12 +41,19 @@ public final class Identifier {
 
 	static Identifier create(Value v, ByteBuffer ser) {
 		byte[] hash = Hashes.hashUnique(ser);
-		// literal prefix
-		if (v.isLiteral()) {
-			hash[0] &= 0x7F; // 0 msb
+		byte typeBits;
+		if (v.isIRI()) {
+			typeBits = IRI_TYPE_BITS;
+		} else if (v.isLiteral()) {
+			typeBits = LITERAL_TYPE_BITS;
+		} else if (v.isBNode()) {
+			typeBits = BNODE_TYPE_BITS;
+		} else if (v.isTriple()) {
+			typeBits = TRIPLE_TYPE_BITS;
 		} else {
-			hash[0] |= NON_LITERAL_FLAG; // 1 msb
+			throw new AssertionError(String.format("Unexpected RDF value: %s", v.getClass()));
 		}
+		hash[TYPE_INDEX] = (byte) ((hash[TYPE_INDEX] & CLEAR_TYPE_MASK) | typeBits);
 		return new Identifier(hash);
 	}
 
@@ -50,8 +65,20 @@ public final class Identifier {
 		this.hashcode = ((value[0] & 0xFF) << 24) | ((value[1] & 0xFF) << 16) | ((value[2] & 0xFF) << 8) | (value[3] & 0xFF);
 	}
 
-	public boolean isLiteral() {
-		return (value[0] & NON_LITERAL_FLAG) == 0;
+	public final boolean isIRI() {
+		return (value[TYPE_INDEX] & TYPE_MASK) == IRI_TYPE_BITS;
+	}
+
+	public final boolean isLiteral() {
+		return (value[TYPE_INDEX] & TYPE_MASK) == LITERAL_TYPE_BITS;
+	}
+
+	public final boolean isBNode() {
+		return (value[TYPE_INDEX] & TYPE_MASK) == BNODE_TYPE_BITS;
+	}
+
+	public final boolean isTriple() {
+		return (value[TYPE_INDEX] & TYPE_MASK) == TRIPLE_TYPE_BITS;
 	}
 
 	public ByteBuffer writeTo(ByteBuffer bb) {

@@ -1,8 +1,12 @@
 package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.filter.MultiRowRangeFilter;
+import org.apache.hadoop.hbase.filter.MultiRowRangeFilter.RowRange;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
@@ -222,10 +226,26 @@ public enum StatementIndex {
 	}
 
 	public static final Scan scanLiterals() {
-		return IndexType.scanLiterals();
+		StatementIndex index = OSP;
+		List<RowRange> ranges = new ArrayList<>(Identifier.TYPE_SALT_SIZE);
+		for (int i=0; i<Identifier.TYPE_SALT_SIZE; i++) {
+			byte[] startKey = index.concat(false, new byte[] {(byte) i}); // inclusive
+			byte[] stopKey = index.concat(false, new byte[] {(byte) i, Identifier.LITERAL_STOP_BITS}); // exclusive
+			ranges.add(new RowRange(startKey, true, stopKey, false));
+		}
+		return index.scan().setFilter(new MultiRowRangeFilter(ranges));
 	}
+
 	public static final Scan scanLiterals(RDFContext ctx) {
-		return IndexType.scanLiterals(ctx);
+		StatementIndex index = COSP;
+		byte[] ctxb = ctx.getKeyHash(index);
+		List<RowRange> ranges = new ArrayList<>(Identifier.TYPE_SALT_SIZE);
+		for (int i=0; i<Identifier.TYPE_SALT_SIZE; i++) {
+			byte[] startKey = index.concat(false, ctxb, new byte[] {(byte) i}); // inclusive
+			byte[] stopKey = index.concat(false, ctxb, new byte[] {(byte) i, Identifier.LITERAL_STOP_BITS}); // exclusive
+			ranges.add(new RowRange(startKey, true, stopKey, false));
+		}
+		return index.scan().setFilter(new MultiRowRangeFilter(ranges));
 	}
 
     private static Statement createStatement(Resource s, IRI p, Value o, Resource c, ValueFactory vf) {
@@ -396,4 +416,25 @@ public enum StatementIndex {
 	public final Scan scan(RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3, RDFIdentifier k4) {
 		return indexType.scan(this, k1, k2, k3, k4);
 	}
+
+    /**
+     * Helper method concatenating keys
+     * @param trailingZero boolean switch adding trailing zero to the resulting key
+     * @param fragments variable number of the key fragments as byte arrays
+     * @return concatenated key as byte array
+     */
+    byte[] concat(boolean trailingZero, byte[]... fragments) {
+        int i = 1;
+        for (byte[] fr : fragments) {
+            i += fr.length;
+        }
+        byte[] res = new byte[trailingZero ? i + 1 : i];
+        res[0] = prefix;
+        i = 1;
+        for (byte[] fr : fragments) {
+            System.arraycopy(fr, 0, res, i, fr.length);
+            i += fr.length;
+        }
+        return res;
+    }
 }
