@@ -45,7 +45,7 @@ public class RDFSplitterTest {
 	@Test
 	public void splitSequential() throws Exception {
 		StatementCollector[] outs = createCollectors(3);
-		RDFSplitter splitter = new RDFSplitter(tmpFile, RDFFormat.TURTLE, false, outs, null, 1);
+		RDFSplitter splitter = new RDFSplitter(tmpFile, RDFFormat.TURTLE, null, outs, null, 1);
 		long stmtCount = splitter.call();
 		List<Statement> actualStmts = concat(outs);
 		assertEquals(stmtCount, actualStmts.size());
@@ -56,7 +56,7 @@ public class RDFSplitterTest {
 	@Test
 	public void splitParallel() throws Exception {
 		StatementCollector[] outs = createCollectors(3);
-		RDFSplitter splitter = new RDFSplitter(tmpFile, RDFFormat.TURTLE, false, outs, null, 2);
+		RDFSplitter splitter = new RDFSplitter(tmpFile, RDFFormat.TURTLE, null, outs, null, 2);
 		long stmtCount = splitter.call();
 		List<Statement> actualStmts = concat(outs);
 		assertEquals(stmtCount, actualStmts.size());

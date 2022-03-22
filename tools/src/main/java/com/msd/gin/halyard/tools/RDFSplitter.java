@@ -17,6 +17,10 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.*;
 
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
@@ -41,31 +45,53 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		String inExt = inputFileName.substring(dotPos);
 		outExt = outExt != null ? outExt : inExt;
 
-		boolean isInputGzipped = inExt.endsWith(".gz");
+		String inCompression = getCompression(inExt);
 		RDFFormat inFormat = getParserFormatForName(inExt);
-		boolean gzipOutput = outExt.endsWith(".gz");
+		String outCompression = getCompression(outExt);
 		RDFFormat outFormat = getWriterFormatForName(outExt);
 
 		RDFFile[] files = new RDFFile[numParts];
 		for (int i=0; i<files.length; i++) {
-			files[i] = new RDFFile(outFormat, gzipOutput, outputDir.resolve(outBaseName+"_"+(i+1)+outExt));
+			files[i] = new RDFFile(outFormat, outCompression, outputDir.resolve(outBaseName+"_"+(i+1)+outExt));
 		}
 		RDFFile bnodeFile;
 		if (numParts > 1 || numThreads > 1) {
-			bnodeFile = new RDFFile(outFormat, gzipOutput, outputDir.resolve(outBaseName+"_bnodes"+outExt));
+			bnodeFile = new RDFFile(outFormat, outCompression, outputDir.resolve(outBaseName+"_bnodes"+outExt));
 		} else {
 			bnodeFile = null;
 		}
 
-		new RDFSplitter(inputFile, inFormat, isInputGzipped, files, bnodeFile, numThreads).call();
+		new RDFSplitter(inputFile, inFormat, inCompression, files, bnodeFile, numThreads).call();
 	}
 
-	private static InputStream decompress(boolean isGzipped, InputStream in) throws IOException {
-		return isGzipped ? new GZIPInputStream(in) : in;
+	private static String getCompression(String ext) {
+		if (ext.endsWith(".gz")) {
+			return CompressorStreamFactory.GZIP;
+		} else if (ext.endsWith(".bz2")) {
+			return CompressorStreamFactory.BZIP2;
+		} else {
+			return null;
+		}
 	}
 
-	private static OutputStream compress(boolean isGzipped, OutputStream out) throws IOException {
-		return isGzipped ? new GZIPOutputStream(out, BUFFER_SIZE) : out;
+	private static InputStream decompress(String compression, InputStream in) throws IOException {
+		if (CompressorStreamFactory.GZIP.equals(compression)) {
+			return new GZIPInputStream(in);
+		} else if (CompressorStreamFactory.BZIP2.equals(compression)) {
+			return new BZip2CompressorInputStream(in);
+		} else {
+			return in;
+		}
+	}
+
+	private static OutputStream compress(String compression, OutputStream out) throws IOException, CompressorException {
+		if (CompressorStreamFactory.GZIP.equals(compression)) {
+			return new GZIPOutputStream(out, BUFFER_SIZE);
+		} else if (CompressorStreamFactory.BZIP2.equals(compression)) {
+			return new BZip2CompressorOutputStream(new BufferedOutputStream(out, BUFFER_SIZE));
+		} else {
+			return out;
+		}
 	}
 
 	private static RDFFormat getParserFormatForName(String fileName) {
@@ -85,7 +111,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 	private final ExecutorCompletionService<Long> completionService = new ExecutorCompletionService<>(Executors.newCachedThreadPool());
 	private final Path inputFile;
 	private final RDFFormat format;
-	private final boolean isGzipped;
+	private final String compression;
 	private final RDFHandler[] outHandlers;
 	private final RDFHandler bnodeOutHandler;
 	private WriterTask.StatementBatcher[] batchers;
@@ -97,10 +123,10 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 	private long readStartTime;
 	private long previousStatusBytesRead;
 
-	RDFSplitter(Path inputFile, RDFFormat format, boolean gzipped, RDFHandler[] outHandlers, RDFHandler bnodeOutHandler, int numThreads) {
+	RDFSplitter(Path inputFile, RDFFormat format, String compression, RDFHandler[] outHandlers, RDFHandler bnodeOutHandler, int numThreads) {
 		this.inputFile = inputFile;
 		this.format = format;
-		this.isGzipped = gzipped;
+		this.compression = compression;
 		this.outHandlers = outHandlers;
 		this.bnodeOutHandler = bnodeOutHandler;
 		this.tasks = new WriterTask[numThreads];
@@ -122,7 +148,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		inputByteSize = Files.size(inputFile);
 		inCounter = new CountingInputStream(new BufferedInputStream(Files.newInputStream(inputFile), tasks.length*BUFFER_SIZE));
 		long totalStmts;
-		try(InputStream in = decompress(isGzipped, inCounter)) {
+		try(InputStream in = decompress(compression, inCounter)) {
 			totalStmts = split(parser, in, outHandlers, bnodeOutHandler);
 		}
 		LOGGER.info("Finished writing a total of {} statements", totalStmts);
@@ -362,25 +388,25 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 
 	final static class RDFFile implements RDFHandler {
 		private final RDFFormat format;
-		private final boolean isGzipped;
+		private final String compression;
 		private final Path filename;
 		private OutputStream out;
 		private RDFWriter writer;
 
-		RDFFile(RDFFormat format, boolean isGzipped, Path filename) {
+		RDFFile(RDFFormat format, String compression, Path filename) {
 			this.format = format;
-			this.isGzipped = isGzipped;
+			this.compression = compression;
 			this.filename = filename;
 		}
 
 		@Override
 		public void startRDF() throws RDFHandlerException {
 			try {
-				out = compress(isGzipped, Files.newOutputStream(filename));
+				out = compress(compression, Files.newOutputStream(filename));
 				writer = Rio.createWriter(format, out);
 				LOGGER.info("Started writing to {}", filename);
 				writer.startRDF();
-			} catch (IOException e) {
+			} catch (IOException | CompressorException e) {
 				throw new RDFHandlerException(e);
 			}
 		}
