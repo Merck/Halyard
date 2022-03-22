@@ -41,7 +41,10 @@ public class ValueIOTest {
 			vf.createIRI("test:/foo"), vf.createLiteral("5423"), vf.createLiteral("\u98DF"),
 			vf.createLiteral(true), vf.createLiteral((byte) 6), vf.createLiteral((short) 7843),
 			vf.createLiteral(34), vf.createLiteral(87.232), vf.createLiteral(74234l), vf.createLiteral(4.809f),
-			vf.createLiteral(BigInteger.valueOf(96)), vf.createLiteral(BigDecimal.valueOf(856.03)),
+			vf.createLiteral(BigInteger.valueOf(96)),
+			vf.createLiteral(BigInteger.valueOf(Integer.MIN_VALUE)),
+			vf.createLiteral(String.valueOf(Long.MAX_VALUE)+String.valueOf(Long.MAX_VALUE), XSD.INTEGER),
+			vf.createLiteral(BigDecimal.valueOf(856.03)),
 			vf.createIRI(RDF.NAMESPACE), vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)),
 			vf.createLiteral(NOW), vf.createLiteral("13:03:22.000", XSD.TIME),
 			vf.createLiteral("1980-02-14", XSD.DATE),
@@ -76,6 +79,8 @@ public class ValueIOTest {
 		int size = buf.limit();
 		Value actual = ValueIO.SIMPLE_READER.readValue(buf);
 		assertEquals(expected, actual);
+		assertEquals(actual, expected);
+		assertEquals(expected.hashCode(), actual.hashCode());
 
 		// check readValue() works on a subsequence
 		ByteBuffer extbuf = ByteBuffer.allocate(3 + size + 7);

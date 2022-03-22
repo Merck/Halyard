@@ -44,6 +44,8 @@ public class IdValueFactoryTest {
 			vf.createLiteral(74234l),
 			vf.createLiteral(4.809f),
 			vf.createLiteral(BigInteger.valueOf(96)),
+			vf.createLiteral(BigInteger.valueOf(Integer.MIN_VALUE)),
+			vf.createLiteral(String.valueOf(Long.MAX_VALUE)+String.valueOf(Long.MAX_VALUE), XSD.INTEGER),
 			vf.createLiteral(BigDecimal.valueOf(856.03)),
 			vf.createIRI(RDF.NAMESPACE),
 			vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)),
@@ -79,8 +81,8 @@ public class IdValueFactoryTest {
 
 	@Test
 	public void testEquals() {
-		assertTrue(expected.equals(actual));
-		assertTrue(actual.equals(expected));
+		assertEquals(expected, actual);
+		assertEquals(actual, expected);
 	}
 
 	@Test
@@ -103,7 +105,15 @@ public class IdValueFactoryTest {
 		try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(out.toByteArray()))) {
 			deser = (Value) ois.readObject();
 		}
+
 		assertEquals(actual, deser);
+		assertEquals(deser, actual);
+		assertEquals(actual.hashCode(), deser.hashCode());
+
+		assertEquals(expected, deser);
+		assertEquals(deser, expected);
+		assertEquals(expected.hashCode(), deser.hashCode());
+
 		// should have better compression than the standard classes
 		assertThat("Serialized size", out.toByteArray().length, lessThan(expectedOut.toByteArray().length));
 	}

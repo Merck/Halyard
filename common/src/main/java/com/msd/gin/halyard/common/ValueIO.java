@@ -238,13 +238,14 @@ public final class ValueIO {
 	private static final byte DATE_TYPE = 'D';
 	private static final byte BIG_FLOAT_TYPE = 'F';
 	private static final byte BIG_INT_TYPE = 'I';
+	private static final byte COMPRESSED_BIG_INT_TYPE = 'J';
 	private static final byte DATETIME_TYPE = 'T';
 	private static final byte XML_TYPE = 'x';
 
 	private static final ByteWriter DEFAULT_BYTE_WRITER = new ByteWriter() {
 		@Override
 		public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
-			b = ensureCapacity(b, 1+2);
+			b = ensureCapacity(b, 1+SHORT_SIZE);
 			b.put(DATATYPE_LITERAL_TYPE);
 			int sizePos = b.position();
 			int startPos = b.position()+2;
@@ -369,9 +370,29 @@ public final class ValueIO {
 		addByteWriter(XSD.INTEGER, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
-				byte[] bytes = l.integerValue().toByteArray();
-				b = ensureCapacity(b, 1 + bytes.length);
-				return b.put(BIG_INT_TYPE).put(bytes);
+				BigInteger bigInt;
+				int x;
+				if (l.getLabel().length() < 10) {
+					x = l.intValue();
+					bigInt = null;
+				} else {
+					bigInt = l.integerValue();
+					long u = bigInt.longValue();
+					if (u >= Integer.MIN_VALUE && u <= Integer.MAX_VALUE) {
+						x = bigInt.intValueExact();
+						bigInt = null;
+					} else {
+						x = 0;
+					}
+				}
+				if (bigInt != null) {
+					byte[] bytes = bigInt.toByteArray();
+					b = ensureCapacity(b, 1 + bytes.length);
+					return b.put(BIG_INT_TYPE).put(bytes);
+				} else {
+					b = ensureCapacity(b, 1 + INT_SIZE);
+					return b.put(COMPRESSED_BIG_INT_TYPE).putInt(x);
+				}
 			}
 		});
 		addByteReader(BIG_INT_TYPE, new ByteReader() {
@@ -380,6 +401,12 @@ public final class ValueIO {
 				byte[] bytes = new byte[b.remaining()];
 				b.get(bytes);
 				return vf.createLiteral(new BigInteger(bytes));
+			}
+		});
+		addByteReader(COMPRESSED_BIG_INT_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				return new IntLiteral(b.getInt(), XSD.INTEGER);
 			}
 		});
 
@@ -633,7 +660,7 @@ public final class ValueIO {
 		int endPos = buf.position();
 		int len = endPos - startPos;
 		buf.position(sizePos);
-		if (sizeBytes == 2) {
+		if (sizeBytes == SHORT_SIZE) {
 			buf.putShort((short) len);
 		} else if (sizeBytes == INT_SIZE) {
 			buf.putInt(len);
@@ -646,7 +673,7 @@ public final class ValueIO {
 
 	public static Value readValue(ByteBuffer buf, ValueIO.Reader reader, int sizeBytes) {
 		int len;
-		if (sizeBytes == 2) {
+		if (sizeBytes == SHORT_SIZE) {
 			len = buf.getShort();
 		} else if (sizeBytes == INT_SIZE) {
 			len = buf.getInt();
