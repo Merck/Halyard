@@ -30,6 +30,12 @@ import static org.junit.Assert.*;
 public class ValueIOTest {
 	private static final Date NOW = new Date();
 
+	private static String longString(String s) {
+		String[] copies = new String[200/s.length()+1];
+		Arrays.fill(copies, s);
+		return String.join(" ", copies);
+	}
+
 	private static List<Value> createData(ValueFactory vf) {
 		return Arrays.asList(RDF.TYPE, vf.createLiteral("foo"), vf.createBNode("__foobar__"),
 			vf.createIRI("test:/foo"), vf.createLiteral("5423"), vf.createLiteral("\u98DF"),
@@ -42,7 +48,9 @@ public class ValueIOTest {
 			vf.createLiteral("foo", vf.createIRI("urn:bar:1")), vf.createLiteral("foo", "en-GB"), vf.createLiteral("bar", "zx-XY"),
 			vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL),
 			vf.createLiteral("invalid xml still works", RDF.XMLLITERAL),
-			vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME));
+			vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME),
+			vf.createLiteral(longString("The cat slept on the mat.")),
+			vf.createLiteral(longString("¿Dónde está el gato?"), "es"));
 	}
 
 	@Parameterized.Parameters(name = "{0}")
