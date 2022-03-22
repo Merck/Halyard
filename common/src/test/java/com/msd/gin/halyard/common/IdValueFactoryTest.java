@@ -34,6 +34,8 @@ public class IdValueFactoryTest {
 			vf.createLiteral("foo"),
 			vf.createBNode("__foobar__"),
 			vf.createIRI("test:/foo"),
+			vf.createIRI("http://www.testmyiri.com"),
+			vf.createIRI("https://www.testmyiri.com"),
 			vf.createLiteral("5423"),
 			vf.createLiteral("\u98DF"),
 			vf.createLiteral(true),

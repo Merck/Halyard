@@ -38,7 +38,10 @@ public class ValueIOTest {
 
 	private static List<Value> createData(ValueFactory vf) {
 		return Arrays.asList(RDF.TYPE, vf.createLiteral("foo"), vf.createBNode("__foobar__"),
-			vf.createIRI("test:/foo"), vf.createLiteral("5423"), vf.createLiteral("\u98DF"),
+			vf.createIRI("test:/foo"),
+			vf.createIRI("http://www.testmyiri.com"),
+			vf.createIRI("https://www.testmyiri.com"),
+			vf.createLiteral("5423"), vf.createLiteral("\u98DF"),
 			vf.createLiteral(true), vf.createLiteral((byte) 6), vf.createLiteral((short) 7843),
 			vf.createLiteral(34), vf.createLiteral(87.232), vf.createLiteral(74234l), vf.createLiteral(4.809f),
 			vf.createLiteral(BigInteger.valueOf(96)),

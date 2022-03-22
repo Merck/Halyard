@@ -217,6 +217,7 @@ public final class ValueIO {
 	}
 
 	private static final byte IRI_TYPE = '<';
+	private static final byte COMPRESSED_IRI_TYPE = 'w';
 	private static final byte IRI_HASH_TYPE = '#';
 	private static final byte NAMESPACE_HASH_TYPE = ':';
 	private static final byte BNODE_TYPE = '_';
@@ -241,6 +242,9 @@ public final class ValueIO {
 	private static final byte COMPRESSED_BIG_INT_TYPE = 'J';
 	private static final byte DATETIME_TYPE = 'T';
 	private static final byte XML_TYPE = 'x';
+
+	private static final byte HTTP_SCHEME = 'h';
+	private static final byte HTTPS_SCHEME = 's';
 
 	private static final ByteWriter DEFAULT_BYTE_WRITER = new ByteWriter() {
 		@Override
@@ -744,7 +748,6 @@ public final class ValueIO {
 				b = ensureCapacity(b, 1 + IRI_HASH_SIZE);
 				b.put(IRI_HASH_TYPE);
 				b.putInt(irihash);
-				return b;
 			} else {
 				IRI iri = v;
 				Short nshash = WELL_KNOWN_NAMESPACES.inverse().get(iri.getNamespace());
@@ -754,15 +757,39 @@ public final class ValueIO {
 					b.put(NAMESPACE_HASH_TYPE);
 					b.putShort(nshash);
 					b.put(localBytes);
-					return b;
 				} else {
-					ByteBuffer iriBytes = writeUncompressedString(v.stringValue());
-					b = ensureCapacity(b, 1+iriBytes.remaining());
-					b.put(IRI_TYPE);
-					b.put(iriBytes);
-					return b;
+					String s = v.stringValue();
+					byte schemeType;
+					int prefixLen;
+					if (s.startsWith("http")) {
+						if (s.startsWith("://", 4)) {
+							schemeType = HTTP_SCHEME;
+							prefixLen = 7;
+						} else if (s.startsWith("s://", 4)) {
+							schemeType = HTTPS_SCHEME;
+							prefixLen = 8;
+						} else {
+							schemeType = 0;
+							prefixLen = 0;
+						}
+					} else {
+						schemeType = 0;
+						prefixLen = 0;
+					}
+					if (schemeType != 0) {
+						ByteBuffer restBytes = writeUncompressedString(s.substring(prefixLen));
+						b = ensureCapacity(b, 2+restBytes.remaining());
+						b.put(COMPRESSED_IRI_TYPE).put(schemeType);
+						b.put(restBytes);
+					} else {
+						ByteBuffer iriBytes = writeUncompressedString(s);
+						b = ensureCapacity(b, 1+iriBytes.remaining());
+						b.put(IRI_TYPE);
+						b.put(iriBytes);
+					}
 				}
 			}
+			return b;
 		}
 
 		private static ByteBuffer writeBNode(BNode n, ByteBuffer b) {
@@ -839,13 +866,26 @@ public final class ValueIO {
 			int type = b.get();
 			switch(type) {
 				case IRI_TYPE:
-					IRI iri = vf.createIRI(readUncompressedString(b));
-					b.position(originalLimit);
-					return iri;
+					return vf.createIRI(readUncompressedString(b));
+				case COMPRESSED_IRI_TYPE:
+					int schemeType = b.get();
+					String prefix;
+					switch (schemeType) {
+						case HTTP_SCHEME:
+							prefix = "http://";
+							break;
+						case HTTPS_SCHEME:
+							prefix = "https://";
+							break;
+						default:
+							throw new AssertionError(String.format("Unexpected scheme type: %d", schemeType));
+					}
+					String s = readUncompressedString(b);
+					return vf.createIRI(prefix + s);
 				case IRI_HASH_TYPE:
 					b.mark();
 					Integer irihash = b.getInt(); // 32-bit hash
-					iri = WELL_KNOWN_IRIS.get(irihash);
+					IRI iri = WELL_KNOWN_IRIS.get(irihash);
 					if (iri == null) {
 						b.limit(b.position()).reset();
 						throw new IllegalStateException(String.format("Unknown IRI hash: %s", Hashes.encode(b)));
