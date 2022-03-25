@@ -6,11 +6,14 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Base64;
 
 public final class Hashes {
+	private static final String ID_HASH = Config.getString("halyard.id.hash", "SHA-1");
+	private static final int ID_SIZE = Config.getInteger("halyard.id.size", 0);
 	private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
-    private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
+	private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
 
 	static MessageDigest getMessageDigest(String algorithm) {
         try {
@@ -23,7 +26,7 @@ public final class Hashes {
     private static final ThreadLocal<MessageDigest> MD = new ThreadLocal<MessageDigest>() {
         @Override
 		protected MessageDigest initialValue() {
-			return getMessageDigest("SHA-1");
+			return getMessageDigest(ID_HASH);
         }
     };
 
@@ -65,15 +68,20 @@ public final class Hashes {
 		MessageDigest md = MD.get();
         try {
             md.update(key);
-            return md.digest();
+            byte[] hash = md.digest();
+            return (ID_SIZE > 0) ? Arrays.copyOf(hash, ID_SIZE) : hash;
         } finally {
             md.reset();
         }
     }
 
     public static int hashUniqueSize() {
-        MessageDigest md = MD.get();
-        return md.getDigestLength();
+        if (ID_SIZE > 0) {
+            return ID_SIZE;
+        } else {
+            MessageDigest md = MD.get();
+            return md.getDigestLength();
+        }
     }
 
     public static String encode(byte b[]) {

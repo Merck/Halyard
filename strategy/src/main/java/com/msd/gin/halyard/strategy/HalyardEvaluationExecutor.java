@@ -18,6 +18,7 @@ package com.msd.gin.halyard.strategy;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.common.Config;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 
 import java.util.concurrent.LinkedBlockingQueue;
@@ -41,10 +42,10 @@ import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 
 final class HalyardEvaluationExecutor {
 
-    private static final int THREADS = Integer.parseInt(System.getProperty("halyard.evaluation.threads", "20"));
-    private static final int MAX_RETRIES = Integer.parseInt(System.getProperty("halyard.evaluation.maxRetries", "3"));
-    private static final int THREAD_GAIN = Integer.parseInt(System.getProperty("halyard.evaluation.threadGain", "2"));
-    private static final int MAX_THREADS = Integer.parseInt(System.getProperty("halyard.evaluation.maxThreads", "100"));
+    private static final int THREADS = Config.getInteger("halyard.evaluation.threads", 20);
+    private static final int MAX_RETRIES = Config.getInteger("halyard.evaluation.maxRetries", 3);
+    private static final int THREAD_GAIN = Config.getInteger("halyard.evaluation.threadGain", 2);
+    private static final int MAX_THREADS = Config.getInteger("halyard.evaluation.maxThreads", 100);
 
     private static ThreadPoolExecutor createExecutor(String groupName, String namePrefix) {
         ThreadGroup tg = new ThreadGroup(groupName);
@@ -244,8 +245,8 @@ final class HalyardEvaluationExecutor {
 		}
     }
 
-    private static final int MAX_QUEUE_SIZE = Integer.parseInt(System.getProperty("halyard.evaluation.maxQueueSize", "5000"));
-	private static final int POLL_TIMEOUT_MILLIS = Integer.parseInt(System.getProperty("halyard.evaluation.pollTimeoutMillis", "1000"));
+    private static final int MAX_QUEUE_SIZE = Config.getInteger("halyard.evaluation.maxQueueSize", 5000);
+	private static final int POLL_TIMEOUT_MILLIS = Config.getInteger("halyard.evaluation.pollTimeoutMillis", 1000);
     private static final BindingSet END = new EmptyBindingSet();
 
     static final class BindingSetPipeQueue {

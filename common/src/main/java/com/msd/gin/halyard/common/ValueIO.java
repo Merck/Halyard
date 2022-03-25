@@ -76,7 +76,7 @@ public final class ValueIO {
 	private static final int IRI_HASH_SIZE = 4;
 	private static final int NAMESPACE_HASH_SIZE = 2;
 	private static final int LANG_HASH_SIZE = 2;
-	private static final int COMPRESSION_THRESHOLD = Integer.getInteger("halyard.string.compressionThreshold", 200);
+	private static final int COMPRESSION_THRESHOLD = Config.getInteger("halyard.string.compressionThreshold", 200);
 	private static final int SHORT_SIZE = 2;
 	private static final int INT_SIZE = 4;
 
