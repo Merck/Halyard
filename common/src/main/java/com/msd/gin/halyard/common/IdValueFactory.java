@@ -31,12 +31,12 @@ public class IdValueFactory implements ValueFactory {
 
 	@Override
 	public IRI createIRI(String iri) {
-		return new IdentifiableIRI(DELEGATE.createIRI(iri));
+		return new IdentifiableIRI(iri);
 	}
 
 	@Override
 	public IRI createIRI(String namespace, String localName) {
-		return new IdentifiableIRI(DELEGATE.createIRI(namespace, localName));
+		return new IdentifiableIRI(namespace, localName);
 	}
 
 	@Override

@@ -126,7 +126,7 @@ public final class ValueIO {
 
 	private static void addIRIs(Collection<IRI> iris) {
 		for (IRI iri : iris) {
-			IdentifiableIRI idIri = new IdentifiableIRI(iri);
+			IdentifiableIRI idIri = new IdentifiableIRI(iri.stringValue());
 			Identifier id = idIri.getId();
 			if (WELL_KNOWN_IRI_IDS.putIfAbsent(id, idIri) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",

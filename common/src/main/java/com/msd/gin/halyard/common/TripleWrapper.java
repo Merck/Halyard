@@ -13,30 +13,37 @@ public abstract class TripleWrapper implements Triple {
 		this.triple = triple;
 	}
 
-	public Resource getSubject() {
+	@Override
+	public final Resource getSubject() {
 		return triple.getSubject();
 	}
 
-	public IRI getPredicate() {
+	@Override
+	public final IRI getPredicate() {
 		return triple.getPredicate();
 	}
 
-	public Value getObject() {
+	@Override
+	public final Value getObject() {
 		return triple.getObject();
 	}
 
-	public String stringValue() {
+	@Override
+	public final String stringValue() {
 		return triple.stringValue();
 	}
 
+	@Override
 	public final String toString() {
 		return triple.toString();
 	}
 
+	@Override
 	public final int hashCode() {
 		return triple.hashCode();
 	}
 
+	@Override
 	public final boolean equals(Object o) {
 		return triple.equals(o);
 	}

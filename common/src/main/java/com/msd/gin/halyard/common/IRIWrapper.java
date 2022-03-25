@@ -25,14 +25,17 @@ public abstract class IRIWrapper implements IRI {
 		return iri.stringValue();
 	}
 
+	@Override
 	public final String toString() {
 		return iri.toString();
 	}
 
+	@Override
 	public final int hashCode() {
 		return iri.hashCode();
 	}
 
+	@Override
 	public final boolean equals(Object o) {
 		return iri.equals(o);
 	}

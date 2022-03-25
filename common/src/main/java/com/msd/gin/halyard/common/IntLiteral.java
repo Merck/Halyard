@@ -102,17 +102,17 @@ public final class IntLiteral implements Literal {
 	@Override
 	public boolean equals(Object o) {
 		return this == o || o instanceof Literal
-				&& getLabel().equals(((Literal) o).getLabel())
-				&& getDatatype().equals(((Literal) o).getDatatype());
+				&& label.equals(((Literal) o).getLabel())
+				&& datatype.equals(((Literal) o).getDatatype());
 	}
 
 	@Override
 	public int hashCode() {
-		return getLabel().hashCode();
+		return label.hashCode();
 	}
 
 	@Override
 	public String toString() {
-		return "\"" + getLabel() + "\"^^<" + datatype.stringValue() + ">";
+		return "\"" + label + "\"^^<" + datatype.stringValue() + ">";
 	}
 }

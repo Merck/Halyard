@@ -20,14 +20,17 @@ public abstract class BNodeWrapper implements BNode {
 		return bnode.stringValue();
 	}
 
+	@Override
 	public final String toString() {
 		return bnode.toString();
 	}
 
+	@Override
 	public final int hashCode() {
 		return bnode.hashCode();
 	}
 
+	@Override
 	public final boolean equals(Object o) {
 		return bnode.equals(o);
 	}
