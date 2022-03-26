@@ -8,6 +8,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.function.Function;
 
 public final class Hashes {
 	private static final String ID_HASH = Config.getString("halyard.id.hash", "SHA-1");
@@ -23,11 +24,16 @@ public final class Hashes {
         }
     }
 
-    private static final ThreadLocal<MessageDigest> MD = new ThreadLocal<MessageDigest>() {
+    private static final ThreadLocal<HashFunction> MD = new ThreadLocal<HashFunction>() {
         @Override
-		protected MessageDigest initialValue() {
-			return getMessageDigest(ID_HASH);
-        }
+		protected HashFunction initialValue() {
+			switch (ID_HASH) {
+				case "Murmur3-128":
+					return new GuavaHashFunction(Hashing.murmur3_128());
+				default:
+					return new MessageDigestHashFunction(getMessageDigest(ID_HASH));
+			}
+		}
     };
 
     private static final byte[] PEARSON_HASH_TABLE = {
@@ -65,22 +71,15 @@ public final class Hashes {
     }
 
     public static byte[] hashUnique(ByteBuffer key) {
-		MessageDigest md = MD.get();
-        try {
-            md.update(key);
-            byte[] hash = md.digest();
-            return (ID_SIZE > 0) ? Arrays.copyOf(hash, ID_SIZE) : hash;
-        } finally {
-            md.reset();
-        }
+        byte[] hash = MD.get().apply(key);
+        return (ID_SIZE > 0) ? Arrays.copyOf(hash, ID_SIZE) : hash;
     }
 
     public static int hashUniqueSize() {
         if (ID_SIZE > 0) {
             return ID_SIZE;
         } else {
-            MessageDigest md = MD.get();
-            return md.getDigestLength();
+        	return MD.get().size();
         }
     }
 
@@ -97,5 +96,51 @@ public final class Hashes {
 	 */
 	static CharSequence encode(ByteBuffer b) {
 		return StandardCharsets.UTF_8.decode(ENCODER.encode(b));
+	}
+
+
+	static interface HashFunction extends Function<ByteBuffer,byte[]> {
+		int size();
+	}
+
+	static final class MessageDigestHashFunction implements HashFunction {
+		final MessageDigest md;
+
+		MessageDigestHashFunction(MessageDigest md) {
+			this.md = md;
+		}
+
+		@Override
+		public byte[] apply(ByteBuffer bb) {
+			try {
+				md.update(bb);
+				return md.digest();
+			} finally {
+				md.reset();
+			}
+		}
+
+		@Override
+		public int size() {
+			return md.getDigestLength();
+		}
+	}
+
+	static final class GuavaHashFunction implements HashFunction {
+		final com.google.common.hash.HashFunction hf;
+
+		GuavaHashFunction(com.google.common.hash.HashFunction hf) {
+			this.hf = hf;
+		}
+
+		@Override
+		public byte[] apply(ByteBuffer bb) {
+			return hf.hashBytes(bb).asBytes();
+		}
+
+		@Override
+		public int size() {
+			return hf.bits()/Byte.SIZE;
+		}
 	}
 }
