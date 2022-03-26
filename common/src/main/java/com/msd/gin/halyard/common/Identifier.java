@@ -12,7 +12,7 @@ public final class Identifier {
 	private static final byte BNODE_TYPE_BITS = (byte) 0xC0;
 	private static final byte TYPE_MASK = (byte) 0xC0;
 	private static final byte CLEAR_TYPE_MASK = ~TYPE_MASK;
-	private static final int TYPE_INDEX = 1;
+	private static final int TYPE_INDEX = (ID_SIZE > 1) ? 1 : 0;
 	static final int TYPE_SALT_SIZE = 1<<(8*TYPE_INDEX);
 	static final byte LITERAL_STOP_BITS = (byte) 0x40;
 
@@ -62,7 +62,11 @@ public final class Identifier {
 			throw new IllegalArgumentException("Byte array has incorrect length");
 		}
 		this.value = value;
-		this.hashcode = ((value[0] & 0xFF) << 24) | ((value[1] & 0xFF) << 16) | ((value[2] & 0xFF) << 8) | (value[3] & 0xFF);
+		int h = value[0] & 0xFF;
+		for (int i=1; i<Math.min(value.length, 4); i++) {
+			h = (h << 8) | (value[i] & 0xFF);
+		}
+		this.hashcode = h;
 	}
 
 	public final boolean isIRI() {

@@ -82,7 +82,8 @@ public final class IdentifiableIRI implements IRI, Identifiable, SerializableVal
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			ser = ValueIO.CELL_WRITER.toBytes(this);
+			byte[] b = ValueIO.CELL_WRITER.toBytes(this);
+			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 		}
 		return ser.duplicate();
 	}

@@ -715,13 +715,13 @@ public final class ValueIO {
 			this.tw = tw;
 		}
 
-		public ByteBuffer toBytes(Value v) {
+		public byte[] toBytes(Value v) {
 			ByteBuffer tmp = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
 			tmp = writeTo(v, tmp);
 			tmp.flip();
 			byte[] b = new byte[tmp.remaining()];
 			tmp.get(b);
-			return ByteBuffer.wrap(b).asReadOnlyBuffer();
+			return b;
 		}
 
 		public ByteBuffer writeTo(Value v, ByteBuffer b) {

@@ -12,6 +12,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +44,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		int dotPos = inputFileName.indexOf('.');
 		String outBaseName = inputFileName.substring(0, dotPos);
 		String inExt = inputFileName.substring(dotPos);
-		outExt = outExt != null ? outExt : inExt;
+		outExt = (outExt != null) ? outExt : inExt;
 
 		String inCompression = getCompression(inExt);
 		RDFFormat inFormat = getParserFormatForName(inExt);
@@ -64,7 +65,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		new RDFSplitter(inputFile, inFormat, inCompression, files, bnodeFile, numThreads).call();
 	}
 
-	private static String getCompression(String ext) {
+	static String getCompression(String ext) {
 		if (ext.endsWith(".gz")) {
 			return CompressorStreamFactory.GZIP;
 		} else if (ext.endsWith(".bz2")) {
@@ -94,7 +95,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		}
 	}
 
-	private static RDFFormat getParserFormatForName(String fileName) {
+	static RDFFormat getParserFormatForName(String fileName) {
 		return Rio.getParserFormatForFileName(fileName).orElseThrow(Rio.unsupportedFormat(fileName));
 	}
 
@@ -108,15 +109,16 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 	private static final Object START = new Object();
 	private static final Object END = new Object();
 
-	private final ExecutorCompletionService<Long> completionService = new ExecutorCompletionService<>(Executors.newCachedThreadPool());
+	private final ExecutorService executor = Executors.newCachedThreadPool();
+	private final ExecutorCompletionService<Long> completionService = new ExecutorCompletionService<>(executor);
 	private final Path inputFile;
 	private final RDFFormat format;
 	private final String compression;
 	private final RDFHandler[] outHandlers;
 	private final RDFHandler bnodeOutHandler;
-	private WriterTask.StatementBatcher[] batchers;
-	private WriterTask.StatementBatcher bnodeBatcher;
-	private final WriterTask[] tasks;
+	private OutputTask.StatementBatcher[] batchers;
+	private OutputTask.StatementBatcher bnodeBatcher;
+	private final OutputTask[] tasks;
 	private long totalStmtReadCount;
 	private long inputByteSize;
 	private CountingInputStream inCounter;
@@ -129,9 +131,9 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		this.compression = compression;
 		this.outHandlers = outHandlers;
 		this.bnodeOutHandler = bnodeOutHandler;
-		this.tasks = new WriterTask[numThreads];
+		this.tasks = new OutputTask[numThreads];
 		for (int i=0; i<numThreads; i++) {
-			this.tasks[i] = new WriterTask();
+			this.tasks[i] = new OutputTask();
 		}
 	}
 
@@ -157,7 +159,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 	}
 
 	long split(RDFParser parser, InputStream in, RDFHandler[] handlers, RDFHandler bnodeHandler) throws Exception {
-		batchers = new WriterTask.StatementBatcher[handlers.length];
+		batchers = new OutputTask.StatementBatcher[handlers.length];
 		for (int i=0; i<handlers.length; i++) {
 			batchers[i] = tasks[i%tasks.length].createBatcher(handlers[i]);
 		}
@@ -165,22 +167,32 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 			bnodeBatcher = tasks[tasks.length-1].createBatcher(bnodeHandler);
 		}
 
-		for (WriterTask task : tasks) {
+		for (OutputTask task : tasks) {
 			completionService.submit(task);
 		}
 
-		readStartTime = System.currentTimeMillis();
-		parser.parse(in);
-		LOGGER.info("Finished reading a total of {} statements in {}mins", totalStmtReadCount, TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis()-readStartTime));
+		completionService.submit(() -> {
+			readStartTime = System.currentTimeMillis();
+			parser.parse(in);
+			LOGGER.info("Finished reading a total of {} statements in {}mins", totalStmtReadCount, TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis()-readStartTime));
+			return 0L;
+		});
 
 		long stmtCount = 0L;
-		for (int i=0; i<tasks.length; i++) {
+		for (int i=0; i<tasks.length+1; i++) {
 			try {
 				stmtCount += completionService.take().get();
 			} catch (InterruptedException e) {
+				executor.shutdownNow();
 				throw e;
 			} catch (ExecutionException e) {
-				throw (Exception) e.getCause();
+				executor.shutdownNow();
+				Throwable thr = e.getCause();
+				if (thr instanceof Exception) {
+					throw (Exception) thr;
+				} else {
+					throw e;
+				}
 			}
 		}
 		return stmtCount;
@@ -278,7 +290,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		return true;
 	}
 
-	final static class WriterTask implements Callable<Long> {
+	final static class OutputTask implements Callable<Long> {
 		private final BlockingQueue<StatementBatch> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
 		private final List<StatementBatcher> batchers = new ArrayList<>();
 		private int remainingFiles;

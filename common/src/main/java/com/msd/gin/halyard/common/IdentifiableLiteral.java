@@ -30,7 +30,8 @@ public final class IdentifiableLiteral extends LiteralWrapper implements Identif
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			ser = ValueIO.CELL_WRITER.toBytes(literal);
+			byte[] b = ValueIO.CELL_WRITER.toBytes(literal);
+			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 		}
 		return ser.duplicate();
 	}

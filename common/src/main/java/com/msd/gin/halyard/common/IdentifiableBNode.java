@@ -30,7 +30,8 @@ public final class IdentifiableBNode extends BNodeWrapper implements Identifiabl
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			ser = ValueIO.CELL_WRITER.toBytes(bnode);
+			byte[] b = ValueIO.CELL_WRITER.toBytes(bnode);
+			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 		}
 		return ser.duplicate();
 	}

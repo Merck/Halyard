@@ -23,7 +23,8 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 			if (val instanceof SerializableValue) {
 				ser = ((SerializableValue) val).getSerializedForm();
 			} else {
-				ser = ValueIO.CELL_WRITER.toBytes(val);
+				byte[] b = ValueIO.CELL_WRITER.toBytes(val);
+				ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 			}
 		}
 		return ser.duplicate();
