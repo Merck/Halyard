@@ -17,6 +17,7 @@ import org.eclipse.rdf4j.rio.RDFWriterFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFWriter;
 
 import com.msd.gin.halyard.common.ValueIO;
+import com.msd.gin.halyard.common.ValueIO.StreamTripleWriter;
 
 public final class HRDFWriter extends AbstractRDFWriter {
 
@@ -54,6 +55,8 @@ public final class HRDFWriter extends AbstractRDFWriter {
 
 
 	private final DataOutputStream out;
+	private static final ValueIO valueIO = ValueIO.create();
+	private static final ValueIO.Writer valueWriter = valueIO.createWriter(new StreamTripleWriter());
 
 	public HRDFWriter(OutputStream out) {
 		this.out = new DataOutputStream(out);
@@ -90,17 +93,17 @@ public final class HRDFWriter extends AbstractRDFWriter {
 		buf.put((byte) type);
 		boolean skip = (c == null) || c.equals(prevContext);
 		if (!skip) {
-			buf = ValueIO.writeValue(c, ValueIO.STREAM_WRITER, buf, 2);
+			buf = ValueIO.writeValue(c, valueWriter, buf, 2);
 		}
 		skip = subj.equals(prevSubject) && skip;
 		if (!skip) {
-			buf = ValueIO.writeValue(subj, ValueIO.STREAM_WRITER, buf, 2);
+			buf = ValueIO.writeValue(subj, valueWriter, buf, 2);
 		}
 		skip = pred.equals(prevPredicate) && skip;
 		if (!skip) {
-			buf = ValueIO.writeValue(pred, ValueIO.STREAM_WRITER, buf, 2);
+			buf = ValueIO.writeValue(pred, valueWriter, buf, 2);
 		}
-		buf = ValueIO.writeValue(st.getObject(), ValueIO.STREAM_WRITER, buf, 4);
+		buf = ValueIO.writeValue(st.getObject(), valueWriter, buf, 4);
 		try {
 			out.write(buf.array(), buf.arrayOffset(), buf.position());
 		} catch(IOException e) {

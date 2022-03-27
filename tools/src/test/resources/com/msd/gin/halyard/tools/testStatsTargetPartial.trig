@@ -14,7 +14,7 @@ halyard:statsContext {
 		a sd:NamedGraph , sd:Graph , void:Dataset ;
 		void:classes "450"^^xsd:long ;
 		void:triples "900"^^xsd:long ;
-		void:propertyPartition :graph0_property_ZpJz64R6kT_ECxYbD25HFiHNPeI ;
+		void:propertyPartition :graph0_property_dZg5UlsxjZuh-4meqlYQe3-J8X8 ;
 		void:properties "14"^^xsd:long ;
 		void-ext:distinctLiterals "386"^^xsd:long ;
 		void:distinctObjects "886"^^xsd:long ;
@@ -24,7 +24,7 @@ halyard:statsContext {
 		void-ext:distinctIRIReferenceObjects "450"^^xsd:long ;
 		void-ext:distinctIRIReferenceSubjects "50"^^xsd:long .
 
-	:graph0_property_ZpJz64R6kT_ECxYbD25HFiHNPeI a void:Dataset ;
+	:graph0_property_dZg5UlsxjZuh-4meqlYQe3-J8X8 a void:Dataset ;
 		void:property rdf:type ;
 		void:triples "450"^^xsd:long .
 }

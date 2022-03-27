@@ -1,6 +1,7 @@
 package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.Hashes;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.common.Identifier;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -25,7 +26,7 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 
 	protected abstract int statementPosition();
 
-	protected abstract Value getValue(Table t, Identifier id, ValueFactory vf) throws IOException;
+	protected abstract Value getValue(Table t, Identifier id, ValueFactory vf, IdentifiableValueIO valueIO) throws IOException;
 
 	@Override
 	public final CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> evaluate(ValueFactory vf,
@@ -36,15 +37,18 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 			throw new ValueExprEvaluationException(String.format("%s requires an identifier IRI", getURI()));
 		}
 
+		IdentifiableValueIO valueIO = (IdentifiableValueIO) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_VALUEIO_ATTRIBUTE);
+
 		IRI idIri = (IRI) args[0];
 		Identifier id;
 		if (HALYARD.STATEMENT_ID_NS.getName().equals(idIri.getNamespace())) {
+			int idSize = valueIO.getIdSize();
 			byte[] stmtId = Hashes.decode(idIri.getLocalName());
-			byte[] idBytes = new byte[Identifier.ID_SIZE];
-			System.arraycopy(stmtId, statementPosition() * Identifier.ID_SIZE, idBytes, 0, Identifier.ID_SIZE);
-			id = new Identifier(idBytes);
+			byte[] idBytes = new byte[idSize];
+			System.arraycopy(stmtId, statementPosition() * idSize, idBytes, 0, idSize);
+			id = valueIO.id(idBytes);
 		} else if (HALYARD.VALUE_ID_NS.getName().equals(idIri.getNamespace())) {
-			id = new Identifier(Hashes.decode(idIri.getLocalName()));
+			id = valueIO.id(Hashes.decode(idIri.getLocalName()));
 		} else {
 			throw new ValueExprEvaluationException(String.format("%s requires an identifier IRI", getURI()));
 		}
@@ -52,7 +56,7 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 		Table table = (Table) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_TABLE_ATTRIBUTE);
 		Value v;
 		try {
-			v = getValue(table, id, vf);
+			v = getValue(table, id, vf, valueIO);
 		} catch (IOException e) {
 			throw new ValueExprEvaluationException(e);
 		}

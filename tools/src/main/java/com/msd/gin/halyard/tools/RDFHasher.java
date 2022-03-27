@@ -1,8 +1,8 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.Hashes;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.common.Identifier;
-import com.msd.gin.halyard.common.ValueIO;
 
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 public final class RDFHasher {
     private static final Logger LOGGER = LoggerFactory.getLogger(RDFHasher.class);
+    private static final IdentifiableValueIO valueIO = IdentifiableValueIO.create();
 
 	public static void main(String[] args) throws Exception {
 		Path inputFile = Paths.get(args[0]);
@@ -60,13 +61,13 @@ public final class RDFHasher {
 		}
 
 		private void add(Value v) {
-			Identifier id = Identifier.id(v);
-			byte[] ser = ValueIO.STREAM_WRITER.toBytes(v);
-			byte[] hash = new byte[Identifier.ID_SIZE];
+			Identifier id = valueIO.id(v);
+			byte[] ser = valueIO.STREAM_WRITER.toBytes(v);
+			byte[] hash = new byte[valueIO.getIdSize()];
 			id.writeTo(ByteBuffer.wrap(hash));
 			byte[] prev = hashes.put(hash, ser);
 			if (prev != null) {
-				Value prevValue = ValueIO.STREAM_READER.readValue(ByteBuffer.wrap(prev));
+				Value prevValue = valueIO.STREAM_READER.readValue(ByteBuffer.wrap(prev));
 				LOGGER.warn("Hash collision! {} and {} both have hash {}", v, prevValue, Hashes.encode(hash));
 			}
 		}

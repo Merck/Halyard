@@ -1,6 +1,7 @@
 package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.common.Identifier;
 
 import java.io.IOException;
@@ -26,7 +27,7 @@ public final class SubjectTupleFunction extends AbstractReificationTupleFunction
 	}
 
 	@Override
-	protected Value getValue(Table table, Identifier id, ValueFactory vf) throws IOException {
-		return HalyardTableUtils.getSubject(table, id, vf);
+	protected Value getValue(Table table, Identifier id, ValueFactory vf, IdentifiableValueIO valueIO) throws IOException {
+		return HalyardTableUtils.getSubject(table, id, vf, valueIO);
 	}
 }

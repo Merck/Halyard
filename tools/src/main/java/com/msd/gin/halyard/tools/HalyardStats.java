@@ -19,7 +19,7 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
-import com.msd.gin.halyard.common.Identifier;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFIdentifier;
 import com.msd.gin.halyard.common.RDFObject;
@@ -98,10 +98,6 @@ public final class HalyardStats extends AbstractHalyardTool {
     private static final String TARGET_GRAPH = "halyard.stats.target.graph";
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
-	private static final RDFPredicate RDF_TYPE_PREDICATE = RDFPredicate.create(RDF.TYPE);
-	private static final byte[] POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.POS);
-	private static final byte[] CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.CPOS);
-
     static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
     static final class StatsMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
@@ -114,8 +110,12 @@ public final class HalyardStats extends AbstractHalyardTool {
         final byte[] lastCtxFragment = new byte[RDFContext.KEY_SIZE];
         final byte[] lastClassFragment = new byte[RDFObject.KEY_SIZE];
         final ByteArrayOutputStream baos = new ByteArrayOutputStream(128);
+    	RDFPredicate RDF_TYPE_PREDICATE;
+    	byte[] POS_TYPE_HASH;
+    	byte[] CPOS_TYPE_HASH;
         IRI statsContext, graphContext;
         byte[] cspoStatsContextHash;
+        IdentifiableValueIO valueIO;
         ValueIO.Reader valueReader;
         StatementIndex lastIndex;
         long counter = 0;
@@ -133,14 +133,18 @@ public final class HalyardStats extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
+            Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
+            valueIO = IdentifiableValueIO.create(conf);
+            valueReader = valueIO.createReader(SVF, new TableTripleReader(table));
+        	RDF_TYPE_PREDICATE = RDFPredicate.create(RDF.TYPE, valueIO);
+        	POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.POS);
+        	CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.CPOS);
             update = conf.get(TARGET) == null;
             threshold = conf.getLong(THRESHOLD, 1000);
             statsContext = SVF.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String gc = conf.get(GRAPH_CONTEXT);
             if (gc != null) graphContext = SVF.createIRI(gc);
-			cspoStatsContextHash = RDFContext.create(statsContext).getKeyHash(StatementIndex.CSPO);
-            Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            valueReader = new ValueIO.Reader(SVF, new TableTripleReader(table));
+			cspoStatsContextHash = RDFContext.create(statsContext, valueIO).getKeyHash(StatementIndex.CSPO);
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, int len, byte[] target) {
@@ -297,7 +301,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                         dos.writeInt(0);
                     } else {
                     	ByteBuffer b = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
-						b = ValueIO.CELL_WRITER.writeTo(partitionId, b);
+						b = valueIO.CELL_WRITER.writeTo(partitionId, b);
 						int len = b.position();
                         dos.writeInt(len);
                         dos.write(b.array(), b.arrayOffset(), len);
@@ -371,6 +375,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         RDFWriter writer;
         Map<String, Boolean> graphs;
         IRI statsGraphContext;
+        IdentifiableValueIO valueIO;
         ValueIO.Reader valueReader;
         HBaseSail sail;
 		SailConnection conn;
@@ -381,7 +386,8 @@ public final class HalyardStats extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             statsGraphContext = SVF.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            valueReader = new ValueIO.Reader(SVF, new TableTripleReader(table));
+            valueIO = IdentifiableValueIO.create(conf);
+            valueReader = valueIO.createReader(SVF, new TableTripleReader(table));
             String targetUrl = conf.get(TARGET);
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
@@ -458,7 +464,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                 if (partitionId.hasRemaining()) {
 					Value partition = valueReader.readValue(partitionId);
                     IRI pred = SVF.createIRI(predicate);
-					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + Identifier.id(partition));
+					IRI subset = SVF.createIRI(graph + "_" + pred.getLocalName() + "_" + valueIO.id(partition));
                     writeStatement(graphNode, SVF.createIRI(predicate + "Partition"), subset);
                     writeStatement(subset, RDF.TYPE, VOID.DATASET);
 					writeStatement(subset, pred, partition);
@@ -540,14 +546,15 @@ public final class HalyardStats extends AbstractHalyardTool {
         TableName sourceTableName = TableName.valueOf(source);
         List<Scan> scans;
         if (graphContext != null) { //restricting stats to scan given graph context only
+            IdentifiableValueIO valueIO = IdentifiableValueIO.create(getConf());
             scans = new ArrayList<>(4);
-            RDFContext rdfGraphCtx = RDFContext.create(SVF.createIRI(graphContext));
+            RDFContext rdfGraphCtx = RDFContext.create(SVF.createIRI(graphContext), valueIO);
             scans.add(scan(sourceTableName, StatementIndex.CSPO, rdfGraphCtx));
             scans.add(scan(sourceTableName, StatementIndex.CPOS, rdfGraphCtx));
             scans.add(scan(sourceTableName, StatementIndex.COSP, rdfGraphCtx));
             if (target == null) { //add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
 				scans.add(scan(sourceTableName, StatementIndex.CSPO,
-					RDFContext.create(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SVF.createIRI(targetGraph))
+					RDFContext.create(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : SVF.createIRI(targetGraph), valueIO)
 				));
             }
         } else {

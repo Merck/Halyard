@@ -4,6 +4,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.filter.MultiRowRangeFilter;
 import org.apache.hadoop.hbase.filter.MultiRowRangeFilter.RowRange;
@@ -225,10 +227,11 @@ public enum StatementIndex {
 		}
 	}
 
-	public static final Scan scanLiterals() {
+	public static final Scan scanLiterals(IdentifiableValueIO valueIO) {
+		int typeSaltSize = valueIO.getTypeSaltSize();
 		StatementIndex index = OSP;
-		List<RowRange> ranges = new ArrayList<>(Identifier.TYPE_SALT_SIZE);
-		for (int i=0; i<Identifier.TYPE_SALT_SIZE; i++) {
+		List<RowRange> ranges = new ArrayList<>(typeSaltSize);
+		for (int i=0; i<typeSaltSize; i++) {
 			byte[] startKey = index.concat(false, new byte[] {(byte) i}); // inclusive
 			byte[] stopKey = index.concat(false, new byte[] {(byte) i, Identifier.LITERAL_STOP_BITS}); // exclusive
 			ranges.add(new RowRange(startKey, true, stopKey, false));
@@ -236,11 +239,13 @@ public enum StatementIndex {
 		return index.scan().setFilter(new MultiRowRangeFilter(ranges));
 	}
 
-	public static final Scan scanLiterals(RDFContext ctx) {
+	public static final Scan scanLiterals(Resource graph, IdentifiableValueIO valueIO) {
+		RDFContext ctx = RDFContext.create(graph, valueIO);
+		int typeSaltSize = valueIO.getTypeSaltSize();
 		StatementIndex index = COSP;
 		byte[] ctxb = ctx.getKeyHash(index);
-		List<RowRange> ranges = new ArrayList<>(Identifier.TYPE_SALT_SIZE);
-		for (int i=0; i<Identifier.TYPE_SALT_SIZE; i++) {
+		List<RowRange> ranges = new ArrayList<>(typeSaltSize);
+		for (int i=0; i<typeSaltSize; i++) {
 			byte[] startKey = index.concat(false, ctxb, new byte[] {(byte) i}); // inclusive
 			byte[] stopKey = index.concat(false, ctxb, new byte[] {(byte) i, Identifier.LITERAL_STOP_BITS}); // exclusive
 			ranges.add(new RowRange(startKey, true, stopKey, false));
@@ -260,7 +265,7 @@ public enum StatementIndex {
 	 * @param sizeLen length of size field, 2 for short, 4 for int.
 	 */
 	private static int len(RDFValue<?> v, int sizeLen) {
-		if (ValueIO.isWellKnownIRI(v.val)) {
+		if (v.isWellKnownIRI()) {
 			return 1;
 		} else {
 			return sizeLen + v.getSerializedForm().remaining();
@@ -268,7 +273,7 @@ public enum StatementIndex {
 	}
 
 	private static void putShortRDFValue(ByteBuffer cv, RDFValue<?> v) {
-		if (ValueIO.isWellKnownIRI(v.val)) {
+		if (v.isWellKnownIRI()) {
 			cv.put(WELL_KNOWN_IRI_MARKER);
 		} else {
 			ByteBuffer ser = v.getSerializedForm();
@@ -277,7 +282,7 @@ public enum StatementIndex {
 	}
 
 	private static void putIntRDFValue(ByteBuffer cv, RDFValue<?> v) {
-		if (ValueIO.isWellKnownIRI(v.val)) {
+		if (v.isWellKnownIRI()) {
 			cv.put(WELL_KNOWN_IRI_MARKER);
 		} else {
 			ByteBuffer ser = v.getSerializedForm();
@@ -286,7 +291,7 @@ public enum StatementIndex {
 	}
 
 	private static void putLastRDFValue(ByteBuffer cv, RDFValue<?> v) {
-		if (ValueIO.isWellKnownIRI(v.val)) {
+		if (v.isWellKnownIRI()) {
 			cv.put(WELL_KNOWN_IRI_MARKER);
 		} else {
 			ByteBuffer ser = v.getSerializedForm();
@@ -294,7 +299,7 @@ public enum StatementIndex {
 		}
 	}
 
-    private static <V extends Value> V parseShortRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader) {
+    private static <V extends Value> V parseShortRDFValue(StatementIndex index, RDFRole role, @Nullable RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader) {
     	byte marker = cv.get(cv.position()); // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -305,7 +310,7 @@ public enum StatementIndex {
    		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, reader);
     }
 
-    private static <V extends Value> V parseIntRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader) {
+    private static <V extends Value> V parseIntRDFValue(StatementIndex index, RDFRole role, @Nullable RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader) {
     	byte marker = cv.get(cv.position()); // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -316,7 +321,7 @@ public enum StatementIndex {
    		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, reader);
     }
 
-    private static <V extends Value> V parseLastRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader) {
+    private static <V extends Value> V parseLastRDFValue(StatementIndex index, RDFRole role, @Nullable RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader) {
     	byte marker = cv.hasRemaining() ? cv.get(cv.position()) : 0; // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -328,23 +333,24 @@ public enum StatementIndex {
     }
 
     @SuppressWarnings("unchecked")
-	private static <V extends Value> V parseRDFValue(StatementIndex index, RDFRole role, RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, int len, ValueIO.Reader reader) {
+	private static <V extends Value> V parseRDFValue(StatementIndex index, RDFRole role, @Nullable RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, int len, ValueIO.Reader reader) {
+    	IdentifiableValueIO valueIO = (IdentifiableValueIO) reader.getValueIO();
     	if(pattern != null) {
     		// if we have been given the value then don't bother to read it and skip to the next
-    		skipId(key, cn, keySize);
+    		skipId(key, cn, keySize, valueIO.getIdSize());
     		if (len > 0) {
     			cv.position(cv.position() + len);
     		}
 			return pattern.val;
     	} else if(len == WELL_KNOWN_IRI_MARKER) {
-			Identifier id = parseId(index, role, key, cn, keySize);
-			IRI iri = ValueIO.WELL_KNOWN_IRI_IDS.get(id);
+			Identifier id = parseId(index, role, key, cn, keySize, valueIO);
+			IRI iri = valueIO.getWellKnownIRI(id);
 			if (iri == null) {
 				throw new IllegalStateException(String.format("Unknown IRI hash: %s", id));
 			}
 			return (V) iri;
 		} else if(len > 0) {
-			Identifier id = parseId(index, role, key, cn, keySize);
+			Identifier id = parseId(index, role, key, cn, keySize, valueIO);
 			int limit = cv.limit();
 			cv.limit(cv.position() + len);
 			V value = (V) reader.readValue(cv);
@@ -360,17 +366,17 @@ public enum StatementIndex {
 		}
     }
 
-	private static Identifier parseId(StatementIndex index, RDFRole role, ByteBuffer key, ByteBuffer cn, int keySize) {
-		byte[] idBytes = new byte[Identifier.ID_SIZE];
+	private static Identifier parseId(StatementIndex index, RDFRole role, ByteBuffer key, ByteBuffer cn, int keySize, IdentifiableValueIO valueIO) {
+		byte[] idBytes = new byte[valueIO.getIdSize()];
 		role.unrotate(key.array(), key.arrayOffset()+key.position(), keySize, index, idBytes);
 		key.position(key.position()+keySize);
 		cn.get(idBytes, keySize, idBytes.length - keySize);
-		return new Identifier(idBytes);
+		return valueIO.id(idBytes);
 	}
 
-	private static void skipId(ByteBuffer key, ByteBuffer cn, int keySize) {
+	private static void skipId(ByteBuffer key, ByteBuffer cn, int keySize, int idSize) {
 		key.position(key.position() + keySize);
-		cn.position(cn.position() + Identifier.ID_SIZE - keySize);
+		cn.position(cn.position() + idSize - keySize);
 	}
 
 	protected final byte prefix;
@@ -394,7 +400,7 @@ public enum StatementIndex {
 	}
 
 	abstract byte[] value(RDFValue<?> v1, RDFValue<?> v2, RDFValue<?> v3, RDFValue<?> v4);
-	abstract Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader);
+	abstract Statement parseStatement(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader);
 	abstract byte[][] newStopKeys();
 	abstract byte[] keyHash(Identifier id);
 	abstract byte[] qualifierHash(Identifier id);

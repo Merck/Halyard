@@ -23,7 +23,8 @@ import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class HalyardTableUtilsKeyValueTest {
-	private static final ValueFactory vf = TimestampedValueFactory.getInstance();
+    private static final IdentifiableValueIO valueIO = IdentifiableValueIO.create();
+	private static final ValueFactory vf = new TimestampedValueFactory(valueIO);
 
     private static final IRI SUBJ1 = vf.createIRI("http://whatever/subj1");
     private static final IRI SUBJ2 = RDF.NIL;
@@ -72,10 +73,10 @@ public class HalyardTableUtilsKeyValueTest {
     private final RDFContext c;
 
 	public HalyardTableUtilsKeyValueTest(Resource s, IRI p, Value o, Resource c) {
-        this.s = RDFSubject.create(s);
-        this.p = RDFPredicate.create(p);
-        this.o = RDFObject.create(o);
-        this.c = (c != null) ? RDFContext.create(c) : null;
+        this.s = RDFSubject.create(s, valueIO);
+        this.p = RDFPredicate.create(p, valueIO);
+        this.o = RDFObject.create(o, valueIO);
+        this.c = (c != null) ? RDFContext.create(c, valueIO) : null;
 	}
 
 	@Test
@@ -83,7 +84,7 @@ public class HalyardTableUtilsKeyValueTest {
 		long ts = 0;
 		Resource ctx = c != null ? c.val : null;
 		Statement expected = vf.createStatement(s.val, p.val, o.val, ctx);
-		List<? extends Cell> kvs = HalyardTableUtils.toKeyValues(s.val, p.val, o.val, ctx, false, ts);
+		List<? extends Cell> kvs = HalyardTableUtils.toKeyValues(s.val, p.val, o.val, ctx, false, ts, valueIO);
 		for(Cell kv : kvs) {
 			testParseStatement("spoc", expected, s, p, o, c != null ? c : null, kv, ts);
 			testParseStatement("_poc", expected, null, p, o, c != null ? c : null, kv, ts);
@@ -94,20 +95,20 @@ public class HalyardTableUtilsKeyValueTest {
 	}
 
 	private void testParseStatement(String msg, Statement expected, RDFSubject s, RDFPredicate p, RDFObject o, RDFContext c, Cell kv, long ts) {
-		Statement actual = HalyardTableUtils.parseStatement(s, p, o, c, kv, new ValueIO.Reader(vf, null));
+		Statement actual = HalyardTableUtils.parseStatement(s, p, o, c, kv, valueIO.createReader(vf, null));
 		assertEquals(msg, expected, actual);
 		assertEquals(ts, ((Timestamped)actual).getTimestamp());
 		if(s == null) {
-			assertEquals(Identifier.id(expected.getSubject()), ((Identifiable)actual.getSubject()).getId());
+			assertEquals(valueIO.id(expected.getSubject()), ((Identifiable)actual.getSubject()).getId());
 		}
 		if(p == null) {
-			assertEquals(Identifier.id(expected.getPredicate()), ((Identifiable)actual.getPredicate()).getId());
+			assertEquals(valueIO.id(expected.getPredicate()), ((Identifiable)actual.getPredicate()).getId());
 		}
 		if(o == null) {
-			assertEquals(Identifier.id(expected.getObject()), ((Identifiable)actual.getObject()).getId());
+			assertEquals(valueIO.id(expected.getObject()), ((Identifiable)actual.getObject()).getId());
 		}
 		if (c == null && (expected.getContext() != null || actual.getContext() != null)) {
-			assertEquals(Identifier.id(expected.getContext()), ((Identifiable)actual.getContext()).getId());
+			assertEquals(valueIO.id(expected.getContext()), ((Identifiable)actual.getContext()).getId());
 		}
 	}
 }

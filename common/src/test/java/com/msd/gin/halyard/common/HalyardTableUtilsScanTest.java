@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
@@ -49,7 +50,7 @@ import static org.junit.Assert.*;
 @RunWith(Parameterized.class)
 public class HalyardTableUtilsScanTest {
 
-    private static final String SUBJ1 = "http://whatever/subj1";
+	private static final String SUBJ1 = "http://whatever/subj1";
     private static final String SUBJ2 = "http://whatever/subj2";
     private static final String PRED1 = RDF.TYPE.stringValue();
     private static final String PRED2 = "http://whatever/pred";
@@ -146,12 +147,15 @@ public class HalyardTableUtilsScanTest {
            });
     }
 
+    private static IdentifiableValueIO valueIO;
 	private static Table table;
     private static Set<Statement> allStatements;
 
     @BeforeClass
     public static void setup() throws Exception {
-        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testScan", true, 0);
+		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+		valueIO = IdentifiableValueIO.create(conf);
+        table = HalyardTableUtils.getTable(conf, "testScan", true, 0);
 
         SimpleValueFactory vf = SimpleValueFactory.getInstance();
         allStatements = new HashSet<>();
@@ -160,7 +164,7 @@ public class HalyardTableUtilsScanTest {
         long timestamp = System.currentTimeMillis();
 		List<Put> puts = new ArrayList<>();
         for (Statement st : allStatements) {
-            for (Cell kv : HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext(), false, timestamp)) {
+            for (Cell kv : HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext(), false, timestamp, valueIO)) {
 				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
             }
         }
@@ -185,17 +189,18 @@ public class HalyardTableUtilsScanTest {
 
     @Test
     public void testScan() throws Exception {
-        ValueFactory vf = ValueIO.SIMPLE_READER.getValueFactory();
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        ValueIO.Reader reader = valueIO.createReader(vf, null);
 
-        RDFSubject subj = RDFSubject.create(s == null ? null : vf.createIRI(s));
-        RDFPredicate pred = RDFPredicate.create(p == null ? null : vf.createIRI(p));
-        RDFObject obj = RDFObject.create(o == null ? null : vf.createLiteral(o));
-        RDFContext ctx = RDFContext.create(c == null ? null : vf.createIRI(c));
+        RDFSubject subj = RDFSubject.create(s == null ? null : vf.createIRI(s), valueIO);
+        RDFPredicate pred = RDFPredicate.create(p == null ? null : vf.createIRI(p), valueIO);
+        RDFObject obj = RDFObject.create(o == null ? null : vf.createLiteral(o), valueIO);
+        RDFContext ctx = RDFContext.create(c == null ? null : vf.createIRI(c), valueIO);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, ctx))) {
             Set<Statement> res = new HashSet<>();
             Result r;
             while ((r = rs.next()) != null) {
-                res.addAll(HalyardTableUtils.parseStatements(subj, pred, obj, ctx, r, ValueIO.SIMPLE_READER));
+                res.addAll(HalyardTableUtils.parseStatements(subj, pred, obj, ctx, r, reader));
             }
             assertTrue(allStatements.containsAll(res));
             assertEquals(expRes, res.size());
@@ -221,7 +226,7 @@ public class HalyardTableUtilsScanTest {
                     Set<Statement> res = new HashSet<>();
                     Result r;
                     while ((r = rs.next()) != null) {
-                        res.addAll(HalyardTableUtils.parseStatements(null, null, null, null, r, ValueIO.SIMPLE_READER));
+                        res.addAll(HalyardTableUtils.parseStatements(null, null, null, null, r, reader));
                     }
                     assertTrue(allStatements.containsAll(res));
                     assertEquals(expRes, res.size());

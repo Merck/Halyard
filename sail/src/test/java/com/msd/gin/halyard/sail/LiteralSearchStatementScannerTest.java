@@ -17,7 +17,7 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.Identifier;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.BufferedReader;
@@ -70,8 +70,9 @@ public class LiteralSearchStatementScannerTest implements Runnable {
 
     @Test
     public void statementLiteralSearchTest() throws Exception {
+		IdentifiableValueIO valueIO = hbaseSail.getValueIO();
         Literal val = SimpleValueFactory.getInstance().createLiteral("Whatever Text");
-		response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: 30\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + Identifier.id(val) + "\",\"_source\":{\"label\":\"" + val.getLabel() + "\",\"datatype\":\""
+		response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: 30\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + valueIO.id(val) + "\",\"_source\":{\"label\":\"" + val.getLabel() + "\",\"datatype\":\""
 				+ val.getDatatype() + "\"}}]}}";
         Thread t = new Thread(this);
         t.setDaemon(true);

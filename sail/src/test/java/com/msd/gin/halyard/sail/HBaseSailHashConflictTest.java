@@ -18,12 +18,15 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Put;
@@ -33,6 +36,7 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
@@ -41,6 +45,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+
 import static org.junit.Assert.*;
 
 /**
@@ -50,10 +55,11 @@ import static org.junit.Assert.*;
 @RunWith(Parameterized.class)
 public class HBaseSailHashConflictTest {
 
-	private static final Resource SUBJ = SimpleValueFactory.getInstance().createIRI("http://testConflictingHash/subject1/");
-    private static final IRI PRED = SimpleValueFactory.getInstance().createIRI("http://testConflictingHash/pred1/");
-    private static final Value OBJ = SimpleValueFactory.getInstance().createLiteral("literal1");
-    private static final IRI CONF = SimpleValueFactory.getInstance().createIRI("http://testConflictingHash/conflict/");
+	private static final ValueFactory SVF = SimpleValueFactory.getInstance();
+	private static final Resource SUBJ = SVF.createIRI("http://testConflictingHash/subject1/");
+	private static final IRI PRED = SVF.createIRI("http://testConflictingHash/pred1/");
+	private static final Value OBJ = SVF.createLiteral("literal1");
+	private static final IRI CONF = SVF.createIRI("http://testConflictingHash/conflict/");
 
     private static HBaseSail sail;
 
@@ -76,17 +82,17 @@ public class HBaseSailHashConflictTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-		try (Table table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", true, 0)) {
+		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+		IdentifiableValueIO valueIO = IdentifiableValueIO.create(conf);
+
+		try (Table table = HalyardTableUtils.getTable(conf, "testConflictingHash", true, 0)) {
             long timestamp = System.currentTimeMillis();
-			List<? extends Cell> triple = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp);
+			List<? extends Cell> triple = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp, valueIO);
 			List<? extends Cell> conflicts[] = new List[] {
-                HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(SUBJ, CONF,  OBJ, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(CONF, PRED,  OBJ, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(CONF, PRED, CONF, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(CONF, CONF,  OBJ, null, false, timestamp),
-                HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null, false, timestamp),
+					HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null, false, timestamp, valueIO), HalyardTableUtils.toKeyValues(SUBJ, CONF, OBJ, null, false, timestamp, valueIO),
+					HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null, false, timestamp, valueIO), HalyardTableUtils.toKeyValues(CONF, PRED, OBJ, null, false, timestamp, valueIO),
+					HalyardTableUtils.toKeyValues(CONF, PRED, CONF, null, false, timestamp, valueIO), HalyardTableUtils.toKeyValues(CONF, CONF, OBJ, null, false, timestamp, valueIO),
+					HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null, false, timestamp, valueIO),
             };
 			List<Put> puts = new ArrayList<>();
 			for (int i = 0; i < triple.size(); i++) {
@@ -104,8 +110,9 @@ public class HBaseSailHashConflictTest {
             }
 			table.put(puts);
         }
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "testConflictingHash", false, 0, true, 0, null, null);
-        sail.initialize();
+
+		sail = new HBaseSail(conf, "testConflictingHash", false, 0, true, 0, null, null);
+		sail.initialize();
     }
 
     @AfterClass

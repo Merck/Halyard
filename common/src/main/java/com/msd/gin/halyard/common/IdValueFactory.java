@@ -20,48 +20,50 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.base.AbstractValueFactory;
 
 public class IdValueFactory implements ValueFactory {
-	private static final IdValueFactory VF = new IdValueFactory();
 	private static final ValueFactory DELEGATE = new AbstractValueFactory() {};
-	private static final Literal TRUE = new IdentifiableLiteral(DELEGATE.createLiteral(true));
-	private static final Literal FALSE = new IdentifiableLiteral(DELEGATE.createLiteral(false));
+	private final IdentifiableValueIO valueIO;
+	private final Literal TRUE;
+	private final Literal FALSE;
 
-	public static IdValueFactory getInstance() {
-		return VF;
+	public IdValueFactory(IdentifiableValueIO valueIO) {
+		this.valueIO = valueIO;
+		this.TRUE = new IdentifiableLiteral(DELEGATE.createLiteral(true), valueIO);
+		this.FALSE = new IdentifiableLiteral(DELEGATE.createLiteral(false), valueIO);
 	}
 
 	@Override
 	public IRI createIRI(String iri) {
-		return new IdentifiableIRI(iri);
+		return new IdentifiableIRI(iri, valueIO);
 	}
 
 	@Override
 	public IRI createIRI(String namespace, String localName) {
-		return new IdentifiableIRI(namespace, localName);
+		return new IdentifiableIRI(namespace, localName, valueIO);
 	}
 
 	@Override
 	public BNode createBNode() {
-		return new IdentifiableBNode(DELEGATE.createBNode(UUID.randomUUID().toString()));
+		return new IdentifiableBNode(DELEGATE.createBNode(UUID.randomUUID().toString()), valueIO);
 	}
 
 	@Override
 	public BNode createBNode(String nodeID) {
-		return new IdentifiableBNode(DELEGATE.createBNode(nodeID));
+		return new IdentifiableBNode(DELEGATE.createBNode(nodeID), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(String value) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(String value, String language) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value, language));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value, language), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(String value, IRI datatype) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value, datatype));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value, datatype), valueIO);
 	}
 
 	@Override
@@ -71,66 +73,66 @@ public class IdValueFactory implements ValueFactory {
 
 	@Override
 	public Literal createLiteral(byte value) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(short value) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(int value) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(long value) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(float value) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(double value) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(BigDecimal value) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(BigInteger value) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(XMLGregorianCalendar calendar) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(calendar));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(calendar), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(Date date) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(date));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(date), valueIO);
 	}
 
 	public Literal createLiteral(TemporalAccessor value) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value), valueIO);
 	}
 
 	@Override
 	public Literal createLiteral(TemporalAmount value) {
-		return new IdentifiableLiteral(DELEGATE.createLiteral(value));
+		return new IdentifiableLiteral(DELEGATE.createLiteral(value), valueIO);
 	}
 
 	@Override
 	public Triple createTriple(Resource subject, IRI predicate, Value object) {
-		return new IdentifiableTriple(DELEGATE.createTriple(subject, predicate, object));
+		return new IdentifiableTriple(DELEGATE.createTriple(subject, predicate, object), valueIO);
 	}
 
 	@Override

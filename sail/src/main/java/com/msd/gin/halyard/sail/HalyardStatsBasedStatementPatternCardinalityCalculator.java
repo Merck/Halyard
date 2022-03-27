@@ -16,7 +16,7 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.common.Identifier;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.vocab.VOID_EXT;
@@ -44,9 +44,11 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
 	private static final Logger LOG = LoggerFactory.getLogger(HalyardStatsBasedStatementPatternCardinalityCalculator.class);
 
 	private final TripleSource statsSource;
+	private final IdentifiableValueIO valueIO;
 
-	public HalyardStatsBasedStatementPatternCardinalityCalculator(TripleSource statsSource) {
+	public HalyardStatsBasedStatementPatternCardinalityCalculator(TripleSource statsSource, IdentifiableValueIO valueIO) {
 		this.statsSource = statsSource;
+		this.valueIO = valueIO;
     }
 
     @Override
@@ -119,6 +121,6 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
         if (partitionVar == null || !partitionVar.hasValue()) {
             return defaultCardinality;
         }
-		return getTriplesCount(statsSource.getValueFactory().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + Identifier.id(partitionVar.getValue())), 100l);
+		return getTriplesCount(statsSource.getValueFactory().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + valueIO.id(partitionVar.getValue())), 100l);
     }
 }

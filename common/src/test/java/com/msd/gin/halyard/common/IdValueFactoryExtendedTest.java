@@ -27,6 +27,7 @@ import static org.hamcrest.Matchers.lessThan;
 
 @RunWith(Parameterized.class)
 public class IdValueFactoryExtendedTest {
+	private static final IdentifiableValueIO valueIO = IdentifiableValueIO.create();
 	private static final Date NOW = new Date();
 
 	private static List<Value> createData(ValueFactory vf) {
@@ -65,7 +66,7 @@ public class IdValueFactoryExtendedTest {
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> data() {
 		List<Value> expected = createData(SimpleValueFactory.getInstance());
-		List<Value> actual = createData(IdValueFactory.getInstance());
+		List<Value> actual = createData(new IdValueFactory(valueIO));
 		List<Object[]> testValues = new ArrayList<>();
 		for (int i=0; i<expected.size(); i++) {
 			testValues.add(new Object[] {expected.get(i), actual.get(i)});

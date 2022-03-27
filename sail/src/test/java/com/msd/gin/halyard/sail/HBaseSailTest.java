@@ -18,7 +18,7 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.Identifier;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.util.List;
@@ -576,6 +576,7 @@ public class HBaseSailTest {
     public void testCardinalityCalculator() throws Exception {
         HBaseSail sail = new HBaseSail(hconn, "cardinalitytable", true, 0, true, 0, null, null);
         sail.initialize();
+		IdentifiableValueIO valueIO = sail.getValueIO();
         SimpleValueFactory f = SimpleValueFactory.getInstance();
         TupleExpr q1 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s a ?o}", "http://whatever/").getTupleExpr();
         TupleExpr q2 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {graph <http://whatevercontext> {?s a ?o}}", "http://whatever/").getTupleExpr();
@@ -587,9 +588,9 @@ public class HBaseSailTest {
         assertEquals(0.0001, sail.statistics.getCardinality(q4), 0.00001);
 		try (SailConnection conn = sail.getConnection()) {
 	        conn.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
-			conn.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_" + Identifier.id(RDF.TYPE)), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
+			conn.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_" + valueIO.id(RDF.TYPE)), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
 	        conn.addStatement(f.createIRI("http://whatevercontext"), VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
-			conn.addStatement(f.createIRI("http://whatevercontext_property_" + Identifier.id(RDF.TYPE)), VOID.TRIPLES, f.createLiteral(20l), HALYARD.STATS_GRAPH_CONTEXT);
+			conn.addStatement(f.createIRI("http://whatevercontext_property_" + valueIO.id(RDF.TYPE)), VOID.TRIPLES, f.createLiteral(20l), HALYARD.STATS_GRAPH_CONTEXT);
 		}
         assertEquals(5000.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(20.0, sail.statistics.getCardinality(q2), 0.01);

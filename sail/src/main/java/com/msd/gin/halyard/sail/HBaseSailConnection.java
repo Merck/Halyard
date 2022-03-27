@@ -19,8 +19,8 @@ package com.msd.gin.halyard.sail;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
+import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
@@ -93,6 +93,7 @@ public class HBaseSailConnection implements SailConnection {
 
 	public static final String SOURCE_STRING_BINDING = "__source__";
 	public static final String QUERY_CONTEXT_TABLE_ATTRIBUTE = Table.class.getName();
+	public static final String QUERY_CONTEXT_VALUEIO_ATTRIBUTE = ValueIO.class.getName();
 
 	private final Cache<PreparedQueryKey, TupleExpr> queryCache = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(5000).expireAfterWrite(1L, TimeUnit.HOURS).build();
 
@@ -149,13 +150,14 @@ public class HBaseSailConnection implements SailConnection {
     }
 
 	private RDFStarTripleSource createTripleSource() {
-		return new HBaseSearchTripleSource(table, sail.getValueFactory(), sail.evaluationTimeout, sail.scanSettings, sail.elasticIndexURL, sail.ticker);
+		return new HBaseSearchTripleSource(table, sail.getValueFactory(), sail.getValueIO(), sail.evaluationTimeout, sail.scanSettings, sail.elasticIndexURL, sail.ticker);
 	}
 
 	private QueryContext createQueryContext(TripleSource source, boolean includeInferred) {
 		SailConnectionQueryPreparer queryPreparer = new SailConnectionQueryPreparer(this, includeInferred, source);
 		QueryContext queryContext = new QueryContext(queryPreparer);
 		queryContext.setAttribute(QUERY_CONTEXT_TABLE_ATTRIBUTE, table);
+		queryContext.setAttribute(QUERY_CONTEXT_VALUEIO_ATTRIBUTE, sail.getValueIO());
 		return queryContext;
 	}
 
@@ -291,7 +293,7 @@ public class HBaseSailConnection implements SailConnection {
 					final ResultScanner rs;
 
 					StatementScanner() throws IOException {
-						super(new ValueIO.Reader(sail.getValueFactory(), new TableTripleReader(table)));
+						super(sail.getValueIO().createReader(sail.getValueFactory(), new TableTripleReader(table)));
 						rs = table.getScanner(StatementIndex.CSPO.scan());
 					}
 
@@ -469,7 +471,7 @@ public class HBaseSailConnection implements SailConnection {
 		}
         try {
 			for (Resource ctx : contexts) {
-				for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, false, timestamp)) { // serialize the key value pairs relating to the statement in HBase
+				for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, false, timestamp, sail.getValueIO())) { // serialize the key value pairs relating to the statement in HBase
 					put(kv);
 				}
 			}
@@ -518,7 +520,7 @@ public class HBaseSailConnection implements SailConnection {
 		checkWritable();
 		try {
 			for (Resource ctx : contexts) {
-				for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, true, timestamp)) { // calculate the kv's corresponding to the quad (or triple)
+				for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, true, timestamp, sail.getValueIO())) { // calculate the kv's corresponding to the quad (or triple)
 					delete(kv);
 				}
 			}

@@ -19,6 +19,7 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -72,6 +73,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
     static final class DeleteMapper extends TableMapper<ImmutableBytesWritable, KeyValue> {
 
         final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
+        IdentifiableValueIO valueIO;
         ValueIO.Reader valueReader;
         long total = 0, deleted = 0;
         Resource subj;
@@ -83,7 +85,8 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            valueReader = new ValueIO.Reader(SVF, new TableTripleReader(table));
+            valueIO = IdentifiableValueIO.create(conf);
+            valueReader = valueIO.createReader(SVF, new TableTripleReader(table));
             String s = conf.get(SUBJECT);
             if (s!= null) {
                 subj = NTriplesUtil.parseResource(s, SVF);

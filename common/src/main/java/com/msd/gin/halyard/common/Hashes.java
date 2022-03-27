@@ -11,8 +11,6 @@ import java.util.Base64;
 import java.util.function.Function;
 
 public final class Hashes {
-	private static final String ID_HASH = Config.getString("halyard.id.hash", "SHA-1");
-	private static final int ID_SIZE = Config.getInteger("halyard.id.size", 0);
 	private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
 	private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
 
@@ -24,19 +22,18 @@ public final class Hashes {
         }
     }
 
-    private static final ThreadLocal<HashFunction> MD = new ThreadLocal<HashFunction>() {
-        @Override
-		protected HashFunction initialValue() {
-			switch (ID_HASH) {
-				case "Murmur3-128":
-					return new GuavaHashFunction(Hashing.murmur3_128());
-				default:
-					return new MessageDigestHashFunction(getMessageDigest(ID_HASH));
-			}
+	public static HashFunction getHash(String algorithm, int size) {
+		switch (algorithm) {
+			case "FarmHash-64":
+				return new GuavaHashFunction(Hashing.farmHashFingerprint64(), size);
+			case "Murmur3-128":
+				return new GuavaHashFunction(Hashing.murmur3_128(), size);
+			default:
+				return new MessageDigestHashFunction(getMessageDigest(algorithm), size);
 		}
-    };
+	}
 
-    private static final byte[] PEARSON_HASH_TABLE = {
+	private static final byte[] PEARSON_HASH_TABLE = {
 		// 0-255 shuffled in any (random) order suffices
 		39,(byte)158,(byte)178,(byte)187,(byte)131,(byte)136,1,49,50,17,(byte)141,91,47,(byte)129,60,99,
 		(byte)237,18,(byte)253,(byte)225,8,(byte)208,(byte)172,(byte)244,(byte)255,126,101,79,(byte)145,(byte)235,(byte)228,121,
@@ -70,19 +67,6 @@ public final class Hashes {
     	return Hashing.murmur3_32().hashBytes(key).asInt();
     }
 
-    public static byte[] hashUnique(ByteBuffer key) {
-        byte[] hash = MD.get().apply(key);
-        return (ID_SIZE > 0) ? Arrays.copyOf(hash, ID_SIZE) : hash;
-    }
-
-    public static int hashUniqueSize() {
-        if (ID_SIZE > 0) {
-            return ID_SIZE;
-        } else {
-        	return MD.get().size();
-        }
-    }
-
     public static String encode(byte b[]) {
         return ENCODER.encodeToString(b);
     }
@@ -99,19 +83,40 @@ public final class Hashes {
 	}
 
 
-	static interface HashFunction extends Function<ByteBuffer,byte[]> {
-		int size();
+	public static abstract class HashFunction implements Function<ByteBuffer,byte[]> {
+		final int size;
+
+		static int hashSize(int size, int defaultSize) {
+			return (size > 0) ? size : defaultSize;
+		}
+
+		HashFunction(int size) {
+			this.size = size;
+		}
+
+		public final int size() {
+			return size;
+		}
+
+		@Override
+		public final byte[] apply(ByteBuffer bb) {
+			byte[] hash = calculateHash(bb);
+			return (size != hash.length) ? Arrays.copyOf(hash, size) : hash;
+		}
+
+		protected abstract byte[] calculateHash(ByteBuffer bb);
 	}
 
-	static final class MessageDigestHashFunction implements HashFunction {
+	static final class MessageDigestHashFunction extends HashFunction {
 		final MessageDigest md;
 
-		MessageDigestHashFunction(MessageDigest md) {
+		MessageDigestHashFunction(MessageDigest md, int size) {
+			super(hashSize(size, md.getDigestLength()));
 			this.md = md;
 		}
 
 		@Override
-		public byte[] apply(ByteBuffer bb) {
+		protected byte[] calculateHash(ByteBuffer bb) {
 			try {
 				md.update(bb);
 				return md.digest();
@@ -119,28 +124,19 @@ public final class Hashes {
 				md.reset();
 			}
 		}
-
-		@Override
-		public int size() {
-			return md.getDigestLength();
-		}
 	}
 
-	static final class GuavaHashFunction implements HashFunction {
+	static final class GuavaHashFunction extends HashFunction {
 		final com.google.common.hash.HashFunction hf;
 
-		GuavaHashFunction(com.google.common.hash.HashFunction hf) {
+		GuavaHashFunction(com.google.common.hash.HashFunction hf, int size) {
+			super(hashSize(size, hf.bits()/Byte.SIZE));
 			this.hf = hf;
 		}
 
 		@Override
-		public byte[] apply(ByteBuffer bb) {
+		protected byte[] calculateHash(ByteBuffer bb) {
 			return hf.hashBytes(bb).asBytes();
-		}
-
-		@Override
-		public int size() {
-			return hf.bits()/Byte.SIZE;
 		}
 	}
 }

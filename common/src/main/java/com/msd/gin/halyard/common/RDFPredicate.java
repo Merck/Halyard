@@ -3,11 +3,11 @@ package com.msd.gin.halyard.common;
 import org.eclipse.rdf4j.model.IRI;
 
 public final class RDFPredicate extends RDFValue<IRI> {
-	public static RDFPredicate create(IRI pred) {
+	public static RDFPredicate create(IRI pred, IdentifiableValueIO valueIO) {
 		if(pred == null) {
 			return null;
 		}
-		return new RDFPredicate(pred);
+		return new RDFPredicate(pred, valueIO);
 	}
 
 	/**
@@ -18,7 +18,7 @@ public final class RDFPredicate extends RDFValue<IRI> {
 	static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_32;
 	static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
 
-	private RDFPredicate(IRI val) {
-		super(RDFRole.PREDICATE, val);
+	private RDFPredicate(IRI val, IdentifiableValueIO valueIO) {
+		super(RDFRole.PREDICATE, val, valueIO);
 	}
 }

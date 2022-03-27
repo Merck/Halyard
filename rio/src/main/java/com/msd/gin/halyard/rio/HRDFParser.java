@@ -18,6 +18,7 @@ import org.eclipse.rdf4j.rio.RDFParserFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
 
 import com.msd.gin.halyard.common.ValueIO;
+import com.msd.gin.halyard.common.ValueIO.StreamTripleReader;
 
 public final class HRDFParser extends AbstractRDFParser {
 
@@ -35,6 +36,8 @@ public final class HRDFParser extends AbstractRDFParser {
 
     }
 
+	private static final ValueIO valueIO = ValueIO.create();
+
     @Override
 	public RDFFormat getRDFFormat() {
 		return com.msd.gin.halyard.rio.HRDF.FORMAT;
@@ -47,7 +50,7 @@ public final class HRDFParser extends AbstractRDFParser {
 		RDFHandlerException
 	{
 		clear();
-		ValueIO.Reader valueReader = new ValueIO.Reader(valueFactory, new ValueIO.StreamTripleReader(), (id,vf) -> createNode(id));
+		ValueIO.Reader valueReader = valueIO.createReader(valueFactory, new StreamTripleReader(), (id,vf) -> createNode(id));
 		try {
 			byte[] buffer = new byte[1024];
 			DataInputStream dataIn = new DataInputStream(in);

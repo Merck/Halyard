@@ -2,22 +2,25 @@ package com.msd.gin.halyard.common;
 
 import java.io.ObjectStreamException;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 import org.eclipse.rdf4j.model.Literal;
 
 public final class IdentifiableLiteral extends LiteralWrapper implements Identifiable, SerializableValue {
 	private static final long serialVersionUID = 4299930477670062440L;
+	private final IdentifiableValueIO valueIO;
 	private Identifier id;
 	private ByteBuffer ser;
 
-	IdentifiableLiteral(Literal literal) {
+	IdentifiableLiteral(Literal literal, IdentifiableValueIO valueIO) {
 		super(literal);
+		this.valueIO = Objects.requireNonNull(valueIO);
 	}
 
 	@Override
 	public Identifier getId() {
 		if (id == null) {
-			id = Identifier.create(literal, getSerializedForm());
+			id = valueIO.id(literal, getSerializedForm());
 		}
 		return id;
 	}
@@ -30,7 +33,7 @@ public final class IdentifiableLiteral extends LiteralWrapper implements Identif
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = ValueIO.CELL_WRITER.toBytes(literal);
+			byte[] b = valueIO.CELL_WRITER.toBytes(literal);
 			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 		}
 		return ser.duplicate();
@@ -40,6 +43,6 @@ public final class IdentifiableLiteral extends LiteralWrapper implements Identif
 		ByteBuffer serBuf = getSerializedForm();
 		byte[] b = new byte[serBuf.remaining()];
 		serBuf.get(b);
-		return new SerializedValue(b);
+		return new SerializedValue(b, valueIO.STREAM_READER);
 	}
 }

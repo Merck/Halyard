@@ -6,11 +6,11 @@ public class RDFIdentifier {
 	private final RDFRole role;
 	private Identifier id;
 
-	public static RDFIdentifier create(RDFRole role, byte[] idBytes) {
-		return new RDFIdentifier(role, new Identifier(idBytes));
+	public static RDFIdentifier create(RDFRole role, Identifier id) {
+		return new RDFIdentifier(role, id);
 	}
 
-	RDFIdentifier(RDFRole role, Identifier id) {
+	private RDFIdentifier(RDFRole role, Identifier id) {
 		this(role);
 		this.id = id;
 	}
@@ -59,11 +59,11 @@ public class RDFIdentifier {
 	}
 
 	final int qualifierHashSize() {
-		return role.qualifierHashSize();
+		return role.qualifierHashSize(getId().size());
 	}
 
 	final int endQualifierHashSize() {
-		return role.endQualifierHashSize();
+		return role.endQualifierHashSize(getId().size());
 	}
 
 	@Override

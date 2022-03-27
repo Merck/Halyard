@@ -36,18 +36,19 @@ import static org.junit.Assert.*;
  */
 @RunWith(Parameterized.class)
 public class HalyardTableUtilsCalculateSplitsTest {
+    private static final IdentifiableValueIO valueIO = IdentifiableValueIO.create();
 
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][] {
-				{ 0, true, null, new String[] { "01", "02", "03", "04", "05" } },
-				{ 1, true, null, new String[] { "008000", "01", "018000", "02", "028000", "03", "04", "05" } },
-				{ 2, true, null, new String[] { "004000", "008000", "00c000", "01", "014000", "018000", "01c000", "02", "024000", "028000", "02c000", "03", "038000", "04", "048000", "05", "058000" } },
-				{ 0, false, null, new String[] { "01", "02" } },
-				{ 1, false, null, new String[] { "008000", "01", "018000", "02", "028000" } },
-				{ 2, false, null, new String[] { "004000", "008000", "00c000", "01", "014000", "018000", "01c000", "02", "024000", "028000", "02c000" } },
-				{ 2, false, Collections.singletonMap(RDF.VALUE, 0.5f), new String[] { "004000", "008000", "00c000", "01", "015fb029d0", "015fb029d08000", "018000", "02", "024000", "028000", "02c000" } },
-				{ 2, false, Collections.singletonMap(RDF.VALUE, 0.8f), new String[] { "004000", "008000", "00c000", "01", "015fb029d04000", "015fb029d08000", "015fb029d0c000", "02", "024000", "028000", "02c000" } },
+			{ 0, true, null, new String[] { "01", "02", "03", "04", "05" } },
+			{ 1, true, null, new String[] { "008000", "01", "018000", "02", "028000", "03", "04", "05" } },
+			{ 2, true, null, new String[] { "004000", "008000", "00c000", "01", "014000", "018000", "01c000", "02", "024000", "028000", "02c000", "03", "038000", "04", "048000", "05", "058000" } },
+			{ 0, false, null, new String[] { "01", "02" } },
+			{ 1, false, null, new String[] { "008000", "01", "018000", "02", "028000" } },
+			{ 2, false, null, new String[] { "004000", "008000", "00c000", "01", "014000", "018000", "01c000", "02", "024000", "028000", "02c000" } },
+			{ 2, false, Collections.singletonMap(RDF.VALUE, 0.5f), new String[] { "004000", "008000", "00c000", "01", "016b8c8491",     "016b8c84918000", "018000", "02", "024000", "028000", "02c000" } },
+			{ 2, false, Collections.singletonMap(RDF.VALUE, 0.8f), new String[] { "004000", "008000", "00c000", "01", "016b8c84914000", "016b8c84918000", "016b8c8491c000", "02", "024000", "028000", "02c000" } },
         });
     }
 
@@ -65,7 +66,7 @@ public class HalyardTableUtilsCalculateSplitsTest {
 
     @Test
     public void testCalculateSplits() {
-		byte bb[][] = HalyardTableUtils.calculateSplits(splits, quads, predicateFractions);
+		byte bb[][] = HalyardTableUtils.calculateSplits(splits, quads, predicateFractions, valueIO);
         if (expected == null) {
             assertNull(bb);
         } else {

@@ -10,19 +10,21 @@ import org.eclipse.rdf4j.model.util.URIUtil;
 public final class IdentifiableIRI implements IRI, Identifiable, SerializableValue {
 	private static final long serialVersionUID = 8055405742401584331L;
 	private final String iri;
+	private final IdentifiableValueIO valueIO;
 	private int localNameIdx = -1;
 	private Identifier id;
 	private ByteBuffer ser;
 
-	IdentifiableIRI(String iri) {
+	IdentifiableIRI(String iri, IdentifiableValueIO valueIO) {
 		if (iri.indexOf(':') == -1) {
 			throw new IllegalArgumentException(String.format("Not a valid (absolute) IRI: %s", iri));
 		}
 		this.iri = Objects.requireNonNull(iri);
+		this.valueIO = Objects.requireNonNull(valueIO);
 	}
 
-	IdentifiableIRI(String namespace, String localName) {
-		this(Objects.requireNonNull(namespace, "Namespace is null") + Objects.requireNonNull(localName, "Local name is null"));
+	IdentifiableIRI(String namespace, String localName, IdentifiableValueIO valueIO) {
+		this(Objects.requireNonNull(namespace, "Namespace is null") + Objects.requireNonNull(localName, "Local name is null"), valueIO);
 		localNameIdx = namespace.length();
 	}
 
@@ -55,9 +57,9 @@ public final class IdentifiableIRI implements IRI, Identifiable, SerializableVal
 	@Override
 	public Identifier getId() {
 		if (id == null) {
-			id = ValueIO.WELL_KNOWN_IRI_IDS.inverse().get(this);
+			id = valueIO.wellKnownId(this);
 			if (id == null) {
-				id = Identifier.create(this, getSerializedForm());
+				id = valueIO.id(this, getSerializedForm());
 			}
 		}
 		return id;
@@ -82,7 +84,7 @@ public final class IdentifiableIRI implements IRI, Identifiable, SerializableVal
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = ValueIO.CELL_WRITER.toBytes(this);
+			byte[] b = valueIO.CELL_WRITER.toBytes(this);
 			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 		}
 		return ser.duplicate();
@@ -92,6 +94,6 @@ public final class IdentifiableIRI implements IRI, Identifiable, SerializableVal
 		ByteBuffer serBuf = getSerializedForm();
 		byte[] b = new byte[serBuf.remaining()];
 		serBuf.get(b);
-		return new SerializedValue(b);
+		return new SerializedValue(b, valueIO.STREAM_READER);
 	}
 }

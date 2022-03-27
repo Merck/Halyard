@@ -9,17 +9,27 @@ import java.nio.ByteBuffer;
 
 final class SerializedValue implements Externalizable {
 	private static final long serialVersionUID = -5353524716487912852L;
+	private static volatile boolean isReaderSet = false;
+	private static ValueIO.Reader serReader;
 
 	private byte[] ser;
 
 	public SerializedValue() {}
 
-	public SerializedValue(byte[] ser) {
+	public SerializedValue(byte[] ser, ValueIO.Reader reader) {
 		this.ser = ser;
+		if (!isReaderSet) {
+			synchronized(SerializedValue.class) {
+				if (!isReaderSet) {
+					serReader = reader;
+					isReaderSet = true;
+				}
+			}
+		}
 	}
 
 	private Object readResolve() throws ObjectStreamException {
-		return ValueIO.STREAM_READER.readValue(ByteBuffer.wrap(ser));
+		return serReader.readValue(ByteBuffer.wrap(ser));
 	}
 
 	@Override

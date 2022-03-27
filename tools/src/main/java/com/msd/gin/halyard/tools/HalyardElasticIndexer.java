@@ -17,13 +17,13 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.StatementIndex;
-import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.IdValueFactory;
-import com.msd.gin.halyard.common.Identifier;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.StatementIndex;
+import com.msd.gin.halyard.common.ValueIO;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -54,8 +54,9 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
-import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
@@ -72,12 +73,12 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.elastic.source";
 
-    static final ValueFactory VF = IdValueFactory.getInstance();
-
     static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
 
-    	final Text outputJson = new Text();
+        final Text outputJson = new Text();
+        IdentifiableValueIO valueIO;
         ValueIO.Reader valueReader;
+        IdValueFactory valueFactory;
         long counter = 0, exports = 0, statements = 0;
         byte[] lastHash = new byte[RDFObject.KEY_SIZE];
         Set<Literal> literals;
@@ -85,8 +86,10 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException {
             Configuration conf = context.getConfiguration();
+            valueIO = IdentifiableValueIO.create(conf);
+            valueFactory = new IdValueFactory(valueIO);
             Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            valueReader = new ValueIO.Reader(VF, new TableTripleReader(table));
+            valueReader = valueIO.createReader(valueFactory, new TableTripleReader(table));
         }
 
         @Override
@@ -108,7 +111,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 if (literals.add(l)) {
             		try(StringBuilderWriter json = new StringBuilderWriter(128)) {
 		                json.append("{\"id\":");
-		                JSONObject.quote(Identifier.id(l).toString(), json);
+		                JSONObject.quote(valueIO.id(l).toString(), json);
 		                json.append(",\"label\":");
 		                JSONObject.quote(l.getLabel(), json);
 		                if(l.getLanguage().isPresent()) {
@@ -222,14 +225,16 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         }
         job.setJarByClass(HalyardElasticIndexer.class);
         TableMapReduceUtil.initCredentials(job);
+        IdentifiableValueIO valueIO = IdentifiableValueIO.create(getConf());
 
         Scan scan;
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP literal region(s)
-        	scan = StatementIndex.scanLiterals(RDFContext.create(NTriplesUtil.parseResource(cmd.getOptionValue('g'), VF)));
+        	Resource graph = NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance());
+        	scan = StatementIndex.scanLiterals(graph, valueIO);
         } else {
             //scan OSP literal region(s)
-        	scan = StatementIndex.scanLiterals();
+        	scan = StatementIndex.scanLiterals(valueIO);
         }
         TableMapReduceUtil.initTableMapperJob(
                 source,

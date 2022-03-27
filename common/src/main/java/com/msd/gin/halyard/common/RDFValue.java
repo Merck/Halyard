@@ -1,11 +1,13 @@
 package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 import org.eclipse.rdf4j.model.Value;
 
 public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 	final V val;
+	private final IdentifiableValueIO valueIO;
 	private ByteBuffer ser;
 
 	public static <V extends Value> boolean matches(V value, RDFValue<V> pattern) {
@@ -13,9 +15,14 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 	}
 
 
-	protected RDFValue(RDFRole role, V val) {
+	protected RDFValue(RDFRole role, V val, IdentifiableValueIO valueIO) {
 		super(role);
-		this.val = val;
+		this.val = Objects.requireNonNull(val);
+		this.valueIO = Objects.requireNonNull(valueIO);
+	}
+
+	boolean isWellKnownIRI() {
+		return valueIO.isWellKnownIRI(val);
 	}
 
 	public final ByteBuffer getSerializedForm() {
@@ -23,7 +30,7 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 			if (val instanceof SerializableValue) {
 				ser = ((SerializableValue) val).getSerializedForm();
 			} else {
-				byte[] b = ValueIO.CELL_WRITER.toBytes(val);
+				byte[] b = valueIO.CELL_WRITER.toBytes(val);
 				ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 			}
 		}
@@ -32,7 +39,7 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 
 	@Override
 	protected final Identifier calculateId() {
-		return Identifier.id(val);
+		return valueIO.id(val);
 	}
 
 	@Override

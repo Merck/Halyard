@@ -17,7 +17,8 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.Identifier;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -65,7 +66,8 @@ public class HalyardElasticIndexerTest {
 
 	@Test
     public void testElasticIndexer() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "elasticTable", true, 0, true, 0, null, null);
+		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+        HBaseSail sail = new HBaseSail(conf, "elasticTable", true, 0, true, 0, null, null);
         sail.initialize();
         ValueFactory vf = SimpleValueFactory.getInstance();
 		try (SailConnection conn = sail.getConnection()) {
@@ -77,11 +79,12 @@ public class HalyardElasticIndexerTest {
 				conn.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i), vf.createIRI("http://whatever/NTobj" + i), (i % 4 == 0) ? null : vf.createIRI("http://whatever/graph#" + (i % 4)));
 			}
 		}
-        testElasticIndexer(false, vf);
-        testElasticIndexer(true, vf);
+		IdentifiableValueIO valueIO = sail.getValueIO();
+        testElasticIndexer(false, vf, valueIO);
+        testElasticIndexer(true, vf, valueIO);
     }
 
-    public void testElasticIndexer(boolean namedGraphOnly, ValueFactory vf) throws Exception {
+    public void testElasticIndexer(boolean namedGraphOnly, ValueFactory vf, IdentifiableValueIO valueIO) throws Exception {
         final String[] requestUri = new String[2];
         final JSONObject[] createRequest = new JSONObject[1];
         final List<String> bulkBody = new ArrayList<>(200);
@@ -256,7 +259,7 @@ public class HalyardElasticIndexerTest {
             String id = new JSONObject(bulkBody.get(i)).getJSONObject("index").getString("_id");
             JSONObject fields = new JSONObject(bulkBody.get(i+1));
             Literal literal = vf.createLiteral(fields.getString("label"), vf.createIRI(fields.getString("datatype")));
-            assertEquals("Invalid hash for literal " + literal, Identifier.id(literal).toString(), id);
+            assertEquals("Invalid hash for literal " + literal, valueIO.id(literal).toString(), id);
         }
     }
 

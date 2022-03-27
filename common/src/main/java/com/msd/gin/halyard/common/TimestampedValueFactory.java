@@ -8,10 +8,9 @@ import org.eclipse.rdf4j.model.impl.ContextStatement;
 import org.eclipse.rdf4j.model.impl.SimpleStatement;
 
 public class TimestampedValueFactory extends IdValueFactory {
-	private static final TimestampedValueFactory VF = new TimestampedValueFactory();
 
-	public static TimestampedValueFactory getInstance() {
-		return VF;
+	public TimestampedValueFactory(IdentifiableValueIO valueIO) {
+		super(valueIO);
 	}
 
 	@Override

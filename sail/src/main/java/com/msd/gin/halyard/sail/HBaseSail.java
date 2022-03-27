@@ -18,6 +18,7 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.IdValueFactory;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.function.DynamicFunctionRegistry;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 
@@ -103,7 +104,8 @@ public class HBaseSail implements Sail {
     final String elasticIndexURL;
     final Ticker ticker;
 	private FederatedServiceResolver federatedServiceResolver;
-	private final ValueFactory valueFactory = IdValueFactory.getInstance();
+	private final IdentifiableValueIO valueIO;
+	private final ValueFactory valueFactory;
 	private FunctionRegistry functionRegistry = new DynamicFunctionRegistry();
 	private TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
 	private SpinParser spinParser = new SpinParser();
@@ -123,6 +125,8 @@ public class HBaseSail implements Sail {
 		this.hConnection = conn;
 		this.hConnectionIsShared = (conn != null);
 		this.config = config;
+		this.valueIO = IdentifiableValueIO.create(config);
+		this.valueFactory = new IdValueFactory(valueIO);
 		this.tableName = tableName;
 		this.create = create;
 		this.splitBits = splitBits;
@@ -218,7 +222,7 @@ public class HBaseSail implements Sail {
 		}
 
 		statsConnection = getConnection();
-		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(new SailConnectionTripleSource(statsConnection, false, getValueFactory())), service -> {
+		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(new SailConnectionTripleSource(statsConnection, false, getValueFactory()), valueIO), service -> {
 			HalyardEvaluationStatistics fedStats = null;
 			FederatedService fedServ = federatedServiceResolver.getService(service);
 			if (fedServ instanceof SailFederatedService) {
@@ -299,6 +303,10 @@ public class HBaseSail implements Sail {
 
 	public void setSpinParser(SpinParser parser) {
 		this.spinParser = parser;
+	}
+
+	public IdentifiableValueIO getValueIO() {
+		return valueIO;
 	}
 
     @Override

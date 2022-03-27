@@ -111,12 +111,12 @@ public enum RDFRole {
 	abstract int keyHashSize();
 	abstract int endKeyHashSize();
 
-	final int qualifierHashSize() {
-		return Identifier.ID_SIZE - keyHashSize();
+	final int qualifierHashSize(int idSize) {
+		return idSize - keyHashSize();
 	}
 
-	final int endQualifierHashSize() {
-		return Identifier.ID_SIZE - endKeyHashSize();
+	final int endQualifierHashSize(int idSize) {
+		return idSize - endKeyHashSize();
 	}
 
 	final byte[] keyHash(StatementIndex index, Identifier id) {
@@ -132,17 +132,17 @@ public enum RDFRole {
 	}
 
 	byte[] qualifierHash(Identifier id) {
-		byte[] b = new byte[qualifierHashSize()];
+		byte[] b = new byte[qualifierHashSize(id.size())];
 		writeQualifierHashTo(id, ByteBuffer.wrap(b));
 		return b;
 	}
 
 	final ByteBuffer writeQualifierHashTo(Identifier id, ByteBuffer bb) {
-		return id.writeSliceTo(keyHashSize(), qualifierHashSize(), bb);
+		return id.writeSliceTo(keyHashSize(), qualifierHashSize(id.size()), bb);
 	}
 
 	final ByteBuffer writeEndQualifierHashTo(Identifier id, ByteBuffer bb) {
-		return id.writeSliceTo(endKeyHashSize(), endQualifierHashSize(), bb);
+		return id.writeSliceTo(endKeyHashSize(), endQualifierHashSize(id.size()), bb);
 	}
 
 	protected abstract int toShift(StatementIndex index);

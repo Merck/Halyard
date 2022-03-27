@@ -21,6 +21,8 @@ import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.Hashes;
+import com.msd.gin.halyard.common.Hashes.HashFunction;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.sail.HBaseSail;
@@ -120,6 +122,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         private final Random random = new Random(0);
         private int decimationFactor;
         private Table table;
+        private IdentifiableValueIO valueIO;
         private ValueIO.Reader valueReader;
 
         @Override
@@ -127,14 +130,15 @@ public final class HalyardSummary extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             this.table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            this.valueReader = new ValueIO.Reader(SVF, new TableTripleReader(table));
+            this.valueIO = IdentifiableValueIO.create(conf);
+            this.valueReader = valueIO.createReader(SVF, new TableTripleReader(table));
         }
 
         private Set<IRI> queryForClasses(Value instance) throws IOException {
             if (instance instanceof Resource) {
                 Set<IRI> res = new HashSet<>();
-                RDFSubject s = RDFSubject.create((Resource)instance);
-                RDFPredicate p = RDFPredicate.create(RDF.TYPE);
+                RDFSubject s = RDFSubject.create((Resource)instance, valueIO);
+                RDFPredicate p = RDFPredicate.create(RDF.TYPE, valueIO);
                 Scan scan = HalyardTableUtils.scan(s, p, null, null);
                 try (ResultScanner scanner = table.getScanner(scan)) {
                     for (Result r : scanner) {
@@ -302,6 +306,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         private IRI namedGraph;
         private int decimationFactor;
         private final BitSet ccSet = new BitSet(64), pcSet = new BitSet(64), dcSet = new BitSet(64), rcSet = new BitSet(64), drcSet = new BitSet(64);
+        private final HashFunction keyHash = Hashes.getHash("SHA-1", 0);
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -455,7 +460,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
 	                            write(sliceRPred, RDFS.LABEL, SVF.createLiteral("slice rdfs:range with cardinality " + cardinality));
 	                            write(sliceRPred, CARDINALITY, SVF.createLiteral(BigInteger.valueOf(cardinality)));
 	                        }
-	                        IRI generatedRoot = SVF.createIRI(NAMESPACE, Hashes.encode(Hashes.hashUnique(ByteBuffer.wrap(key.get(), key.getOffset(), key.getLength()))));
+	                        IRI generatedRoot = SVF.createIRI(NAMESPACE, Hashes.encode(keyHash.apply(ByteBuffer.wrap(key.get(), key.getOffset(), key.getLength()))));
 	                        write(generatedRoot, slicePPred, firstKey);
 	                        write(generatedRoot, sliceDPred, SVF.createIRI(dis.readUTF()));
 	                        write(generatedRoot, sliceRPred, SVF.createIRI(dis.readUTF()));

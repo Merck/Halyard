@@ -16,7 +16,6 @@
  */
 package com.msd.gin.halyard.strategy.aggregators;
 
-import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.strategy.collections.BigHashSet;
 
 import java.io.IOException;
@@ -24,6 +23,7 @@ import java.math.BigInteger;
 
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.AbstractAggregateOperator;
@@ -34,7 +34,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
 
 public abstract class Aggregator implements AutoCloseable {
 	protected static final ValueComparator COMPARATOR = new ValueComparator();
-	protected static final Literal ZERO = IdValueFactory.getInstance().createLiteral(BigInteger.ZERO);
+	protected static final Literal ZERO = SimpleValueFactory.getInstance().createLiteral(BigInteger.ZERO);
 	private final ValueExpr arg;
 	private final boolean isDistinct;
 	private final EvaluationStrategy strategy;

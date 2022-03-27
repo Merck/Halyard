@@ -18,6 +18,7 @@ package com.msd.gin.halyard.sail;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -56,8 +57,8 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 
 	private final String elasticSearchURL;
 
-	public HBaseSearchTripleSource(Table table, ValueFactory vf, long timeoutSecs, HBaseSail.ScanSettings settings, String elasticSearchURL, HBaseSail.Ticker ticker) {
-		super(table, vf, timeoutSecs, settings, ticker);
+	public HBaseSearchTripleSource(Table table, ValueFactory vf, IdentifiableValueIO valueIO, long timeoutSecs, HBaseSail.ScanSettings settings, String elasticSearchURL, HBaseSail.Ticker ticker) {
+		super(table, vf, valueIO, timeoutSecs, settings, ticker);
 		this.elasticSearchURL = elasticSearchURL;
 	}
 
@@ -113,9 +114,9 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 											for (int i = 0; i < hits.length(); i++) {
 												JSONObject source = hits.getJSONObject(i).getJSONObject("_source");
 												if (source.has("lang")) {
-													objList.add(RDFObject.create(vf.createLiteral(source.getString("label"), source.getString("lang"))));
+													objList.add(RDFObject.create(vf.createLiteral(source.getString("label"), source.getString("lang")), valueIO));
 												} else {
-													objList.add(RDFObject.create(vf.createLiteral(source.getString("label"), vf.createIRI(source.getString("datatype")))));
+													objList.add(RDFObject.create(vf.createLiteral(source.getString("label"), vf.createIRI(source.getString("datatype"))), valueIO));
 												}
 											}
 										}

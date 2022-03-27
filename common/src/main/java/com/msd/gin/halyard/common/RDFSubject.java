@@ -3,11 +3,11 @@ package com.msd.gin.halyard.common;
 import org.eclipse.rdf4j.model.Resource;
 
 public final class RDFSubject extends RDFValue<Resource> {
-	public static RDFSubject create(Resource subj) {
+	public static RDFSubject create(Resource subj, IdentifiableValueIO valueIO) {
 		if(subj == null) {
 			return null;
 		}
-		return new RDFSubject(subj);
+		return new RDFSubject(subj, valueIO);
 	}
 
 	/**
@@ -18,7 +18,7 @@ public final class RDFSubject extends RDFValue<Resource> {
 	static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_64;
 	static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_64;
 
-	private RDFSubject(Resource val) {
-		super(RDFRole.SUBJECT, val);
+	private RDFSubject(Resource val, IdentifiableValueIO valueIO) {
+		super(RDFRole.SUBJECT, val, valueIO);
 	}
 }
