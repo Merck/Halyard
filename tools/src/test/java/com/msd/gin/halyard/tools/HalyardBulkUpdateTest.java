@@ -18,14 +18,14 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
+
 import java.io.File;
 import java.io.PrintStream;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.TreeMap;
-import org.apache.commons.cli.MissingOptionException;
+
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Statement;
@@ -36,19 +36,21 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Assert;
-import org.junit.Rule;
 import org.junit.Test;
-import static org.junit.Assert.assertEquals;
+
+import static org.junit.Assert.*;
 
 /**
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardBulkUpdateTest {
+public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
     private static final String TABLE = "bulkupdatetesttable";
 
-	@Rule
-	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
+	@Override
+	protected AbstractHalyardTool createTool() {
+		return new HalyardBulkUpdate();
+	}
 
     @Test
     public void testBulkUpdate() throws Exception {
@@ -80,7 +82,7 @@ public class HalyardBulkUpdateTest {
         File htableDir = File.createTempFile("test_htable", "");
         htableDir.delete();
 
-        assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", TABLE}));
+        assertEquals(0, run(conf, new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", TABLE}));
 
         q.delete();
         queries.delete();
@@ -232,7 +234,7 @@ public class HalyardBulkUpdateTest {
         htableDir.delete();
 
         //execute BulkUpdate
-        assertEquals(0, ToolRunner.run(conf, new HalyardBulkUpdate(), new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", "timebulkupdatetesttable"}));
+        assertEquals(0, run(conf, new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", "timebulkupdatetesttable"}));
 
         q1.delete();
         q2.delete();
@@ -274,15 +276,5 @@ public class HalyardBulkUpdateTest {
             }
             Assert.fail(sb.toString());
         }
-    }
-
-    @Test
-    public void testHelp() throws Exception {
-        assertEquals(-1, new HalyardBulkUpdate().run(new String[]{"-h"}));
-    }
-
-    @Test(expected = MissingOptionException.class)
-    public void testRunNoArgs() throws Exception {
-        assertEquals(-1, new HalyardBulkUpdate().run(new String[]{}));
     }
 }

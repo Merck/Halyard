@@ -19,6 +19,7 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.tools.HalyardExport.ExportException;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
@@ -29,13 +30,12 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.commons.cli.MissingOptionException;
+
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -50,12 +50,13 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
+
 import static org.junit.Assert.*;
 /**
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardExportTest {
+public class HalyardExportTest extends AbstractHalyardToolTest {
 
     private static final String TABLE = "exporttesttable";
     private static final String TUPLE_QUERY = "select * where {?s ?p ?o}";
@@ -64,8 +65,11 @@ public class HalyardExportTest {
 
     @Rule
     public TestName name = new TestName();
-	@Rule
-	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
+
+	@Override
+	protected AbstractHalyardTool createTool() {
+		return new HalyardExport();
+	}
 
     @BeforeClass
     public static void setup() throws Exception {
@@ -96,80 +100,65 @@ public class HalyardExportTest {
         FileUtils.deleteDirectory(new File(URI.create(ROOT)));
     }
 
-    @Test
-    public void testHelp() throws Exception {
-        runExport("-h");
-    }
-
-    @Test(expected = MissingOptionException.class)
-    public void testRunNoArgs() throws Exception {
-        runExport();
-    }
-
-    @Test
-    public void testVersion() throws Exception {
-        runExport("-v");
-    }
-
     @Test(expected = ParseException.class)
     public void testMissingArgs() throws Exception {
-        runExport("-s", "whatever", "-q", "query");
+        run("-s", "whatever", "-q", "query");
     }
 
     @Test(expected = ParseException.class)
     public void testUnknownArg() throws Exception {
-        runExport("-y");
+        run("-y");
     }
 
     @Test(expected = ParseException.class)
     public void testDupArgs() throws Exception {
-        runExport("-s", "whatever", "-q", "query", "-t", "target", "-s", "whatever2");
+        run("-s", "whatever", "-q", "query", "-t", "target", "-s", "whatever2");
     }
 
     @Test
     public void testExport_CSV() throws Exception {
-        runExport("-s", TABLE, "-q", TUPLE_QUERY, "-t", ROOT + name.getMethodName() +".csv");
+        run("-s", TABLE, "-q", TUPLE_QUERY, "-t", ROOT + name.getMethodName() +".csv");
         assertEquals(1001, getLinesCount(ROOT + name.getMethodName() +".csv", null));
     }
 
     @Test
     public void testExport_CSV_GZ() throws Exception {
-        runExport("-s", TABLE, "-q", TUPLE_QUERY, "-t", ROOT + name.getMethodName() +".csv.gz");
+        run("-s", TABLE, "-q", TUPLE_QUERY, "-t", ROOT + name.getMethodName() +".csv.gz");
         assertEquals(1001, getLinesCount(ROOT + name.getMethodName() +".csv.gz", CompressorStreamFactory.GZIP));
     }
 
     @Test
     public void testExport_CSV_BZ2() throws Exception {
-        runExport("-s", TABLE, "-q", TUPLE_QUERY, "-t", ROOT + name.getMethodName() +".csv.bz2");
+        run("-s", TABLE, "-q", TUPLE_QUERY, "-t", ROOT + name.getMethodName() +".csv.bz2");
         assertEquals(1001, getLinesCount(ROOT + name.getMethodName() +".csv.bz2", CompressorStreamFactory.BZIP2));
     }
 
     @Test
     public void testExport_JSONLD() throws Exception {
-        runExport("-s", TABLE, "-q", GRAPH_QUERY, "-t", ROOT + name.getMethodName() +".jsonld");
+        run("-s", TABLE, "-q", GRAPH_QUERY, "-t", ROOT + name.getMethodName() +".jsonld");
         assertEquals(1000, getTriplesCount(ROOT + name.getMethodName() +".jsonld", null, RDFFormat.JSONLD));
     }
 
     @Test
     public void testExport_NT_GZ() throws Exception {
-        runExport("-s", TABLE, "-q", GRAPH_QUERY, "-t", ROOT + name.getMethodName() +".nt.gz");
+        run("-s", TABLE, "-q", GRAPH_QUERY, "-t", ROOT + name.getMethodName() +".nt.gz");
         assertEquals(1000, getTriplesCount(ROOT + name.getMethodName() +".nt.gz", CompressorStreamFactory.GZIP, RDFFormat.NTRIPLES));
     }
 
     @Test
     public void testExport_TTL_BZ2() throws Exception {
-        runExport("-s", TABLE, "-q", GRAPH_QUERY, "-t", ROOT + name.getMethodName() +".ttl.bz2");
+        run("-s", TABLE, "-q", GRAPH_QUERY, "-t", ROOT + name.getMethodName() +".ttl.bz2");
         assertEquals(1000, getTriplesCount(ROOT + name.getMethodName() +".ttl.bz2", CompressorStreamFactory.BZIP2, RDFFormat.TURTLE));
     }
 
     @Test
     public void testExport_Graph_to_NULL() throws Exception {
-        runExport("-s", TABLE, "-q", GRAPH_QUERY, "-t", "null:/");
+        run("-s", TABLE, "-q", GRAPH_QUERY, "-t", "null:/");
     }
 
     @Test
     public void testExport_Tuples_to_NULL() throws Exception {
-        runExport("-s", TABLE, "-q", TUPLE_QUERY, "-t", "null:/");
+        run("-s", TABLE, "-q", TUPLE_QUERY, "-t", "null:/");
     }
 
     public static int getLinesCount(String uri, String compression) throws Exception {
@@ -210,12 +199,12 @@ public class HalyardExportTest {
 
     @Test(expected = ExportException.class)
     public void testUnknownForm() throws Exception {
-        runExport("-s", TABLE, "-q", TUPLE_QUERY, "-t", ROOT + "/testUnknownForm.xyz.gz");
+        run("-s", TABLE, "-q", TUPLE_QUERY, "-t", ROOT + "/testUnknownForm.xyz.gz");
     }
 
     @Test(expected = ExportException.class)
     public void testGraphToCSV() throws Exception {
-        runExport("-s", TABLE, "-q", GRAPH_QUERY, "-t", ROOT + "/testGraphToCSV.csv");
+        run("-s", TABLE, "-q", GRAPH_QUERY, "-t", ROOT + "/testGraphToCSV.csv");
     }
 
     @Test(expected = ExportException.class)
@@ -223,7 +212,7 @@ public class HalyardExportTest {
         Class.forName("org.apache.derby.jdbc.EmbeddedDriver");
         DriverManager.getConnection("jdbc:derby:memory:halyard-graph-export-test;create=true").close();
         try {
-            runExport("-s", TABLE, "-q", TUPLE_QUERY, "-t", "jdbc:derby:memory:halyard-graph-export-test/what@ever", "-c", "org.apache.derby.jdbc.EmbeddedDriver");
+            run("-s", TABLE, "-q", TUPLE_QUERY, "-t", "jdbc:derby:memory:halyard-graph-export-test/what@ever", "-c", "org.apache.derby.jdbc.EmbeddedDriver");
         } finally {
             try {
                 DriverManager.getConnection("jdbc:derby:memory:halyard-graph-export-test;shutdown=true").close();
@@ -236,7 +225,7 @@ public class HalyardExportTest {
         Class.forName("org.apache.derby.jdbc.EmbeddedDriver");
         DriverManager.getConnection("jdbc:derby:memory:halyard-graph-export-test;create=true").close();
         try {
-            runExport("-s", TABLE, "-q", GRAPH_QUERY, "-t", "jdbc:derby:memory:halyard-graph-export-test/whatever", "-c", "org.apache.derby.jdbc.EmbeddedDriver");
+            run("-s", TABLE, "-q", GRAPH_QUERY, "-t", "jdbc:derby:memory:halyard-graph-export-test/whatever", "-c", "org.apache.derby.jdbc.EmbeddedDriver");
         } finally {
             try {
                 DriverManager.getConnection("jdbc:derby:memory:halyard-graph-export-test;shutdown=true").close();
@@ -246,12 +235,12 @@ public class HalyardExportTest {
 
     @Test(expected = ExportException.class)
     public void testTupleToRDF() throws Exception {
-        runExport("-s", TABLE, "-q", TUPLE_QUERY, "-t", ROOT + "/testTupleToRDF.nt");
+        run("-s", TABLE, "-q", TUPLE_QUERY, "-t", ROOT + "/testTupleToRDF.nt");
     }
 
     @Test(expected = ExportException.class)
     public void testInvalidQuery() throws Exception {
-        runExport("-s", TABLE, "-q", "ask {<http://whatever/subj> ?p ?o}", "-t", ROOT + name.getMethodName() +".csv");
+        run("-s", TABLE, "-q", "ask {<http://whatever/subj> ?p ?o}", "-t", ROOT + name.getMethodName() +".csv");
     }
 
     @Test
@@ -261,7 +250,7 @@ public class HalyardExportTest {
             c.createStatement().executeUpdate("create table " + name.getMethodName() + " (s varchar(100), p varchar(100), o varchar(100))");
         }
         try {
-            runExport("-s", TABLE, "-q", TUPLE_QUERY, "-t", "jdbc:derby:memory:halyard-export-test/" + name.getMethodName(), "-c", "org.apache.derby.jdbc.EmbeddedDriver", "-r");
+            run("-s", TABLE, "-q", TUPLE_QUERY, "-t", "jdbc:derby:memory:halyard-export-test/" + name.getMethodName(), "-c", "org.apache.derby.jdbc.EmbeddedDriver", "-r");
             try (Connection c = DriverManager.getConnection("jdbc:derby:memory:halyard-export-test")) {
                 try (ResultSet rs = c.createStatement().executeQuery("select count(*) from " + name.getMethodName())) {
                     assertTrue(rs.next());
@@ -273,9 +262,5 @@ public class HalyardExportTest {
                 DriverManager.getConnection("jdbc:derby:memory:halyard-export-test;shutdown=true").close();
             } catch (SQLException ignore) {}
         }
-    }
-
-    private static int runExport(String ... args) throws Exception {
-        return ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardExport(), args);
     }
 }

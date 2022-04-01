@@ -19,6 +19,7 @@ package com.msd.gin.halyard.tools;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
@@ -90,7 +91,19 @@ public abstract class AbstractHalyardTool implements Tool {
         if (single) {
             singleOptions.add(opt == null ? longOpt : opt);
         }
+    }
 
+    protected final Collection<Option> getOptions() {
+        return options.getOptions();
+    }
+
+    protected final List<Option> getRequiredOptions() {
+        List<?> optionNames = options.getRequiredOptions();
+        List<Option> requiredOptions = new ArrayList<>(optionNames.size());
+        for(Object name : optionNames) {
+            requiredOptions.add(options.getOption((String) name));
+        }
+        return requiredOptions;
     }
 
     private static final class OrderedOption extends Option {

@@ -33,7 +33,7 @@ public final class IdentifiableTriple extends TripleWrapper implements Identifia
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = valueIO.CELL_WRITER.toBytes(triple);
+			byte[] b = valueIO.ID_TRIPLE_WRITER.toBytes(triple);
 			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 		}
 		return ser.duplicate();

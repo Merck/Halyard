@@ -96,9 +96,9 @@ public final class HalyardSummary extends AbstractHalyardTool {
         ClassSummary, PredicateSummary, DomainSummary, RangeSummary, DomainAndRangeSummary;
     }
 
-    static final String NAMESPACE = "http://merck.github.io/Halyard/summary#";
-    static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
-    static final IRI CARDINALITY = SVF.createIRI(NAMESPACE, "cardinality");
+    private static final String NAMESPACE = "http://merck.github.io/Halyard/summary#";
+    private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
+    private static final IRI CARDINALITY = SVF.createIRI(NAMESPACE, "cardinality");
 
     private static final String FILTER_NAMESPACE_PREFIX = "http://merck.github.io/Halyard/";
     private static final String SOURCE = "halyard.summary.source";

@@ -18,25 +18,27 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
+
 import java.io.File;
 import java.io.PrintStream;
-import org.apache.commons.cli.MissingOptionException;
-import org.apache.commons.cli.UnrecognizedOptionException;
+
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
-import org.junit.Rule;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 /**
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardBulkExportTest {
-	@Rule
-	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
+public class HalyardBulkExportTest extends AbstractHalyardToolTest {
+	@Override
+	protected AbstractHalyardTool createTool() {
+		return new HalyardBulkExport();
+	}
 
     @Test
     public void testBulkExport() throws Exception {
@@ -96,7 +98,7 @@ public class HalyardBulkExportTest {
             qs.println("select * where {?s ?p ?o. FILTER (<http://merck.github.io/Halyard/ns#forkAndFilterBy> (2, ?p))}");
         }
 
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkExport(),
+        assertEquals(0, run(
                 new String[]{"-s", "bulkExportTable2", "-q", q.toURI().toURL().toString(), "-t", root.toURI().toURL().toString() + "{0}-{1}.csv"}));
 
         File f1 = new File(root, "test_parallelBulkExport-0.csv");
@@ -109,25 +111,5 @@ public class HalyardBulkExportTest {
         f1.delete();
         f2.delete();
         root.delete();
-    }
-
-    @Test
-    public void testHelp() throws Exception {
-        assertEquals(-1, new HalyardBulkExport().run(new String[]{"-h"}));
-    }
-
-    @Test(expected = MissingOptionException.class)
-    public void testRunNoArgs() throws Exception {
-        assertEquals(-1, new HalyardBulkExport().run(new String[]{}));
-    }
-
-    @Test
-    public void testRunVersion() throws Exception {
-        assertEquals(0, new HalyardBulkExport().run(new String[]{"-v"}));
-    }
-
-    @Test(expected = UnrecognizedOptionException.class)
-    public void testRunInvalid() throws Exception {
-        new HalyardBulkExport().run(new String[]{"--invalid"});
     }
 }

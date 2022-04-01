@@ -89,9 +89,6 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
      */
     public static final String ELASTIC_INDEX_URL = "halyard.elastic.index.url";
 
-    static final String TIMESTAMP_BINDING_NAME = "HALYARD_TIMESTAMP_SPECIAL_VARIABLE";
-    static final String TIMESTAMP_CALLBACK_BINDING_NAME = "HALYARD_TIMESTAMP_SPECIAL_CALLBACK_BINDING";
-
     /**
      * Full URI of a custom SPARQL function to decimate parallel evaluation based on Mapper index
      */

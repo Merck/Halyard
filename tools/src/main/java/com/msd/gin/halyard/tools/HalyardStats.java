@@ -98,7 +98,7 @@ public final class HalyardStats extends AbstractHalyardTool {
     private static final String TARGET_GRAPH = "halyard.stats.target.graph";
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
-    static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
+    private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
     static final class StatsMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
 
@@ -110,11 +110,13 @@ public final class HalyardStats extends AbstractHalyardTool {
         final byte[] lastCtxFragment = new byte[RDFContext.KEY_SIZE];
         final byte[] lastClassFragment = new byte[RDFObject.KEY_SIZE];
         final ByteArrayOutputStream baos = new ByteArrayOutputStream(128);
+        ByteBuffer bb = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
     	RDFPredicate RDF_TYPE_PREDICATE;
     	byte[] POS_TYPE_HASH;
     	byte[] CPOS_TYPE_HASH;
         IRI statsContext, graphContext;
         byte[] cspoStatsContextHash;
+        Table table;
         IdentifiableValueIO valueIO;
         ValueIO.Reader valueReader;
         StatementIndex lastIndex;
@@ -133,7 +135,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
+            table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             valueIO = IdentifiableValueIO.create(conf);
             valueReader = valueIO.createReader(SVF, new TableTripleReader(table));
         	RDF_TYPE_PREDICATE = RDFPredicate.create(RDF.TYPE, valueIO);
@@ -300,11 +302,12 @@ public final class HalyardStats extends AbstractHalyardTool {
                     if (partitionId == null) {
                         dos.writeInt(0);
                     } else {
-                    	ByteBuffer b = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
-						b = valueIO.CELL_WRITER.writeTo(partitionId, b);
-						int len = b.position();
+                    	bb.clear();
+						bb = valueIO.ID_TRIPLE_WRITER.writeTo(partitionId, bb);
+						bb.flip();
+						int len = bb.limit();
                         dos.writeInt(len);
-                        dos.write(b.array(), b.arrayOffset(), len);
+                        dos.write(bb.array(), bb.arrayOffset(), len);
                     }
                 }
                 outputKey.set(baos.toByteArray());
@@ -354,6 +357,10 @@ public final class HalyardStats extends AbstractHalyardTool {
 				sail.shutDown();
                 sail = null;
             }
+        	if (table != null) {
+        		table.close();
+        		table = null;
+        	}
         }
 
     }
@@ -435,6 +442,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             for (LongWritable val : values) {
                 count += val.get();
             }
+
             String graph;
             String predicate;
             ByteBuffer partitionId;
@@ -442,13 +450,14 @@ public final class HalyardStats extends AbstractHalyardTool {
                 graph = dis.readUTF();
                 predicate = dis.readUTF();
                 partitionId = ByteBuffer.allocate(dis.readInt());
-                dis.readFully(partitionId.array());
+                dis.readFully(partitionId.array(), partitionId.arrayOffset(), partitionId.limit());
             }
+
             if (SD.NAMED_GRAPH_PROPERTY.stringValue().equals(predicate)) { //workaround to at least count all small named graph that are below the treshold
                 writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, SVF.createIRI(graph));
             } else {
                 IRI graphNode;
-                if (graph.equals(HALYARD.STATS_ROOT_NODE.stringValue())) {
+                if (HALYARD.STATS_ROOT_NODE.stringValue().equals(graph)) {
                     graphNode = HALYARD.STATS_ROOT_NODE;
                 } else {
                     graphNode = SVF.createIRI(graph);

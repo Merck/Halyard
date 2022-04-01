@@ -18,6 +18,7 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -28,9 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import org.apache.commons.cli.MissingOptionException;
-import org.apache.commons.cli.UnrecognizedOptionException;
-import org.apache.hadoop.util.ToolRunner;
+
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Model;
@@ -41,16 +40,19 @@ import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.sail.SailConnection;
-import org.junit.Rule;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 /**
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardSummaryTest {
-	@Rule
-	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
+public class HalyardSummaryTest extends AbstractHalyardToolTest {
+
+	@Override
+	protected AbstractHalyardTool createTool() {
+		return new HalyardSummary();
+	}
 
 	private IRI[] generateIRIs(int num, String prefix) {
         SimpleValueFactory svf = SimpleValueFactory.getInstance();
@@ -144,8 +146,7 @@ public class HalyardSummaryTest {
         File summary = File.createTempFile("summary", ".trig");
         final IRI namedGraph = svf.createIRI("http://whatever/summary");
 
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardSummary(),
-            new String[]{"-s", "summaryTable", "-t", summary.toURI().toURL().toString(), "-g", namedGraph.stringValue(), "-d", "1"}));
+        assertEquals(0, run(new String[]{"-s", "summaryTable", "-t", summary.toURI().toURL().toString(), "-g", namedGraph.stringValue(), "-d", "1"}));
 
         try (BufferedReader in = new BufferedReader(new FileReader(summary))) {
             Model model = Rio.parse(in, "http://whatever/", RDFFormat.TRIG);
@@ -185,20 +186,5 @@ public class HalyardSummaryTest {
             }
         }
         fail("required: [] <" + pred1 + "> <" + obj1 + ">; <" + pred2 + "> <" + obj2 + ">; <" + pred3 + "> <" + obj3 + ">");
-    }
-
-    @Test(expected = MissingOptionException.class)
-    public void testRunNoArgs() throws Exception {
-        new HalyardSummary().run(new String[0]);
-    }
-
-    @Test
-    public void testRunVersion() throws Exception {
-        assertEquals(0, new HalyardSummary().run(new String[]{"-v"}));
-    }
-
-    @Test(expected = UnrecognizedOptionException.class)
-    public void testRunInvalid() throws Exception {
-        new HalyardSummary().run(new String[]{"-invalid"});
     }
 }

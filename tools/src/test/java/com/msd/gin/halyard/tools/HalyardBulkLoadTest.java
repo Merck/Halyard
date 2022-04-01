@@ -18,11 +18,12 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.util.zip.GZIPOutputStream;
-import org.apache.commons.cli.MissingOptionException;
+
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
@@ -31,17 +32,20 @@ import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.sail.SailConnection;
-import org.junit.Rule;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 /**
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardBulkLoadTest {
-	@Rule
-	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
+public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
+
+	@Override
+	protected AbstractHalyardTool createTool() {
+		return new HalyardBulkLoad();
+	}
 
     @Test
     public void testBulkLoad() throws Exception {
@@ -90,7 +94,7 @@ public class HalyardBulkLoadTest {
         htableDir.delete();
 
         //load with override of the graph context, however with no default graph context
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkLoad(), new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o", "-m", "1000"}));
+        assertEquals(0, run(new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o", "-m", "1000"}));
 
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
@@ -104,7 +108,7 @@ public class HalyardBulkLoadTest {
         htableDir.delete();
 
         //default load
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkLoad(), new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-g", "{0}"}));
+        assertEquals(0, run(new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-g", "{0}"}));
 
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         rep = new SailRepository(sail);
@@ -132,7 +136,7 @@ public class HalyardBulkLoadTest {
         htableDir.delete();
 
         //load with graph context override containing URI path pattern
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkLoad(), new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o", "-g", "http://what{1}"}));
+        assertEquals(0, run(new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o", "-g", "http://what{1}"}));
 
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         rep = new SailRepository(sail);
@@ -161,7 +165,7 @@ public class HalyardBulkLoadTest {
         htableDir.delete();
 
         //load with override of the graph context, however with no default graph context
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkLoad(), new String[]{"-b", "-1", "-i", "-s", file.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable2"}));
+        assertEquals(0, run(new String[]{"-b", "-1", "-i", "-s", file.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable2"}));
 
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable2", false, 0, true, 30, null, null);
         sail.initialize();
@@ -179,10 +183,5 @@ public class HalyardBulkLoadTest {
         assertNotNull(query, c);
         assertTrue(query, c instanceof Literal);
         assertEquals(query, count, ((Literal)c).intValue());
-    }
-
-    @Test(expected = MissingOptionException.class)
-    public void testRunNoArgs() throws Exception {
-        assertEquals(-1, new HalyardBulkLoad().run(new String[0]));
     }
 }

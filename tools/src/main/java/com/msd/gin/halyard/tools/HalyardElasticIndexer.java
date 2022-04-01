@@ -76,6 +76,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
     static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
 
         final Text outputJson = new Text();
+        Table table;
         IdentifiableValueIO valueIO;
         ValueIO.Reader valueReader;
         IdValueFactory valueFactory;
@@ -88,7 +89,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             valueIO = IdentifiableValueIO.create(conf);
             valueFactory = new IdValueFactory(valueIO);
-            Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
+            table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             valueReader = valueIO.createReader(valueFactory, new TableTripleReader(table));
         }
 
@@ -128,6 +129,14 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 	                exports++;
                 }
             }
+        }
+
+        @Override
+        protected void cleanup(Context output) throws IOException {
+        	if (table != null) {
+        		table.close();
+        		table = null;
+        	}
         }
     }
 

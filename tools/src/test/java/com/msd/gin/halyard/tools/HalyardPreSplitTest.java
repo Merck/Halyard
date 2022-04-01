@@ -18,35 +18,39 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
-import org.apache.commons.cli.MissingOptionException;
+
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.util.ToolRunner;
-import org.junit.Rule;
 import org.junit.Test;
-import static org.junit.Assert.assertEquals;
+
+import static org.junit.Assert.*;
 
 /**
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardPreSplitTest {
-	@Rule
-	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
+public class HalyardPreSplitTest extends AbstractHalyardToolTest {
+
+	@Override
+	protected AbstractHalyardTool createTool() {
+		return new HalyardPreSplit();
+	}
 
     @Test
     public void testPreSplit() throws Exception {
         File file = File.createTempFile("test_triples", ".nq");
+        file.deleteOnExit();
         try (PrintStream ps = new PrintStream(new FileOutputStream(file))) {
             ps.println("<http://whatever/NTsubj1> <http://whatever/NTpred1> \"whatever NT value 1\" <http://whatever/ctx1> .");
             ps.println("<http://whatever/NTsubj2> <http://whatever/NTpred2> \"whatever NT value 2\" <http://whatever/ctx2> .");
         }
 
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardPreSplit(), new String[]{"-d", "1", "-l",  "0", "-s", file.toURI().toURL().toString(), "-t", "preSplitTable"}));
+        assertEquals(0, run(new String[]{"-d", "1", "-l",  "0", "-s", file.toURI().toURL().toString(), "-t", "preSplitTable"}));
 
 		try (Connection conn = HalyardTableUtils.getConnection(HBaseServerTestInstance.getInstanceConfig())) {
 			try (Table t = HalyardTableUtils.getTable(conn, "preSplitTable", false, 0)) {
@@ -60,6 +64,7 @@ public class HalyardPreSplitTest {
     @Test
     public void testPreSplitOfExisting() throws Exception {
         File file = File.createTempFile("test_triples", ".nq");
+        file.deleteOnExit();
         try (PrintStream ps = new PrintStream(new FileOutputStream(file))) {
             ps.println("<http://whatever/NTsubj1> <http://whatever/NTpred1> \"whatever NT value 1\" <http://whatever/ctx1> .");
             ps.println("<http://whatever/NTsubj2> <http://whatever/NTpred2> \"whatever NT value 2\" <http://whatever/ctx2> .");
@@ -67,16 +72,6 @@ public class HalyardPreSplitTest {
 
         HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "preSplitTable2", true, -1).close();
 
-        assertEquals(-1, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardPreSplit(), new String[]{"-d", "1", "-l",  "0", "-s", file.toURI().toURL().toString(), "-t", "preSplitTable2"}));
-    }
-
-    @Test
-    public void testHelp() throws Exception {
-        assertEquals(-1, new HalyardPreSplit().run(new String[]{"-h"}));
-    }
-
-    @Test(expected = MissingOptionException.class)
-    public void testRunNoArgs() throws Exception {
-        assertEquals(-1, new HalyardPreSplit().run(new String[]{}));
+        assertEquals(-1, run(new String[]{"-d", "1", "-l",  "0", "-s", file.toURI().toURL().toString(), "-t", "preSplitTable2"}));
     }
 }

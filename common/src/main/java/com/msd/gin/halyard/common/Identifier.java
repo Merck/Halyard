@@ -15,7 +15,7 @@ public final class Identifier {
 
 	static Identifier create(Value v, int typeIndex, IdentifiableValueIO valueIO) {
 		ByteBuffer ser = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
-		ser = valueIO.CELL_WRITER.writeTo(v, ser);
+		ser = valueIO.ID_TRIPLE_WRITER.writeTo(v, ser);
 		ser.flip();
 		return Identifier.create(v, ser, typeIndex, valueIO);
 	}

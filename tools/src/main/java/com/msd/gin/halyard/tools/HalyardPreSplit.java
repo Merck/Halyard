@@ -60,9 +60,9 @@ import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
  */
 public final class HalyardPreSplit extends AbstractHalyardTool {
 
-    static final String TABLE_PROPERTY = "halyard.presplit.table";
-    static final String SPLIT_LIMIT_PROPERTY = "halyard.presplit.limit";
-    static final String DECIMATION_FACTOR_PROPERTY = "halyard.presplit.decimation";
+    private static final String TABLE_PROPERTY = "halyard.presplit.table";
+    private static final String SPLIT_LIMIT_PROPERTY = "halyard.presplit.limit";
+    private static final String DECIMATION_FACTOR_PROPERTY = "halyard.presplit.decimation";
 
     private static final long DEFAULT_SPLIT_LIMIT = 80000000l;
     private static final int DEFAULT_DECIMATION_FACTOR = 1000;
@@ -117,7 +117,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         }
 
         @Override
-	public void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
+        public void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
             if (lastRegion != region || size > splitLimit) {
                 byte[] split = lastRegion != region ? new byte[]{region} : key.copyBytes();
@@ -129,7 +129,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
             for (LongWritable val : values) {
                     size += val.get();
             }
-	}
+        }
 
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
@@ -183,7 +183,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         getConf().setInt(DECIMATION_FACTOR_PROPERTY, Integer.parseInt(cmd.getOptionValue('d', String.valueOf(DEFAULT_DECIMATION_FACTOR))));
         getConf().setLong(SPLIT_LIMIT_PROPERTY, Long.parseLong(cmd.getOptionValue('l', String.valueOf(DEFAULT_SPLIT_LIMIT))));
         Job job = Job.getInstance(getConf(), "HalyardPreSplit -> " + target);
-         job.getConfiguration().set(TABLE_PROPERTY, target);
+        job.getConfiguration().set(TABLE_PROPERTY, target);
         job.setJarByClass(HalyardPreSplit.class);
         job.setMapperClass(RDFDecimatingMapper.class);
         job.setMapOutputKeyClass(ImmutableBytesWritable.class);

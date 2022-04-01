@@ -18,12 +18,12 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
+
 import java.io.File;
 import java.net.URI;
-import org.apache.commons.cli.MissingOptionException;
+
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
@@ -42,15 +42,18 @@ import org.junit.rules.TestName;
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardUpdateTest {
+public class HalyardUpdateTest extends AbstractHalyardToolTest {
 
     private static final String TABLE = "updatetesttable";
     private static String ROOT;
 
     @Rule
     public TestName name = new TestName();
-	@Rule
-	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
+
+	@Override
+	protected AbstractHalyardTool createTool() {
+		return new HalyardUpdate();
+	}
 
     @BeforeClass
     public static void setup() throws Exception {
@@ -79,44 +82,29 @@ public class HalyardUpdateTest {
         FileUtils.deleteDirectory(new File(URI.create(ROOT)));
     }
 
-    @Test
-    public void testHelp() throws Exception {
-        runUpdate("-h");
-    }
-
-    @Test(expected = MissingOptionException.class)
-    public void testRunNoArgs() throws Exception {
-        runUpdate();
-    }
-
-    @Test
-    public void testVersion() throws Exception {
-        runUpdate("-v");
-    }
-
     @Test(expected = ParseException.class)
     public void testMissingArgs() throws Exception {
-        runUpdate("-s", "whatever");
+        run("-s", "whatever");
     }
 
     @Test(expected = ParseException.class)
     public void testUnknownArg() throws Exception {
-        runUpdate("-y");
+        run("-y");
     }
 
     @Test(expected = ParseException.class)
     public void testDupArgs() throws Exception {
-        runUpdate("-s", "whatever", "-q", "query", "-s", "whatever2");
+        run("-s", "whatever", "-q", "query", "-s", "whatever2");
     }
 
     @Test(expected = MalformedQueryException.class)
     public void testInvalidQuery() throws Exception {
-        runUpdate("-s", TABLE, "-q", "construct {?s ?p ?o} where {?s ?p ?o}");
+        run("-s", TABLE, "-q", "construct {?s ?p ?o} where {?s ?p ?o}");
     }
 
     @Test
     public void testInsertAndDelete() throws Exception {
-        runUpdate("-s", TABLE, "-q", "insert {?o <http://whatever/reverse> ?s} where {?s <http://whatever/pred> ?o}");
+        run("-s", TABLE, "-q", "insert {?o <http://whatever/reverse> ?s} where {?s <http://whatever/pred> ?o}");
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
         sail.initialize();
         try {
@@ -134,7 +122,7 @@ public class HalyardUpdateTest {
             sail.shutDown();
         }
 
-        runUpdate("-s", TABLE, "-q", "delete {?s <http://whatever/reverse> ?o} where {?s <http://whatever/reverse> ?o}");
+        run("-s", TABLE, "-q", "delete {?s <http://whatever/reverse> ?o} where {?s <http://whatever/reverse> ?o}");
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
         sail.initialize();
         try {
@@ -146,9 +134,5 @@ public class HalyardUpdateTest {
         } finally {
             sail.shutDown();
         }
-    }
-
-    private static int runUpdate(String ... args) throws Exception {
-        return ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardUpdate(), args);
     }
 }

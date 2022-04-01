@@ -136,7 +136,10 @@ public final class Hashes {
 
 		@Override
 		protected byte[] calculateHash(ByteBuffer bb) {
-			return hf.hashBytes(bb).asBytes();
+			// backwards compatible with old Guava
+			byte[] b = new byte[bb.remaining()];
+			bb.get(b);
+			return hf.hashBytes(b).asBytes();
 		}
 	}
 }

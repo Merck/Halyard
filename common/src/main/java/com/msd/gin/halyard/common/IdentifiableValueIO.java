@@ -13,7 +13,7 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 
 public class IdentifiableValueIO extends ValueIO {
-	public final ValueIO.Writer CELL_WRITER;
+	public final ValueIO.Writer ID_TRIPLE_WRITER;
 	public final ValueIO.Writer STREAM_WRITER;
 	public final ValueIO.Reader STREAM_READER;
 	private final BiMap<Identifier, IRI> WELL_KNOWN_IRI_IDS = HashBiMap.create(256);
@@ -32,7 +32,11 @@ public class IdentifiableValueIO extends ValueIO {
 	}
 
 	public IdentifiableValueIO(Configuration config) {
-		super(config.getInt("halyard.string.compressionThreshold", 200));
+		super(
+			config.getBoolean("halyard.vocabularies", true),
+			config.getBoolean("halyard.languages", true),
+			config.getInt("halyard.string.compressionThreshold", 200)
+		);
 		String confIdAlgo = config.get("halyard.id.hash", "SHA-1");
 		int confIdSize = config.getInt("halyard.id.size", 0);
 		idHash = new ThreadLocal<HashFunction>() {
@@ -45,7 +49,7 @@ public class IdentifiableValueIO extends ValueIO {
 		typeIndex = (idSize > 1) ? 1 : 0;
 		typeSaltSize = 1 << (8*typeIndex);
 
-		CELL_WRITER = createWriter(new CellTripleWriter());
+		ID_TRIPLE_WRITER = createWriter(new IdTripleWriter());
 		STREAM_WRITER = createWriter(new StreamTripleWriter());
 		STREAM_READER = createReader(new IdValueFactory(this), new StreamTripleReader());
 
@@ -127,7 +131,7 @@ public class IdentifiableValueIO extends ValueIO {
 	}
 
 
-	private static final class CellTripleWriter implements TripleWriter {
+	private static final class IdTripleWriter implements TripleWriter {
 		@Override
 		public ByteBuffer writeTriple(Resource subj, IRI pred, Value obj, ValueIO.Writer writer, ByteBuffer buf) {
 			return ((IdentifiableValueIO)writer.getValueIO()).writeStatementId(subj, pred, obj, buf);

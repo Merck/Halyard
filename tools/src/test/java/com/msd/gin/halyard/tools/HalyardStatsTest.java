@@ -17,18 +17,17 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.vocab.VOID_EXT;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.commons.cli.MissingOptionException;
-import org.apache.commons.cli.UnrecognizedOptionException;
-import org.apache.hadoop.util.ToolRunner;
+
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Statement;
@@ -49,16 +48,19 @@ import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
 import org.eclipse.rdf4j.rio.helpers.ParseErrorLogger;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
-import org.junit.Rule;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 /**
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardStatsTest {
-	@Rule
-	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
+public class HalyardStatsTest extends AbstractHalyardToolTest {
+
+	@Override
+	protected AbstractHalyardTool createTool() {
+		return new HalyardStats();
+	}
 
     @Test
     public void testStatsTarget() throws Exception {
@@ -81,8 +83,7 @@ public class HalyardStatsTest {
         root.delete();
         root.mkdirs();
 
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(),
-                new String[]{"-s", "statsTable", "-t", root.toURI().toURL().toString() + "stats{0}.trig", "-r", "100", "-g", "http://whatever/myStats"}));
+        assertEquals(0, run(new String[]{"-s", "statsTable", "-t", root.toURI().toURL().toString() + "stats{0}.trig", "-r", "100", "-g", "http://whatever/myStats"}));
 
         File stats = new File(root, "stats0.trig");
         assertTrue(stats.isFile());
@@ -166,7 +167,7 @@ public class HalyardStatsTest {
 		}
 
 		// update stats
-		assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(), new String[] { "-s", "statsTable2", "-r", "100" }));
+		assertEquals(0, run(new String[] { "-s", "statsTable2", "-r", "100" }));
 
 		// verify with golden file
 		try (SailConnection conn = sail.getConnection()) {
@@ -195,7 +196,7 @@ public class HalyardStatsTest {
 		}
 
 		// update stats only for graph1
-		assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(), new String[] { "-s", "statsTable2", "-r", "100", "-c", "http://whatever/graph1" }));
+		assertEquals(0, run(new String[] { "-s", "statsTable2", "-r", "100", "-c", "http://whatever/graph1" }));
 
 		// verify with golden file
 		try (SailConnection conn = sail.getConnection()) {
@@ -234,8 +235,7 @@ public class HalyardStatsTest {
         root.delete();
         root.mkdirs();
 
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardStats(),
-                new String[]{"-s", "statsTable3", "-t", root.toURI().toURL().toString() + "stats{0}.trig", "-r", "100", "-g", "http://whatever/myStats", "-c", "http://whatever/graph0"}));
+        assertEquals(0, run(new String[]{"-s", "statsTable3", "-t", root.toURI().toURL().toString() + "stats{0}.trig", "-r", "100", "-g", "http://whatever/myStats", "-c", "http://whatever/graph0"}));
 
         File stats = new File(root, "stats0.trig");
         assertTrue(stats.isFile());
@@ -246,20 +246,5 @@ public class HalyardStatsTest {
                 assertEqualModels(refM, statsM);
             }
         }
-    }
-
-    @Test(expected = MissingOptionException.class)
-    public void testRunNoArgs() throws Exception {
-        new HalyardStats().run(new String[0]);
-    }
-
-    @Test
-    public void testRunVersion() throws Exception {
-        assertEquals(0, new HalyardStats().run(new String[]{"-v"}));
-    }
-
-    @Test(expected = UnrecognizedOptionException.class)
-    public void testRunInvalid() throws Exception {
-        new HalyardStats().run(new String[]{"-invalid"});
     }
 }

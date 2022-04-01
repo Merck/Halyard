@@ -38,6 +38,7 @@ public final class HalyardMain {
         } else {
             AbstractHalyardTool tools[] = new AbstractHalyardTool[] {
                 new HalyardPreSplit(),
+                new HalyardHash(),
                 new HalyardBulkLoad(),
                 new HalyardStats(),
                 new HalyardElasticIndexer(),

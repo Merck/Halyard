@@ -18,7 +18,6 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.IdentifiableValueIO;
-import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -36,17 +35,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.commons.cli.MissingOptionException;
-import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.json.JSONObject;
-import org.junit.Rule;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -55,14 +50,16 @@ import static org.junit.Assert.*;
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardElasticIndexerTest {
+public class HalyardElasticIndexerTest extends AbstractHalyardToolTest {
 	private static final String ES_VERSION = "7.17.0";
 	private static final String NODE_ID = UUID.randomUUID().toString();
 	private static final String INDEX_NAME = "my_index";
 	private static final String INDEX_PATH = "/"+INDEX_NAME;
 
-	@Rule
-	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
+	@Override
+	protected AbstractHalyardTool createTool() {
+		return new HalyardElasticIndexer();
+	}
 
 	@Test
     public void testElasticIndexer() throws Exception {
@@ -244,8 +241,7 @@ public class HalyardElasticIndexerTest {
             String[] cmdLineArgs = namedGraphOnly ? new String[]{"-s", "elasticTable", "-t", indexUrl, "-c", "-g", "<http://whatever/graph#1>"}
             : new String[]{"-s", "elasticTable", "-t", indexUrl, "-c"};
             Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-            HalyardElasticIndexer indexer = new HalyardElasticIndexer();
-            int rc = ToolRunner.run(conf, indexer, cmdLineArgs);
+            int rc = run(conf, cmdLineArgs);
             assertEquals(0, rc);
         } finally {
             server.stop(0);
@@ -261,25 +257,5 @@ public class HalyardElasticIndexerTest {
             Literal literal = vf.createLiteral(fields.getString("label"), vf.createIRI(fields.getString("datatype")));
             assertEquals("Invalid hash for literal " + literal, valueIO.id(literal).toString(), id);
         }
-    }
-
-    @Test
-    public void testHelp() throws Exception {
-        assertEquals(-1, new HalyardElasticIndexer().run(new String[]{"-h"}));
-    }
-
-    @Test(expected = MissingOptionException.class)
-    public void testRunNoArgs() throws Exception {
-        assertEquals(-1, new HalyardElasticIndexer().run(new String[]{}));
-    }
-
-    @Test
-    public void testRunVersion() throws Exception {
-        assertEquals(0, new HalyardElasticIndexer().run(new String[]{"-v"}));
-    }
-
-    @Test(expected = UnrecognizedOptionException.class)
-    public void testRunInvalid() throws Exception {
-        new HalyardElasticIndexer().run(new String[]{"-invalid"});
     }
 }

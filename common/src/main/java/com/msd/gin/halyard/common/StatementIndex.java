@@ -368,7 +368,7 @@ public enum StatementIndex {
 
 	private static Identifier parseId(StatementIndex index, RDFRole role, ByteBuffer key, ByteBuffer cn, int keySize, IdentifiableValueIO valueIO) {
 		byte[] idBytes = new byte[valueIO.getIdSize()];
-		role.unrotate(key.array(), key.arrayOffset()+key.position(), keySize, index, idBytes);
+		role.unrotate(key.array(), key.arrayOffset() + key.position(), keySize, index, idBytes);
 		key.position(key.position()+keySize);
 		cn.get(idBytes, keySize, idBytes.length - keySize);
 		return valueIO.id(idBytes);

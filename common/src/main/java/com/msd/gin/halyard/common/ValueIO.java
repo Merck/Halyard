@@ -12,6 +12,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -67,9 +68,6 @@ public class ValueIO {
 	public static final int DEFAULT_BUFFER_SIZE = 128;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ValueIO.class);
-    private static final List<Class<?>> VOCABULARIES = getVocabularies();
-	private static final BiMap<Short, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);
-	private static final BiMap<Short, String> WELL_KNOWN_LANGS = HashBiMap.create(256);
 	private static final int IRI_HASH_SIZE = 4;
 	private static final int NAMESPACE_HASH_SIZE = 2;
 	private static final int LANG_HASH_SIZE = 2;
@@ -78,66 +76,30 @@ public class ValueIO {
 
 	private static List<Class<?>> getVocabularies() {
 		List<Class<?>> vocabs = new ArrayList<>(25);
-		Class<?>[] defaultVocabs = { RDF.class, RDFS.class, XSD.class, SD.class, VOID.class, FOAF.class,
+
+		LOGGER.debug("Loading default vocabularies...");
+		Class<?>[] defaultVocabClasses = { RDF.class, RDFS.class, XSD.class, SD.class, VOID.class, FOAF.class,
 				OWL.class, DC.class, DCTERMS.class, SKOS.class, SKOSXL.class, ORG.class, GEO.class,
 				WGS84.class, PROV.class, ROV.class };
-		Collections.addAll(vocabs, defaultVocabs);
+		for (Class<?> vocabClass : defaultVocabClasses) {
+			LOGGER.debug("Loading vocabulary {}", vocabClass.getName());
+			vocabs.add(vocabClass);
+		}
 
-		Logger logger = LoggerFactory.getLogger(HalyardTableUtils.class);
-		logger.info("Searching for vocabularies...");
-		for(Vocabulary vocab : ServiceLoader.load(Vocabulary.class)) {
-			logger.info("Loading vocabulary {}", vocab.getClass());
+		LOGGER.info("Searching for additional vocabularies...");
+		for (Vocabulary vocab : ServiceLoader.load(Vocabulary.class)) {
+			LOGGER.info("Loading vocabulary {}", vocab.getClass().getName());
 			vocabs.add(vocab.getClass());
 		}
+
 		return Collections.unmodifiableList(vocabs);
 	}
 
-	static {
-		for(Class<?> vocab : VOCABULARIES) {
-			loadNamespaces(vocab);
-		}
-		loadLanguageTags();
-	}
-
-	private static void loadNamespaces(Class<?> vocab) {
-		Collection<Namespace> namespaces = getNamespace(vocab);
-		addNamespaces(namespaces);
-	}
-
-	private static Set<Namespace> getNamespace(Class<?> vocabulary) {
-		Set<Namespace> namespaces = new HashSet<>();
-		for (Field f : vocabulary.getFields()) {
-			if (f.getType() == Namespace.class) {
-				try {
-					namespaces.add((Namespace) f.get(null));
-				} catch (IllegalAccessException ex) {
-					throw new AssertionError(ex);
-				}
-			}
-		}
-		return namespaces;
-	}
-
-	private static void addNamespaces(Collection<Namespace> namespaces) {
-		for (Namespace namespace : namespaces) {
-			String name = namespace.getName();
-			Short hash = Hashes.hash16(name.getBytes(StandardCharsets.UTF_8));
-			if (WELL_KNOWN_NAMESPACES.putIfAbsent(hash, name) != null) {
-				throw new AssertionError(String.format("Hash collision between %s and %s",
-						WELL_KNOWN_NAMESPACES.get(hash), name));
-			}
-		}
-	}
-
-	private static void loadLanguageTags() {
-		for (Locale l : Locale.getAvailableLocales()) {
-			String langTag = l.toLanguageTag();
-			Short hash = Hashes.hash16(langTag.getBytes(StandardCharsets.UTF_8));
-			if (WELL_KNOWN_LANGS.putIfAbsent(hash, langTag) != null) {
-				throw new AssertionError(String.format("Hash collision between %s and %s",
-						WELL_KNOWN_LANGS.get(hash), langTag));
-			}
-		}
+	private static Locale[] getLanguages() {
+		LOGGER.debug("Searching for languages...");
+		Locale[] locales = Locale.getAvailableLocales();
+		Arrays.sort(locales, (l1, l2) -> l1.toLanguageTag().compareTo(l2.toLanguageTag()));
+		return locales;
 	}
 
 	interface ByteWriter {
@@ -309,20 +271,30 @@ public class ValueIO {
 	}
 
 	public static ValueIO create() {
+		boolean loadVocabularies = Config.getBoolean("halyard.vocabularies", true);
+		boolean loadLanguages = Config.getBoolean("halyard.languages", true);
 		int stringCompressionThreshold = Config.getInteger("halyard.string.compressionThreshold", 200);
-		return new ValueIO(stringCompressionThreshold);
+		return new ValueIO(loadVocabularies, loadLanguages, stringCompressionThreshold);
 	}
 
+	private final BiMap<Short, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);
+	private final BiMap<Short, String> WELL_KNOWN_LANGS = HashBiMap.create(256);
 	protected final BiMap<Integer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(1024);
 	private final Map<IRI, ByteWriter> BYTE_WRITERS = new HashMap<>(32);
 	private final Map<Integer, ByteReader> BYTE_READERS = new HashMap<>(32);
 	private final int stringCompressionThreshold;
 
-	public ValueIO(int stringCompressionThreshold) {
+	public ValueIO(boolean loadVocabularies, boolean loadLanguages, int stringCompressionThreshold) {
 		this.stringCompressionThreshold = stringCompressionThreshold;
 
-		for(Class<?> vocab : VOCABULARIES) {
-			loadIRIs(vocab);
+		if (loadVocabularies) {
+			for(Class<?> vocab : getVocabularies()) {
+				loadNamespaces(vocab);
+				loadIRIs(vocab);
+			}
+		}
+		if (loadLanguages) {
+			loadLanguageTags();
 		}
 
 		addByteReaderWriters();
@@ -330,6 +302,48 @@ public class ValueIO {
 
 	boolean isWellKnownIRI(Value v) {
 		return WELL_KNOWN_IRIS.containsValue(v);
+	}
+
+	private void loadNamespaces(Class<?> vocab) {
+		Collection<Namespace> namespaces = getNamespace(vocab);
+		addNamespaces(namespaces);
+	}
+
+	private Set<Namespace> getNamespace(Class<?> vocabulary) {
+		Set<Namespace> namespaces = new HashSet<>();
+		for (Field f : vocabulary.getFields()) {
+			if (f.getType() == Namespace.class) {
+				try {
+					namespaces.add((Namespace) f.get(null));
+				} catch (IllegalAccessException ex) {
+					throw new AssertionError(ex);
+				}
+			}
+		}
+		return namespaces;
+	}
+
+	private void addNamespaces(Collection<Namespace> namespaces) {
+		for (Namespace namespace : namespaces) {
+			String name = namespace.getName();
+			Short hash = Hashes.hash16(name.getBytes(StandardCharsets.UTF_8));
+			if (WELL_KNOWN_NAMESPACES.putIfAbsent(hash, name) != null) {
+				throw new AssertionError(String.format("Hash collision between %s and %s",
+						WELL_KNOWN_NAMESPACES.get(hash), name));
+			}
+		}
+	}
+
+	private void loadLanguageTags() {
+		for (Locale l : getLanguages()) {
+			String langTag = l.toLanguageTag();
+			LOGGER.debug("Loading language {}", langTag);
+			Short hash = Hashes.hash16(langTag.getBytes(StandardCharsets.UTF_8));
+			if (WELL_KNOWN_LANGS.putIfAbsent(hash, langTag) != null) {
+				throw new AssertionError(String.format("Hash collision between %s and %s",
+						WELL_KNOWN_LANGS.get(hash), langTag));
+			}
+		}
 	}
 
 	private void loadIRIs(Class<?> vocab) {

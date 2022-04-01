@@ -17,9 +17,9 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.ValueIO;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -68,11 +68,12 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
     private static final String OBJECT = "halyard.delete.object";
     private static final String CONTEXTS = "halyard.delete.contexts";
 
-    static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
+    private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
     static final class DeleteMapper extends TableMapper<ImmutableBytesWritable, KeyValue> {
 
         final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
+        Table table;
         IdentifiableValueIO valueIO;
         ValueIO.Reader valueReader;
         long total = 0, deleted = 0;
@@ -84,7 +85,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
+            table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             valueIO = IdentifiableValueIO.create(conf);
             valueReader = valueIO.createReader(SVF, new TableTripleReader(table));
             String s = conf.get(SUBJECT);
@@ -137,6 +138,13 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 
         }
 
+        @Override
+        protected void cleanup(Context output) throws IOException {
+        	if (table != null) {
+        		table.close();
+        		table = null;
+        	}
+        }
     }
 
     public HalyardBulkDelete() {

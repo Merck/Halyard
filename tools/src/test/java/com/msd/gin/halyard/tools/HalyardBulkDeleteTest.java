@@ -18,9 +18,9 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
+
 import java.io.File;
-import org.apache.commons.cli.MissingOptionException;
-import org.apache.commons.cli.UnrecognizedOptionException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ToolRunner;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -30,21 +30,23 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Assert;
-import org.junit.Rule;
 import org.junit.Test;
-import static org.junit.Assert.assertEquals;
+
+import static org.junit.Assert.*;
 
 /**
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardBulkDeleteTest {
+public class HalyardBulkDeleteTest extends AbstractHalyardToolTest {
     private static final String TABLE = "bulkdeletetesttable";
 
-	@Rule
-	public final HadoopLogRule hadoopLogs = HadoopLogRule.create();
+	@Override
+	protected AbstractHalyardTool createTool() {
+		return new HalyardBulkDelete();
+	}
 
-    @Test
+	@Test
     public void testBulkDelete() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
@@ -61,14 +63,14 @@ public class HalyardBulkDeleteTest {
         File htableDir = File.createTempFile("test_htable", "");
         htableDir.delete();
 
-        assertEquals(0, ToolRunner.run(conf, new HalyardBulkDelete(), new String[]{ "-t", TABLE, "-o", "<http://whatever/obj0>", "-g", "NONE", "-g", "<http://whatever/ctx1>", "-f", htableDir.toURI().toURL().toString()}));
+        assertEquals(0, run(conf, new String[]{ "-t", TABLE, "-o", "<http://whatever/obj0>", "-g", "NONE", "-g", "<http://whatever/ctx1>", "-f", htableDir.toURI().toURL().toString()}));
 
         assertCount(23);
 
         htableDir = File.createTempFile("test_htable", "");
         htableDir.delete();
 
-        assertEquals(0, ToolRunner.run(conf, new HalyardBulkDelete(), new String[]{ "-t", TABLE, "-s", "<http://whatever/subj2>", "-f", htableDir.toURI().toURL().toString()}));
+        assertEquals(0, run(conf, new String[]{ "-t", TABLE, "-s", "<http://whatever/subj2>", "-f", htableDir.toURI().toURL().toString()}));
 
         assertCount(18);
 
@@ -98,25 +100,5 @@ public class HalyardBulkDeleteTest {
         } finally {
             sail.shutDown();
         }
-    }
-
-    @Test
-    public void testHelp() throws Exception {
-        assertEquals(-1, new HalyardBulkDelete().run(new String[]{"-h"}));
-    }
-
-    @Test(expected = MissingOptionException.class)
-    public void testRunNoArgs() throws Exception {
-        assertEquals(-1, new HalyardBulkDelete().run(new String[]{}));
-    }
-
-    @Test
-    public void testRunVersion() throws Exception {
-        assertEquals(0, new HalyardBulkDelete().run(new String[]{"-v"}));
-    }
-
-    @Test(expected = UnrecognizedOptionException.class)
-    public void testRunInvalid() throws Exception {
-        new HalyardBulkDelete().run(new String[]{"-invalid"});
     }
 }
