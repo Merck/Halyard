@@ -67,6 +67,7 @@ public final class WIKIDATA implements Vocabulary {
     public static final IRI ENGLISH_WIKIPEDIA = SVF.createIRI(WD_NAMESPACE, "Q328");
     public static final IRI ENGLISH = SVF.createIRI(WD_NAMESPACE, "Q1860");
     public static final IRI SPECIES = SVF.createIRI(WD_NAMESPACE, "Q7432");
+    public static final IRI GENE = SVF.createIRI(WD_NAMESPACE, "Q7187");
     public static final IRI METRE = SVF.createIRI(WD_NAMESPACE, "Q11573");
     public static final IRI TAXON = SVF.createIRI(WD_NAMESPACE, "Q16521");
     public static final IRI PUBMED_CENTRAL = SVF.createIRI(WD_NAMESPACE, "Q229883");
@@ -74,7 +75,9 @@ public final class WIKIDATA implements Vocabulary {
     public static final IRI WIKIMEDIA_CATEGORY = SVF.createIRI(WD_NAMESPACE, "Q4167836");
     public static final IRI CROSSREF = SVF.createIRI(WD_NAMESPACE, "Q5188229");
     public static final IRI EUROPE_PUBMED_CENTRAL = SVF.createIRI(WD_NAMESPACE, "Q5412157");
+    public static final IRI GBIF = SVF.createIRI(WD_NAMESPACE, "Q1531570");
     public static final IRI MALE = SVF.createIRI(WD_NAMESPACE, "Q6581097");
+    public static final IRI FEMALE = SVF.createIRI(WD_NAMESPACE, "Q6581072");
     public static final IRI SCHOLARLY_ARTICLE = SVF.createIRI(WD_NAMESPACE, "Q13442814");
 
     public static final class Properties {
@@ -93,7 +96,9 @@ public final class WIKIDATA implements Vocabulary {
         public static final String FOLLOWED_BY= "P156";
         public static final String GND_ID = "P227";
         public static final String STATED_IN = "P248";
+        public static final String LOCATION = "P276";
         public static final String SUBCLASS_OF = "P279";
+        public static final String POSTAL_CODE = "P281";
         public static final String PAGES = "P304";
         public static final String ENTREZ_GENE_ID = "P351";
         public static final String UNIPROT_PROTEIN_ID = "P352";
@@ -104,8 +109,12 @@ public final class WIKIDATA implements Vocabulary {
         public static final String ORCID = "P496";
         public static final String CATALOG_CODE = "P528";
         public static final String DATE_OF_BIRTH = "P569";
+        public static final String DATE_OF_DEATH = "P570";
+        public static final String INCEPTION = "P571";
         public static final String PUBLICATION_DATE = "P577";
+        public static final String END_TIME = "P582";
         public static final String POINT_IN_TIME = "P585";
+        public static final String COORDINATE_LOCATION = "P625";
         public static final String OF = "P642";
         public static final String STREET_NUMBER = "P670";
         public static final String PUBMED_ID = "P698";
@@ -114,19 +123,23 @@ public final class WIKIDATA implements Vocabulary {
         public static final String RETRIEVED = "P813";
         public static final String ARXIV_ID = "P818";
         public static final String REFERENCE_URL = "P854";
+        public static final String OFFICIAL_WEBSITE = "P856";
         public static final String MAIN_SUBJECT = "P921";
         public static final String PMCID = "P932";
         public static final String WORK_LOCATION = "P937";
         public static final String CATALOG = "P972";
+        public static final String CHROMOSOME = "P1057";
         public static final String POPULATION = "P1082";
         public static final String APPARENT_MAGNITUDE = "P1215";
         public static final String ASTRONOMICAL_FILTER = "P1227";
         public static final String PUBLISHED_IN = "P1433";
+        public static final String OFFICIAL_NAME = "P1448";
         public static final String TITLE = "P1476";
         public static final String SERIES_ORDINAL = "P1545";
         public static final String GEONAMES_ID = "P1566";
         public static final String SEE_ALSO = "P1659";
         public static final String NATIVE_LABEL = "P1705";
+        public static final String NAMED_AS = "P1810";
         public static final String SHORT_NAME = "P1813";
         public static final String LENGTH = "P2043";
         public static final String AREA = "P2046";
@@ -134,8 +147,15 @@ public final class WIKIDATA implements Vocabulary {
         public static final String HEIGHT = "P2048";
         public static final String WIDTH = "P2049";
         public static final String AUTHOR_NAME_STRING = "P2093";
+        public static final String PARALLAX = "P2214";
+        public static final String PROPER_MOTION = "P2215";
+        public static final String RADIAL_VELOCITY = "P2216";
         public static final String GOOGLE_KNOWLEDGE_GRAPH_ID = "P2671";
         public static final String CITES_WORK = "P2860";
+        public static final String EXACT_MATCH = "P2888";
+        public static final String RIGHT_ASCENSION = "P6257";
+        public static final String DECLINATION = "P6258";
+        public static final String EPOCH = "P6259";
         public static final String STREET_ADDRESS = "P6375";
     }
 
