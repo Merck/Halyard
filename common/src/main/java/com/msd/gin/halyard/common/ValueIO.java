@@ -67,7 +67,7 @@ import net.jpountz.lz4.LZ4FastDecompressor;
 public class ValueIO {
 	public static final int DEFAULT_BUFFER_SIZE = 128;
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ValueIO.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(ValueIO.class);
 	private static final int IRI_HASH_SIZE = 4;
 	private static final int NAMESPACE_HASH_SIZE = 2;
 	private static final int LANG_HASH_SIZE = 2;
@@ -77,7 +77,7 @@ public class ValueIO {
 	private static List<Class<?>> getVocabularies() {
 		List<Class<?>> vocabs = new ArrayList<>(25);
 
-		LOGGER.debug("Loading default vocabularies...");
+		LOGGER.info("Loading default vocabularies...");
 		Class<?>[] defaultVocabClasses = { RDF.class, RDFS.class, XSD.class, SD.class, VOID.class, FOAF.class,
 				OWL.class, DC.class, DCTERMS.class, SKOS.class, SKOSXL.class, ORG.class, GEO.class,
 				WGS84.class, PROV.class, ROV.class };

@@ -11,8 +11,12 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class IdentifiableValueIO extends ValueIO {
+	private static final Logger LOGGER = LoggerFactory.getLogger(IdentifiableValueIO.class);
+
 	public final ValueIO.Writer ID_TRIPLE_WRITER;
 	public final ValueIO.Writer STREAM_WRITER;
 	public final ValueIO.Reader STREAM_READER;
@@ -39,6 +43,7 @@ public class IdentifiableValueIO extends ValueIO {
 		);
 		String confIdAlgo = Config.getString(config, "halyard.id.hash", "SHA-1");
 		int confIdSize = Config.getInteger(config, "halyard.id.size", 0);
+		LOGGER.info("Identifier hash configuration: {} {}", confIdAlgo, confIdSize);
 
 		idHash = new ThreadLocal<HashFunction>() {
 			@Override
