@@ -33,12 +33,13 @@ public class IdentifiableValueIO extends ValueIO {
 
 	public IdentifiableValueIO(Configuration config) {
 		super(
-			config.getBoolean("halyard.vocabularies", true),
-			config.getBoolean("halyard.languages", true),
-			config.getInt("halyard.string.compressionThreshold", 200)
+			Config.getBoolean(config, "halyard.vocabularies", true),
+			Config.getBoolean(config, "halyard.languages", true),
+			Config.getInteger(config, "halyard.string.compressionThreshold", 200)
 		);
-		String confIdAlgo = config.get("halyard.id.hash", "SHA-1");
-		int confIdSize = config.getInt("halyard.id.size", 0);
+		String confIdAlgo = Config.getString(config, "halyard.id.hash", "SHA-1");
+		int confIdSize = Config.getInteger(config, "halyard.id.size", 0);
+
 		idHash = new ThreadLocal<HashFunction>() {
 			@Override
 			protected HashFunction initialValue() {
