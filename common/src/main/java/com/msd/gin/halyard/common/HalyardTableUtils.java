@@ -566,7 +566,7 @@ public final class HalyardTableUtils {
      * @param stopRow stop row key byte array (exclusive)
      * @return HBase Scan instance
      */
-	public static Scan scan(byte[] startRow, byte[] stopRow) {
+	static Scan scan(byte[] startRow, byte[] stopRow) {
         Scan scan = new Scan();
         scan.addFamily(CF_NAME);
 		scan.readVersions(READ_VERSIONS);

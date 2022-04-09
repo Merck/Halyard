@@ -567,7 +567,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 				));
             }
         } else {
-            Scan scan = HalyardTableUtils.scan(null, null);
+            Scan scan = StatementIndex.scanAll();
             scan.setAttribute(Scan.SCAN_ATTRIBUTES_TABLE_NAME, sourceTableName.toBytes());
             scans = Collections.singletonList(scan);
         }

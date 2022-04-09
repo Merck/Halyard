@@ -19,6 +19,7 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.ValueIO;
 
 import java.io.IOException;
@@ -191,7 +192,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         job.setJarByClass(HalyardBulkDelete.class);
         TableMapReduceUtil.initCredentials(job);
 
-        Scan scan = HalyardTableUtils.scan(null, null);
+        Scan scan = StatementIndex.scanAll();
 
         TableMapReduceUtil.initTableMapperJob(source,
             scan,

@@ -45,7 +45,7 @@ enum IndexType {
 			stopKeys[0] = k1b;
 			stopKeys[1] = k2b;
 			stopKeys[2] = k3b;
-			return HalyardTableUtils.scan(index.concat(false, k1b, k2b, k3b), index.concat(true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, null)));
+			return scan(index, new byte[][] {k1b, k2b, k3b}, stopKeys).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, null)));
 		}
 
 		@Override
@@ -54,7 +54,7 @@ enum IndexType {
 			byte[] k2b = k2.getKeyHash(index);
 			byte[] k3b = k3.getEndKeyHash(index);
 			byte[] k4b = k4.getKeyHash(index);
-			return HalyardTableUtils.scan(index.concat(false, k1b, k2b, k3b, k4b), index.concat(true, k1b, k2b, k3b, k4b)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, k4)));
+			return scan(index, new byte[][] {k1b, k2b, k3b, k4b}, new byte[][] {k1b, k2b, k3b, k4b}).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, k4)));
 		}
 	},
 
@@ -95,7 +95,7 @@ enum IndexType {
 			stopKeys[0] = k1b;
 			stopKeys[1] = k2b;
 			stopKeys[2] = k3b;
-			return HalyardTableUtils.scan(index.concat(false, k1b, k2b, k3b), index.concat(true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, null)));
+			return scan(index, new byte[][] {k1b, k2b, k3b}, stopKeys).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, null)));
 		}
 
 		@Override
@@ -104,26 +104,26 @@ enum IndexType {
 			byte[] k2b = k2.getKeyHash(index);
 			byte[] k3b = k3.getKeyHash(index);
 			byte[] k4b = k4.getEndKeyHash(index);
-			return HalyardTableUtils.scan(index.concat(false, k1b, k2b, k3b, k4b), index.concat(true, k1b, k2b, k3b, k4b)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, k4)));
+			return scan(index, new byte[][] {k1b, k2b, k3b, k4b}, new byte[][] {k1b, k2b, k3b, k4b}).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, k3, k4)));
 		}
 	};
 
 	abstract byte[] row(StatementIndex index, RDFIdentifier v1, RDFIdentifier v2, RDFIdentifier v3, RDFIdentifier v4);
 	abstract byte[] qualifier(StatementIndex index, RDFIdentifier v1, RDFIdentifier v2, RDFIdentifier v3, RDFIdentifier v4);
 	final Scan scan(StatementIndex index) {
-		return HalyardTableUtils.scan(index.concat(false), index.concat(true, index.newStopKeys()));
+		return scan(index, new byte[0][], index.newStopKeys());
 	}
 	final Scan scan(StatementIndex index, Identifier id) {
 		byte[] kb = index.keyHash(id);
 		byte[][] stopKeys = index.newStopKeys();
 		stopKeys[0] = kb;
-		return HalyardTableUtils.scan(index.concat(false, kb), index.concat(true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifierHash(id)));
+		return scan(index, new byte[][] {kb}, stopKeys).setFilter(new ColumnPrefixFilter(index.qualifierHash(id)));
 	}
 	final Scan scan(StatementIndex index, RDFIdentifier k) {
 		byte[] kb = k.getKeyHash(index);
 		byte[][] stopKeys = index.newStopKeys();
 		stopKeys[0] = kb;
-		return HalyardTableUtils.scan(index.concat(false, kb), index.concat(true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k, null, null, null)));
+		return scan(index, new byte[][] {kb}, stopKeys).setFilter(new ColumnPrefixFilter(index.qualifier(k, null, null, null)));
 	}
 	final Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2) {
 		byte[] k1b = k1.getKeyHash(index);
@@ -131,7 +131,10 @@ enum IndexType {
 		byte[][] stopKeys = index.newStopKeys();
 		stopKeys[0] = k1b;
 		stopKeys[1] = k2b;
-		return HalyardTableUtils.scan(index.concat(false, k1b, k2b), index.concat(true, stopKeys)).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, null, null)));
+		return scan(index, new byte[][] {k1b, k2b}, stopKeys).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, null, null)));
+	}
+	final Scan scan(StatementIndex index, byte[][] startKeys, byte[][] stopKeys) {
+		return HalyardTableUtils.scan(index.concat(false, startKeys), index.concat(true, stopKeys));
 	}
 	abstract Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3);
 	abstract Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3, RDFIdentifier k4);

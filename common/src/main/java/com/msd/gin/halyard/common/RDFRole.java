@@ -81,7 +81,7 @@ public enum RDFRole {
 					return 1;
 				case OSP:
 				case COSP:
-					// NB: preserve non-literal flag for scanning
+					// NB: preserve type flags (isLiteral) for literal scanning
 					return 0;
 				default:
 					throw new AssertionError();

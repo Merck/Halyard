@@ -227,6 +227,10 @@ public enum StatementIndex {
 		}
 	}
 
+	public static final Scan scanAll() {
+		return HalyardTableUtils.scan(SPO.concat(false), COSP.concat(true, COSP.newStopKeys()));
+	}
+
 	public static final Scan scanLiterals(IdentifiableValueIO valueIO) {
 		int typeSaltSize = valueIO.getTypeSaltSize();
 		StatementIndex index = OSP;
@@ -430,16 +434,16 @@ public enum StatementIndex {
      * @return concatenated key as byte array
      */
     byte[] concat(boolean trailingZero, byte[]... fragments) {
-        int i = 1;
+        int totalLen = 1; // for prefix
         for (byte[] fr : fragments) {
-            i += fr.length;
+            totalLen += fr.length;
         }
-        byte[] res = new byte[trailingZero ? i + 1 : i];
+        byte[] res = new byte[trailingZero ? totalLen + 1 : totalLen];
         res[0] = prefix;
-        i = 1;
+        int offset = 1; // for prefix
         for (byte[] fr : fragments) {
-            System.arraycopy(fr, 0, res, i, fr.length);
-            i += fr.length;
+            System.arraycopy(fr, 0, res, offset, fr.length);
+            offset += fr.length;
         }
         return res;
     }
