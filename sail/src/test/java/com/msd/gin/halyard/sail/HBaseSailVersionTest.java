@@ -18,6 +18,7 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.repository.HBaseRepository;
 
 import java.util.Date;
@@ -129,11 +130,7 @@ public class HBaseSailVersionTest {
     @Test
     public void testModify() throws Exception {
 		TableName htableName = TableName.valueOf("timestamptable");
-		try (Admin admin = hconn.getAdmin()) {
-			ColumnFamilyDescriptor cd = ColumnFamilyDescriptorBuilder.newBuilder("e".getBytes()).setMaxVersions(5).build();
-			TableDescriptor td = TableDescriptorBuilder.newBuilder(htableName).setColumnFamily(cd).build();
-			admin.createTable(td, null);
-        }
+		HalyardTableUtils.createTable(hconn, htableName, null, IdentifiableValueIO.create(hconn.getConfiguration()), 5);
 
 		HBaseSail sail = new HBaseSail(hconn, "timestamptable", false, 0, true, 0, null, null);
 		HBaseRepository rep = new HBaseRepository(sail);

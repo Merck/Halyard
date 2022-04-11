@@ -92,10 +92,10 @@ public class HBaseSail implements Sail {
 	private static final long STATUS_CACHING_TIMEOUT = 60000l;
 
     private final Configuration config; //the configuration of the HBase database
-    final String tableName;
-    final boolean create;
+	final TableName tableName;
+	final boolean create;
     final boolean pushStrategy;
-    final int splitBits;
+	final int splitBits;
 	private SailConnection statsConnection;
 	protected HalyardEvaluationStatistics statistics;
 	final int evaluationTimeout; // secs
@@ -104,8 +104,8 @@ public class HBaseSail implements Sail {
     final String elasticIndexURL;
     final Ticker ticker;
 	private FederatedServiceResolver federatedServiceResolver;
-	private final IdentifiableValueIO valueIO;
-	private final ValueFactory valueFactory;
+	private IdentifiableValueIO valueIO;
+	private ValueFactory valueFactory;
 	private FunctionRegistry functionRegistry = new DynamicFunctionRegistry();
 	private TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
 	private SpinParser spinParser = new SpinParser();
@@ -125,9 +125,7 @@ public class HBaseSail implements Sail {
 		this.hConnection = conn;
 		this.hConnectionIsShared = (conn != null);
 		this.config = config;
-		this.valueIO = IdentifiableValueIO.create(config);
-		this.valueFactory = new IdValueFactory(valueIO);
-		this.tableName = tableName;
+		this.tableName = TableName.valueOf(tableName);
 		this.create = create;
 		this.splitBits = splitBits;
 		this.pushStrategy = pushStrategy;
@@ -184,7 +182,7 @@ public class HBaseSail implements Sail {
      */
 	Table getTable() {
         try {
-			return HalyardTableUtils.getTable(hConnection, tableName, create, splitBits);
+			return hConnection.getTable(tableName);
 		} catch (IOException e) {
 			throw new SailException(e);
 		}
@@ -212,14 +210,12 @@ public class HBaseSail implements Sail {
 			}
     	}
 
-    	try {
-			if (!create && !hConnection.getAdmin().tableExists(TableName.valueOf(tableName))) {
-				throw new SailException(String.format("Table does not exist: %s", tableName));
-			}
-		}
-		catch (IOException e) {
+		try (Table table = HalyardTableUtils.getTable(hConnection, tableName.getNameAsString(), create, splitBits)) {
+			this.valueIO = IdentifiableValueIO.create(table);
+		} catch (IOException e) {
 			throw new SailException(e);
 		}
+		this.valueFactory = new IdValueFactory(valueIO);
 
 		statsConnection = getConnection();
 		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(new SailConnectionTripleSource(statsConnection, false, getValueFactory()), valueIO), service -> {
@@ -358,6 +354,9 @@ public class HBaseSail implements Sail {
 
     @Override
     public ValueFactory getValueFactory() {
+		if (valueFactory == null) {
+			throw new IllegalStateException("Sail is not initialized");
+		}
 		return valueFactory;
     }
 

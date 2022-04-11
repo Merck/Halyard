@@ -39,9 +39,11 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -493,7 +495,7 @@ public class HBaseSailConnection implements SailConnection {
 	private void removeStatements(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
 		checkWritable();
 		if (subj == null && pred == null && obj == null && (contexts == null || contexts.length == 0)) {
-			clearAll();
+			clearAllStatements();
 		} else {
 			long timestamp = getTimestamp(op, true);
 			try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
@@ -552,10 +554,18 @@ public class HBaseSailConnection implements SailConnection {
         removeStatements(null, null, null, contexts); //remove all statements in the contexts.
     }
 
-    private void clearAll() throws SailException {
+    private void clearAllStatements() throws SailException {
     	checkWritable();
         try {
+			Get getConfig = new Get(HalyardTableUtils.CONFIG_ROW_KEY);
+			Result config = table.get(getConfig);
 			HalyardTableUtils.truncateTable(sail.hConnection, table); // delete all triples, the whole DB but retains splits!
+			// rewrite config
+			Put putConfig = new Put(HalyardTableUtils.CONFIG_ROW_KEY);
+			for (Cell cell : config.rawCells()) {
+				putConfig.add(cell);
+			}
+			table.put(putConfig);
         } catch (IOException ex) {
             throw new SailException(ex);
         }

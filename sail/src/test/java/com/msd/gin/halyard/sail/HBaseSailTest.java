@@ -100,18 +100,27 @@ public class HBaseSailTest {
     @Test
     public void testIsWritable() throws Exception {
         HBaseSail sail = new HBaseSail(hconn, "whatevertableRW", true, 0, true, 0, null, null);
-        sail.initialize();
-		TableDescriptor desc = sail.getTable().getDescriptor();
-        assertTrue(sail.isWritable());
-        sail.shutDown();
-        try (Admin ha = hconn.getAdmin()) {
+		sail.initialize();
+		TableDescriptor desc;
+		try {
+			desc = sail.getTable().getDescriptor();
+			assertTrue(sail.isWritable());
+		} finally {
+			sail.shutDown();
+        }
+
+		try (Admin ha = hconn.getAdmin()) {
 			desc = TableDescriptorBuilder.newBuilder(desc).setReadOnly(true).build();
 			ha.modifyTable(desc);
-        }
+		}
+
 		sail = new HBaseSail(hconn, desc.getTableName().getNameAsString(), true, 0, true, 0, null, null);
-        sail.initialize();
-        assertFalse(sail.isWritable());
-        sail.shutDown();
+		sail.initialize();
+		try {
+			assertFalse(sail.isWritable());
+		} finally {
+			sail.shutDown();
+        }
     }
 
     @Test(expected = SailException.class)
@@ -136,8 +145,8 @@ public class HBaseSailTest {
     @Test
     public void testGetConnection() throws Exception {
         HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
+		sail.initialize();
 		try {
-			sail.initialize();
 			try (SailConnection conn = sail.getConnection()) {
 				assertTrue(conn.isOpen());
 			}
@@ -148,7 +157,13 @@ public class HBaseSailTest {
 
     @Test
     public void testGetValueFactory() throws Exception {
-        assertNotNull(new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null).getValueFactory());
+		HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
+		sail.initialize();
+		try {
+			assertNotNull(sail.getValueFactory());
+		} finally {
+			sail.shutDown();
+		}
     }
 
     @Test
@@ -175,6 +190,8 @@ public class HBaseSailTest {
                 assertTrue(ctxIt.hasNext());
                 assertEquals("http://whatever/ctx", ctxIt.next().stringValue());
             }
+		} finally {
+			sail.shutDown();
         }
     }
 
@@ -202,14 +219,16 @@ public class HBaseSailTest {
             	conn.size(HALYARD.STATS_ROOT_NODE);
                 fail("Expected SailException");
             } catch (SailException se) {}
+		} finally {
+			sail.shutDown();
         }
     }
 
     @Test(expected = UnknownSailTransactionStateException.class)
     public void testBegin() throws Exception {
         HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
+		sail.initialize();
 		try {
-			sail.initialize();
 			try (SailConnection conn = sail.getConnection()) {
 				conn.begin(IsolationLevels.READ_COMMITTED);
 			}
@@ -221,11 +240,9 @@ public class HBaseSailTest {
     @Test
     public void testRollback() throws Exception {
         HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
-		try {
-			sail.initialize();
-			try (SailConnection conn = sail.getConnection()) {
-				conn.rollback();
-			}
+		sail.initialize();
+		try (SailConnection conn = sail.getConnection()) {
+			conn.rollback();
 		} finally {
 			sail.shutDown();
 		}
@@ -234,11 +251,9 @@ public class HBaseSailTest {
     @Test
     public void testIsActive() throws Exception {
     	HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
-		try {
-			sail.initialize();
-			try (SailConnection conn = sail.getConnection()) {
-				assertTrue(conn.isActive());
-			}
+		sail.initialize();
+		try (SailConnection conn = sail.getConnection()) {
+			assertTrue(conn.isActive());
 		} finally {
 			sail.shutDown();
 		}
@@ -253,8 +268,9 @@ public class HBaseSailTest {
         	conn.setNamespace("prefix", "http://whatever/namespace/");
         	assertEquals("http://whatever/namespace/", conn.getNamespace("prefix"));
         	assertEquals(1, countNamespaces(conn));
+		} finally {
+			sail.shutDown();
         }
-        sail.shutDown();
         sail = new HBaseSail(hconn, "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
@@ -262,8 +278,9 @@ public class HBaseSailTest {
 	        conn.removeNamespace("prefix");
         	assertNull(conn.getNamespace("prefix"));
         	assertEquals(0, countNamespaces(conn));
+		} finally {
+			sail.shutDown();
         }
-        sail.shutDown();
         sail = new HBaseSail(hconn, "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
@@ -272,8 +289,9 @@ public class HBaseSailTest {
 	        conn.setNamespace("prefix", "http://whatever/namespace2/");
         	assertEquals("http://whatever/namespace2/", conn.getNamespace("prefix"));
         	assertEquals(1, countNamespaces(conn));
+		} finally {
+			sail.shutDown();
         }
-        sail.shutDown();
         sail = new HBaseSail(hconn, "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
@@ -281,14 +299,16 @@ public class HBaseSailTest {
         	assertEquals("http://whatever/namespace2/", conn.getNamespace("prefix"));
         	conn.clearNamespaces();
         	assertEquals(0, countNamespaces(conn));
+		} finally {
+			sail.shutDown();
         }
-        sail.shutDown();
         sail = new HBaseSail(hconn, "whatevertable", false, 0, true, 0, null, null);
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
         	assertEquals(0, countNamespaces(conn));
+		} finally {
+			sail.shutDown();
         }
-        sail.shutDown();
     }
 
     private int countNamespaces(SailConnection conn) {
@@ -328,7 +348,13 @@ public class HBaseSailTest {
 	        iter = conn.getStatements(subj, pred, obj, true);
 	        assertFalse(iter.hasNext());
 	        iter.close();
+		} finally {
+			sail.shutDown();
         }
+		// check sail can be re-initialized after clear()
+		sail = new HBaseSail(hconn, "whatevertableClear", false, 0, true, 0, null, null);
+		sail.initialize();
+		sail.shutDown();
     }
 
     @Test

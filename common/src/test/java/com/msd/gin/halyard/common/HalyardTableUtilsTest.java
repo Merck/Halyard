@@ -53,9 +53,9 @@ public class HalyardTableUtilsTest {
     @BeforeClass
     public static void setup() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-		valueIO = IdentifiableValueIO.create(conf);
 		conn = HalyardTableUtils.getConnection(conf);
 		table = HalyardTableUtils.getTable(conn, "testUtils", true, -1);
+		valueIO = IdentifiableValueIO.create(table);
     }
 
     @AfterClass

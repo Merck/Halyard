@@ -19,10 +19,10 @@ package com.msd.gin.halyard.tools;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.InputFormat;
@@ -64,7 +65,7 @@ final class QueryInputFormat extends InputFormat<NullWritable, Void> {
             byte buffer[] = new byte[(int)fileStatus.getLen()];
             IOUtils.readFully(in, buffer);
             String name = path.getName();
-            String query = new String(buffer, StandardCharsets.UTF_8);
+            String query = Bytes.toString(buffer);
             addQuery(conf, name, query, Math.max(1, ParallelSplitFunction.getNumberOfForksFromFunctionArgument(query, sparqlUpdate, stage)));
         }
     }

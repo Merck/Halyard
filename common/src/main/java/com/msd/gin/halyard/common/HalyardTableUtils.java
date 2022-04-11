@@ -21,7 +21,6 @@ import com.msd.gin.halyard.vocab.HALYARD;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -46,6 +45,7 @@ import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
@@ -73,7 +73,10 @@ import org.eclipse.rdf4j.model.ValueFactory;
  */
 public final class HalyardTableUtils {
 
-    private static final byte[] CF_NAME = "e".getBytes(StandardCharsets.UTF_8);
+    static final byte[] CF_NAME = Bytes.toBytes("e");
+    public static final byte[] CONFIG_ROW_KEY = new byte[] {(byte) 0xff};
+    static final byte[] ID_HASH_CONFIG_COL = Bytes.toBytes("id.hash");
+    static final byte[] ID_SIZE_CONFIG_COL = Bytes.toBytes("id.size");
 
 	private static final int PREFIXES = 3;
 
@@ -139,7 +142,12 @@ public final class HalyardTableUtils {
 	}
 	public static Table getTable(Connection conn, String tableName, boolean create, int splitBits, boolean quads) throws IOException {
 		IdentifiableValueIO valueIO = IdentifiableValueIO.create(conn.getConfiguration());
-		return getTable(conn, tableName, create, splitBits < 0 ? null : calculateSplits(splitBits, quads, valueIO));
+		TableName htableName = TableName.valueOf(tableName);
+        if (create) {
+            return createTableIfNotExists(conn, htableName, splitBits < 0 ? null : calculateSplits(splitBits, quads, valueIO), valueIO);
+        } else {
+        	return conn.getTable(htableName);
+        }
     }
 
     /**
@@ -148,37 +156,49 @@ public final class HalyardTableUtils {
      * @param tableName String table name
      * @param create boolean option to create the table if does not exists
      * @param splits array of keys used to pre-split new table, may be null
-     * @return HTable
+     * @param valueIO ValueIO
+	 * @return the org.apache.hadoop.hbase.client.Table
      * @throws IOException throws IOException in case of any HBase IO problems
      */
-	public static Table getTable(Configuration config, String tableName, boolean create, byte[][] splits)
-			throws IOException {
-		return getTable(getConnection(config), tableName, create, splits);
-	}
-
-	/**
-	 * Helper method which locates or creates and returns the specified Table used for triple/ quad storage
-	 * 
-	 * @param conn Connection to the cluster running HBase
-	 * @param tableName String table name
-	 * @param create boolean option to create the table if does not exists
-	 * @param splits array of keys used to pre-split new table, may be null
-	 * @return Table
-	 * @throws IOException throws IOException in case of any HBase IO problems
-	 */
-	public static Table getTable(Connection conn, String tableName, boolean create, byte[][] splits)
+	public static Table createTableIfNotExists(Configuration config, String tableName, byte[][] splits, IdentifiableValueIO valueIO)
 			throws IOException {
 		TableName htableName = TableName.valueOf(tableName);
-        if (create) {
-			try (Admin admin = conn.getAdmin()) {
-				// check if the table exists and if it doesn't, make it
-				if (!admin.tableExists(htableName)) {
-					TableDescriptor td = TableDescriptorBuilder.newBuilder(htableName).setColumnFamily(createColumnFamily()).setMaxFileSize(REGION_MAX_FILESIZE).setRegionSplitPolicyClassName(REGION_SPLIT_POLICY).build();
-					admin.createTable(td, splits);
-                }
-            }
-        }
-		return conn.getTable(htableName);
+		Connection conn = getConnection(config);
+		return createTableIfNotExists(conn, htableName, splits, valueIO);
+	}
+
+	private static Table createTableIfNotExists(Connection conn, TableName htableName, byte[][] splits, IdentifiableValueIO valueIO)
+		throws IOException {
+		boolean tableAlreadyExists;
+		try (Admin admin = conn.getAdmin()) {
+			tableAlreadyExists = admin.tableExists(htableName);
+		}
+		// check if the table exists and if it doesn't, make it
+		if (!tableAlreadyExists) {
+			return createTable(conn, htableName, splits, valueIO, 1);
+		} else {
+			return conn.getTable(htableName);
+		}
+	}
+
+	public static Table createTable(Connection conn, TableName htableName, byte[][] splits, IdentifiableValueIO valueIO, int maxVersions) throws IOException {
+		try (Admin admin = conn.getAdmin()) {
+			TableDescriptor td = TableDescriptorBuilder.newBuilder(htableName)
+				.setColumnFamily(createColumnFamily(maxVersions))
+				.setMaxFileSize(REGION_MAX_FILESIZE)
+				.setRegionSplitPolicyClassName(REGION_SPLIT_POLICY)
+				.build();
+			admin.createTable(td, splits);
+		}
+		Table table = conn.getTable(htableName);
+		Configuration config = conn.getConfiguration();
+		String confIdAlgo = Config.getString(config, Config.ID_HASH_CONFIG, "SHA-1");
+		int confIdSize = Config.getInteger(config, Config.ID_SIZE_CONFIG, 0);
+		Put configPut = new Put(CONFIG_ROW_KEY)
+			.addColumn(CF_NAME, ID_HASH_CONFIG_COL, Bytes.toBytes(confIdAlgo))
+			.addColumn(CF_NAME, ID_SIZE_CONFIG_COL, Bytes.toBytes(confIdSize));
+		table.put(configPut);
+		return table;
 	}
 
 	public static Connection getConnection(Configuration config) throws IOException {
@@ -581,9 +601,9 @@ public final class HalyardTableUtils {
         return scan;
     }
 
-	private static ColumnFamilyDescriptor createColumnFamily() {
+	private static ColumnFamilyDescriptor createColumnFamily(int maxVersions) {
 		return ColumnFamilyDescriptorBuilder.newBuilder(CF_NAME)
-                .setMaxVersions(1)
+                .setMaxVersions(maxVersions)
                 .setBlockCacheEnabled(true)
                 .setBloomFilterType(BloomType.ROW)
                 .setCompressionType(DEFAULT_COMPRESSION_ALGORITHM)

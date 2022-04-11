@@ -3,6 +3,9 @@ package com.msd.gin.halyard.common;
 import org.apache.hadoop.conf.Configuration;
 
 public final class Config {
+    public static final String ID_HASH_CONFIG = "halyard.id.hash";
+    public static final String ID_SIZE_CONFIG = "halyard.id.size";
+	
 	public static String getString(String key, String defaultValue) {
 		return System.getProperty(key, defaultValue);
 	}

@@ -55,7 +55,7 @@ public class HBaseSailFactoryTest {
         assertFalse(hbs.create);
         assertFalse(hbs.pushStrategy);
         assertEquals(3, hbs.splitBits);
-        assertEquals("testtable", hbs.tableName);
+		assertEquals("testtable", hbs.tableName.getNameAsString());
         assertEquals(480, hbs.evaluationTimeout);
         assertEquals("http://whatever/index", hbs.elasticIndexURL);
     }

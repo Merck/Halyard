@@ -136,7 +136,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            valueIO = IdentifiableValueIO.create(conf);
+            valueIO = IdentifiableValueIO.create(table);
             valueReader = valueIO.createReader(SVF, new TableTripleReader(table));
         	RDF_TYPE_PREDICATE = RDFPredicate.create(RDF.TYPE, valueIO);
         	POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.POS);
@@ -393,7 +393,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             statsGraphContext = SVF.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            valueIO = IdentifiableValueIO.create(conf);
+            valueIO = IdentifiableValueIO.create(table);
             valueReader = valueIO.createReader(SVF, new TableTripleReader(table));
             String targetUrl = conf.get(TARGET);
             if (targetUrl == null) {
@@ -552,10 +552,14 @@ public final class HalyardStats extends AbstractHalyardTool {
         job.setJarByClass(HalyardStats.class);
         TableMapReduceUtil.initCredentials(job);
 
-        TableName sourceTableName = TableName.valueOf(source);
+        TableName sourceTableName;
+        IdentifiableValueIO valueIO;
+        try (Table table = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
+        	sourceTableName = table.getName();
+            valueIO = IdentifiableValueIO.create(table);
+        }
         List<Scan> scans;
         if (graphContext != null) { //restricting stats to scan given graph context only
-            IdentifiableValueIO valueIO = IdentifiableValueIO.create(getConf());
             scans = new ArrayList<>(4);
             RDFContext rdfGraphCtx = RDFContext.create(SVF.createIRI(graphContext), valueIO);
             scans.add(scan(sourceTableName, StatementIndex.CSPO, rdfGraphCtx));

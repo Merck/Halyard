@@ -4,10 +4,16 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.msd.gin.halyard.common.Hashes.HashFunction;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
@@ -35,15 +41,55 @@ public class IdentifiableValueIO extends ValueIO {
 		return new IdentifiableValueIO(config);
 	}
 
-	public IdentifiableValueIO(Configuration config) {
+	public static IdentifiableValueIO create(Table table) throws IOException {
+		Get getConfig = new Get(HalyardTableUtils.CONFIG_ROW_KEY)
+			.addColumn(HalyardTableUtils.CF_NAME, HalyardTableUtils.ID_HASH_CONFIG_COL)
+			.addColumn(HalyardTableUtils.CF_NAME, HalyardTableUtils.ID_SIZE_CONFIG_COL);
+		Result res = table.get(getConfig);
+		Cell[] cells = res.rawCells();
+		if (cells == null) {
+			throw new IOException("No config found");
+		}
+		String idAlgo = null;
+		int idSize = -1; 
+		for (Cell cell : cells) {
+			ByteBuffer q = ByteBuffer.wrap(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
+			if (ByteBuffer.wrap(HalyardTableUtils.ID_HASH_CONFIG_COL).equals(q)) {
+				idAlgo = Bytes.toString(cell.getValueArray(), cell.getValueOffset(), cell.getValueLength());
+			} else if (ByteBuffer.wrap(HalyardTableUtils.ID_SIZE_CONFIG_COL).equals(q)) {
+				idSize = Bytes.toInt(cell.getValueArray(), cell.getValueOffset(), cell.getValueLength());
+			}
+		}
+		if (idAlgo == null) {
+			throw new IOException("Identifier hash missing from table");
+		}
+		if (idSize == -1) {
+			throw new IOException("Identifier size missing from table");
+		}
+		Configuration conf = table.getConfiguration();
+
+		String confIdAlgo = conf.get(Config.ID_HASH_CONFIG);
+		if (confIdAlgo != null && !confIdAlgo.equals(idAlgo)) {
+			throw new IOException(String.format("Identifier hash mismatch: table contains %s but configuration says %s", idAlgo, confIdAlgo));
+		}
+		conf.set(Config.ID_HASH_CONFIG, idAlgo);
+
+		int confIdSize = conf.getInt(Config.ID_SIZE_CONFIG, -1);
+		if (confIdSize != -1 && confIdSize != idSize) {
+			throw new IOException(String.format("Identifier size mismatch: table contains %s but configuration says %s", idSize, confIdSize));
+		}
+		conf.setInt(Config.ID_SIZE_CONFIG, idSize);
+		return create(conf);
+	}
+
+	private IdentifiableValueIO(Configuration config) {
 		super(
 			Config.getBoolean(config, "halyard.vocabularies", true),
 			Config.getBoolean(config, "halyard.languages", true),
 			Config.getInteger(config, "halyard.string.compressionThreshold", 200)
 		);
-		String confIdAlgo = Config.getString(config, "halyard.id.hash", "SHA-1");
-		int confIdSize = Config.getInteger(config, "halyard.id.size", 0);
-		LOGGER.info("Identifier hash configuration: {} {}", confIdAlgo, confIdSize);
+		String confIdAlgo = Config.getString(config, Config.ID_HASH_CONFIG, "SHA-1");
+		int confIdSize = Config.getInteger(config, Config.ID_SIZE_CONFIG, 0);
 
 		idHash = new ThreadLocal<HashFunction>() {
 			@Override
@@ -51,7 +97,10 @@ public class IdentifiableValueIO extends ValueIO {
 				return Hashes.getHash(confIdAlgo, confIdSize);
 			}
 		};
-		idSize = idHash.get().size();
+		HashFunction hashInstance = idHash.get();
+		idSize = hashInstance.size();
+		LOGGER.info("Identifier hash: {} {}-bit ({} bytes)", hashInstance.getName(), idSize*Byte.SIZE, idSize);
+
 		typeIndex = (idSize > 1) ? 1 : 0;
 		typeSaltSize = 1 << (8*typeIndex);
 

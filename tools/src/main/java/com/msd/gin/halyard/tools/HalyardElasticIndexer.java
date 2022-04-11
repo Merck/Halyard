@@ -50,6 +50,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -87,9 +88,9 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException {
             Configuration conf = context.getConfiguration();
-            valueIO = IdentifiableValueIO.create(conf);
-            valueFactory = new IdValueFactory(valueIO);
             table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
+            valueIO = IdentifiableValueIO.create(table);
+            valueFactory = new IdValueFactory(valueIO);
             valueReader = valueIO.createReader(valueFactory, new TableTripleReader(table));
         }
 
@@ -206,7 +207,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             http.setRequestMethod("PUT");
             http.setDoOutput(true);
             http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-            byte b[] = getMappingConfig("", Integer.toString(shards), Integer.toString(replicas)).getBytes(StandardCharsets.UTF_8);
+            byte b[] = Bytes.toBytes(getMappingConfig("", Integer.toString(shards), Integer.toString(replicas)));
             http.setFixedLengthStreamingMode(b.length);
             http.connect();
             try {
@@ -234,7 +235,11 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         }
         job.setJarByClass(HalyardElasticIndexer.class);
         TableMapReduceUtil.initCredentials(job);
-        IdentifiableValueIO valueIO = IdentifiableValueIO.create(getConf());
+
+        IdentifiableValueIO valueIO;
+        try (Table table = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
+            valueIO = IdentifiableValueIO.create(table);
+        }
 
         Scan scan;
         if (cmd.hasOption('g')) {

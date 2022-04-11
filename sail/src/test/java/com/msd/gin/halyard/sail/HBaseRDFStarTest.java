@@ -13,7 +13,7 @@ public class HBaseRDFStarTest extends RDFStarSupportTest {
 	protected Repository createRepository() {
 		Sail sail;
 		try {
-			sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "whatevertable", true, 0, true, 0, null, null);
+			sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "rdfstartable", true, 0, true, 0, null, null);
 		} catch (Exception e) {
 			throw new AssertionError(e);
 		}

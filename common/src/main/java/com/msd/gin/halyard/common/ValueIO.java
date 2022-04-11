@@ -32,6 +32,7 @@ import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.transform.TransformerException;
 
+import org.apache.hadoop.hbase.util.Bytes;
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -326,7 +327,7 @@ public class ValueIO {
 	private void addNamespaces(Collection<Namespace> namespaces) {
 		for (Namespace namespace : namespaces) {
 			String name = namespace.getName();
-			Short hash = Hashes.hash16(name.getBytes(StandardCharsets.UTF_8));
+			Short hash = Hashes.hash16(Bytes.toBytes(name));
 			if (WELL_KNOWN_NAMESPACES.putIfAbsent(hash, name) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
 						WELL_KNOWN_NAMESPACES.get(hash), name));
@@ -338,7 +339,7 @@ public class ValueIO {
 		for (Locale l : getLanguages()) {
 			String langTag = l.toLanguageTag();
 			LOGGER.debug("Loading language {}", langTag);
-			Short hash = Hashes.hash16(langTag.getBytes(StandardCharsets.UTF_8));
+			Short hash = Hashes.hash16(Bytes.toBytes(langTag));
 			if (WELL_KNOWN_LANGS.putIfAbsent(hash, langTag) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
 						WELL_KNOWN_LANGS.get(hash), langTag));
@@ -369,7 +370,7 @@ public class ValueIO {
 	}
 
 	protected void addIRI(IRI iri) {
-		Integer hash = Hashes.hash32(iri.stringValue().getBytes(StandardCharsets.UTF_8));
+		Integer hash = Hashes.hash32(Bytes.toBytes(iri.stringValue()));
 		if (WELL_KNOWN_IRIS.putIfAbsent(hash, iri) != null) {
 			throw new AssertionError(String.format("Hash collision between %s and %s",
 					WELL_KNOWN_IRIS.get(hash), iri));
@@ -841,7 +842,8 @@ public class ValueIO {
 					try {
 						return writer.writeBytes(l, b);
 					} catch (Exception e) {
-						LOGGER.warn("Possibly invalid literal: {}", l, e);
+						LOGGER.warn("Possibly invalid literal: {} ({})", l, e.getMessage());
+						LOGGER.debug("{} for {} failed", ByteWriter.class.getSimpleName(), l.getDatatype(), e);
 						// if the dedicated writer fails then fallback to the generic writer
 						return defaultLiteralWriteBytes(l, b);
 					}

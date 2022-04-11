@@ -25,9 +25,9 @@ public final class Hashes {
 	public static HashFunction getHash(String algorithm, int size) {
 		switch (algorithm) {
 			case "FarmHash-64":
-				return new GuavaHashFunction(Hashing.farmHashFingerprint64(), size);
+				return new GuavaHashFunction(algorithm, Hashing.farmHashFingerprint64(), size);
 			case "Murmur3-128":
-				return new GuavaHashFunction(Hashing.murmur3_128(), size);
+				return new GuavaHashFunction(algorithm, Hashing.murmur3_128(), size);
 			default:
 				return new MessageDigestHashFunction(getMessageDigest(algorithm), size);
 		}
@@ -67,10 +67,16 @@ public final class Hashes {
     	return Hashing.murmur3_32().hashBytes(key).asInt();
     }
 
+    /**
+     * Encode a byte array to a base-64 string.
+     */
     public static String encode(byte b[]) {
         return ENCODER.encodeToString(b);
     }
 
+    /**
+     * Decode a base-64 string to a byte array.
+     */
     public static byte[] decode(String s) {
     	return DECODER.decode(s);
     }
@@ -84,14 +90,20 @@ public final class Hashes {
 
 
 	public static abstract class HashFunction implements Function<ByteBuffer,byte[]> {
+		final String name;
 		final int size;
 
 		static int hashSize(int size, int defaultSize) {
 			return (size > 0) ? size : defaultSize;
 		}
 
-		HashFunction(int size) {
+		HashFunction(String name, int size) {
+			this.name = name;
 			this.size = size;
+		}
+
+		public final String getName() {
+			return name;
 		}
 
 		public final int size() {
@@ -111,7 +123,7 @@ public final class Hashes {
 		final MessageDigest md;
 
 		MessageDigestHashFunction(MessageDigest md, int size) {
-			super(hashSize(size, md.getDigestLength()));
+			super(md.getAlgorithm(), hashSize(size, md.getDigestLength()));
 			this.md = md;
 		}
 
@@ -129,8 +141,8 @@ public final class Hashes {
 	static final class GuavaHashFunction extends HashFunction {
 		final com.google.common.hash.HashFunction hf;
 
-		GuavaHashFunction(com.google.common.hash.HashFunction hf, int size) {
-			super(hashSize(size, hf.bits()/Byte.SIZE));
+		GuavaHashFunction(String name, com.google.common.hash.HashFunction hf, int size) {
+			super(name, hashSize(size, hf.bits()/Byte.SIZE));
 			this.hf = hf;
 		}
 

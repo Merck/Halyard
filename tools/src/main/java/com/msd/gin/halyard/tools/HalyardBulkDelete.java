@@ -87,7 +87,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            valueIO = IdentifiableValueIO.create(conf);
+            valueIO = IdentifiableValueIO.create(table);
             valueReader = valueIO.createReader(SVF, new TableTripleReader(table));
             String s = conf.get(SUBJECT);
             if (s!= null) {

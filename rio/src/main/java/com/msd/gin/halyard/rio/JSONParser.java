@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 
+import org.apache.hadoop.hbase.util.Bytes;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.vocabulary.OWL;
@@ -212,8 +213,8 @@ public final class JSONParser extends AbstractRDFParser {
     }
 
     private void hash(String val) {
-        byte[] bs = val.getBytes(StandardCharsets.UTF_8);
-        byte[] bsLen = String.valueOf(bs.length).getBytes(StandardCharsets.UTF_8);
+        byte[] bs = Bytes.toBytes(val);
+        byte[] bsLen = Bytes.toBytes(String.valueOf(bs.length));
         md.update(bsLen);
         md.update((byte)':');
         md.update(bs);

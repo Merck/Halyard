@@ -37,8 +37,8 @@ public class StatementIndexTest {
     @BeforeClass
     public static void setup() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-		valueIO = IdentifiableValueIO.create(conf);
         table = HalyardTableUtils.getTable(conf, "testStatementIndex", true, 0);
+		valueIO = IdentifiableValueIO.create(table);
 
         SimpleValueFactory vf = SimpleValueFactory.getInstance();
         allStatements = new HashSet<>();

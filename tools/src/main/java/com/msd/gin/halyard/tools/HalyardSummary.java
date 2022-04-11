@@ -130,7 +130,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             this.table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            this.valueIO = IdentifiableValueIO.create(conf);
+            this.valueIO = IdentifiableValueIO.create(table);
             this.valueReader = valueIO.createReader(SVF, new TableTripleReader(table));
         }
 

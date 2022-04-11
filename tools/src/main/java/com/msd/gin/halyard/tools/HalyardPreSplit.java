@@ -134,7 +134,8 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            HalyardTableUtils.getTable(conf, conf.get(TABLE_PROPERTY), true, splits.toArray(new byte[splits.size()][])).close();
+            IdentifiableValueIO valueIO = IdentifiableValueIO.create(conf);
+            HalyardTableUtils.createTableIfNotExists(conf, conf.get(TABLE_PROPERTY), splits.toArray(new byte[splits.size()][]), valueIO).close();
         }
     }
 
