@@ -1,6 +1,6 @@
 # Halyard-star
 
-![CI](https://github.com/pulquero/Halyard/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/pulquero/Halyard/actions/workflows/ci.yml/badge.svg)](https://github.com/pulquero/Halyard/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/github/pulquero/Halyard/coverage.svg?branch=latest)](https://codecov.io/gh/pulquero/Halyard/)
 
 **Fork of [Halyard](https://github.com/Merck/Halyard) with support for RDF-star, XPath 3 functions, SPIN functions (and many other improvements/fixes).**
