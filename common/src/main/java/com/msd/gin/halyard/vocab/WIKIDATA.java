@@ -55,11 +55,20 @@ public final class WIKIDATA implements Vocabulary {
     // common ID namespaces
     public static final Namespace DOI_NS = new SimpleNamespace("doi", "http://dx.doi.org/");
     public static final Namespace ORCID_NS = new SimpleNamespace("orcid", "https://orcid.org/");
-    public static final Namespace GKG_NS = new SimpleNamespace("gkg", "http://g.co/kg/g/");
+    public static final Namespace GKG_NS = new SimpleNamespace("gkg", "http://g.co/kg/");
     public static final Namespace GEONAMES_NS = new SimpleNamespace("geonames", "http://sws.geonames.org/");
     public static final Namespace ENTREZ_NS = new SimpleNamespace("entrez", "http://purl.uniprot.org/geneid/");
     public static final Namespace UNIPROT_NS = new SimpleNamespace("uniprot", "http://purl.uniprot.org/uniprot/");
     public static final Namespace GND_NS = new SimpleNamespace("gnd", "https://d-nb.info/gnd/");
+    public static final Namespace LOC_NS = new SimpleNamespace("loc", "http://id.loc.gov/authorities/names/");
+    public static final Namespace VIAF_NS = new SimpleNamespace("viaf", "http://viaf.org/viaf/");
+
+    public static final Namespace EN_WIKIPEDIA = new SimpleNamespace("wiki_en", "https://en.wikipedia.org/");
+    public static final Namespace FR_WIKIPEDIA = new SimpleNamespace("wiki_fr", "https://fr.wikipedia.org/");
+    public static final Namespace DE_WIKIPEDIA = new SimpleNamespace("wiki_de", "https://de.wikipedia.org/");
+    public static final Namespace ES_WIKIPEDIA = new SimpleNamespace("wiki_es", "https://es.wikipedia.org/");
+    public static final Namespace IT_WIKIPEDIA = new SimpleNamespace("wiki_it", "https://it.wikipedia.org/");
+    public static final Namespace WIKIMEDIA = new SimpleNamespace("wikimedia", "https://commons.wikimedia.org/");
 
     // popular items
     public static final IRI HUMAN = SVF.createIRI(WD_NAMESPACE, "Q5");
@@ -79,6 +88,7 @@ public final class WIKIDATA implements Vocabulary {
     public static final IRI MALE = SVF.createIRI(WD_NAMESPACE, "Q6581097");
     public static final IRI FEMALE = SVF.createIRI(WD_NAMESPACE, "Q6581072");
     public static final IRI SCHOLARLY_ARTICLE = SVF.createIRI(WD_NAMESPACE, "Q13442814");
+    public static final IRI FREEBASE = SVF.createIRI(WD_NAMESPACE, "Q15241312");
 
     public static final class Properties {
         // popular properties

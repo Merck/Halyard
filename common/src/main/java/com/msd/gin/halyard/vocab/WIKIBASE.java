@@ -75,4 +75,6 @@ public final class WIKIBASE implements Vocabulary {
     public static final IRI TIME_TIMEZONE = SVF.createIRI(NAMESPACE, "timeTimezone");
     public static final IRI TIME_CALENDAR_MODEL = SVF.createIRI(NAMESPACE, "timeCalendarModel");
     public static final IRI WIKI_GROUP = SVF.createIRI(NAMESPACE, "wikiGroup");
+
+    public static final IRI DUMP = SVF.createIRI(NAMESPACE, "Dump");
 }
