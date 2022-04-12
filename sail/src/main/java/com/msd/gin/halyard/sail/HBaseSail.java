@@ -21,6 +21,7 @@ import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.function.DynamicFunctionRegistry;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.File;
 import java.io.IOException;
@@ -35,8 +36,11 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
+import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.FN;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.SD;
 import org.eclipse.rdf4j.model.vocabulary.SPIF;
 import org.eclipse.rdf4j.model.vocabulary.SPIN;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContextInitializer;
@@ -102,6 +106,7 @@ public class HBaseSail implements Sail {
     private boolean readOnly = false;
     private long readOnlyTimestamp = -1;
     final String elasticIndexURL;
+	boolean includeNamespaces = false;
     final Ticker ticker;
 	private FederatedServiceResolver federatedServiceResolver;
 	private IdentifiableValueIO valueIO;
@@ -217,6 +222,10 @@ public class HBaseSail implements Sail {
 		}
 		this.valueFactory = new IdValueFactory(valueIO);
 
+		if (includeNamespaces) {
+			addNamespaces();
+		}
+
 		statsConnection = getConnection();
 		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(new SailConnectionTripleSource(statsConnection, false, getValueFactory()), valueIO), service -> {
 			HalyardEvaluationStatistics fedStats = null;
@@ -233,6 +242,18 @@ public class HBaseSail implements Sail {
 		registerSpinParsingFunctions();
 		registerSpinParsingTupleFunctions();
     }
+
+	private void addNamespaces() {
+		try (SailConnection conn = getConnection()) {
+			boolean nsExists = conn.hasStatement(HALYARD.SYSTEM_GRAPH_CONTEXT, RDF.TYPE, SD.GRAPH_CLASS, false, HALYARD.SYSTEM_GRAPH_CONTEXT);
+			if (!nsExists) {
+				for (Namespace ns : valueIO.getWellKnownNamespaces()) {
+					conn.setNamespace(ns.getPrefix(), ns.getName());
+				}
+				conn.addStatement(HALYARD.SYSTEM_GRAPH_CONTEXT, RDF.TYPE, SD.GRAPH_CLASS, HALYARD.SYSTEM_GRAPH_CONTEXT);
+			}
+		}
+	}
 
 	private void registerSpinParsingFunctions() {
 		if (!(functionRegistry.get(FN.CONCAT.stringValue()).get() instanceof org.eclipse.rdf4j.spin.function.Concat)) {

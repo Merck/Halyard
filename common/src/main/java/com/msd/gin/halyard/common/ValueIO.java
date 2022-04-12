@@ -279,6 +279,7 @@ public class ValueIO {
 	}
 
 	private final BiMap<Short, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);
+	private final Map<String,Namespace> WELL_KNOWN_NAMESPACE_PREFIXES = new HashMap<>(256);
 	private final BiMap<Short, String> WELL_KNOWN_LANGS = HashBiMap.create(256);
 	protected final BiMap<Integer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(1024);
 	private final Map<IRI, ByteWriter> BYTE_WRITERS = new HashMap<>(32);
@@ -299,6 +300,10 @@ public class ValueIO {
 		}
 
 		addByteReaderWriters();
+	}
+
+	public Collection<Namespace> getWellKnownNamespaces() {
+		return WELL_KNOWN_NAMESPACE_PREFIXES.values();
 	}
 
 	boolean isWellKnownIRI(Value v) {
@@ -332,6 +337,7 @@ public class ValueIO {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
 						WELL_KNOWN_NAMESPACES.get(hash), name));
 			}
+			WELL_KNOWN_NAMESPACE_PREFIXES.put(namespace.getPrefix(), namespace);
 		}
 	}
 
