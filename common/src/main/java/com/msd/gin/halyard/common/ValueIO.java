@@ -153,7 +153,8 @@ public class ValueIO {
 	private static final byte DATE_TYPE = 'D';
 	private static final byte BIG_FLOAT_TYPE = 'F';
 	private static final byte BIG_INT_TYPE = 'I';
-	private static final byte COMPRESSED_BIG_INT_TYPE = 'J';
+	private static final byte INT_COMPRESSED_BIG_INT_TYPE = 'J';
+	private static final byte SHORT_COMPRESSED_BIG_INT_TYPE = 'K';
 	private static final byte DATETIME_TYPE = 'T';
 	private static final byte XML_TYPE = 'x';
 
@@ -522,9 +523,12 @@ public class ValueIO {
 					byte[] bytes = bigInt.toByteArray();
 					b = ensureCapacity(b, 1 + bytes.length);
 					return b.put(BIG_INT_TYPE).put(bytes);
+				} else if (x >= Short.MIN_VALUE && x <= Short.MAX_VALUE) {
+					b = ensureCapacity(b, 1 + SHORT_SIZE);
+					return b.put(SHORT_COMPRESSED_BIG_INT_TYPE).putShort((short) x);
 				} else {
 					b = ensureCapacity(b, 1 + INT_SIZE);
-					return b.put(COMPRESSED_BIG_INT_TYPE).putInt(x);
+					return b.put(INT_COMPRESSED_BIG_INT_TYPE).putInt(x);
 				}
 			}
 		});
@@ -536,10 +540,16 @@ public class ValueIO {
 				return vf.createLiteral(new BigInteger(bytes));
 			}
 		});
-		addByteReader(COMPRESSED_BIG_INT_TYPE, new ByteReader() {
+		addByteReader(INT_COMPRESSED_BIG_INT_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
 				return new IntLiteral(b.getInt(), XSD.INTEGER);
+			}
+		});
+		addByteReader(SHORT_COMPRESSED_BIG_INT_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				return new IntLiteral(b.getShort(), XSD.INTEGER);
 			}
 		});
 
