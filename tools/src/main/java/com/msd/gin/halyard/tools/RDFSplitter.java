@@ -31,9 +31,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class RDFSplitter implements RDFHandler, Callable<Long> {
-    private static final Logger LOGGER = LoggerFactory.getLogger(RDFSplitter.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(RDFSplitter.class);
 
-    public static void main(String[] args) throws Exception {
+	public static void main(String[] args) throws Exception {
 		Path inputFile = Paths.get(args[0]);
 		Path outputDir = Paths.get(args[1]);
 		int numParts = Integer.parseInt(args[2]);
@@ -367,7 +367,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 			@Override
 			public void endRDF() throws RDFHandlerException {
 				add(END, true);
-				LOGGER.info("Consumed {} statements", stmtCount);
+				LOGGER.info("Batcher for {} consumed {} statements", handler.toString(), stmtCount);
 			}
 
 			@Override
@@ -447,6 +447,11 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		@Override
 		public void handleComment(String comment) throws RDFHandlerException {
 			writer.handleComment(comment);
+		}
+
+		@Override
+		public String toString() {
+			return filename.toString();
 		}
 	}
 
