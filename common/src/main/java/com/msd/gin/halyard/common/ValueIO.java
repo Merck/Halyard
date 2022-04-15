@@ -4,6 +4,7 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -58,6 +59,7 @@ import org.eclipse.rdf4j.model.vocabulary.SKOSXL;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.model.vocabulary.WGS84;
 import org.eclipse.rdf4j.model.vocabulary.XSD;
+import org.locationtech.jts.io.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,6 +158,7 @@ public class ValueIO {
 	private static final byte INT_COMPRESSED_BIG_INT_TYPE = 'J';
 	private static final byte SHORT_COMPRESSED_BIG_INT_TYPE = 'K';
 	private static final byte DATETIME_TYPE = 'T';
+	private static final byte WKT_LITERAL_TYPE = 'W';
 	private static final byte XML_TYPE = 'x';
 
 	private static final byte HTTP_SCHEME = 'h';
@@ -659,6 +662,42 @@ public class ValueIO {
 				}
 				cal.setTimezone(tz);
 				return vf.createLiteral(cal);
+			}
+		});
+
+		addByteWriter(GEO.WKT_LITERAL, new ByteWriter() {
+			@Override
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				try {
+					byte[] wkb = WKTLiteral.writeWKB(l.getLabel());
+					b = ensureCapacity(b, 2 + wkb.length);
+					b.put(WKT_LITERAL_TYPE);
+					b.put(WKT_LITERAL_TYPE); // mark as valid
+					return b.put(wkb);
+				} catch (ParseException | IOException e) {
+					b = ensureCapacity(b, 2);
+					b.put(WKT_LITERAL_TYPE);
+					b.put(UNCOMPRESSED_STRING_TYPE); // mark as invalid
+					return b.put(writeUncompressedString(l.getLabel()));
+				}
+			}
+		});
+		addByteReader(WKT_LITERAL_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				int wktType = b.get();
+				switch (wktType) {
+					case WKT_LITERAL_TYPE:
+						// valid wkt
+						byte[] wkbBytes = new byte[b.remaining()];
+						b.get(wkbBytes);
+						return new WKTLiteral(wkbBytes);
+					case UNCOMPRESSED_STRING_TYPE:
+						// invalid xml
+						return vf.createLiteral(readUncompressedString(b), GEO.WKT_LITERAL);
+					default:
+						throw new AssertionError(String.format("Unrecognized WKT type: %d", wktType));
+				}
 			}
 		});
 

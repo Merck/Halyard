@@ -198,7 +198,7 @@ public class XMLLiteral implements Literal {
 	public String toString() {
 		String label = getLabel();
 		IRI datatype = getDatatype();
-		StringBuilder sb = new StringBuilder(label.length() + datatype.stringValue().length() + 6);
+		StringBuilder sb = new StringBuilder(label.length() + datatype.stringValue().length() + 10);
 		sb.append("\"\"\"").append(label).append("\"\"\"");
 		sb.append("^^<").append(datatype.stringValue()).append(">");
 		return sb.toString();

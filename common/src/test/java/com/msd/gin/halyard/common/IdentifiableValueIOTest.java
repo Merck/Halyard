@@ -18,6 +18,7 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.GEO;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.junit.Test;
@@ -53,6 +54,8 @@ public class IdentifiableValueIOTest {
 			vf.createLiteral(NOW), vf.createLiteral("13:03:22.000", XSD.TIME),
 			vf.createLiteral("1980-02-14", XSD.DATE),
 			vf.createLiteral("foo", vf.createIRI("urn:bar:1")), vf.createLiteral("foo", "en-GB"), vf.createLiteral("bar", "zx-XY"),
+			vf.createLiteral("POINT (139.81 35.6972)", GEO.WKT_LITERAL),
+			vf.createLiteral("invalid still works (139.81 35.6972)", GEO.WKT_LITERAL),
 			vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL),
 			vf.createLiteral("invalid xml still works", RDF.XMLLITERAL),
 			vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME),
