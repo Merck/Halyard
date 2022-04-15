@@ -67,6 +67,7 @@ public final class Hashes {
 
     /**
      * Encode a byte array to a base-64 string.
+     * @param b array to encode.
      */
     public static String encode(byte b[]) {
         return ENCODER.encodeToString(b);
@@ -74,6 +75,7 @@ public final class Hashes {
 
     /**
      * Decode a base-64 string to a byte array.
+     * @param s string to decode.
      */
     public static byte[] decode(String s) {
     	return DECODER.decode(s);

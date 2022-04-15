@@ -1,5 +1,7 @@
 package com.msd.gin.halyard.common;
 
+import com.msd.gin.halyard.vocab.WIKIDATA;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -51,6 +53,7 @@ public class IdValueFactoryExtendedTest {
 			vf.createLiteral(BigInteger.valueOf(Integer.MIN_VALUE)),
 			vf.createLiteral(String.valueOf(Long.MAX_VALUE)+String.valueOf(Long.MAX_VALUE), XSD.INTEGER),
 			vf.createLiteral(BigDecimal.valueOf(856.03)),
+			vf.createLiteral("z", XSD.INT),
 			vf.createIRI(RDF.NAMESPACE),
 			vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)),
 			vf.createLiteral(NOW),
@@ -63,7 +66,12 @@ public class IdValueFactoryExtendedTest {
 			vf.createLiteral("invalid still works (139.81 35.6972)", GEO.WKT_LITERAL),
 			vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL),
 			vf.createLiteral("invalid xml still works", RDF.XMLLITERAL),
-			vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME));
+			vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME),
+			vf.createIRI(WIKIDATA.WD_NAMESPACE, "Q51515413"),
+			vf.createIRI(WIKIDATA.WD_NAMESPACE, "L252248-F2"),
+			vf.createIRI(WIKIDATA.WDS_NAMESPACE, "Q78246295-047c20cf-4fd2-8173-f044-c04d3ec21f45"),
+			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "400f9abd3fd761c62af23dbe8f8432158a6ce272"),
+			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "invalid"));
 	}
 
 	@Parameterized.Parameters(name = "{0}")

@@ -1,5 +1,7 @@
 package com.msd.gin.halyard.common;
 
+import com.msd.gin.halyard.vocab.WIKIDATA;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -50,6 +52,7 @@ public class IdentifiableValueIOTest {
 			vf.createLiteral(BigInteger.valueOf(Integer.MIN_VALUE)),
 			vf.createLiteral(String.valueOf(Long.MAX_VALUE)+String.valueOf(Long.MAX_VALUE), XSD.INTEGER),
 			vf.createLiteral(BigDecimal.valueOf(856.03)),
+			vf.createLiteral("z", XSD.INT),
 			vf.createIRI(RDF.NAMESPACE), vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)),
 			vf.createLiteral(NOW), vf.createLiteral("13:03:22.000", XSD.TIME),
 			vf.createLiteral("1980-02-14", XSD.DATE),
@@ -60,7 +63,12 @@ public class IdentifiableValueIOTest {
 			vf.createLiteral("invalid xml still works", RDF.XMLLITERAL),
 			vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME),
 			vf.createLiteral(longString("The cat slept on the mat.")),
-			vf.createLiteral(longString("¿Dónde está el gato?"), "es"));
+			vf.createLiteral(longString("¿Dónde está el gato?"), "es"),
+			vf.createIRI(WIKIDATA.WD_NAMESPACE, "Q51515413"),
+			vf.createIRI(WIKIDATA.WD_NAMESPACE, "L252248-F2"),
+			vf.createIRI(WIKIDATA.WDS_NAMESPACE, "Q78246295-047c20cf-4fd2-8173-f044-c04d3ec21f45"),
+			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "400f9abd3fd761c62af23dbe8f8432158a6ce272"),
+			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "invalid"));
 	}
 
 	@Parameterized.Parameters(name = "{0}")
@@ -79,11 +87,20 @@ public class IdentifiableValueIOTest {
 	}
 
 	@Test
-	public void testToAndFromBytes() {
+	public void testToAndFromBytesNoBuffer() {
+		testToAndFromBytes(0);
+	}
+
+	@Test
+	public void testToAndFromBytesBigBuffer() {
+		testToAndFromBytes(10240);
+	}
+
+	private void testToAndFromBytes(int bufferSize) {
         ValueIO.Writer writer = valueIO.createWriter(null);
         ValueIO.Reader reader = valueIO.createReader(new IdValueFactory(valueIO), null);
 
-        ByteBuffer buf = ByteBuffer.allocate(0);
+        ByteBuffer buf = ByteBuffer.allocate(bufferSize);
 		buf = writer.writeTo(expected, buf);
 		buf.flip();
 		int size = buf.limit();

@@ -28,6 +28,9 @@ public class WKTLiteral implements Literal {
 	static byte[] writeWKB(String wkt) throws ParseException, IOException {
 		WKTReader wktReader = new WKTReader();
 		Geometry geom = wktReader.read(wkt);
+		if (geom == null) {
+			throw new ParseException(String.format("Failed to parse %s", wkt));
+		}
 		WKBWriter wkbWriter = new WKBWriter();
 		return wkbWriter.write(geom);
 	}

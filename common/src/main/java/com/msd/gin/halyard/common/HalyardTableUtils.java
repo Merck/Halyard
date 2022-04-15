@@ -154,7 +154,6 @@ public final class HalyardTableUtils {
      * Helper method which locates or creates and returns the specified HTable used for triple/ quad storage
      * @param config Hadoop Configuration of the cluster running HBase
      * @param tableName String table name
-     * @param create boolean option to create the table if does not exists
      * @param splits array of keys used to pre-split new table, may be null
      * @param valueIO ValueIO
 	 * @return the org.apache.hadoop.hbase.client.Table
@@ -336,6 +335,7 @@ public final class HalyardTableUtils {
      * @param context optional context Resource
      * @param delete boolean switch whether to get KeyValues for deletion instead of for insertion
      * @param timestamp long timestamp value for time-ordering purposes
+     * @param valueIO IdentifiableValueIO
      * @return List of KeyValues
      */
 	public static List<? extends KeyValue> toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, long timestamp, IdentifiableValueIO valueIO) {

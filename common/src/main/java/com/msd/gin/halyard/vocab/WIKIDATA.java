@@ -1,34 +1,41 @@
 package com.msd.gin.halyard.vocab;
 
+import com.msd.gin.halyard.common.AbstractIRIEncodingNamespace;
+import com.msd.gin.halyard.common.ValueIO;
+import com.msd.gin.halyard.common.Vocabulary;
+
+import java.lang.reflect.Field;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+
+import org.apache.hadoop.hbase.util.Bytes;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.kohsuke.MetaInfServices;
 
-import com.msd.gin.halyard.common.Vocabulary;
-
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
 @MetaInfServices(Vocabulary.class)
 public final class WIKIDATA implements Vocabulary {
     private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
-    public static final Namespace WDATA_NS = new SimpleNamespace("wdata", "https://www.wikidata.org/wiki/Special:EntityData/");
+    public static final Namespace WDATA_NS = new EntityNamespace("wdata", "https://www.wikidata.org/wiki/Special:EntityData/");
     public static final String WD_NAMESPACE = "http://www.wikidata.org/entity/";
+    public static final String WDS_NAMESPACE = "http://www.wikidata.org/entity/statement/";
+    public static final String WDV_NAMESPACE = "http://www.wikidata.org/value/";
     public static final String WDT_NAMESPACE = "http://www.wikidata.org/prop/direct/";
     public static final String WDTN_NAMESPACE = "http://www.wikidata.org/prop/direct-normalized/";
     public static final String WDNO_NAMESPACE = "http://www.wikidata.org/prop/novalue/";
-    public static final Namespace WD_NS = new SimpleNamespace("wd", WD_NAMESPACE);
-    public static final Namespace WDS_NS = new SimpleNamespace("wds", "http://www.wikidata.org/entity/statement/");
-    public static final Namespace WDV_NS = new SimpleNamespace("wdv", "http://www.wikidata.org/value/");
-    public static final Namespace WDREF_NS = new SimpleNamespace("wdref", "http://www.wikidata.org/reference/");
-    public static final Namespace WDT_NS = new SimpleNamespace("wdt", WDT_NAMESPACE);
-    public static final Namespace WDTN_NS = new SimpleNamespace("wdtn", WDTN_NAMESPACE);
-    public static final Namespace WDNO_NS = new SimpleNamespace("wdno", WDNO_NAMESPACE);
+    public static final Namespace WD_NS = new EntityNamespace("wd", WD_NAMESPACE);
+    public static final Namespace WDS_NS = new StatementNamespace("wds", WDS_NAMESPACE);
+    public static final Namespace WDV_NS = new HashNamespace("wdv", WDV_NAMESPACE);
+    public static final Namespace WDREF_NS = new HashNamespace("wdref", "http://www.wikidata.org/reference/");
+    public static final Namespace WDT_NS = new EntityNamespace("wdt", WDT_NAMESPACE);
+    public static final Namespace WDTN_NS = new EntityNamespace("wdtn", WDTN_NAMESPACE);
+    public static final Namespace WDNO_NS = new EntityNamespace("wdno", WDNO_NAMESPACE);
 
     public static final String P_NAMESPACE = "http://www.wikidata.org/prop/";
     public static final String PS_NAMESPACE = "http://www.wikidata.org/prop/statement/";
@@ -41,27 +48,29 @@ public final class WIKIDATA implements Vocabulary {
     public static final String PRV_NAMESPACE = "http://www.wikidata.org/prop/reference/value/";
     public static final String PRN_NAMESPACE = "http://www.wikidata.org/prop/reference/value-normalized/";
 
-    public static final Namespace P_NS = new SimpleNamespace("p", P_NAMESPACE);
-    public static final Namespace PS_NS = new SimpleNamespace("ps", PS_NAMESPACE);
-    public static final Namespace PSV_NS = new SimpleNamespace("psv", PSV_NAMESPACE);
-    public static final Namespace PSN_NS = new SimpleNamespace("psn", PSN_NAMESPACE);
-    public static final Namespace PQ_NS = new SimpleNamespace("pq", PQ_NAMESPACE);
-    public static final Namespace PQV_NS = new SimpleNamespace("pqv", PQV_NAMESPACE);
-    public static final Namespace PQN_NS = new SimpleNamespace("pqn", PQN_NAMESPACE);
-    public static final Namespace PR_NS = new SimpleNamespace("pr", PR_NAMESPACE);
-    public static final Namespace PRV_NS = new SimpleNamespace("prv", PRV_NAMESPACE);
-    public static final Namespace PRN_NS = new SimpleNamespace("prn", PRN_NAMESPACE);
+    public static final Namespace P_NS = new EntityNamespace("p", P_NAMESPACE);
+    public static final Namespace PS_NS = new EntityNamespace("ps", PS_NAMESPACE);
+    public static final Namespace PSV_NS = new EntityNamespace("psv", PSV_NAMESPACE);
+    public static final Namespace PSN_NS = new EntityNamespace("psn", PSN_NAMESPACE);
+    public static final Namespace PQ_NS = new EntityNamespace("pq", PQ_NAMESPACE);
+    public static final Namespace PQV_NS = new EntityNamespace("pqv", PQV_NAMESPACE);
+    public static final Namespace PQN_NS = new EntityNamespace("pqn", PQN_NAMESPACE);
+    public static final Namespace PR_NS = new EntityNamespace("pr", PR_NAMESPACE);
+    public static final Namespace PRV_NS = new EntityNamespace("prv", PRV_NAMESPACE);
+    public static final Namespace PRN_NS = new EntityNamespace("prn", PRN_NAMESPACE);
 
     // common ID namespaces
     public static final Namespace DOI_NS = new SimpleNamespace("doi", "http://dx.doi.org/");
     public static final Namespace ORCID_NS = new SimpleNamespace("orcid", "https://orcid.org/");
-    public static final Namespace GKG_NS = new SimpleNamespace("gkg", "http://g.co/kg/");
+    public static final Namespace GKG_NS = new SimpleNamespace("gkg", "http://g.co/kg/g/");
+    public static final Namespace FREEBASE_NS = new SimpleNamespace("freebase", "http://g.co/kg/m/");
     public static final Namespace GEONAMES_NS = new SimpleNamespace("geonames", "http://sws.geonames.org/");
     public static final Namespace ENTREZ_NS = new SimpleNamespace("entrez", "http://purl.uniprot.org/geneid/");
     public static final Namespace UNIPROT_NS = new SimpleNamespace("uniprot", "http://purl.uniprot.org/uniprot/");
     public static final Namespace GND_NS = new SimpleNamespace("gnd", "https://d-nb.info/gnd/");
     public static final Namespace LOC_NS = new SimpleNamespace("loc", "http://id.loc.gov/authorities/names/");
     public static final Namespace VIAF_NS = new SimpleNamespace("viaf", "http://viaf.org/viaf/");
+    public static final Namespace MAG_NS = new SimpleNamespace("mag", "http://ma-graph.org/entity/");
 
     public static final Namespace EN_WIKIPEDIA = new SimpleNamespace("wiki_en", "https://en.wikipedia.org/");
     public static final Namespace FR_WIKIPEDIA = new SimpleNamespace("wiki_fr", "https://fr.wikipedia.org/");
@@ -102,6 +111,7 @@ public final class WIKIDATA implements Vocabulary {
         public static final String FAMILY = "P53";
         public static final String EDUCATED_AT = "P69";
         public static final String OCCUPATION = "P106";
+        public static final String EMPLOYER = "P108";
         public static final String FOLLOWS = "P155";
         public static final String FOLLOWED_BY= "P156";
         public static final String GND_ID = "P227";
@@ -126,6 +136,7 @@ public final class WIKIDATA implements Vocabulary {
         public static final String POINT_IN_TIME = "P585";
         public static final String COORDINATE_LOCATION = "P625";
         public static final String OF = "P642";
+        public static final String FREEBASE_ID = "P646";
         public static final String STREET_NUMBER = "P670";
         public static final String PUBMED_ID = "P698";
         public static final String FAMILY_NAME = "P734";
@@ -181,7 +192,7 @@ public final class WIKIDATA implements Vocabulary {
 			}
 		}
 		String[] propertyNamespaces = {
-			WDT_NAMESPACE, WDTN_NAMESPACE, WDNO_NAMESPACE,
+			WD_NAMESPACE, WDT_NAMESPACE, WDTN_NAMESPACE, WDNO_NAMESPACE,
 			P_NAMESPACE, PS_NAMESPACE, PSV_NAMESPACE, PSN_NAMESPACE,
 			PQ_NAMESPACE, PQV_NAMESPACE, PQN_NAMESPACE, PR_NAMESPACE, PRV_NAMESPACE, PRN_NAMESPACE
 		};
@@ -193,5 +204,98 @@ public final class WIKIDATA implements Vocabulary {
 			}
 		}
 		return iris;
+	}
+
+	static final class EntityNamespace extends AbstractIRIEncodingNamespace {
+		private static final long serialVersionUID = 1637550316595185157L;
+
+		EntityNamespace(String prefix, String ns) {
+			super(prefix, ns);
+		}
+
+		@Override
+		public ByteBuffer writeBytes(String localName, ByteBuffer b) {
+			int pos = localName.indexOf('-');
+			if (pos != -1) {
+				int len = localName.length() - pos - 1;
+				b = ValueIO.ensureCapacity(b, 2 + len);
+				b.put((byte) '-');
+				byte[] subId = Bytes.toBytes(localName.substring(pos+1));
+				b.put((byte)subId.length);
+				b.put(subId);
+			}
+			b = ValueIO.ensureCapacity(b, 1);
+			b.put((byte) localName.charAt(0));
+			return ValueIO.writeCompressedInteger(localName.substring(1, pos != -1 ? pos : localName.length()), b);
+		}
+
+		@Override
+		public String readBytes(ByteBuffer b) {
+			String suffix;
+			char type = (char) b.get();
+			if (type == '-') {
+				int len = b.get();
+				byte[] subId = new byte[len];
+				b.get(subId);
+				suffix = "-" + Bytes.toString(subId);
+				type = (char) b.get();
+			} else {
+				suffix = "";
+			}
+			String id = ValueIO.readCompressedInteger(b);
+			return type + id + suffix;
+		}
+	}
+
+	static final class HashNamespace extends AbstractIRIEncodingNamespace {
+		private static final long serialVersionUID = 2218386262774783440L;
+
+		HashNamespace(String prefix, String ns) {
+			super(prefix, ns);
+		}
+
+		@Override
+		public ByteBuffer writeBytes(String localName, ByteBuffer b) {
+			byte[] hexBytes = Bytes.fromHex(localName);
+			b = ValueIO.ensureCapacity(b, hexBytes.length);
+			b.put(hexBytes);
+			return b;
+		}
+
+		@Override
+		public String readBytes(ByteBuffer b) {
+			byte[] hexBytes = new byte[b.remaining()];
+			b.get(hexBytes);
+			return Bytes.toHex(hexBytes);
+		}
+	}
+
+	static final class StatementNamespace extends AbstractIRIEncodingNamespace {
+		private static final long serialVersionUID = -3329839557078371520L;
+
+		public StatementNamespace(String prefix, String name) {
+			super(prefix, name);
+		}
+
+		@Override
+		public ByteBuffer writeBytes(String localName, ByteBuffer b) {
+			int uuidPos = localName.indexOf('-');
+			UUID uuid = UUID.fromString(localName.substring(uuidPos+1));
+			b = ValueIO.ensureCapacity(b, 1 + Long.BYTES + Long.BYTES);
+			b.put((byte) localName.charAt(0));
+			b.putLong(uuid.getMostSignificantBits());
+			b.putLong(uuid.getLeastSignificantBits());
+			return ValueIO.writeCompressedInteger(localName.substring(1, uuidPos), b);
+		}
+
+		@Override
+		public String readBytes(ByteBuffer b) {
+			char type = (char) b.get();
+			long uuidMost = b.getLong();
+			long uuidLeast = b.getLong();
+			String id = ValueIO.readCompressedInteger(b);
+			UUID uuid = new UUID(uuidMost, uuidLeast);
+			return type + id + "-" + uuid.toString();
+		}
 	}
 }
