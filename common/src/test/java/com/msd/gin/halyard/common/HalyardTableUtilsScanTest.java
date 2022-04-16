@@ -147,7 +147,7 @@ public class HalyardTableUtilsScanTest {
            });
     }
 
-    private static IdentifiableValueIO valueIO;
+    private static RDFFactory rdfFactory;
 	private static Table table;
     private static Set<Statement> allStatements;
 
@@ -155,7 +155,7 @@ public class HalyardTableUtilsScanTest {
     public static void setup() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         table = HalyardTableUtils.getTable(conf, "testScan", true, 0);
-		valueIO = IdentifiableValueIO.create(table);
+		rdfFactory = RDFFactory.create(table);
 
         SimpleValueFactory vf = SimpleValueFactory.getInstance();
         allStatements = new HashSet<>();
@@ -164,7 +164,7 @@ public class HalyardTableUtilsScanTest {
         long timestamp = System.currentTimeMillis();
 		List<Put> puts = new ArrayList<>();
         for (Statement st : allStatements) {
-            for (Cell kv : HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext(), false, timestamp, valueIO)) {
+            for (Cell kv : HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext(), false, timestamp, rdfFactory)) {
 				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
             }
         }
@@ -190,17 +190,17 @@ public class HalyardTableUtilsScanTest {
     @Test
     public void testScan() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = valueIO.createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
 
-        RDFSubject subj = RDFSubject.create(s == null ? null : vf.createIRI(s), valueIO);
-        RDFPredicate pred = RDFPredicate.create(p == null ? null : vf.createIRI(p), valueIO);
-        RDFObject obj = RDFObject.create(o == null ? null : vf.createLiteral(o), valueIO);
-        RDFContext ctx = RDFContext.create(c == null ? null : vf.createIRI(c), valueIO);
+        RDFSubject subj = rdfFactory.createSubject(s == null ? null : vf.createIRI(s));
+        RDFPredicate pred = rdfFactory.createPredicate(p == null ? null : vf.createIRI(p));
+        RDFObject obj = rdfFactory.createObject(o == null ? null : vf.createLiteral(o));
+        RDFContext ctx = rdfFactory.createContext(c == null ? null : vf.createIRI(c));
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, ctx))) {
             Set<Statement> res = new HashSet<>();
             Result r;
             while ((r = rs.next()) != null) {
-                res.addAll(HalyardTableUtils.parseStatements(subj, pred, obj, ctx, r, reader));
+                res.addAll(HalyardTableUtils.parseStatements(subj, pred, obj, ctx, r, reader, rdfFactory));
             }
             assertTrue(allStatements.containsAll(res));
             assertEquals(expRes, res.size());
@@ -226,7 +226,7 @@ public class HalyardTableUtilsScanTest {
                     Set<Statement> res = new HashSet<>();
                     Result r;
                     while ((r = rs.next()) != null) {
-                        res.addAll(HalyardTableUtils.parseStatements(null, null, null, null, r, reader));
+                        res.addAll(HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory));
                     }
                     assertTrue(allStatements.containsAll(res));
                     assertEquals(expRes, res.size());

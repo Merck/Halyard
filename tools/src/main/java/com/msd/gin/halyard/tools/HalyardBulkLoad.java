@@ -17,7 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.Closeable;
@@ -199,19 +199,19 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     public static final class RDFMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, KeyValue> {
 
         private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
-        private IdentifiableValueIO valueIO;
+        private RDFFactory rdfFactory;
         private long timestamp;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            valueIO = IdentifiableValueIO.create(conf);
+            rdfFactory = RDFFactory.create(conf);
             timestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
         @Override
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
-            for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, timestamp, valueIO)) {
+            for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, timestamp, rdfFactory)) {
                 rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                 context.write(rowKey, keyValue);
             }

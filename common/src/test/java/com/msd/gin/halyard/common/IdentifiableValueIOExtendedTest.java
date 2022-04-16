@@ -11,7 +11,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class IdentifiableValueIOExtendedTest {
-	private static final IdentifiableValueIO valueIO = IdentifiableValueIO.create();
+    private static final RDFFactory rdfFactory = RDFFactory.create();
 
 	@Test
 	public void testUniqueTypeFlags() throws IllegalAccessException {
@@ -31,14 +31,14 @@ public class IdentifiableValueIOExtendedTest {
 
 	@Test
 	public void testWellKnownId() {
-		Identifier id = valueIO.wellKnownId(RDF.TYPE);
+		Identifier id = rdfFactory.getValueIO().wellKnownId(RDF.TYPE);
 		assertNotNull(id);
-		IRI typeIri = valueIO.getWellKnownIRI(id);
+		IRI typeIri = rdfFactory.getValueIO().getWellKnownIRI(id);
 		assertEquals(RDF.TYPE, typeIri);
 	}
 
 	@Test
 	public void testWellKnownIRI() {
-		assertTrue(valueIO.isWellKnownIRI(RDF.TYPE));
+		assertTrue(rdfFactory.getValueIO().isWellKnownIRI(RDF.TYPE));
 	}
 }

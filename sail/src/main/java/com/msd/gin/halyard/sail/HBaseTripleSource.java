@@ -19,10 +19,7 @@ package com.msd.gin.halyard.sail;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.IdentifiableValueIO;
-import com.msd.gin.halyard.common.RDFContext;
-import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.RDFPredicate;
-import com.msd.gin.halyard.common.RDFSubject;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.TimestampedValueFactory;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -65,22 +62,23 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 
 	private final Table table;
 	private final ValueFactory valueFactory;
-	protected final IdentifiableValueIO valueIO;
+	protected final RDFFactory rdfFactory;
 	private final ValueIO.Reader valueReader;
 	private final ValueIO.Reader tsValueReader;
 	private final long timeoutSecs;
 	private final HBaseSail.ScanSettings settings;
 	private final HBaseSail.Ticker ticker;
 
-	public HBaseTripleSource(Table table, ValueFactory vf, IdentifiableValueIO valueIO, long timeoutSecs) {
-		this(table, vf, valueIO, timeoutSecs, null, null);
+	public HBaseTripleSource(Table table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs) {
+		this(table, vf, rdfFactory, timeoutSecs, null, null);
 	}
 
-	public HBaseTripleSource(Table table, ValueFactory vf, IdentifiableValueIO valueIO, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
+	public HBaseTripleSource(Table table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
 		this.table = table;
 		this.valueFactory = vf;
-		this.valueIO = valueIO;
-		TableTripleReader tf = new TableTripleReader(table);
+		this.rdfFactory = rdfFactory;
+		TableTripleReader tf = new TableTripleReader(table, rdfFactory);
+		IdentifiableValueIO valueIO = rdfFactory.getValueIO();
 		this.valueReader = valueIO.createReader(vf, tf);
 		this.tsValueReader = valueIO.createReader(new TimestampedValueFactory(valueIO), tf);
 		this.timeoutSecs = timeoutSecs;
@@ -149,10 +147,10 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 		private ResultScanner rs = null;
 
 		public StatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contextsList, ValueIO.Reader reader) {
-			super(reader);
-			this.subj = RDFSubject.create(subj, valueIO);
-			this.pred = RDFPredicate.create(pred, valueIO);
-			this.obj = RDFObject.create(obj, valueIO);
+			super(reader, HBaseTripleSource.this.rdfFactory);
+			this.subj = rdfFactory.createSubject(subj);
+			this.pred = rdfFactory.createPredicate(pred);
+			this.obj = rdfFactory.createObject(obj);
 			this.contextsList = contextsList;
 			this.contexts = contextsList.iterator();
 			LOG.trace("New StatementScanner {} {} {} {}", subj, pred, obj, contextsList);
@@ -164,7 +162,7 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 					if (contexts.hasNext()) {
 
 						// build a ResultScanner from an HBase Scan that finds potential matches
-						ctx = RDFContext.create(contexts.next(), valueIO);
+						ctx = rdfFactory.createContext(contexts.next());
 						Scan scan = HalyardTableUtils.scan(subj, pred, obj, ctx);
 						if (settings != null) {
 							scan.setTimeRange(settings.minTimestamp, settings.maxTimestamp);

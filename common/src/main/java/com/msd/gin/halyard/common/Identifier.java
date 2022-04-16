@@ -13,15 +13,7 @@ public final class Identifier {
 	private static final byte TYPE_MASK = (byte) 0xC0;
 	private static final byte CLEAR_TYPE_MASK = ~TYPE_MASK;
 
-	static Identifier create(Value v, int typeIndex, IdentifiableValueIO valueIO) {
-		ByteBuffer ser = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
-		ser = valueIO.ID_TRIPLE_WRITER.writeTo(v, ser);
-		ser.flip();
-		return Identifier.create(v, ser, typeIndex, valueIO);
-	}
-
-	static Identifier create(Value v, ByteBuffer ser, int typeIndex, IdentifiableValueIO valueIO) {
-		byte[] hash = valueIO.hash(ser);
+	static Identifier create(Value v, byte[] hash, int typeIndex) {
 		byte typeBits;
 		if (v.isIRI()) {
 			typeBits = IRI_TYPE_BITS;

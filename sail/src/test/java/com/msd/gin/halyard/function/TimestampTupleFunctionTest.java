@@ -1,6 +1,6 @@
 package com.msd.gin.halyard.function;
 
-import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.common.TimestampedValueFactory;
 import com.msd.gin.halyard.sail.HBaseTripleSource;
@@ -24,7 +24,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class TimestampTupleFunctionTest {
-	private static final IdentifiableValueIO valueIO = IdentifiableValueIO.create();
+	private static final RDFFactory rdfFactory = RDFFactory.create();
 
 	@Test
 	public void testTimestampedStatements() {
@@ -33,8 +33,8 @@ public class TimestampTupleFunctionTest {
 		Resource subj = SVF.createBNode();
 		IRI pred = SVF.createIRI(":prop");
 		Value obj = SVF.createBNode();
-		TripleSource tripleSource = new HBaseTripleSource(null, SVF, valueIO, 0) {
-			TimestampedValueFactory TVF = new TimestampedValueFactory(valueIO);
+		TripleSource tripleSource = new HBaseTripleSource(null, SVF, rdfFactory, 0) {
+			TimestampedValueFactory TVF = new TimestampedValueFactory(rdfFactory.getValueIO());
 
 			@Override
 			public CloseableIteration<? extends Statement, QueryEvaluationException> getTimestampedStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
@@ -59,8 +59,8 @@ public class TimestampTupleFunctionTest {
 		Resource subj = SVF.createBNode();
 		IRI pred = SVF.createIRI(":prop");
 		Value obj = SVF.createBNode();
-		TripleSource tripleSource = new HBaseTripleSource(null, SVF, valueIO, 0) {
-			TimestampedValueFactory TVF = new TimestampedValueFactory(valueIO);
+		TripleSource tripleSource = new HBaseTripleSource(null, SVF, rdfFactory, 0) {
+			TimestampedValueFactory TVF = new TimestampedValueFactory(rdfFactory.getValueIO());
 
 			@Override
 			public CloseableIteration<? extends Statement, QueryEvaluationException> getTimestampedStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {

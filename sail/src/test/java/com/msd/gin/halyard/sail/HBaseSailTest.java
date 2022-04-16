@@ -602,7 +602,7 @@ public class HBaseSailTest {
     public void testCardinalityCalculator() throws Exception {
         HBaseSail sail = new HBaseSail(hconn, "cardinalitytable", true, 0, true, 0, null, null);
         sail.initialize();
-		IdentifiableValueIO valueIO = sail.getValueIO();
+		IdentifiableValueIO valueIO = sail.getRDFFactory().getValueIO();
         SimpleValueFactory f = SimpleValueFactory.getInstance();
         TupleExpr q1 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s a ?o}", "http://whatever/").getTupleExpr();
         TupleExpr q2 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {graph <http://whatevercontext> {?s a ?o}}", "http://whatever/").getTupleExpr();

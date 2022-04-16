@@ -18,7 +18,7 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.RDFFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -83,16 +83,16 @@ public class HBaseSailHashConflictTest {
     @BeforeClass
     public static void setup() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-		IdentifiableValueIO valueIO = IdentifiableValueIO.create(conf);
+		RDFFactory rdfFactory = RDFFactory.create(conf);
 
 		try (Table table = HalyardTableUtils.getTable(conf, "testConflictingHash", true, 0)) {
             long timestamp = System.currentTimeMillis();
-			List<? extends Cell> triple = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp, valueIO);
+			List<? extends Cell> triple = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp, rdfFactory);
 			List<? extends Cell> conflicts[] = new List[] {
-					HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null, false, timestamp, valueIO), HalyardTableUtils.toKeyValues(SUBJ, CONF, OBJ, null, false, timestamp, valueIO),
-					HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null, false, timestamp, valueIO), HalyardTableUtils.toKeyValues(CONF, PRED, OBJ, null, false, timestamp, valueIO),
-					HalyardTableUtils.toKeyValues(CONF, PRED, CONF, null, false, timestamp, valueIO), HalyardTableUtils.toKeyValues(CONF, CONF, OBJ, null, false, timestamp, valueIO),
-					HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null, false, timestamp, valueIO),
+					HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null, false, timestamp, rdfFactory), HalyardTableUtils.toKeyValues(SUBJ, CONF, OBJ, null, false, timestamp, rdfFactory),
+					HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null, false, timestamp, rdfFactory), HalyardTableUtils.toKeyValues(CONF, PRED, OBJ, null, false, timestamp, rdfFactory),
+					HalyardTableUtils.toKeyValues(CONF, PRED, CONF, null, false, timestamp, rdfFactory), HalyardTableUtils.toKeyValues(CONF, CONF, OBJ, null, false, timestamp, rdfFactory),
+					HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null, false, timestamp, rdfFactory),
             };
 			List<Put> puts = new ArrayList<>();
 			for (int i = 0; i < triple.size(); i++) {

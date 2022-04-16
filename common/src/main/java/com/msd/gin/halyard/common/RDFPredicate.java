@@ -1,13 +1,15 @@
 package com.msd.gin.halyard.common;
 
+import javax.annotation.Nullable;
+
 import org.eclipse.rdf4j.model.IRI;
 
 public final class RDFPredicate extends RDFValue<IRI> {
-	public static RDFPredicate create(IRI pred, IdentifiableValueIO valueIO) {
+	static RDFPredicate create(RDFRole role, @Nullable IRI pred, IdentifiableValueIO valueIO) {
 		if(pred == null) {
 			return null;
 		}
-		return new RDFPredicate(pred, valueIO);
+		return new RDFPredicate(role, pred, valueIO);
 	}
 
 	/**
@@ -18,7 +20,7 @@ public final class RDFPredicate extends RDFValue<IRI> {
 	static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_32;
 	static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
 
-	private RDFPredicate(IRI val, IdentifiableValueIO valueIO) {
-		super(RDFRole.PREDICATE, val, valueIO);
+	private RDFPredicate(RDFRole role, IRI val, IdentifiableValueIO valueIO) {
+		super(role, val, valueIO);
 	}
 }

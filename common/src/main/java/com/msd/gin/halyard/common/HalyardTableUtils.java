@@ -141,10 +141,10 @@ public final class HalyardTableUtils {
 		return getTable(conn, tableName, create, splitBits, true);
 	}
 	public static Table getTable(Connection conn, String tableName, boolean create, int splitBits, boolean quads) throws IOException {
-		IdentifiableValueIO valueIO = IdentifiableValueIO.create(conn.getConfiguration());
+		RDFFactory rdfFactory = RDFFactory.create(conn.getConfiguration());
 		TableName htableName = TableName.valueOf(tableName);
         if (create) {
-            return createTableIfNotExists(conn, htableName, splitBits < 0 ? null : calculateSplits(splitBits, quads, valueIO), valueIO);
+            return createTableIfNotExists(conn, htableName, splitBits < 0 ? null : calculateSplits(splitBits, quads, rdfFactory), rdfFactory.getValueIO());
         } else {
         	return conn.getTable(htableName);
         }
@@ -226,10 +226,10 @@ public final class HalyardTableUtils {
 	 * @param splitBits must be between 0 and 15, larger values result in more keys.
 	 * @return An array of keys represented as {@code byte[]}s
 	 */
-	static byte[][] calculateSplits(final int splitBits, boolean quads, IdentifiableValueIO valueIO) {
-		return calculateSplits(splitBits, quads, null, valueIO);
+	static byte[][] calculateSplits(final int splitBits, boolean quads, RDFFactory rdfFactory) {
+		return calculateSplits(splitBits, quads, null, rdfFactory);
 	}
-	static byte[][] calculateSplits(final int splitBits, boolean quads, Map<IRI,Float> predicateRatios, IdentifiableValueIO valueIO) {
+	static byte[][] calculateSplits(final int splitBits, boolean quads, Map<IRI,Float> predicateRatios, RDFFactory rdfFactory) {
         TreeSet<byte[]> splitKeys = new TreeSet<>(Bytes.BYTES_COMPARATOR);
         //basic presplits
         splitKeys.add(new byte[]{StatementIndex.POS.prefix});
@@ -241,7 +241,7 @@ public final class HalyardTableUtils {
 		}
         //common presplits
 		addSplits(splitKeys, StatementIndex.SPO.prefix, splitBits, null);
-		addSplits(splitKeys, StatementIndex.POS.prefix, splitBits, transformKeys(predicateRatios, iri -> RDFPredicate.create(iri, valueIO)));
+		addSplits(splitKeys, StatementIndex.POS.prefix, splitBits, transformKeys(predicateRatios, iri -> rdfFactory.createPredicate(iri)));
         addSplits(splitKeys, StatementIndex.OSP.prefix, splitBits, null);
         if (quads) {
 			addSplits(splitKeys, StatementIndex.CSPO.prefix, splitBits/2, null);
@@ -335,18 +335,18 @@ public final class HalyardTableUtils {
      * @param context optional context Resource
      * @param delete boolean switch whether to get KeyValues for deletion instead of for insertion
      * @param timestamp long timestamp value for time-ordering purposes
-     * @param valueIO IdentifiableValueIO
+     * @param rdfFactory RDFFactory
      * @return List of KeyValues
      */
-	public static List<? extends KeyValue> toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, long timestamp, IdentifiableValueIO valueIO) {
+	public static List<? extends KeyValue> toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, long timestamp, RDFFactory rdfFactory) {
 		List<KeyValue> kvs =  new ArrayList<KeyValue>(context == null ? PREFIXES : 2 * PREFIXES);
         KeyValue.Type type = delete ? KeyValue.Type.DeleteColumn : KeyValue.Type.Put;
 		timestamp = toHalyardTimestamp(timestamp, !delete);
-		appendKeyValues(subj, pred, obj, context, type, timestamp, kvs, valueIO);
+		appendKeyValues(subj, pred, obj, context, type, timestamp, kvs, rdfFactory);
 		return kvs;
 	}
 
-    private static void appendKeyValues(Resource subj, IRI pred, Value obj, Resource context, KeyValue.Type type, long timestamp, List<KeyValue> kvs, IdentifiableValueIO valueIO) {
+    private static void appendKeyValues(Resource subj, IRI pred, Value obj, Resource context, KeyValue.Type type, long timestamp, List<KeyValue> kvs, RDFFactory rdfFactory) {
     	if(subj == null || pred == null || obj == null) {
     		throw new NullPointerException();
     	}
@@ -354,10 +354,10 @@ public final class HalyardTableUtils {
     		throw new UnsupportedOperationException("Context cannot be a triple value");
     	}
 
-    	RDFSubject sb = RDFSubject.create(subj, valueIO); // subject bytes
-		RDFPredicate pb = RDFPredicate.create(pred, valueIO); // predicate bytes
-		RDFObject ob = RDFObject.create(obj, valueIO); // object bytes
-		RDFContext cb = RDFContext.create(context, valueIO); // context (graph) bytes
+    	RDFSubject sb = rdfFactory.createSubject(subj); // subject bytes
+		RDFPredicate pb = rdfFactory.createPredicate(pred); // predicate bytes
+		RDFObject ob = rdfFactory.createObject(obj); // object bytes
+		RDFContext cb = rdfFactory.createContext(context); // context (graph) bytes
 
 		// generate HBase key value pairs from: row, family, qualifier, value. Permutations of SPO (and if needed CSPO) are all stored.
 		kvs.add(new KeyValue(StatementIndex.SPO.row(sb, pb, ob, cb), CF_NAME, StatementIndex.SPO.qualifier(sb, pb, ob, cb), timestamp, type, StatementIndex.SPO.value(sb, pb, ob, cb)));
@@ -371,12 +371,12 @@ public final class HalyardTableUtils {
 
 		if (subj.isTriple()) {
 			Triple t = (Triple) subj;
-			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, kvs, valueIO);
+			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, kvs, rdfFactory);
 		}
 
 		if (obj.isTriple()) {
 			Triple t = (Triple) obj;
-			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, kvs, valueIO);
+			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, kvs, rdfFactory);
 		}
     }
 
@@ -474,15 +474,15 @@ public final class HalyardTableUtils {
         }
     }
 
-	public static Resource getSubject(Table table, Identifier id, ValueFactory vf, ValueIO valueIO) throws IOException {
-		TableTripleReader tf = new TableTripleReader(table);
-		ValueIO.Reader valueReader = valueIO.createReader(vf, tf);
-		Scan scan = scan(StatementIndex.SPO, id);
+	public static Resource getSubject(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+		TableTripleReader tf = new TableTripleReader(table, rdfFactory);
+		ValueIO.Reader valueReader = rdfFactory.getValueIO().createReader(vf, tf);
+		Scan scan = scan(StatementIndex.SPO, id, rdfFactory);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
 				if(cells != null && cells.length > 0) {
-					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader);
+					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, rdfFactory);
 					return stmt.getSubject();
 				}
 			}
@@ -490,14 +490,14 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static IRI getPredicate(Table table, Identifier id, ValueFactory vf, ValueIO valueIO) throws IOException {
-		ValueIO.Reader valueReader = valueIO.createReader(vf, null);
-		Scan scan = scan(StatementIndex.POS, id);
+	public static IRI getPredicate(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+		ValueIO.Reader valueReader = rdfFactory.getValueIO().createReader(vf, null);
+		Scan scan = scan(StatementIndex.POS, id, rdfFactory);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
 				if(cells != null && cells.length > 0) {
-					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader);
+					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, rdfFactory);
 					return stmt.getPredicate();
 				}
 			}
@@ -505,15 +505,15 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static Value getObject(Table table, Identifier id, ValueFactory vf, ValueIO valueIO) throws IOException {
-		TableTripleReader tf = new TableTripleReader(table);
-		ValueIO.Reader valueReader = valueIO.createReader(vf, tf);
-		Scan scan = scan(StatementIndex.OSP, id);
+	public static Value getObject(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+		TableTripleReader tf = new TableTripleReader(table, rdfFactory);
+		ValueIO.Reader valueReader = rdfFactory.getValueIO().createReader(vf, tf);
+		Scan scan = scan(StatementIndex.OSP, id, rdfFactory);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
 				if(cells != null && cells.length > 0) {
-					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader);
+					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, rdfFactory);
 					return stmt.getObject();
 				}
 			}
@@ -521,8 +521,8 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	private static Scan scan(StatementIndex index, Identifier id) {
-		Scan scanAll = index.scan(id);
+	private static Scan scan(StatementIndex index, Identifier id, RDFFactory rdfFactory) {
+		Scan scanAll = index.scan(id, rdfFactory);
 		return scan(scanAll.getStartRow(), scanAll.getStopRow())
 			.setFilter(new FilterList(scanAll.getFilter(), new FirstKeyOnlyFilter())).setOneRowLimit();
 	}
@@ -538,17 +538,17 @@ public final class HalyardTableUtils {
 	 * @param valueReader ValueIO.Reader
 	 * @return List of Statements
 	 */
-    public static List<Statement> parseStatements(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, Result res, ValueIO.Reader valueReader) {
+    public static List<Statement> parseStatements(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, Result res, ValueIO.Reader valueReader, RDFFactory rdfFactory) {
     	// multiple triples may have the same hash (i.e. row key)
 		List<Statement> st;
 		Cell[] cells = res.rawCells();
 		if (cells != null && cells.length > 0) {
 			if (cells.length == 1) {
-				st = Collections.singletonList(parseStatement(subj, pred, obj, ctx, cells[0], valueReader));
+				st = Collections.singletonList(parseStatement(subj, pred, obj, ctx, cells[0], valueReader, rdfFactory));
 			} else {
 				st = new ArrayList<>(cells.length);
 				for (Cell c : cells) {
-					st.add(parseStatement(subj, pred, obj, ctx, c, valueReader));
+					st.add(parseStatement(subj, pred, obj, ctx, c, valueReader, rdfFactory));
 				}
 			}
 		} else {
@@ -568,12 +568,12 @@ public final class HalyardTableUtils {
 	 * @param valueReader ValueIO.Reader
 	 * @return Statements
 	 */
-    public static Statement parseStatement(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, Cell cell, ValueIO.Reader valueReader) {
+    public static Statement parseStatement(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, Cell cell, ValueIO.Reader valueReader, RDFFactory rdfFactory) {
     	ByteBuffer key = ByteBuffer.wrap(cell.getRowArray(), cell.getRowOffset(), cell.getRowLength());
         ByteBuffer cn = ByteBuffer.wrap(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
         ByteBuffer cv = ByteBuffer.wrap(cell.getValueArray(), cell.getValueOffset(), cell.getValueLength());
     	StatementIndex index = StatementIndex.toIndex(key.get());
-        Statement stmt = index.parseStatement(subj, pred, obj, ctx, key, cn, cv, valueReader);
+        Statement stmt = index.parseStatement(subj, pred, obj, ctx, key, cn, cv, valueReader, rdfFactory);
 		if (stmt instanceof Timestamped) {
 			((Timestamped) stmt).setTimestamp(fromHalyardTimestamp(cell.getTimestamp()));
         }
@@ -617,24 +617,26 @@ public final class HalyardTableUtils {
 
 	public static final class TableTripleReader implements TripleReader {
 		private final Table table;
+		private final RDFFactory rdfFactory;
 
-		public TableTripleReader(Table table) {
+		public TableTripleReader(Table table, RDFFactory rdfFactory) {
 			this.table = table;
+			this.rdfFactory = rdfFactory;
 		}
 
 		@Override
 		public Triple readTriple(ByteBuffer b, ValueIO.Reader valueReader) {
-			IdentifiableValueIO valueIO = (IdentifiableValueIO) valueReader.getValueIO();
+			IdentifiableValueIO valueIO = (IdentifiableValueIO) rdfFactory.getValueIO();
 			int idSize = valueIO.getIdSize();
 			byte[] sid = new byte[idSize];
 			byte[] pid = new byte[idSize];
 			byte[] oid = new byte[idSize];
 			b.get(sid).get(pid).get(oid);
 
-			RDFContext ckey = RDFContext.create(HALYARD.TRIPLE_GRAPH_CONTEXT, valueIO);
-			RDFIdentifier skey = RDFIdentifier.create(RDFRole.SUBJECT, valueIO.id(sid));
-			RDFIdentifier pkey = RDFIdentifier.create(RDFRole.PREDICATE, valueIO.id(pid));
-			RDFIdentifier okey = RDFIdentifier.create(RDFRole.OBJECT, valueIO.id(oid));
+			RDFContext ckey = rdfFactory.createContext(HALYARD.TRIPLE_GRAPH_CONTEXT);
+			RDFIdentifier skey = rdfFactory.createSubjectId(valueIO.id(sid));
+			RDFIdentifier pkey = rdfFactory.createPredicateId(valueIO.id(pid));
+			RDFIdentifier okey = rdfFactory.createObjectId(valueIO.id(oid));
 			Scan scan = StatementIndex.CSPO.scan(ckey, skey, pkey, okey);
 			Get get = new Get(scan.getStartRow())
 				.setFilter(new FilterList(scan.getFilter(), new FirstKeyOnlyFilter()));
@@ -643,7 +645,7 @@ public final class HalyardTableUtils {
 				get.readVersions(READ_VERSIONS);
 				Result result = table.get(get);
 				assert result.rawCells().length == 1;
-				Statement stmt = parseStatement(null, null, null, ckey, result.rawCells()[0], valueReader);
+				Statement stmt = parseStatement(null, null, null, ckey, result.rawCells()[0], valueReader, rdfFactory);
 				return valueReader.getValueFactory().createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
 			} catch (IOException ioe) {
 				throw new RuntimeException(ioe);

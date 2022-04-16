@@ -30,7 +30,7 @@ public class StatementIndexTest {
     private static final String CTX = "http://whatever/ctx";
 
 	private static Table table;
-	private static IdentifiableValueIO valueIO;
+	private static RDFFactory rdfFactory;
     private static Set<Statement> allStatements;
     private static Set<Literal> allLiterals;
 
@@ -38,7 +38,7 @@ public class StatementIndexTest {
     public static void setup() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         table = HalyardTableUtils.getTable(conf, "testStatementIndex", true, 0);
-		valueIO = IdentifiableValueIO.create(table);
+		rdfFactory = RDFFactory.create(table);
 
         SimpleValueFactory vf = SimpleValueFactory.getInstance();
         allStatements = new HashSet<>();
@@ -55,14 +55,14 @@ public class StatementIndexTest {
             Resource subj = vf.createBNode();
             Statement stmt = vf.createStatement(subj, RDF.VALUE, l, vf.createIRI(CTX));
             allStatements.add(stmt);
-            for (Cell kv : HalyardTableUtils.toKeyValues(stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), stmt.getContext(), false, timestamp, valueIO)) {
+            for (Cell kv : HalyardTableUtils.toKeyValues(stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), stmt.getContext(), false, timestamp, rdfFactory)) {
 				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
             }
 
             // add some non-literal objects
             stmt = vf.createStatement(subj, OWL.SAMEAS, vf.createBNode(), vf.createIRI(CTX));
             allStatements.add(stmt);
-            for (Cell kv : HalyardTableUtils.toKeyValues(stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), stmt.getContext(), false, timestamp, valueIO)) {
+            for (Cell kv : HalyardTableUtils.toKeyValues(stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), stmt.getContext(), false, timestamp, rdfFactory)) {
 				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
             }
         }
@@ -77,14 +77,14 @@ public class StatementIndexTest {
     @Test
     public void testScanAll() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = valueIO.createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
 
         Set<Statement> actual = new HashSet<>();
         Scan scan = StatementIndex.scanAll();
         try (ResultScanner rs = table.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
-                for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader)) {
+                for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
                     actual.add(stmt);
                 }
             }
@@ -95,14 +95,14 @@ public class StatementIndexTest {
     @Test
     public void testScanLiterals() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = valueIO.createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = StatementIndex.scanLiterals(valueIO);
+        Scan scan = StatementIndex.scanLiterals(rdfFactory.getValueIO());
         try (ResultScanner rs = table.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
-                for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader)) {
+                for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
                     actual.add((Literal) stmt.getObject());
                 }
             }
@@ -113,14 +113,14 @@ public class StatementIndexTest {
     @Test
     public void testScanLiteralsContext() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = valueIO.createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = StatementIndex.scanLiterals(vf.createIRI(CTX), valueIO);
+        Scan scan = StatementIndex.scanLiterals(rdfFactory.createContext(vf.createIRI(CTX)), rdfFactory.getValueIO());
         try (ResultScanner rs = table.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
-                for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader)) {
+                for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
                     actual.add((Literal) stmt.getObject());
                 }
             }

@@ -48,14 +48,14 @@ public class HalyardTableUtilsTest {
 
 	private static Connection conn;
 	private static Table table;
-	private static IdentifiableValueIO valueIO;
+	private static RDFFactory rdfFactory;
 
     @BeforeClass
     public static void setup() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
 		conn = HalyardTableUtils.getConnection(conf);
 		table = HalyardTableUtils.getTable(conn, "testUtils", true, -1);
-		valueIO = IdentifiableValueIO.create(table);
+		rdfFactory = RDFFactory.create(table);
     }
 
     @AfterClass
@@ -74,39 +74,39 @@ public class HalyardTableUtilsTest {
     public void testIdIsUnique() {
         ValueFactory vf = SimpleValueFactory.getInstance();
         assertNotEquals(
-        	valueIO.id(vf.createLiteral("1", vf.createIRI("local:type1"))),
-        	valueIO.id(vf.createLiteral("1", vf.createIRI("local:type2"))));
+        	rdfFactory.getValueIO().id(vf.createLiteral("1", vf.createIRI("local:type1"))),
+        	rdfFactory.getValueIO().id(vf.createLiteral("1", vf.createIRI("local:type2"))));
     }
 
     @Test
     public void testBigLiteral() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = valueIO.createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
 
         Resource subj = vf.createIRI("http://testBigLiteral/subject/");
         IRI pred = vf.createIRI("http://testBigLiteral/pred/");
         Value obj = vf.createLiteral(RandomStringUtils.random(100000));
 		List<Put> puts = new ArrayList<>();
-        for (Cell kv : HalyardTableUtils.toKeyValues(subj, pred, obj, null, false, System.currentTimeMillis(), valueIO)) {
+        for (Cell kv : HalyardTableUtils.toKeyValues(subj, pred, obj, null, false, System.currentTimeMillis(), rdfFactory)) {
 			puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
 		table.put(puts);
 
-        RDFSubject s = RDFSubject.create(subj, valueIO);
-        RDFPredicate p = RDFPredicate.create(pred, valueIO);
-        RDFObject o = RDFObject.create(obj, valueIO);
+        RDFSubject s = rdfFactory.createSubject(subj);
+        RDFPredicate p = rdfFactory.createPredicate(pred);
+        RDFObject o = rdfFactory.createObject(obj);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
-            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, o, null, rs.next(), reader).iterator().next().getObject());
+            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, o, null, rs.next(), reader, rdfFactory).iterator().next().getObject());
         }
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, null, null))) {
-            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, null, null, rs.next(), reader).iterator().next().getObject());
+            assertEquals(obj, HalyardTableUtils.parseStatements(s, p, null, null, rs.next(), reader, rdfFactory).iterator().next().getObject());
         }
     }
 
     @Test
     public void testConflictingHash() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = valueIO.createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
 
         Resource subj = vf.createIRI("http://testConflictingHash/subject/");
         IRI pred1 = vf.createIRI("http://testConflictingHash/pred1/");
@@ -114,8 +114,8 @@ public class HalyardTableUtilsTest {
         Value obj1 = vf.createLiteral("literal1");
         Value obj2 = vf.createLiteral("literal2");
         long timestamp = System.currentTimeMillis();
-        List<? extends Cell> kv1 = HalyardTableUtils.toKeyValues(subj, pred1, obj1, null, false, timestamp, valueIO);
-        List<? extends Cell> kv2 = HalyardTableUtils.toKeyValues(subj, pred2, obj2, null, false, timestamp, valueIO);
+        List<? extends Cell> kv1 = HalyardTableUtils.toKeyValues(subj, pred1, obj1, null, false, timestamp, rdfFactory);
+        List<? extends Cell> kv2 = HalyardTableUtils.toKeyValues(subj, pred2, obj2, null, false, timestamp, rdfFactory);
 		List<Put> puts = new ArrayList<>();
         for (int i=0; i<3; i++) {
         	Cell cell1 = kv1.get(i);
@@ -131,11 +131,11 @@ public class HalyardTableUtilsTest {
         }
 		table.put(puts);
 
-        RDFSubject s = RDFSubject.create(subj, valueIO);
-        RDFPredicate p1 = RDFPredicate.create(pred1, valueIO);
-        RDFObject o1 = RDFObject.create(obj1, valueIO);
+        RDFSubject s = rdfFactory.createSubject(subj);
+        RDFPredicate p1 = rdfFactory.createPredicate(pred1);
+        RDFObject o1 = rdfFactory.createObject(obj1);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p1, o1, null))) {
-            List<Statement> res = HalyardTableUtils.parseStatements(s, p1, o1, null, rs.next(), reader);
+            List<Statement> res = HalyardTableUtils.parseStatements(s, p1, o1, null, rs.next(), reader, rdfFactory);
             assertEquals(1, res.size());
             assertTrue(res.contains(SimpleValueFactory.getInstance().createStatement(subj, pred1, obj1)));
         }
@@ -148,13 +148,13 @@ public class HalyardTableUtilsTest {
         IRI pred = vf.createIRI("http://whatever/pred/");
         Value expl = vf.createLiteral("explicit");
 		List<Put> puts = new ArrayList<>();
-        for (Cell kv : HalyardTableUtils.toKeyValues(subj, pred, expl, null, false, System.currentTimeMillis(), valueIO)) {
+        for (Cell kv : HalyardTableUtils.toKeyValues(subj, pred, expl, null, false, System.currentTimeMillis(), rdfFactory)) {
 			puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
 		table.put(puts);
-        RDFSubject s = RDFSubject.create(subj, valueIO);
-        RDFPredicate p = RDFPredicate.create(pred, valueIO);
-        RDFObject o = RDFObject.create(expl, valueIO);
+        RDFSubject s = rdfFactory.createSubject(subj);
+        RDFPredicate p = rdfFactory.createPredicate(pred);
+        RDFObject o = rdfFactory.createObject(expl);
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
             assertNotNull(rs.next());
         }
@@ -177,25 +177,25 @@ public class HalyardTableUtilsTest {
     @Test
     public void testNoResult() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = valueIO.createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
 
-        assertEquals(0, HalyardTableUtils.parseStatements(null, null, null, null, Result.EMPTY_RESULT, reader).size());
+        assertEquals(0, HalyardTableUtils.parseStatements(null, null, null, null, Result.EMPTY_RESULT, reader, rdfFactory).size());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testNegativeSplitBits() {
-		HalyardTableUtils.calculateSplits(-1, true, valueIO);
+		HalyardTableUtils.calculateSplits(-1, true, rdfFactory);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testTooBigSplitBits() {
-		HalyardTableUtils.calculateSplits(17, true, valueIO);
+		HalyardTableUtils.calculateSplits(17, true, rdfFactory);
     }
 
     @Test
     public void testToKeyValuesDelete() throws Exception {
         IRI res = SimpleValueFactory.getInstance().createIRI("http://testiri");
-        List<? extends Cell> kvs = HalyardTableUtils.toKeyValues(res, res, res, res, true, 0, valueIO);
+        List<? extends Cell> kvs = HalyardTableUtils.toKeyValues(res, res, res, res, true, 0, rdfFactory);
         assertEquals(6, kvs.size());
         for (Cell kv : kvs) {
             assertEquals(Cell.Type.DeleteColumn, kv.getType());

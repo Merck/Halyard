@@ -2,6 +2,7 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
@@ -18,6 +19,7 @@ import org.eclipse.rdf4j.model.ValueFactory;
 
 public abstract class AbstractStatementScanner implements CloseableIteration<Statement, IOException> {
 	private final ValueIO.Reader reader;
+	protected final RDFFactory rdfFactory;
 	protected final ValueFactory vf;
 	protected RDFSubject subj;
 	protected RDFPredicate pred;
@@ -26,8 +28,9 @@ public abstract class AbstractStatementScanner implements CloseableIteration<Sta
 	private Statement next = null;
 	private Iterator<Statement> iter = null;
 
-	protected AbstractStatementScanner(ValueIO.Reader reader) {
+	protected AbstractStatementScanner(ValueIO.Reader reader, RDFFactory rdfFactory) {
 		this.reader = reader;
+		this.rdfFactory = rdfFactory;
 		this.vf = reader.getValueFactory();
 	}
 
@@ -42,7 +45,7 @@ public abstract class AbstractStatementScanner implements CloseableIteration<Sta
 					if (res == null) {
 						return false; // no more Results
 					}
-					iter = HalyardTableUtils.parseStatements(subj, pred, obj, ctx, res, reader).iterator();
+					iter = HalyardTableUtils.parseStatements(subj, pred, obj, ctx, res, reader, rdfFactory).iterator();
 				}
 				if (iter.hasNext()) {
 					Statement s = iter.next();

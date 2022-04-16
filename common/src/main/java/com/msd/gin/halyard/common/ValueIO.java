@@ -368,10 +368,6 @@ public class ValueIO {
 		return WELL_KNOWN_NAMESPACE_PREFIXES.values();
 	}
 
-	boolean isWellKnownIRI(Value v) {
-		return WELL_KNOWN_IRIS.containsValue(v);
-	}
-
 	private void loadNamespaces(Class<?> vocab) {
 		Collection<Namespace> namespaces = getNamespace(vocab);
 		addNamespaces(namespaces);

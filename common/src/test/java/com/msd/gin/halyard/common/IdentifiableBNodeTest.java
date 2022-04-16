@@ -7,12 +7,12 @@ import org.eclipse.rdf4j.model.BNodeTest;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 
 public class IdentifiableBNodeTest extends BNodeTest {
-	private static final IdentifiableValueIO valueIO = IdentifiableValueIO.create();
+    private static final RDFFactory rdfFactory = RDFFactory.create();
 
 	@Override
 	protected BNode bnode(String id) {
 		Objects.requireNonNull(id);
-		return new IdentifiableBNode(SimpleValueFactory.getInstance().createBNode(id), valueIO);
+		return new IdentifiableBNode(SimpleValueFactory.getInstance().createBNode(id), rdfFactory.getValueIO());
 	}
 
 }

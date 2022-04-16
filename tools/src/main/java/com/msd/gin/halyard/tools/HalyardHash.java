@@ -1,7 +1,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.Hashes;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.tools.HalyardBulkLoad.RioFileInputFormat;
 
@@ -59,15 +59,15 @@ public final class HalyardHash extends AbstractHalyardTool {
 		private ByteBuffer kbb;
 		private ByteBuffer vbb;
 		private int decimationFactor;
-		private IdentifiableValueIO valueIO;
+		private RDFFactory rdfFactory;
 		private long counter = 0;
 
 		@Override
 		protected void setup(Context context) throws IOException {
 			Configuration conf = context.getConfiguration();
 			decimationFactor = conf.getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
-			valueIO = IdentifiableValueIO.create(conf);
-			kbb = ByteBuffer.allocate(valueIO.getIdSize());
+			rdfFactory = RDFFactory.create(conf);
+			kbb = ByteBuffer.allocate(rdfFactory.getValueIO().getIdSize());
 			vbb = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
 		}
 
@@ -88,11 +88,11 @@ public final class HalyardHash extends AbstractHalyardTool {
 
 		private void report(Context output, Value v) throws IOException, InterruptedException {
 			kbb.clear();
-			kbb = valueIO.id(v).writeTo(kbb);
+			kbb = rdfFactory.getValueIO().id(v).writeTo(kbb);
 			kbb.flip();
 
 			vbb.clear();
-			vbb = valueIO.STREAM_WRITER.writeTo(v, vbb);
+			vbb = rdfFactory.getValueIO().STREAM_WRITER.writeTo(v, vbb);
 			vbb.flip();
 
 			outputKey.set(kbb.array(), kbb.arrayOffset(), kbb.limit());
@@ -102,19 +102,19 @@ public final class HalyardHash extends AbstractHalyardTool {
 	}
 
 	static abstract class AbstractHashReducer<OUTK,OUTV> extends Reducer<ImmutableBytesWritable, ImmutableBytesWritable, OUTK, OUTV> {
-		protected IdentifiableValueIO valueIO;
+		protected RDFFactory rdfFactory;
 
 		@Override
 		protected void setup(Context context) throws IOException {
 			Configuration conf = context.getConfiguration();
-			valueIO = IdentifiableValueIO.create(conf);
+			rdfFactory = RDFFactory.create(conf);
 		}
 
 		@Override
 		protected void reduce(ImmutableBytesWritable key, Iterable<ImmutableBytesWritable> values, Context context) throws IOException, InterruptedException {
 			Set<Value> rdfTerms = new HashSet<>();
 			for (ImmutableBytesWritable value : values) {
-				Value v = valueIO.STREAM_READER.readValue(ByteBuffer.wrap(value.get(), value.getOffset(), value.getLength()));
+				Value v = rdfFactory.getValueIO().STREAM_READER.readValue(ByteBuffer.wrap(value.get(), value.getOffset(), value.getLength()));
 				rdfTerms.add(v);
 			}
 
@@ -137,7 +137,7 @@ public final class HalyardHash extends AbstractHalyardTool {
 		@Override
 		protected void report(Context context, ImmutableBytesWritable key, Value rdfTerm) throws IOException, InterruptedException {
 			ByteBuffer vbb = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
-			vbb = valueIO.STREAM_WRITER.writeTo(rdfTerm, vbb);
+			vbb = rdfFactory.getValueIO().STREAM_WRITER.writeTo(rdfTerm, vbb);
 			vbb.flip();
 			outputValue.set(vbb.array(), vbb.arrayOffset(), vbb.limit());
 			context.write(key, outputValue);

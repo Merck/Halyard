@@ -76,7 +76,7 @@ public class HalyardElasticIndexerTest extends AbstractHalyardToolTest {
 				conn.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i), vf.createIRI("http://whatever/NTobj" + i), (i % 4 == 0) ? null : vf.createIRI("http://whatever/graph#" + (i % 4)));
 			}
 		}
-		IdentifiableValueIO valueIO = sail.getValueIO();
+		IdentifiableValueIO valueIO = sail.getRDFFactory().getValueIO();
         testElasticIndexer(false, vf, valueIO);
         testElasticIndexer(true, vf, valueIO);
     }

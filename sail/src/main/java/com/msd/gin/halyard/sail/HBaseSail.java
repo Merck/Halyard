@@ -18,7 +18,7 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.IdValueFactory;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.function.DynamicFunctionRegistry;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -109,7 +109,7 @@ public class HBaseSail implements Sail {
 	boolean includeNamespaces = false;
     final Ticker ticker;
 	private FederatedServiceResolver federatedServiceResolver;
-	private IdentifiableValueIO valueIO;
+	private RDFFactory rdfFactory;
 	private ValueFactory valueFactory;
 	private FunctionRegistry functionRegistry = new DynamicFunctionRegistry();
 	private TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
@@ -216,18 +216,18 @@ public class HBaseSail implements Sail {
     	}
 
 		try (Table table = HalyardTableUtils.getTable(hConnection, tableName.getNameAsString(), create, splitBits)) {
-			this.valueIO = IdentifiableValueIO.create(table);
+			rdfFactory = RDFFactory.create(table);
 		} catch (IOException e) {
 			throw new SailException(e);
 		}
-		this.valueFactory = new IdValueFactory(valueIO);
+		this.valueFactory = new IdValueFactory(rdfFactory.getValueIO());
 
 		if (includeNamespaces) {
 			addNamespaces();
 		}
 
 		statsConnection = getConnection();
-		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(new SailConnectionTripleSource(statsConnection, false, getValueFactory()), valueIO), service -> {
+		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(new SailConnectionTripleSource(statsConnection, false, getValueFactory()), rdfFactory.getValueIO()), service -> {
 			HalyardEvaluationStatistics fedStats = null;
 			FederatedService fedServ = federatedServiceResolver.getService(service);
 			if (fedServ instanceof SailFederatedService) {
@@ -247,7 +247,7 @@ public class HBaseSail implements Sail {
 		try (SailConnection conn = getConnection()) {
 			boolean nsExists = conn.hasStatement(HALYARD.SYSTEM_GRAPH_CONTEXT, RDF.TYPE, SD.GRAPH_CLASS, false, HALYARD.SYSTEM_GRAPH_CONTEXT);
 			if (!nsExists) {
-				for (Namespace ns : valueIO.getWellKnownNamespaces()) {
+				for (Namespace ns : rdfFactory.getValueIO().getWellKnownNamespaces()) {
 					conn.setNamespace(ns.getPrefix(), ns.getName());
 				}
 				conn.addStatement(HALYARD.SYSTEM_GRAPH_CONTEXT, RDF.TYPE, SD.GRAPH_CLASS, HALYARD.SYSTEM_GRAPH_CONTEXT);
@@ -322,8 +322,8 @@ public class HBaseSail implements Sail {
 		this.spinParser = parser;
 	}
 
-	public IdentifiableValueIO getValueIO() {
-		return valueIO;
+	public RDFFactory getRDFFactory() {
+		return rdfFactory;
 	}
 
     @Override

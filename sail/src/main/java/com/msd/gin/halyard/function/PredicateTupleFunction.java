@@ -1,8 +1,8 @@
 package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.common.Identifier;
+import com.msd.gin.halyard.common.RDFFactory;
 
 import java.io.IOException;
 
@@ -27,7 +27,7 @@ public final class PredicateTupleFunction extends AbstractReificationTupleFuncti
 	}
 
 	@Override
-	protected Value getValue(Table table, Identifier id, ValueFactory vf, IdentifiableValueIO valueIO) throws IOException {
-		return HalyardTableUtils.getPredicate(table, id, vf, valueIO);
+	protected Value getValue(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+		return HalyardTableUtils.getPredicate(table, id, vf, rdfFactory);
 	}
 }

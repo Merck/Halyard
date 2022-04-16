@@ -4,16 +4,16 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.IRITest;
 
 public class IdentifiableIRITest extends IRITest {
-	private static final IdentifiableValueIO valueIO = IdentifiableValueIO.create();
+    private static final RDFFactory rdfFactory = RDFFactory.create();
 
 	@Override
 	protected IRI iri(String iri) {
-		return new IdentifiableIRI(iri, valueIO);
+		return new IdentifiableIRI(iri, rdfFactory.getValueIO());
 	}
 
 	@Override
 	protected IRI iri(String namespace, String localname) {
-		return new IdentifiableIRI(namespace, localname, valueIO);
+		return new IdentifiableIRI(namespace, localname, rdfFactory.getValueIO());
 	}
 
 }

@@ -9,7 +9,6 @@ import java.nio.ByteBuffer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Table;
@@ -32,16 +31,11 @@ public class IdentifiableValueIO extends ValueIO {
 	private final int typeIndex;
 	private final int typeSaltSize;
 
-	public static IdentifiableValueIO create() {
-		Configuration conf = HBaseConfiguration.create();
-		return create(conf);
-	}
-
-	public static IdentifiableValueIO create(Configuration config) {
+	static IdentifiableValueIO create(Configuration config) {
 		return new IdentifiableValueIO(config);
 	}
 
-	public static IdentifiableValueIO create(Table table) throws IOException {
+	static IdentifiableValueIO create(Table table) throws IOException {
 		Get getConfig = new Get(HalyardTableUtils.CONFIG_ROW_KEY)
 			.addColumn(HalyardTableUtils.CF_NAME, HalyardTableUtils.ID_HASH_CONFIG_COL)
 			.addColumn(HalyardTableUtils.CF_NAME, HalyardTableUtils.ID_SIZE_CONFIG_COL);
@@ -132,16 +126,16 @@ public class IdentifiableValueIO extends ValueIO {
 		return WELL_KNOWN_IRI_IDS.get(id);
 	}
 
+	boolean isWellKnownIRI(Value v) {
+		return WELL_KNOWN_IRI_IDS.containsValue(v);
+	}
+
 	public int getIdSize() {
 		return idSize;
 	}
 
 	int getTypeSaltSize() {
 		return typeSaltSize;
-	}
-
-	byte[] hash(ByteBuffer bb) {
-		return idHash.get().apply(bb);
 	}
 
 	public Identifier id(Value v) {
@@ -154,11 +148,15 @@ public class IdentifiableValueIO extends ValueIO {
 			return id;
 		}
 
-		return Identifier.create(v, typeIndex, this);
+		ByteBuffer ser = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
+		ser = ID_TRIPLE_WRITER.writeTo(v, ser);
+		ser.flip();
+		return id(v, ser);
 	}
 
 	Identifier id(Value v, ByteBuffer ser) {
-		return Identifier.create(v, ser, typeIndex, this);
+		byte[] hash = idHash.get().apply(ser);
+		return Identifier.create(v, hash, typeIndex);
 	}
 
 	public Identifier id(byte[] idBytes) {

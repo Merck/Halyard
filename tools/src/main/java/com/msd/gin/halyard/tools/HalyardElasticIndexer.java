@@ -19,8 +19,8 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.IdValueFactory;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.ValueIO;
@@ -78,7 +78,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
         final Text outputJson = new Text();
         Table table;
-        IdentifiableValueIO valueIO;
+        RDFFactory rdfFactory;
         ValueIO.Reader valueReader;
         IdValueFactory valueFactory;
         long counter = 0, exports = 0, statements = 0;
@@ -89,9 +89,9 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException {
             Configuration conf = context.getConfiguration();
             table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            valueIO = IdentifiableValueIO.create(table);
-            valueFactory = new IdValueFactory(valueIO);
-            valueReader = valueIO.createReader(valueFactory, new TableTripleReader(table));
+            rdfFactory = RDFFactory.create(table);
+            valueFactory = new IdValueFactory(rdfFactory.getValueIO());
+            valueReader = rdfFactory.getValueIO().createReader(valueFactory, new TableTripleReader(table, rdfFactory));
         }
 
         @Override
@@ -107,13 +107,13 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             	lastHash = hash;
             }
 
-            for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, valueReader)) {
+            for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, valueReader, rdfFactory)) {
                 statements++;
             	Literal l = (Literal) st.getObject();
                 if (literals.add(l)) {
             		try(StringBuilderWriter json = new StringBuilderWriter(128)) {
 		                json.append("{\"id\":");
-		                JSONObject.quote(valueIO.id(l).toString(), json);
+		                JSONObject.quote(rdfFactory.getValueIO().id(l).toString(), json);
 		                json.append(",\"label\":");
 		                JSONObject.quote(l.getLabel(), json);
 		                if(l.getLanguage().isPresent()) {
@@ -236,19 +236,19 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         job.setJarByClass(HalyardElasticIndexer.class);
         TableMapReduceUtil.initCredentials(job);
 
-        IdentifiableValueIO valueIO;
+        RDFFactory rdfFactory;
         try (Table table = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
-            valueIO = IdentifiableValueIO.create(table);
+            rdfFactory = RDFFactory.create(table);
         }
 
         Scan scan;
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP literal region(s)
         	Resource graph = NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance());
-        	scan = StatementIndex.scanLiterals(graph, valueIO);
+        	scan = StatementIndex.scanLiterals(rdfFactory.createContext(graph), rdfFactory.getValueIO());
         } else {
             //scan OSP literal region(s)
-        	scan = StatementIndex.scanLiterals(valueIO);
+        	scan = StatementIndex.scanLiterals(rdfFactory.getValueIO());
         }
         TableMapReduceUtil.initTableMapperJob(
                 source,

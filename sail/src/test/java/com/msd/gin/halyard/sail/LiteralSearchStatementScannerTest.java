@@ -70,7 +70,7 @@ public class LiteralSearchStatementScannerTest implements Runnable {
 
     @Test
     public void statementLiteralSearchTest() throws Exception {
-		IdentifiableValueIO valueIO = hbaseSail.getValueIO();
+		IdentifiableValueIO valueIO = hbaseSail.getRDFFactory().getValueIO();
         Literal val = SimpleValueFactory.getInstance().createLiteral("Whatever Text");
 		response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: 30\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + valueIO.id(val) + "\",\"_source\":{\"label\":\"" + val.getLabel() + "\",\"datatype\":\""
 				+ val.getDatatype() + "\"}}]}}";

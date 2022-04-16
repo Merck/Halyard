@@ -31,7 +31,7 @@ import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class IdentifiableValueIOTest {
-	private static final IdentifiableValueIO valueIO = IdentifiableValueIO.create();
+    private static final RDFFactory rdfFactory = RDFFactory.create();
 	private static final Date NOW = new Date();
 
 	private static String longString(String s) {
@@ -76,7 +76,7 @@ public class IdentifiableValueIOTest {
 		Function<Value,Object[]> toArg = v -> new Object[] {v};
 		List<Object[]> testValues = new ArrayList<>();
 		testValues.addAll(createData(SimpleValueFactory.getInstance()).stream().map(toArg).collect(Collectors.toList()));
-		testValues.addAll(createData(new IdValueFactory(valueIO)).stream().map(toArg).collect(Collectors.toList()));
+		testValues.addAll(createData(new IdValueFactory(rdfFactory.getValueIO())).stream().map(toArg).collect(Collectors.toList()));
 		return testValues;
 	}
 
@@ -97,8 +97,8 @@ public class IdentifiableValueIOTest {
 	}
 
 	private void testToAndFromBytes(int bufferSize) {
-        ValueIO.Writer writer = valueIO.createWriter(null);
-        ValueIO.Reader reader = valueIO.createReader(new IdValueFactory(valueIO), null);
+        ValueIO.Writer writer = rdfFactory.getValueIO().createWriter(null);
+        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(new IdValueFactory(rdfFactory.getValueIO()), null);
 
         ByteBuffer buf = ByteBuffer.allocate(bufferSize);
 		buf = writer.writeTo(expected, buf);
@@ -126,7 +126,7 @@ public class IdentifiableValueIOTest {
 
 	@Test
 	public void testRDFValue() {
-		Identifier id = valueIO.id(expected);
+		Identifier id = rdfFactory.getValueIO().id(expected);
 		if (expected instanceof Identifiable) {
 			assertEquals(id, ((Identifiable)expected).getId());
 		}
@@ -137,24 +137,24 @@ public class IdentifiableValueIOTest {
 		assertEquals("isTriple", expected.isTriple(), id.isTriple());
 
 		if (expected instanceof Literal) {
-			RDFObject obj = RDFObject.create(expected, valueIO);
+			RDFObject obj = rdfFactory.createObject(expected);
 			assertRDFValueHashes(id, obj);
 		} else {
 			if (expected instanceof IRI) {
-				RDFObject obj = RDFObject.create(expected, valueIO);
+				RDFObject obj = rdfFactory.createObject(expected);
 				assertRDFValueHashes(id, obj);
-				RDFSubject subj = RDFSubject.create((IRI) expected, valueIO);
+				RDFSubject subj = rdfFactory.createSubject((IRI) expected);
 				assertRDFValueHashes(id, subj);
-				RDFContext ctx = RDFContext.create((IRI) expected, valueIO);
+				RDFContext ctx = rdfFactory.createContext((IRI) expected);
 				assertRDFValueHashes(id, ctx);
-				RDFPredicate pred = RDFPredicate.create((IRI) expected, valueIO);
+				RDFPredicate pred = rdfFactory.createPredicate((IRI) expected);
 				assertRDFValueHashes(id, pred);
 			} else if (expected instanceof BNode) {
-				RDFObject obj = RDFObject.create(expected, valueIO);
+				RDFObject obj = rdfFactory.createObject(expected);
 				assertRDFValueHashes(id, obj);
-				RDFSubject subj = RDFSubject.create((Resource) expected, valueIO);
+				RDFSubject subj = rdfFactory.createSubject((Resource) expected);
 				assertRDFValueHashes(id, subj);
-				RDFContext ctx = RDFContext.create((Resource) expected, valueIO);
+				RDFContext ctx = rdfFactory.createContext((Resource) expected);
 				assertRDFValueHashes(id, ctx);
 			} else {
 				throw new AssertionError();
@@ -167,19 +167,19 @@ public class IdentifiableValueIOTest {
 			byte[] keyHash = v.getKeyHash(idx);
 			assertEquals(v.keyHashSize(), keyHash.length);
 
-			ByteBuffer idxId = ByteBuffer.allocate(valueIO.getIdSize());
+			ByteBuffer idxId = ByteBuffer.allocate(rdfFactory.getValueIO().getIdSize());
 			idxId.put(v.getRole().unrotate(keyHash, idx));
 			v.writeQualifierHashTo(idxId);
-			assertEquals(id, valueIO.id(idxId.array()));
+			assertEquals(id, rdfFactory.getValueIO().id(idxId.array()));
 
 			if(!(v instanceof RDFContext)) { // context doesn't have end-hashes
 				byte[] endKeyHash = v.getEndKeyHash(idx);
 				assertEquals(v.endKeyHashSize(), endKeyHash.length);
 
-				ByteBuffer cidxId = ByteBuffer.allocate(valueIO.getIdSize());
+				ByteBuffer cidxId = ByteBuffer.allocate(rdfFactory.getValueIO().getIdSize());
 				cidxId.put(v.getRole().unrotate(endKeyHash, idx));
 				v.writeEndQualifierHashTo(cidxId);
-				assertEquals(id, valueIO.id(cidxId.array()));
+				assertEquals(id, rdfFactory.getValueIO().id(cidxId.array()));
 			}
 		}
 	}

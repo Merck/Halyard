@@ -18,7 +18,7 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.ValueIO;
 
@@ -75,7 +75,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 
         final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
         Table table;
-        IdentifiableValueIO valueIO;
+        RDFFactory rdfFactory;
         ValueIO.Reader valueReader;
         long total = 0, deleted = 0;
         Resource subj;
@@ -87,8 +87,8 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            valueIO = IdentifiableValueIO.create(table);
-            valueReader = valueIO.createReader(SVF, new TableTripleReader(table));
+            rdfFactory = RDFFactory.create(table);
+            valueReader = rdfFactory.getValueIO().createReader(SVF, new TableTripleReader(table, rdfFactory));
             String s = conf.get(SUBJECT);
             if (s!= null) {
                 subj = NTriplesUtil.parseResource(s, SVF);
@@ -117,7 +117,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             for (Cell c : value.rawCells()) {
-                Statement st = HalyardTableUtils.parseStatement(null, null, null, null, c, valueReader);
+                Statement st = HalyardTableUtils.parseStatement(null, null, null, null, c, valueReader, rdfFactory);
                 if ((subj == null || subj.equals(st.getSubject())) && (pred == null || pred.equals(st.getPredicate())) && (obj == null || obj.equals(st.getObject())) && (ctx == null || ctx.contains(st.getContext()))) {
                     KeyValue kv = new KeyValue(c.getRowArray(), c.getRowOffset(), (int) c.getRowLength(),
                         c.getFamilyArray(), c.getFamilyOffset(), (int) c.getFamilyLength(),

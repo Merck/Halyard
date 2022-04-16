@@ -25,12 +25,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
-import static org.hamcrest.Matchers.lessThan;
 
 @RunWith(Parameterized.class)
 public class IdValueFactoryExtendedTest {
-	private static final IdentifiableValueIO valueIO = IdentifiableValueIO.create();
+    private static final RDFFactory rdfFactory = RDFFactory.create();
 	private static final Date NOW = new Date();
 
 	private static List<Value> createData(ValueFactory vf) {
@@ -77,7 +77,7 @@ public class IdValueFactoryExtendedTest {
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> data() {
 		List<Value> expected = createData(SimpleValueFactory.getInstance());
-		List<Value> actual = createData(new IdValueFactory(valueIO));
+		List<Value> actual = createData(new IdValueFactory(rdfFactory.getValueIO()));
 		List<Object[]> testValues = new ArrayList<>();
 		for (int i=0; i<expected.size(); i++) {
 			testValues.add(new Object[] {expected.get(i), actual.get(i)});

@@ -19,7 +19,7 @@ package com.msd.gin.halyard.tools;
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.*;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.tools.HalyardBulkLoad.RioFileInputFormat;
 
@@ -75,7 +75,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
         private final LongWritable keyValueLength = new LongWritable();
         private final Random random = new Random(0);
-        private IdentifiableValueIO valueIO;
+        private RDFFactory rdfFactory;
         private long counter = 0, next = 0;
         private int decimationFactor;
         private long timestamp;
@@ -83,7 +83,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            valueIO = IdentifiableValueIO.create(conf);
+            rdfFactory = RDFFactory.create(conf);
             decimationFactor = conf.getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
             // prefix splits
             for (byte b = 1; b < StatementIndex.values().length; b++) {
@@ -96,7 +96,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
             if (counter++ == next) {
                 next = counter + random.nextInt(decimationFactor);
-                for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, timestamp, valueIO)) {
+                for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, timestamp, rdfFactory)) {
                     rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                     keyValueLength.set(keyValue.getLength());
                     context.write(rowKey, keyValueLength);
@@ -134,8 +134,8 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            IdentifiableValueIO valueIO = IdentifiableValueIO.create(conf);
-            HalyardTableUtils.createTableIfNotExists(conf, conf.get(TABLE_PROPERTY), splits.toArray(new byte[splits.size()][]), valueIO).close();
+            RDFFactory rdfFactory = RDFFactory.create(conf);
+            HalyardTableUtils.createTableIfNotExists(conf, conf.get(TABLE_PROPERTY), splits.toArray(new byte[splits.size()][]), rdfFactory.getValueIO()).close();
         }
     }
 

@@ -4,11 +4,11 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.ValueFactoryTest;
 
 public class IdValueFactoryTest extends ValueFactoryTest {
-	private static final IdentifiableValueIO valueIO = IdentifiableValueIO.create();
+    private static final RDFFactory rdfFactory = RDFFactory.create();
 
 	@Override
 	protected ValueFactory factory() {
-		return new IdValueFactory(valueIO);
+		return new IdValueFactory(rdfFactory.getValueIO());
 	}
 
 }

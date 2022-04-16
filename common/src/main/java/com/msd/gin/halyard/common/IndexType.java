@@ -113,11 +113,11 @@ enum IndexType {
 	final Scan scan(StatementIndex index) {
 		return scan(index, new byte[0][], index.newStopKeys());
 	}
-	final Scan scan(StatementIndex index, Identifier id) {
-		byte[] kb = index.keyHash(id);
+	final Scan scan(StatementIndex index, Identifier id, RDFFactory rdfFactory) {
+		byte[] kb = index.keyHash(id, rdfFactory);
 		byte[][] stopKeys = index.newStopKeys();
 		stopKeys[0] = kb;
-		return scan(index, new byte[][] {kb}, stopKeys).setFilter(new ColumnPrefixFilter(index.qualifierHash(id)));
+		return scan(index, new byte[][] {kb}, stopKeys).setFilter(new ColumnPrefixFilter(index.qualifierHash(id, rdfFactory)));
 	}
 	final Scan scan(StatementIndex index, RDFIdentifier k) {
 		byte[] kb = k.getKeyHash(index);
