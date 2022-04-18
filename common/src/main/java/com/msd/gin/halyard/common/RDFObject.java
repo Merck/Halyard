@@ -5,11 +5,11 @@ import javax.annotation.Nullable;
 import org.eclipse.rdf4j.model.Value;
 
 public final class RDFObject extends RDFValue<Value> {
-	static RDFObject create(RDFRole role, @Nullable Value obj, IdentifiableValueIO valueIO) {
+	static RDFObject create(RDFRole role, @Nullable Value obj, RDFFactory rdfFactory) {
 		if(obj == null) {
 			return null;
 		}
-		return new RDFObject(role, obj, valueIO);
+		return new RDFObject(role, obj, rdfFactory);
 	}
 
 	/**
@@ -20,7 +20,7 @@ public final class RDFObject extends RDFValue<Value> {
 	static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_64;
 	static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
 
-	private RDFObject(RDFRole role, Value val, IdentifiableValueIO valueIO) {
-		super(role, val, valueIO);
+	private RDFObject(RDFRole role, Value val, RDFFactory rdfFactory) {
+		super(role, val, rdfFactory);
 	}
 }

@@ -31,14 +31,14 @@ public class IdentifiableValueIOExtendedTest {
 
 	@Test
 	public void testWellKnownId() {
-		Identifier id = rdfFactory.getValueIO().wellKnownId(RDF.TYPE);
+		Identifier id = rdfFactory.wellKnownId(RDF.TYPE);
 		assertNotNull(id);
-		IRI typeIri = rdfFactory.getValueIO().getWellKnownIRI(id);
+		IRI typeIri = rdfFactory.getWellKnownIRI(id);
 		assertEquals(RDF.TYPE, typeIri);
 	}
 
 	@Test
 	public void testWellKnownIRI() {
-		assertTrue(rdfFactory.getValueIO().isWellKnownIRI(RDF.TYPE));
+		assertTrue(rdfFactory.isWellKnownIRI(RDF.TYPE));
 	}
 }

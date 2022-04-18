@@ -1,7 +1,6 @@
 package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.Hashes;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.common.Identifier;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
@@ -27,7 +26,7 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 
 	protected abstract int statementPosition();
 
-	protected abstract Value getValue(Table t, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException;
+	protected abstract Value getValue(Table t, Identifier id, RDFFactory rdfFactory) throws IOException;
 
 	@Override
 	public final CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> evaluate(ValueFactory vf,
@@ -43,13 +42,13 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 		IRI idIri = (IRI) args[0];
 		Identifier id;
 		if (HALYARD.STATEMENT_ID_NS.getName().equals(idIri.getNamespace())) {
-			int idSize = rdfFactory.getValueIO().getIdSize();
+			int idSize = rdfFactory.getIdSize();
 			byte[] stmtId = Hashes.decode(idIri.getLocalName());
 			byte[] idBytes = new byte[idSize];
 			System.arraycopy(stmtId, statementPosition() * idSize, idBytes, 0, idSize);
-			id = rdfFactory.getValueIO().id(idBytes);
+			id = rdfFactory.id(idBytes);
 		} else if (HALYARD.VALUE_ID_NS.getName().equals(idIri.getNamespace())) {
-			id = rdfFactory.getValueIO().id(Hashes.decode(idIri.getLocalName()));
+			id = rdfFactory.id(Hashes.decode(idIri.getLocalName()));
 		} else {
 			throw new ValueExprEvaluationException(String.format("%s requires an identifier IRI", getURI()));
 		}
@@ -57,7 +56,7 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 		Table table = (Table) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_TABLE_ATTRIBUTE);
 		Value v;
 		try {
-			v = getValue(table, id, vf, rdfFactory);
+			v = getValue(table, id, rdfFactory);
 		} catch (IOException e) {
 			throw new ValueExprEvaluationException(e);
 		}

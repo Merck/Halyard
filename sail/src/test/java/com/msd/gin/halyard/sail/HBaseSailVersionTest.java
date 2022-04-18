@@ -18,7 +18,6 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.repository.HBaseRepository;
 
 import java.util.Date;
@@ -125,7 +124,7 @@ public class HBaseSailVersionTest {
     @Test
     public void testModify() throws Exception {
 		TableName htableName = TableName.valueOf("timestamptable");
-		HalyardTableUtils.createTable(hconn, htableName, null, RDFFactory.create(hconn.getConfiguration()).getValueIO(), 5);
+		HalyardTableUtils.createTable(hconn, htableName, null, 5);
 
 		HBaseSail sail = new HBaseSail(hconn, "timestamptable", false, 0, true, 0, null, null);
 		HBaseRepository rep = new HBaseRepository(sail);

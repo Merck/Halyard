@@ -17,7 +17,6 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.ValueIO;
@@ -51,7 +50,6 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
-import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
@@ -68,8 +66,6 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
     private static final String PREDICATE = "halyard.delete.predicate";
     private static final String OBJECT = "halyard.delete.object";
     private static final String CONTEXTS = "halyard.delete.contexts";
-
-    private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 
     static final class DeleteMapper extends TableMapper<ImmutableBytesWritable, KeyValue> {
 
@@ -88,18 +84,18 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             rdfFactory = RDFFactory.create(table);
-            valueReader = rdfFactory.getValueIO().createReader(SVF, new TableTripleReader(table, rdfFactory));
+            valueReader = rdfFactory.createTableReader(table);
             String s = conf.get(SUBJECT);
             if (s!= null) {
-                subj = NTriplesUtil.parseResource(s, SVF);
+                subj = NTriplesUtil.parseResource(s, rdfFactory.getValueFactory());
             }
             String p = conf.get(PREDICATE);
             if (p!= null) {
-                pred = NTriplesUtil.parseURI(p, SVF);
+                pred = NTriplesUtil.parseURI(p, rdfFactory.getValueFactory());
             }
             String o = conf.get(OBJECT);
             if (o!= null) {
-                obj = NTriplesUtil.parseValue(o, SVF);
+                obj = NTriplesUtil.parseValue(o, rdfFactory.getValueFactory());
             }
             String cs[] = conf.getStrings(CONTEXTS);
             if (cs != null) {
@@ -108,7 +104,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
                     if ("NONE".equals(c)) {
                         ctx.add(null);
                     } else {
-                        ctx.add(NTriplesUtil.parseResource(c, SVF));
+                        ctx.add(NTriplesUtil.parseResource(c, rdfFactory.getValueFactory()));
                     }
                 }
             }

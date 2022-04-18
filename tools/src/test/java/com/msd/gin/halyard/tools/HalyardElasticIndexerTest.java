@@ -17,7 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -76,12 +76,12 @@ public class HalyardElasticIndexerTest extends AbstractHalyardToolTest {
 				conn.addStatement(vf.createIRI("http://whatever/NTsubj"), vf.createIRI("http://whatever/NTpred" + i), vf.createIRI("http://whatever/NTobj" + i), (i % 4 == 0) ? null : vf.createIRI("http://whatever/graph#" + (i % 4)));
 			}
 		}
-		IdentifiableValueIO valueIO = sail.getRDFFactory().getValueIO();
-        testElasticIndexer(false, vf, valueIO);
-        testElasticIndexer(true, vf, valueIO);
+		RDFFactory rdfFactory = sail.getRDFFactory();
+        testElasticIndexer(false, vf, rdfFactory);
+        testElasticIndexer(true, vf, rdfFactory);
     }
 
-    public void testElasticIndexer(boolean namedGraphOnly, ValueFactory vf, IdentifiableValueIO valueIO) throws Exception {
+    public void testElasticIndexer(boolean namedGraphOnly, ValueFactory vf, RDFFactory rdfFactory) throws Exception {
         final String[] requestUri = new String[2];
         final JSONObject[] createRequest = new JSONObject[1];
         final List<String> bulkBody = new ArrayList<>(200);
@@ -255,7 +255,7 @@ public class HalyardElasticIndexerTest extends AbstractHalyardToolTest {
             String id = new JSONObject(bulkBody.get(i)).getJSONObject("index").getString("_id");
             JSONObject fields = new JSONObject(bulkBody.get(i+1));
             Literal literal = vf.createLiteral(fields.getString("label"), vf.createIRI(fields.getString("datatype")));
-            assertEquals("Invalid hash for literal " + literal, valueIO.id(literal).toString(), id);
+            assertEquals("Invalid hash for literal " + literal, rdfFactory.id(literal).toString(), id);
         }
     }
 }

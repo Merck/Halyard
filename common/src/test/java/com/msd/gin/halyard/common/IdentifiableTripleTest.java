@@ -12,12 +12,12 @@ public class IdentifiableTripleTest extends TripleTest {
 
 	@Override
 	protected Triple triple(Resource s, IRI p, Value o) {
-		return new IdentifiableTriple(SimpleValueFactory.getInstance().createTriple(s, p, o), rdfFactory.getValueIO());
+		return new IdentifiableTriple(SimpleValueFactory.getInstance().createTriple(s, p, o), rdfFactory);
 	}
 
 	@Override
 	protected IRI iri(String iri) {
-		return new IdentifiableIRI(iri, rdfFactory.getValueIO());
+		return new IdentifiableIRI(iri, rdfFactory);
 	}
 
 }

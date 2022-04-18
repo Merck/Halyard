@@ -8,19 +8,19 @@ import org.eclipse.rdf4j.model.Triple;
 
 public final class IdentifiableTriple extends TripleWrapper implements Identifiable, SerializableValue {
 	private static final long serialVersionUID = 228285959274911416L;
-	private final IdentifiableValueIO valueIO;
+	private final RDFFactory rdfFactory;
 	private Identifier id;
 	private ByteBuffer ser;
 
-	IdentifiableTriple(Triple triple, IdentifiableValueIO valueIO) {
+	IdentifiableTriple(Triple triple, RDFFactory valueIO) {
 		super(triple);
-		this.valueIO = Objects.requireNonNull(valueIO);
+		this.rdfFactory = Objects.requireNonNull(valueIO);
 	}
 
 	@Override
 	public Identifier getId() {
 		if (id == null) {
-			id = valueIO.id(triple, getSerializedForm());
+			id = rdfFactory.id(triple, getSerializedForm());
 		}
 		return id;
 	}
@@ -33,7 +33,7 @@ public final class IdentifiableTriple extends TripleWrapper implements Identifia
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = valueIO.ID_TRIPLE_WRITER.toBytes(triple);
+			byte[] b = rdfFactory.ID_TRIPLE_WRITER.toBytes(triple);
 			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 		}
 		return ser.duplicate();
@@ -41,7 +41,7 @@ public final class IdentifiableTriple extends TripleWrapper implements Identifia
 
 	private Object writeReplace() throws ObjectStreamException {
 		// NB: CELL_WRITER output is not self-contained for Triples so must use STREAM_WRITER instead
-		byte[] b = valueIO.STREAM_WRITER.toBytes(triple);
-		return new SerializedValue(b, valueIO.STREAM_READER);
+		byte[] b = rdfFactory.STREAM_WRITER.toBytes(triple);
+		return new SerializedValue(b, rdfFactory.STREAM_READER);
 	}
 }

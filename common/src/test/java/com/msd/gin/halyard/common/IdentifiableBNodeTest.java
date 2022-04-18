@@ -12,7 +12,7 @@ public class IdentifiableBNodeTest extends BNodeTest {
 	@Override
 	protected BNode bnode(String id) {
 		Objects.requireNonNull(id);
-		return new IdentifiableBNode(SimpleValueFactory.getInstance().createBNode(id), rdfFactory.getValueIO());
+		return new IdentifiableBNode(SimpleValueFactory.getInstance().createBNode(id), rdfFactory);
 	}
 
 }

@@ -17,7 +17,7 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.BufferedReader;
@@ -34,6 +34,7 @@ import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
@@ -70,17 +71,18 @@ public class LiteralSearchStatementScannerTest implements Runnable {
 
     @Test
     public void statementLiteralSearchTest() throws Exception {
-		IdentifiableValueIO valueIO = hbaseSail.getRDFFactory().getValueIO();
-        Literal val = SimpleValueFactory.getInstance().createLiteral("Whatever Text");
-		response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: 30\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + valueIO.id(val) + "\",\"_source\":{\"label\":\"" + val.getLabel() + "\",\"datatype\":\""
+		ValueFactory vf = SimpleValueFactory.getInstance();
+		RDFFactory rdfFactory = hbaseSail.getRDFFactory();
+		Literal val = vf.createLiteral("Whatever Text");
+		response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: 30\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + rdfFactory.id(val) + "\",\"_source\":{\"label\":\"" + val.getLabel() + "\",\"datatype\":\""
 				+ val.getDatatype() + "\"}}]}}";
         Thread t = new Thread(this);
         t.setDaemon(true);
         t.start();
-        IRI whatever = SimpleValueFactory.getInstance().createIRI("http://whatever");
+		IRI whatever = vf.createIRI("http://whatever");
 		try (SailConnection conn = hbaseSail.getConnection()) {
 			conn.addStatement(whatever, whatever, val);
-			try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, SimpleValueFactory.getInstance().createLiteral("what", HALYARD.SEARCH_TYPE), true)) {
+			try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, vf.createLiteral("what", HALYARD.SEARCH_TYPE), true)) {
 				assertTrue(iter.hasNext());
 			}
 		}

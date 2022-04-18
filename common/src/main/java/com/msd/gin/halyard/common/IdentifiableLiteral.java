@@ -8,19 +8,19 @@ import org.eclipse.rdf4j.model.Literal;
 
 public final class IdentifiableLiteral extends LiteralWrapper implements Identifiable, SerializableValue {
 	private static final long serialVersionUID = 4299930477670062440L;
-	private final IdentifiableValueIO valueIO;
+	private final RDFFactory rdfFactory;
 	private Identifier id;
 	private ByteBuffer ser;
 
-	IdentifiableLiteral(Literal literal, IdentifiableValueIO valueIO) {
+	IdentifiableLiteral(Literal literal, RDFFactory valueIO) {
 		super(literal);
-		this.valueIO = Objects.requireNonNull(valueIO);
+		this.rdfFactory = Objects.requireNonNull(valueIO);
 	}
 
 	@Override
 	public Identifier getId() {
 		if (id == null) {
-			id = valueIO.id(literal, getSerializedForm());
+			id = rdfFactory.id(literal, getSerializedForm());
 		}
 		return id;
 	}
@@ -33,7 +33,7 @@ public final class IdentifiableLiteral extends LiteralWrapper implements Identif
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = valueIO.ID_TRIPLE_WRITER.toBytes(literal);
+			byte[] b = rdfFactory.ID_TRIPLE_WRITER.toBytes(literal);
 			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 		}
 		return ser.duplicate();
@@ -43,6 +43,6 @@ public final class IdentifiableLiteral extends LiteralWrapper implements Identif
 		ByteBuffer serBuf = getSerializedForm();
 		byte[] b = new byte[serBuf.remaining()];
 		serBuf.get(b);
-		return new SerializedValue(b, valueIO.STREAM_READER);
+		return new SerializedValue(b, rdfFactory.STREAM_READER);
 	}
 }

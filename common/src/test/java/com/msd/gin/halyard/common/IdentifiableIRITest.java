@@ -8,12 +8,12 @@ public class IdentifiableIRITest extends IRITest {
 
 	@Override
 	protected IRI iri(String iri) {
-		return new IdentifiableIRI(iri, rdfFactory.getValueIO());
+		return new IdentifiableIRI(iri, rdfFactory);
 	}
 
 	@Override
 	protected IRI iri(String namespace, String localname) {
-		return new IdentifiableIRI(namespace, localname, rdfFactory.getValueIO());
+		return new IdentifiableIRI(namespace, localname, rdfFactory);
 	}
 
 }

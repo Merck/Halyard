@@ -8,19 +8,19 @@ import org.eclipse.rdf4j.model.BNode;
 
 public final class IdentifiableBNode extends BNodeWrapper implements Identifiable, SerializableValue {
 	private static final long serialVersionUID = -6212507967580561560L;
-	private final IdentifiableValueIO valueIO;
+	private final RDFFactory rdfFactory;
 	private Identifier id;
 	private ByteBuffer ser;
 
-	IdentifiableBNode(BNode bnode, IdentifiableValueIO valueIO) {
+	IdentifiableBNode(BNode bnode, RDFFactory valueIO) {
 		super(bnode);
-		this.valueIO = Objects.requireNonNull(valueIO);
+		this.rdfFactory = Objects.requireNonNull(valueIO);
 	}
 
 	@Override
 	public Identifier getId() {
 		if (id == null) {
-			id = valueIO.id(bnode, getSerializedForm());
+			id = rdfFactory.id(bnode, getSerializedForm());
 		}
 		return id;
 	}
@@ -33,7 +33,7 @@ public final class IdentifiableBNode extends BNodeWrapper implements Identifiabl
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = valueIO.ID_TRIPLE_WRITER.toBytes(bnode);
+			byte[] b = rdfFactory.ID_TRIPLE_WRITER.toBytes(bnode);
 			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 		}
 		return ser.duplicate();
@@ -43,6 +43,6 @@ public final class IdentifiableBNode extends BNodeWrapper implements Identifiabl
 		ByteBuffer serBuf = getSerializedForm();
 		byte[] b = new byte[serBuf.remaining()];
 		serBuf.get(b);
-		return new SerializedValue(b, valueIO.STREAM_READER);
+		return new SerializedValue(b, rdfFactory.STREAM_READER);
 	}
 }

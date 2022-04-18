@@ -134,8 +134,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            RDFFactory rdfFactory = RDFFactory.create(conf);
-            HalyardTableUtils.createTableIfNotExists(conf, conf.get(TABLE_PROPERTY), splits.toArray(new byte[splits.size()][]), rdfFactory.getValueIO()).close();
+            HalyardTableUtils.createTableIfNotExists(conf, conf.get(TABLE_PROPERTY), splits.toArray(new byte[splits.size()][])).close();
         }
     }
 

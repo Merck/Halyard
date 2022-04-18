@@ -39,7 +39,7 @@ public class IdentifierTupleFunction implements TupleFunction {
 		String id;
 		if (args.length == 1) {
 			ns = HALYARD.VALUE_ID_NS;
-			id = rdfFactory.getValueIO().id(args[0]).toString();
+			id = rdfFactory.id(args[0]).toString();
 		} else if (args.length == 3) {
 			if (!(args[0] instanceof Resource)) {
 				throw new ValueExprEvaluationException("First argument must be a subject");
@@ -51,7 +51,7 @@ public class IdentifierTupleFunction implements TupleFunction {
 				throw new ValueExprEvaluationException("Third argument must be an object");
 			}
 			ns = HALYARD.STATEMENT_ID_NS;
-			byte[] stmtId = rdfFactory.getValueIO().statementId((Resource) args[0], (IRI) args[1], args[2]);
+			byte[] stmtId = rdfFactory.statementId((Resource) args[0], (IRI) args[1], args[2]);
 			id = Hashes.encode(stmtId);
 		} else {
 			throw new ValueExprEvaluationException(String.format("%s requires 1 or 3 arguments, got %d", getURI(), args.length));

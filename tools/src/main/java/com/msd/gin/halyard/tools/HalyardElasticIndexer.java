@@ -17,8 +17,6 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
-import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFObject;
@@ -80,7 +78,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         Table table;
         RDFFactory rdfFactory;
         ValueIO.Reader valueReader;
-        IdValueFactory valueFactory;
         long counter = 0, exports = 0, statements = 0;
         byte[] lastHash = new byte[RDFObject.KEY_SIZE];
         Set<Literal> literals;
@@ -90,8 +87,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             rdfFactory = RDFFactory.create(table);
-            valueFactory = new IdValueFactory(rdfFactory.getValueIO());
-            valueReader = rdfFactory.getValueIO().createReader(valueFactory, new TableTripleReader(table, rdfFactory));
+            valueReader = rdfFactory.createTableReader(table);
         }
 
         @Override
@@ -113,7 +109,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 if (literals.add(l)) {
             		try(StringBuilderWriter json = new StringBuilderWriter(128)) {
 		                json.append("{\"id\":");
-		                JSONObject.quote(rdfFactory.getValueIO().id(l).toString(), json);
+		                JSONObject.quote(rdfFactory.id(l).toString(), json);
 		                json.append(",\"label\":");
 		                JSONObject.quote(l.getLabel(), json);
 		                if(l.getLanguage().isPresent()) {
@@ -245,10 +241,10 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP literal region(s)
         	Resource graph = NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance());
-        	scan = StatementIndex.scanLiterals(rdfFactory.createContext(graph), rdfFactory.getValueIO());
+        	scan = StatementIndex.scanLiterals(graph, rdfFactory);
         } else {
             //scan OSP literal region(s)
-        	scan = StatementIndex.scanLiterals(rdfFactory.getValueIO());
+        	scan = StatementIndex.scanLiterals(rdfFactory);
         }
         TableMapReduceUtil.initTableMapperJob(
                 source,

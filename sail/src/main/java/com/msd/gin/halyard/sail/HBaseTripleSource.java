@@ -17,10 +17,7 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
-import com.msd.gin.halyard.common.IdentifiableValueIO;
 import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.TimestampedValueFactory;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.vocab.HALYARD;
 
@@ -77,10 +74,8 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 		this.table = table;
 		this.valueFactory = vf;
 		this.rdfFactory = rdfFactory;
-		TableTripleReader tf = new TableTripleReader(table, rdfFactory);
-		IdentifiableValueIO valueIO = rdfFactory.getValueIO();
-		this.valueReader = valueIO.createReader(vf, tf);
-		this.tsValueReader = valueIO.createReader(new TimestampedValueFactory(valueIO), tf);
+		this.valueReader = rdfFactory.createTableReader(table);
+		this.tsValueReader = rdfFactory.createTimestampedTableReader(table);
 		this.timeoutSecs = timeoutSecs;
 		this.settings = settings;
 		this.ticker = ticker;

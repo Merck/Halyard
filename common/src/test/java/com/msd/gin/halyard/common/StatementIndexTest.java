@@ -77,7 +77,7 @@ public class StatementIndexTest {
     @Test
     public void testScanAll() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.createReader(vf);
 
         Set<Statement> actual = new HashSet<>();
         Scan scan = StatementIndex.scanAll();
@@ -95,10 +95,10 @@ public class StatementIndexTest {
     @Test
     public void testScanLiterals() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.createReader(vf);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = StatementIndex.scanLiterals(rdfFactory.getValueIO());
+        Scan scan = StatementIndex.scanLiterals(rdfFactory);
         try (ResultScanner rs = table.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
@@ -113,10 +113,10 @@ public class StatementIndexTest {
     @Test
     public void testScanLiteralsContext() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.createReader(vf);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = StatementIndex.scanLiterals(rdfFactory.createContext(vf.createIRI(CTX)), rdfFactory.getValueIO());
+        Scan scan = StatementIndex.scanLiterals(vf.createIRI(CTX), rdfFactory);
         try (ResultScanner rs = table.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {

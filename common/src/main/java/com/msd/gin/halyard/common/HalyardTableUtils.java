@@ -44,7 +44,6 @@ import org.apache.hadoop.hbase.client.ColumnFamilyDescriptor;
 import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
-import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -63,7 +62,6 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
-import org.eclipse.rdf4j.model.ValueFactory;
 
 /**
  * Core Halyard utility class performing RDF to HBase mappings and base HBase table and key management. The methods of this class define how
@@ -99,7 +97,7 @@ public final class HalyardTableUtils {
 		Arrays.fill(STOP_KEY_128, (byte) 0xff); /* 0xff is 255 in decimal */
     }
 
-	private static final int READ_VERSIONS = 1;
+	static final int READ_VERSIONS = 1;
 	private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
 	private static final long REGION_MAX_FILESIZE = 10000000000l;
@@ -144,7 +142,7 @@ public final class HalyardTableUtils {
 		RDFFactory rdfFactory = RDFFactory.create(conn.getConfiguration());
 		TableName htableName = TableName.valueOf(tableName);
         if (create) {
-            return createTableIfNotExists(conn, htableName, splitBits < 0 ? null : calculateSplits(splitBits, quads, rdfFactory), rdfFactory.getValueIO());
+            return createTableIfNotExists(conn, htableName, splitBits < 0 ? null : calculateSplits(splitBits, quads, rdfFactory));
         } else {
         	return conn.getTable(htableName);
         }
@@ -155,18 +153,17 @@ public final class HalyardTableUtils {
      * @param config Hadoop Configuration of the cluster running HBase
      * @param tableName String table name
      * @param splits array of keys used to pre-split new table, may be null
-     * @param valueIO ValueIO
 	 * @return the org.apache.hadoop.hbase.client.Table
      * @throws IOException throws IOException in case of any HBase IO problems
      */
-	public static Table createTableIfNotExists(Configuration config, String tableName, byte[][] splits, IdentifiableValueIO valueIO)
+	public static Table createTableIfNotExists(Configuration config, String tableName, byte[][] splits)
 			throws IOException {
 		TableName htableName = TableName.valueOf(tableName);
 		Connection conn = getConnection(config);
-		return createTableIfNotExists(conn, htableName, splits, valueIO);
+		return createTableIfNotExists(conn, htableName, splits);
 	}
 
-	private static Table createTableIfNotExists(Connection conn, TableName htableName, byte[][] splits, IdentifiableValueIO valueIO)
+	private static Table createTableIfNotExists(Connection conn, TableName htableName, byte[][] splits)
 		throws IOException {
 		boolean tableAlreadyExists;
 		try (Admin admin = conn.getAdmin()) {
@@ -174,13 +171,13 @@ public final class HalyardTableUtils {
 		}
 		// check if the table exists and if it doesn't, make it
 		if (!tableAlreadyExists) {
-			return createTable(conn, htableName, splits, valueIO, 1);
+			return createTable(conn, htableName, splits, 1);
 		} else {
 			return conn.getTable(htableName);
 		}
 	}
 
-	public static Table createTable(Connection conn, TableName htableName, byte[][] splits, IdentifiableValueIO valueIO, int maxVersions) throws IOException {
+	public static Table createTable(Connection conn, TableName htableName, byte[][] splits, int maxVersions) throws IOException {
 		try (Admin admin = conn.getAdmin()) {
 			TableDescriptor td = TableDescriptorBuilder.newBuilder(htableName)
 				.setColumnFamily(createColumnFamily(maxVersions))
@@ -474,9 +471,8 @@ public final class HalyardTableUtils {
         }
     }
 
-	public static Resource getSubject(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
-		TableTripleReader tf = new TableTripleReader(table, rdfFactory);
-		ValueIO.Reader valueReader = rdfFactory.getValueIO().createReader(vf, tf);
+	public static Resource getSubject(Table table, Identifier id, RDFFactory rdfFactory) throws IOException {
+		ValueIO.Reader valueReader = rdfFactory.createTableReader(table);
 		Scan scan = scan(StatementIndex.SPO, id, rdfFactory);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
@@ -490,8 +486,8 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static IRI getPredicate(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
-		ValueIO.Reader valueReader = rdfFactory.getValueIO().createReader(vf, null);
+	public static IRI getPredicate(Table table, Identifier id, RDFFactory rdfFactory) throws IOException {
+		ValueIO.Reader valueReader = rdfFactory.createTableReader(table);
 		Scan scan = scan(StatementIndex.POS, id, rdfFactory);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
@@ -505,9 +501,8 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static Value getObject(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
-		TableTripleReader tf = new TableTripleReader(table, rdfFactory);
-		ValueIO.Reader valueReader = rdfFactory.getValueIO().createReader(vf, tf);
+	public static Value getObject(Table table, Identifier id, RDFFactory rdfFactory) throws IOException {
+		ValueIO.Reader valueReader = rdfFactory.createTableReader(table);
 		Scan scan = scan(StatementIndex.OSP, id, rdfFactory);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
@@ -614,44 +609,6 @@ public final class HalyardTableUtils {
                 .setKeepDeletedCells(KeepDeletedCells.FALSE)
 				.build();
     }
-
-	public static final class TableTripleReader implements TripleReader {
-		private final Table table;
-		private final RDFFactory rdfFactory;
-
-		public TableTripleReader(Table table, RDFFactory rdfFactory) {
-			this.table = table;
-			this.rdfFactory = rdfFactory;
-		}
-
-		@Override
-		public Triple readTriple(ByteBuffer b, ValueIO.Reader valueReader) {
-			IdentifiableValueIO valueIO = (IdentifiableValueIO) rdfFactory.getValueIO();
-			int idSize = valueIO.getIdSize();
-			byte[] sid = new byte[idSize];
-			byte[] pid = new byte[idSize];
-			byte[] oid = new byte[idSize];
-			b.get(sid).get(pid).get(oid);
-
-			RDFContext ckey = rdfFactory.createContext(HALYARD.TRIPLE_GRAPH_CONTEXT);
-			RDFIdentifier skey = rdfFactory.createSubjectId(valueIO.id(sid));
-			RDFIdentifier pkey = rdfFactory.createPredicateId(valueIO.id(pid));
-			RDFIdentifier okey = rdfFactory.createObjectId(valueIO.id(oid));
-			Scan scan = StatementIndex.CSPO.scan(ckey, skey, pkey, okey);
-			Get get = new Get(scan.getStartRow())
-				.setFilter(new FilterList(scan.getFilter(), new FirstKeyOnlyFilter()));
-			get.addFamily(CF_NAME);
-			try {
-				get.readVersions(READ_VERSIONS);
-				Result result = table.get(get);
-				assert result.rawCells().length == 1;
-				Statement stmt = parseStatement(null, null, null, ckey, result.rawCells()[0], valueReader, rdfFactory);
-				return valueReader.getValueFactory().createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
-			} catch (IOException ioe) {
-				throw new RuntimeException(ioe);
-			}
-		}
-	}
 
 	static final class ByteBufferInputStream extends InputStream {
 		private final ByteBuffer buf;

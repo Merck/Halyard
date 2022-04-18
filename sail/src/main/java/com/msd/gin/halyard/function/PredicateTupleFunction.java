@@ -8,7 +8,6 @@ import java.io.IOException;
 
 import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.model.Value;
-import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunction;
 import org.kohsuke.MetaInfServices;
@@ -27,7 +26,7 @@ public final class PredicateTupleFunction extends AbstractReificationTupleFuncti
 	}
 
 	@Override
-	protected Value getValue(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
-		return HalyardTableUtils.getPredicate(table, id, vf, rdfFactory);
+	protected Value getValue(Table table, Identifier id, RDFFactory rdfFactory) throws IOException {
+		return HalyardTableUtils.getPredicate(table, id, rdfFactory);
 	}
 }

@@ -432,15 +432,11 @@ public class ValueIO {
 
 	private void addIRIs(Collection<IRI> iris) {
 		for (IRI iri : iris) {
-			addIRI(iri);
-		}
-	}
-
-	protected void addIRI(IRI iri) {
-		Integer hash = Hashes.hash32(Bytes.toBytes(iri.stringValue()));
-		if (WELL_KNOWN_IRIS.putIfAbsent(hash, iri) != null) {
-			throw new AssertionError(String.format("Hash collision between %s and %s",
-					WELL_KNOWN_IRIS.get(hash), iri));
+			Integer hash = Hashes.hash32(Bytes.toBytes(iri.stringValue()));
+			if (WELL_KNOWN_IRIS.putIfAbsent(hash, iri) != null) {
+				throw new AssertionError(String.format("Hash collision between %s and %s",
+						WELL_KNOWN_IRIS.get(hash), iri));
+			}
 		}
 	}
 

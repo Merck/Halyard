@@ -17,7 +17,6 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.HalyardTableUtils.TableTripleReader;
 import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.Hashes.HashFunction;
 import com.msd.gin.halyard.common.RDFFactory;
@@ -131,7 +130,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             this.table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             rdfFactory = RDFFactory.create(table);
-            this.valueReader = rdfFactory.getValueIO().createReader(SVF, new TableTripleReader(table, rdfFactory));
+            this.valueReader = rdfFactory.createTableReader(table);
         }
 
         private Set<IRI> queryForClasses(Value instance) throws IOException {

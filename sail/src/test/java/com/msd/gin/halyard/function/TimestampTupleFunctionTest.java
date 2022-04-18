@@ -2,7 +2,6 @@ package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.Timestamped;
-import com.msd.gin.halyard.common.TimestampedValueFactory;
 import com.msd.gin.halyard.sail.HBaseTripleSource;
 
 import java.util.List;
@@ -34,7 +33,7 @@ public class TimestampTupleFunctionTest {
 		IRI pred = SVF.createIRI(":prop");
 		Value obj = SVF.createBNode();
 		TripleSource tripleSource = new HBaseTripleSource(null, SVF, rdfFactory, 0) {
-			TimestampedValueFactory TVF = new TimestampedValueFactory(rdfFactory.getValueIO());
+			ValueFactory TVF = rdfFactory.getTimestampedValueFactory();
 
 			@Override
 			public CloseableIteration<? extends Statement, QueryEvaluationException> getTimestampedStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
@@ -60,7 +59,7 @@ public class TimestampTupleFunctionTest {
 		IRI pred = SVF.createIRI(":prop");
 		Value obj = SVF.createBNode();
 		TripleSource tripleSource = new HBaseTripleSource(null, SVF, rdfFactory, 0) {
-			TimestampedValueFactory TVF = new TimestampedValueFactory(rdfFactory.getValueIO());
+			ValueFactory TVF = rdfFactory.getTimestampedValueFactory();
 
 			@Override
 			public CloseableIteration<? extends Statement, QueryEvaluationException> getTimestampedStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {

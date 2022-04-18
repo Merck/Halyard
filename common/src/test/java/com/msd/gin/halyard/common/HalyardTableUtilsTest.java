@@ -74,14 +74,14 @@ public class HalyardTableUtilsTest {
     public void testIdIsUnique() {
         ValueFactory vf = SimpleValueFactory.getInstance();
         assertNotEquals(
-        	rdfFactory.getValueIO().id(vf.createLiteral("1", vf.createIRI("local:type1"))),
-        	rdfFactory.getValueIO().id(vf.createLiteral("1", vf.createIRI("local:type2"))));
+        	rdfFactory.id(vf.createLiteral("1", vf.createIRI("local:type1"))),
+        	rdfFactory.id(vf.createLiteral("1", vf.createIRI("local:type2"))));
     }
 
     @Test
     public void testBigLiteral() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.createReader(vf);
 
         Resource subj = vf.createIRI("http://testBigLiteral/subject/");
         IRI pred = vf.createIRI("http://testBigLiteral/pred/");
@@ -106,7 +106,7 @@ public class HalyardTableUtilsTest {
     @Test
     public void testConflictingHash() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.createReader(vf);
 
         Resource subj = vf.createIRI("http://testConflictingHash/subject/");
         IRI pred1 = vf.createIRI("http://testConflictingHash/pred1/");
@@ -177,7 +177,7 @@ public class HalyardTableUtilsTest {
     @Test
     public void testNoResult() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.createReader(vf);
 
         assertEquals(0, HalyardTableUtils.parseStatements(null, null, null, null, Result.EMPTY_RESULT, reader, rdfFactory).size());
     }

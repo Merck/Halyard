@@ -7,7 +7,7 @@ import org.eclipse.rdf4j.model.Value;
 
 public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 	final V val;
-	private final IdentifiableValueIO valueIO;
+	private final RDFFactory rdfFactory;
 	private ByteBuffer ser;
 
 	public static <V extends Value> boolean matches(V value, RDFValue<V> pattern) {
@@ -15,14 +15,14 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 	}
 
 
-	protected RDFValue(RDFRole role, V val, IdentifiableValueIO valueIO) {
+	protected RDFValue(RDFRole role, V val, RDFFactory valueIO) {
 		super(role);
 		this.val = Objects.requireNonNull(val);
-		this.valueIO = Objects.requireNonNull(valueIO);
+		this.rdfFactory = Objects.requireNonNull(valueIO);
 	}
 
 	boolean isWellKnownIRI() {
-		return valueIO.isWellKnownIRI(val);
+		return rdfFactory.isWellKnownIRI(val);
 	}
 
 	public final ByteBuffer getSerializedForm() {
@@ -30,7 +30,7 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 			if (val instanceof SerializableValue) {
 				ser = ((SerializableValue) val).getSerializedForm();
 			} else {
-				byte[] b = valueIO.ID_TRIPLE_WRITER.toBytes(val);
+				byte[] b = rdfFactory.ID_TRIPLE_WRITER.toBytes(val);
 				ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 			}
 		}
@@ -39,7 +39,7 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 
 	@Override
 	protected final Identifier calculateId() {
-		return valueIO.id(val);
+		return rdfFactory.id(val);
 	}
 
 	@Override

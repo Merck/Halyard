@@ -10,20 +10,20 @@ import org.eclipse.rdf4j.model.util.URIUtil;
 public final class IdentifiableIRI implements IRI, Identifiable, SerializableValue {
 	private static final long serialVersionUID = 8055405742401584331L;
 	private final String iri;
-	private final IdentifiableValueIO valueIO;
+	private final RDFFactory rdfFactory;
 	private int localNameIdx = -1;
 	private Identifier id;
 	private ByteBuffer ser;
 
-	IdentifiableIRI(String iri, IdentifiableValueIO valueIO) {
+	IdentifiableIRI(String iri, RDFFactory valueIO) {
 		if (iri.indexOf(':') == -1) {
 			throw new IllegalArgumentException(String.format("Not a valid (absolute) IRI: %s", iri));
 		}
 		this.iri = Objects.requireNonNull(iri);
-		this.valueIO = Objects.requireNonNull(valueIO);
+		this.rdfFactory = Objects.requireNonNull(valueIO);
 	}
 
-	IdentifiableIRI(String namespace, String localName, IdentifiableValueIO valueIO) {
+	IdentifiableIRI(String namespace, String localName, RDFFactory valueIO) {
 		this(Objects.requireNonNull(namespace, "Namespace is null") + Objects.requireNonNull(localName, "Local name is null"), valueIO);
 		localNameIdx = namespace.length();
 	}
@@ -57,9 +57,9 @@ public final class IdentifiableIRI implements IRI, Identifiable, SerializableVal
 	@Override
 	public Identifier getId() {
 		if (id == null) {
-			id = valueIO.wellKnownId(this);
+			id = rdfFactory.wellKnownId(this);
 			if (id == null) {
-				id = valueIO.id(this, getSerializedForm());
+				id = rdfFactory.id(this, getSerializedForm());
 			}
 		}
 		return id;
@@ -84,7 +84,7 @@ public final class IdentifiableIRI implements IRI, Identifiable, SerializableVal
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = valueIO.ID_TRIPLE_WRITER.toBytes(this);
+			byte[] b = rdfFactory.ID_TRIPLE_WRITER.toBytes(this);
 			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 		}
 		return ser.duplicate();
@@ -94,6 +94,6 @@ public final class IdentifiableIRI implements IRI, Identifiable, SerializableVal
 		ByteBuffer serBuf = getSerializedForm();
 		byte[] b = new byte[serBuf.remaining()];
 		serBuf.get(b);
-		return new SerializedValue(b, valueIO.STREAM_READER);
+		return new SerializedValue(b, rdfFactory.STREAM_READER);
 	}
 }

@@ -190,7 +190,7 @@ public class HalyardTableUtilsScanTest {
     @Test
     public void testScan() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        ValueIO.Reader reader = rdfFactory.getValueIO().createReader(vf, null);
+        ValueIO.Reader reader = rdfFactory.createReader(vf);
 
         RDFSubject subj = rdfFactory.createSubject(s == null ? null : vf.createIRI(s));
         RDFPredicate pred = rdfFactory.createPredicate(p == null ? null : vf.createIRI(p));

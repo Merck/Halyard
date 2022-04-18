@@ -11,15 +11,15 @@ public class TimestampedStatementTest extends StatementTest {
 
 	@Override
 	protected IRI iri(String iri) {
-		return new IdentifiableIRI(iri, rdfFactory.getValueIO());
+		return new IdentifiableIRI(iri, rdfFactory);
 	}
 
 	@Override
 	protected Statement statement(Resource s, IRI p, Value o, Resource c) {
 		if (c != null) {
-			return new TimestampedValueFactory(rdfFactory.getValueIO()).createStatement(s, p, o, c);
+			return rdfFactory.getTimestampedValueFactory().createStatement(s, p, o, c);
 		} else {
-			return new TimestampedValueFactory(rdfFactory.getValueIO()).createStatement(s, p, o);
+			return rdfFactory.getTimestampedValueFactory().createStatement(s, p, o);
 		}
 	}
 
