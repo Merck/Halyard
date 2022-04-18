@@ -30,7 +30,7 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 			if (val instanceof SerializableValue) {
 				ser = ((SerializableValue) val).getSerializedForm();
 			} else {
-				byte[] b = rdfFactory.ID_TRIPLE_WRITER.toBytes(val);
+				byte[] b = rdfFactory.idTripleWriter.toBytes(val);
 				ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 			}
 		}

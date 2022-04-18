@@ -339,13 +339,13 @@ public class ValueIO {
 		return new ValueIO(loadVocabularies, loadLanguages, stringCompressionThreshold);
 	}
 
-	private final BiMap<Short, String> WELL_KNOWN_NAMESPACES = HashBiMap.create(256);
-	private final Map<String,Namespace> WELL_KNOWN_NAMESPACE_PREFIXES = new HashMap<>(256);
-	private final BiMap<Short, String> WELL_KNOWN_LANGS = HashBiMap.create(256);
-	protected final BiMap<Integer, IRI> WELL_KNOWN_IRIS = HashBiMap.create(1024);
-	private final Map<IRI, ByteWriter> BYTE_WRITERS = new HashMap<>(32);
-	private final Map<Integer, ByteReader> BYTE_READERS = new HashMap<>(32);
-	private final Map<Short, IRIEncodingNamespace> IRI_ENCODERS = new HashMap<>();
+	private final BiMap<Short, String> wellKnownNamespaces = HashBiMap.create(256);
+	private final Map<String,Namespace> wellKnownNamespacePrefixes = new HashMap<>(256);
+	private final BiMap<Short, String> wellKnownLangs = HashBiMap.create(256);
+	protected final BiMap<Integer, IRI> wellKnownIris = HashBiMap.create(1024);
+	private final Map<IRI, ByteWriter> byteWriters = new HashMap<>(32);
+	private final Map<Integer, ByteReader> byteReaders = new HashMap<>(32);
+	private final Map<Short, IRIEncodingNamespace> iriEncoders = new HashMap<>();
 	private final int stringCompressionThreshold;
 
 	public ValueIO(boolean loadVocabularies, boolean loadLanguages, int stringCompressionThreshold) {
@@ -365,7 +365,7 @@ public class ValueIO {
 	}
 
 	public Collection<Namespace> getWellKnownNamespaces() {
-		return WELL_KNOWN_NAMESPACE_PREFIXES.values();
+		return wellKnownNamespacePrefixes.values();
 	}
 
 	private void loadNamespaces(Class<?> vocab) {
@@ -391,13 +391,13 @@ public class ValueIO {
 		for (Namespace namespace : namespaces) {
 			String name = namespace.getName();
 			Short hash = Hashes.hash16(Bytes.toBytes(name));
-			if (WELL_KNOWN_NAMESPACES.putIfAbsent(hash, name) != null) {
+			if (wellKnownNamespaces.putIfAbsent(hash, name) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
-						WELL_KNOWN_NAMESPACES.get(hash), name));
+						wellKnownNamespaces.get(hash), name));
 			}
-			WELL_KNOWN_NAMESPACE_PREFIXES.put(namespace.getPrefix(), namespace);
+			wellKnownNamespacePrefixes.put(namespace.getPrefix(), namespace);
 			if (namespace instanceof IRIEncodingNamespace) {
-				IRI_ENCODERS.put(hash, (IRIEncodingNamespace) namespace);
+				iriEncoders.put(hash, (IRIEncodingNamespace) namespace);
 			}
 		}
 	}
@@ -407,9 +407,9 @@ public class ValueIO {
 			String langTag = l.toLanguageTag();
 			LOGGER.debug("Loading language {}", langTag);
 			Short hash = Hashes.hash16(Bytes.toBytes(langTag));
-			if (WELL_KNOWN_LANGS.putIfAbsent(hash, langTag) != null) {
+			if (wellKnownLangs.putIfAbsent(hash, langTag) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
-						WELL_KNOWN_LANGS.get(hash), langTag));
+						wellKnownLangs.get(hash), langTag));
 			}
 		}
 	}
@@ -433,21 +433,21 @@ public class ValueIO {
 	private void addIRIs(Collection<IRI> iris) {
 		for (IRI iri : iris) {
 			Integer hash = Hashes.hash32(Bytes.toBytes(iri.stringValue()));
-			if (WELL_KNOWN_IRIS.putIfAbsent(hash, iri) != null) {
+			if (wellKnownIris.putIfAbsent(hash, iri) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
-						WELL_KNOWN_IRIS.get(hash), iri));
+						wellKnownIris.get(hash), iri));
 			}
 		}
 	}
 
 	private void addByteWriter(IRI datatype, ByteWriter bw) {
-		if (BYTE_WRITERS.putIfAbsent(datatype, bw) != null) {
+		if (byteWriters.putIfAbsent(datatype, bw) != null) {
 			throw new AssertionError(String.format("%s already exists for %s", ByteWriter.class.getSimpleName(), datatype));
 		}
 	}
 
 	private void addByteReader(int valueType, ByteReader br) {
-		if (BYTE_READERS.putIfAbsent(valueType, br) != null) {
+		if (byteReaders.putIfAbsent(valueType, br) != null) {
 			throw new AssertionError(String.format("%s already exists for %s", ByteReader.class.getSimpleName(), (char)valueType));
 		}
 	}
@@ -854,7 +854,7 @@ public class ValueIO {
 		}
 
 		private ByteBuffer writeIRI(IRI iri, ByteBuffer b) {
-			Integer irihash = WELL_KNOWN_IRIS.inverse().get(iri);
+			Integer irihash = wellKnownIris.inverse().get(iri);
 			if (irihash != null) {
 				b = ensureCapacity(b, 1 + IRI_HASH_SIZE);
 				b.put(IRI_HASH_TYPE);
@@ -862,9 +862,9 @@ public class ValueIO {
 				return b;
 			} else {
 				String ns = iri.getNamespace();
-				Short nshash = WELL_KNOWN_NAMESPACES.inverse().get(ns);
+				Short nshash = wellKnownNamespaces.inverse().get(ns);
 				if (nshash != null) {
-					IRIEncodingNamespace iriEncoder = IRI_ENCODERS.get(nshash);
+					IRIEncodingNamespace iriEncoder = iriEncoders.get(nshash);
 					if (iriEncoder != null) {
 						b = ensureCapacity(b, 1 + NAMESPACE_HASH_SIZE);
 						final int failsafeMark = b.position();
@@ -931,7 +931,7 @@ public class ValueIO {
 		private ByteBuffer writeLiteral(Literal l, ByteBuffer b) {
 			if(l.getLanguage().isPresent()) {
 				String langTag = l.getLanguage().get();
-				Short hash = WELL_KNOWN_LANGS.inverse().get(langTag);
+				Short hash = wellKnownLangs.inverse().get(langTag);
 				if (hash != null) {
 					b = ensureCapacity(b, 1+LANG_HASH_SIZE);
 					b.put(LANGUAGE_HASH_LITERAL_TYPE);
@@ -953,7 +953,7 @@ public class ValueIO {
 				}
 				return writeString(l.getLabel(), b);
 			} else {
-				ByteWriter writer = BYTE_WRITERS.get(l.getDatatype());
+				ByteWriter writer = byteWriters.get(l.getDatatype());
 				if (writer != null) {
 					final int failsafeMark = b.position();
 					try {
@@ -1027,7 +1027,7 @@ public class ValueIO {
 				case IRI_HASH_TYPE:
 					b.mark();
 					Integer irihash = b.getInt(); // 32-bit hash
-					IRI iri = WELL_KNOWN_IRIS.get(irihash);
+					IRI iri = wellKnownIris.get(irihash);
 					if (iri == null) {
 						b.limit(b.position()).reset();
 						throw new IllegalStateException(String.format("Unknown IRI hash: %s", Hashes.encode(b)));
@@ -1036,7 +1036,7 @@ public class ValueIO {
 				case NAMESPACE_HASH_TYPE:
 					b.mark();
 					Short nshash = b.getShort(); // 16-bit hash
-					String namespace = WELL_KNOWN_NAMESPACES.get(nshash);
+					String namespace = wellKnownNamespaces.get(nshash);
 					if (namespace == null) {
 						b.limit(b.position()).reset();
 						throw new IllegalStateException(String.format("Unknown namespace hash: %s", Hashes.encode(b)));
@@ -1045,7 +1045,7 @@ public class ValueIO {
 				case ENCODED_IRI_TYPE:
 					b.mark();
 					nshash = b.getShort(); // 16-bit hash
-					IRIEncodingNamespace iriEncoder = IRI_ENCODERS.get(nshash);
+					IRIEncodingNamespace iriEncoder = iriEncoders.get(nshash);
 					if (iriEncoder == null) {
 						b.limit(b.position()).reset();
 						throw new IllegalStateException(String.format("Unknown IRI encoder hash: %s", Hashes.encode(b)));
@@ -1056,7 +1056,7 @@ public class ValueIO {
 				case LANGUAGE_HASH_LITERAL_TYPE:
 					b.mark();
 					Short langHash = b.getShort(); // 16-bit hash
-					String lang = WELL_KNOWN_LANGS.get(langHash);
+					String lang = wellKnownLangs.get(langHash);
 					if (lang == null) {
 						b.limit(b.position()).reset();
 						throw new IllegalStateException(String.format("Unknown language tag hash: %s", Hashes.encode(b)));
@@ -1080,7 +1080,7 @@ public class ValueIO {
 					}
 					return tf.readTriple(b, this);
 				default:
-					ByteReader reader = BYTE_READERS.get(type);
+					ByteReader reader = byteReaders.get(type);
 					if (reader == null) {
 						throw new AssertionError(String.format("Unexpected type: %s", type));
 					}

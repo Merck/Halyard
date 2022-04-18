@@ -301,7 +301,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                         dos.writeInt(0);
                     } else {
                     	bb.clear();
-						bb = rdfFactory.ID_TRIPLE_WRITER.writeTo(partitionId, bb);
+						bb = rdfFactory.idTripleWriter.writeTo(partitionId, bb);
 						bb.flip();
 						int len = bb.limit();
                         dos.writeInt(len);

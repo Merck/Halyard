@@ -34,10 +34,10 @@ import org.slf4j.LoggerFactory;
 public class RDFFactory {
 	private static final Logger LOGGER = LoggerFactory.getLogger(RDFFactory.class);
 
-	public final ValueIO.Writer ID_TRIPLE_WRITER;
-	public final ValueIO.Writer STREAM_WRITER;
-	public final ValueIO.Reader STREAM_READER;
-	private final BiMap<Identifier, IRI> WELL_KNOWN_IRI_IDS = HashBiMap.create(256);
+	public final ValueIO.Writer idTripleWriter;
+	public final ValueIO.Writer streamWriter;
+	public final ValueIO.Reader streamReader;
+	private final BiMap<Identifier, IRI> wellKnownIriIds = HashBiMap.create(256);
 	private final ThreadLocal<HashFunction> idHash;
 	private final int idSize;
 	private final int typeIndex;
@@ -125,16 +125,16 @@ public class RDFFactory {
 
 		valueFactory = new IdValueFactory(this);
 		tsValueFactory = new TimestampedValueFactory(this);
-		ID_TRIPLE_WRITER = valueIO.createWriter(new IdTripleWriter());
-		STREAM_WRITER = valueIO.createWriter(new StreamTripleWriter());
-		STREAM_READER = valueIO.createReader(valueFactory, new StreamTripleReader());
+		idTripleWriter = valueIO.createWriter(new IdTripleWriter());
+		streamWriter = valueIO.createWriter(new StreamTripleWriter());
+		streamReader = valueIO.createReader(valueFactory, new StreamTripleReader());
 
-		for (IRI iri : valueIO.WELL_KNOWN_IRIS.values()) {
+		for (IRI iri : valueIO.wellKnownIris.values()) {
 			IdentifiableIRI idIri = new IdentifiableIRI(iri.stringValue(), this);
 			Identifier id = idIri.getId();
-			if (WELL_KNOWN_IRI_IDS.putIfAbsent(id, idIri) != null) {
+			if (wellKnownIriIds.putIfAbsent(id, idIri) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
-						WELL_KNOWN_IRI_IDS.get(id), idIri));
+						wellKnownIriIds.get(id), idIri));
 			}
 		}
 
@@ -174,15 +174,15 @@ public class RDFFactory {
 		return valueIO.getWellKnownNamespaces();
 	}
 	Identifier wellKnownId(IRI iri) {
-		return WELL_KNOWN_IRI_IDS.inverse().get(iri);
+		return wellKnownIriIds.inverse().get(iri);
 	}
 
 	IRI getWellKnownIRI(Identifier id) {
-		return WELL_KNOWN_IRI_IDS.get(id);
+		return wellKnownIriIds.get(id);
 	}
 
 	boolean isWellKnownIRI(Value v) {
-		return WELL_KNOWN_IRI_IDS.containsValue(v);
+		return wellKnownIriIds.containsValue(v);
 	}
 
 	public int getIdSize() {
@@ -198,13 +198,13 @@ public class RDFFactory {
 			return ((Identifiable) v).getId();
 		}
 
-		Identifier id = WELL_KNOWN_IRI_IDS.inverse().get(v);
+		Identifier id = wellKnownIriIds.inverse().get(v);
 		if (id != null) {
 			return id;
 		}
 
 		ByteBuffer ser = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
-		ser = ID_TRIPLE_WRITER.writeTo(v, ser);
+		ser = idTripleWriter.writeTo(v, ser);
 		ser.flip();
 		return id(v, ser);
 	}

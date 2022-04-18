@@ -33,7 +33,7 @@ public final class IdentifiableTriple extends TripleWrapper implements Identifia
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = rdfFactory.ID_TRIPLE_WRITER.toBytes(triple);
+			byte[] b = rdfFactory.idTripleWriter.toBytes(triple);
 			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
 		}
 		return ser.duplicate();
@@ -41,7 +41,7 @@ public final class IdentifiableTriple extends TripleWrapper implements Identifia
 
 	private Object writeReplace() throws ObjectStreamException {
 		// NB: CELL_WRITER output is not self-contained for Triples so must use STREAM_WRITER instead
-		byte[] b = rdfFactory.STREAM_WRITER.toBytes(triple);
-		return new SerializedValue(b, rdfFactory.STREAM_READER);
+		byte[] b = rdfFactory.streamWriter.toBytes(triple);
+		return new SerializedValue(b, rdfFactory.streamReader);
 	}
 }
