@@ -30,15 +30,18 @@ import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizerPipeline;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.BindingAssigner;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.BindingSetAssignmentInliner;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.CompareOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.OrderLimitOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.ParentReferenceCleaner;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.RegexAsStringFunctionOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.UnionScopeChangeOptimizer;
 
 /**
 *
@@ -60,6 +63,7 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 	public Iterable<QueryOptimizer> getOptimizers() {
 		return Arrays.asList(
 			new BindingAssigner(),
+			new BindingSetAssignmentInliner(),
 			new HalyardConstantOptimizer(strategy),
 			new RegexAsStringFunctionOptimizer(valueFactory),
 			new CompareOptimizer(),
@@ -67,12 +71,14 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 			new DisjunctiveConstraintOptimizer(),
 			new SameTermFilterOptimizer(),
 			new StarJoinOptimizer(),
+			new UnionScopeChangeOptimizer(),
 			new QueryModelNormalizer(),
 			(statistics instanceof HalyardEvaluationStatistics) ? new HalyardQueryJoinOptimizer((HalyardEvaluationStatistics) statistics) : new QueryJoinOptimizer(statistics),
 			// new SubSelectJoinOptimizer(),
 			new IterativeEvaluationOptimizer(),
 			new HalyardFilterOptimizer(), // apply filter optimizer twice (before and after Joins and Unions shaking)
-			new OrderLimitOptimizer()
+			new OrderLimitOptimizer(),
+			new ParentReferenceCleaner()
 		);
 	}
 }
