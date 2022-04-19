@@ -70,7 +70,7 @@ public class Sorter <E extends Comparable<E> & Serializable> implements Iterable
     		swapToDisk();
     	}
 
-    	if (size < limit || e.compareTo(map.lastKey()) < 0) {
+    	if (size < limit || (!map.isEmpty() && e.compareTo(map.lastKey()) < 0)) {
     		try {
 	            Long c = map.get(e);
 	            if (c == null) {
