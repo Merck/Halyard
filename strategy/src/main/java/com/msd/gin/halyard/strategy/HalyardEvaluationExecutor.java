@@ -63,18 +63,30 @@ final class HalyardEvaluationExecutor {
     //a map of query model nodes and their priority
     private static final Cache<QueryModelNode, Integer> PRIORITY_MAP_CACHE = CacheBuilder.newBuilder().weakKeys().build();
 
+    private static volatile long previousCompletedTaskCount;
+
     private static boolean checkThreads(int retries) {
+    	boolean resetRetries;
+		// if we've been consistently blocked and are at full capacity
 		if (retries > MAX_RETRIES && EXECUTOR.getActiveCount() == EXECUTOR.getMaximumPoolSize()) {
-			// failed to push/pull a new BindingSet and all threads are busy - add some spare threads
-			if (EXECUTOR.getMaximumPoolSize() < MAX_THREADS) {
-				EXECUTOR.setMaximumPoolSize(Math.min(EXECUTOR.getMaximumPoolSize()+THREAD_GAIN, MAX_THREADS));
-				EXECUTOR.setCorePoolSize(Math.min(EXECUTOR.getCorePoolSize()+THREAD_GAIN, MAX_THREADS));
-				return true;
-			} else {
-				throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", MAX_THREADS));
+			// if we are not blocked overall then don't worry about it - might just be taking a long time for results to bubble up the query tree to us
+			resetRetries = (EXECUTOR.getCompletedTaskCount() > previousCompletedTaskCount);
+			if (!resetRetries) {
+				// we are completely blocked, try adding some emergency threads
+				if(EXECUTOR.getMaximumPoolSize() < MAX_THREADS) {
+					EXECUTOR.setMaximumPoolSize(Math.min(EXECUTOR.getMaximumPoolSize()+THREAD_GAIN, MAX_THREADS));
+					EXECUTOR.setCorePoolSize(Math.min(EXECUTOR.getCorePoolSize()+THREAD_GAIN, MAX_THREADS));
+					resetRetries = true;
+				} else {
+					// out of options
+					throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", MAX_THREADS));
+				}
 			}
+		} else {
+			resetRetries = false;
 		}
-		return false;
+    	previousCompletedTaskCount = EXECUTOR.getCompletedTaskCount();
+		return resetRetries;
     }
 
     /**
