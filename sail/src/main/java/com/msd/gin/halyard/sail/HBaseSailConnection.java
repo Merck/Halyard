@@ -23,7 +23,7 @@ import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
-import com.msd.gin.halyard.sail.HBaseSail.ConnectionFactory;
+import com.msd.gin.halyard.sail.HBaseSail.SailConnectionFactory;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -304,7 +304,7 @@ public class HBaseSailConnection implements SailConnection {
 					}
 
 					@Override
-					public void close() throws IOException {
+					protected void handleClose() throws IOException {
 						rs.close();
 					}
 				}
@@ -678,8 +678,8 @@ public class HBaseSailConnection implements SailConnection {
 		}
 	}
 
-	public static class Factory implements ConnectionFactory {
-		public static final ConnectionFactory INSTANCE = new Factory();
+	public static class Factory implements SailConnectionFactory {
+		public static final SailConnectionFactory INSTANCE = new Factory();
 
 		@Override
 		public SailConnection createConnection(HBaseSail sail) {

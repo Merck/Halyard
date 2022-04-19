@@ -64,7 +64,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
 
     @Override
     public int run(CommandLine cmd) throws Exception {
-		SailRepository repo = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('e'), null, new HBaseSail.ConnectionFactory() {
+		SailRepository repo = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('e'), null, new HBaseSail.SailConnectionFactory() {
 			@Override
 			public SailConnection createConnection(HBaseSail sail) {
 				return new HBaseSailConnection(sail) {

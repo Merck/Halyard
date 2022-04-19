@@ -182,9 +182,10 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 		}
 
 		@Override
-		public void close() throws IOException {
+		protected void handleClose() throws IOException {
 			if (rs != null) {
 				rs.close();
+				rs = null;
 			}
 		}
 	}

@@ -139,7 +139,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                         public void tick() {
                             context.progress();
                         }
-					}, new HBaseSail.ConnectionFactory() {
+					}, new HBaseSail.SailConnectionFactory() {
 						@Override
 						public SailConnection createConnection(HBaseSail sail) {
 							return new HBaseSailConnection(sail) {

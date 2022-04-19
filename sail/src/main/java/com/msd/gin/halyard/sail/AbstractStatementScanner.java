@@ -13,11 +13,11 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.apache.hadoop.hbase.client.Result;
-import org.eclipse.rdf4j.common.iteration.CloseableIteration;
+import org.eclipse.rdf4j.common.iteration.AbstractCloseableIteration;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 
-public abstract class AbstractStatementScanner implements CloseableIteration<Statement, IOException> {
+public abstract class AbstractStatementScanner extends AbstractCloseableIteration<Statement, IOException> {
 	private final ValueIO.Reader reader;
 	protected final RDFFactory rdfFactory;
 	protected final ValueFactory vf;

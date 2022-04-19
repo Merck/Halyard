@@ -82,7 +82,7 @@ public class HBaseSail implements Sail {
 	/**
 	 * Interface to make it easy to change connection implementations.
 	 */
-	public interface ConnectionFactory {
+	public interface SailConnectionFactory {
 		SailConnection createConnection(HBaseSail sail);
 	}
 
@@ -115,16 +115,16 @@ public class HBaseSail implements Sail {
 	private SpinParser spinParser = new SpinParser();
 	private final List<QueryContextInitializer> queryContextInitializers = new ArrayList<>();
 	ScanSettings scanSettings = new ScanSettings();
-	final ConnectionFactory connFactory;
+	final SailConnectionFactory connFactory;
 	Connection hConnection;
 	final boolean hConnectionIsShared; //whether a Connection is provided or we need to create our own
 
 
-	private HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, ConnectionFactory connFactory) {
+	private HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
 		this(conn, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, connFactory, new HBaseFederatedServiceResolver(conn, config, tableName, evaluationTimeout, ticker));
     }
 
-	HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, ConnectionFactory connFactory,
+	HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory,
 			FederatedServiceResolver fsr) {
 		this.hConnection = conn;
 		this.hConnectionIsShared = (conn != null);
@@ -152,9 +152,9 @@ public class HBaseSail implements Sail {
 	 * @param evaluationTimeout int timeout in seconds for each query evaluation, negative values mean no timeout
 	 * @param elasticIndexURL String optional ElasticSearch index URL
 	 * @param ticker optional Ticker callback for keep-alive notifications
-	 * @param connFactory {@link ConnectionFactory} for creating connections
+	 * @param connFactory {@link SailConnectionFactory} for creating connections
 	 */
-    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, ConnectionFactory connFactory) {
+    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
     	this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, connFactory);
     }
 
