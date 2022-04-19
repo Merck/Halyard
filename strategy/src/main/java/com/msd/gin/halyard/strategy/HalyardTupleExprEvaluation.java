@@ -168,13 +168,13 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Returns an iterator on the binding set pipe
+     * Returns an iteration of binding sets.
      * @param expr supplied by HalyardEvaluationStrategy
      * @param bindings supplied by HalyardEvaluationStrategy
-     * @return an iterator on the binding set pipe
+     * @return an iteration of binding sets
      */
     CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) {
-    	return HalyardEvaluationExecutor.consumeAndQueue(pipe -> evaluateTupleExpr(pipe, expr, bindings), expr);
+    	return HalyardEvaluationExecutor.pushAndPull(pipe -> evaluateTupleExpr(pipe, expr, bindings), expr);
     }
 
     /**

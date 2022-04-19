@@ -65,7 +65,7 @@ final class HalyardEvaluationExecutor {
 
     private static boolean checkThreads(int retries) {
 		if (retries > MAX_RETRIES && EXECUTOR.getActiveCount() == EXECUTOR.getMaximumPoolSize()) {
-			// failed to pull a new BindingSet and all threads are busy - add some spare threads
+			// failed to push/pull a new BindingSet and all threads are busy - add some spare threads
 			if (EXECUTOR.getMaximumPoolSize() < MAX_THREADS) {
 				EXECUTOR.setMaximumPoolSize(Math.min(EXECUTOR.getMaximumPoolSize()+THREAD_GAIN, MAX_THREADS));
 				EXECUTOR.setCorePoolSize(Math.min(EXECUTOR.getCorePoolSize()+THREAD_GAIN, MAX_THREADS));
@@ -87,19 +87,25 @@ final class HalyardEvaluationExecutor {
 			CloseableIteration<BindingSet, QueryEvaluationException> iter,
 			QueryModelNode node) {
         int priority = getPriorityForNode(node);
-		EXECUTOR.execute(new PipeAndIteration(pipe, iter, priority));
+		EXECUTOR.execute(new IterateAndPipeTask(pipe, iter, priority));
     }
 
 	static void pullAndPush(BindingSetPipe pipe,
 			CloseableIteration<BindingSet, QueryEvaluationException> iter) {
-		PipeAndIteration pai = new PipeAndIteration(pipe, iter, 0);
+		IterateAndPipeTask pai = new IterateAndPipeTask(pipe, iter, 0);
 		while(pai.pushNext());
 	}
 
-	static CloseableIteration<BindingSet, QueryEvaluationException> consumeAndQueue(Consumer<BindingSetPipe> action, QueryModelNode node) {
+    /**
+     * Asynchronously pushes to a pipe using the push action, and returns an iteration of binding sets to pull from.
+     * @param pushAction action to push to the pipe
+     * @param node an implementation of any {@QueryModelNode} sub-type, typically a {@code ValueExpression}, {@Code UpdateExpression} or {@TupleExpression}
+     * @return iteration of binding sets to pull from.
+     */
+	static CloseableIteration<BindingSet, QueryEvaluationException> pushAndPull(Consumer<BindingSetPipe> pushAction, QueryModelNode node) {
         int priority = getPriorityForNode(node);
         BindingSetPipeQueue queue = new BindingSetPipeQueue();
-        EXECUTOR.execute(new PipeAndConsumer(queue.pipe, action, priority));
+        EXECUTOR.execute(new PipeAndQueueTask(queue.pipe, pushAction, priority));
         return queue.iteration;
 	}
 
@@ -114,8 +120,12 @@ final class HalyardEvaluationExecutor {
             return p;
         } else {
             QueryModelNode root = node;
-            while (root.getParentNode() != null) root = root.getParentNode(); //traverse to the root of the query model
-            final AtomicInteger counter = new AtomicInteger(root instanceof ServiceRoot ? getPriorityForNode(((ServiceRoot)root).originalServiceArgs) : 0); //starting priority for ServiceRoot must be evaluated from the original service args node
+            while (root.getParentNode() != null) {
+            	root = root.getParentNode(); //traverse to the root of the query model
+            }
+            //starting priority for ServiceRoot must be evaluated from the original service args node
+            int startingPriority = root instanceof ServiceRoot ? getPriorityForNode(((ServiceRoot)root).originalServiceArgs) : 0;
+            final AtomicInteger counter = new AtomicInteger(startingPriority);
             final AtomicInteger ret = new AtomicInteger();
 
             new AbstractQueryModelVisitor<RuntimeException>() {
@@ -123,7 +133,9 @@ final class HalyardEvaluationExecutor {
                 protected void meetNode(QueryModelNode n) throws RuntimeException {
                     int pp = counter.getAndIncrement();
                     PRIORITY_MAP_CACHE.put(n, pp);
-                    if (n == node || n == node.getParentNode()) ret.set(pp);
+                    if (n == node || n == node.getParentNode()) {
+                    	ret.set(pp);
+                    }
                     super.meetNode(n);
                 }
 
@@ -139,7 +151,9 @@ final class HalyardEvaluationExecutor {
                     n.visitChildren(this);
                     int pp = counter.getAndIncrement();
                     PRIORITY_MAP_CACHE.put(n, pp);
-                    if (n == node) ret.set(pp);
+                    if (n == node) {
+                    	ret.set(pp);
+                    }
                     counter.getAndUpdate((int count) -> 2 * count - checkpoint + 1); //at least double the distance to have a space for service optimizations
                 }
 
@@ -157,28 +171,38 @@ final class HalyardEvaluationExecutor {
 
 
     static abstract class PrioritizedTask implements Comparable<PrioritizedTask>, Runnable {
-    	final int priority;
+    	static final int MIN_SUB_PRIORITY = 0;
+    	static final int MAX_SUB_PRIORITY = 999;
+    	final int queryPriority;
 
-    	PrioritizedTask(int priority) {
-    		this.priority = priority;
+    	PrioritizedTask(int queryPriority) {
+    		this.queryPriority = queryPriority;
     	}
 
-    	public final int getPriority() {
-    		return priority;
+    	public final int getTaskPriority() {
+    		return 1000*queryPriority + getSubPriority();
     	}
+
+    	/**
+    	 * Task sub-priority.
+    	 * @return MIN_SUB_PRIORITY to MAX_SUB_PRIORITY inclusive
+    	 */
+    	protected abstract int getSubPriority();
 
     	@Override
 		public final int compareTo(PrioritizedTask o) {
-			return o.priority - this.priority;
+    		// descending order
+			return o.getTaskPriority() - this.getTaskPriority();
 		}
     }
 
     /**
      * A holder for the BindingSetPipe and the iterator over a tree of query sub-parts
      */
-    static final class PipeAndIteration extends PrioritizedTask {
+    static final class IterateAndPipeTask extends PrioritizedTask {
         private final BindingSetPipe pipe;
         private final CloseableIteration<BindingSet, QueryEvaluationException> iter;
+        private final AtomicInteger pushPriority = new AtomicInteger();
 
         /**
          * Constructor for the class with the supplied variables
@@ -186,7 +210,7 @@ final class HalyardEvaluationExecutor {
          * @param iter The iterator over the evaluation tree
          * @param priority the 'level' of the evaluation in the over-all tree
          */
-		PipeAndIteration(BindingSetPipe pipe,
+		IterateAndPipeTask(BindingSetPipe pipe,
 				CloseableIteration<BindingSet, QueryEvaluationException> iter,
 				int priority) {
 			super(priority);
@@ -207,6 +231,7 @@ final class HalyardEvaluationExecutor {
                         }
                 	} else {
             			pipe.close();
+            			iter.close();
             		}
             	} else {
             		iter.close();
@@ -220,28 +245,39 @@ final class HalyardEvaluationExecutor {
 		@Override
     	public void run() {
         	if (pushNext()) {
+        		pushPriority.updateAndGet(count -> (count < MAX_SUB_PRIORITY) ? count+1 : MAX_SUB_PRIORITY);
                 EXECUTOR.execute(this);
         	}
     	}
+
+		@Override
+		protected int getSubPriority() {
+			return pushPriority.get();
+		}
     }
 
-    static final class PipeAndConsumer extends PrioritizedTask {
+    static final class PipeAndQueueTask extends PrioritizedTask {
         private final BindingSetPipe pipe;
-        private final Consumer<BindingSetPipe> action;
+        private final Consumer<BindingSetPipe> pushAction;
 
-		PipeAndConsumer(BindingSetPipe pipe, Consumer<BindingSetPipe> action, int priority) {
+		PipeAndQueueTask(BindingSetPipe pipe, Consumer<BindingSetPipe> pushAction, int priority) {
 			super(priority);
 			this.pipe = pipe;
-			this.action = action;
+			this.pushAction = pushAction;
 		}
 
 		@Override
 		public void run() {
 			try {
-				action.accept(pipe);
+				pushAction.accept(pipe);
 			} catch(RuntimeException e) {
 				pipe.handleException(e);
 			}
+		}
+
+		@Override
+		protected int getSubPriority() {
+			return MIN_SUB_PRIORITY;
 		}
     }
 
@@ -257,7 +293,7 @@ final class HalyardEvaluationExecutor {
         final BindingSetPipeIteration iteration = new BindingSetPipeIteration();
         final QueueingBindingSetPipe pipe = new QueueingBindingSetPipe();
 
-        @Override
+    	@Override
         public String toString() {
         	return "Queue "+Integer.toHexString(queue.hashCode());
         }
@@ -276,8 +312,10 @@ final class HalyardEvaluationExecutor {
                         	throw new QueryEvaluationException(exception);
                         }
 
-						if (checkThreads(retries)) {
-							retries = 0;
+						if (bs == null) {
+							if(checkThreads(retries)) {
+								retries = 0;
+							}
 						}
                     }
                 } catch (InterruptedException ex) {
@@ -311,8 +349,10 @@ final class HalyardEvaluationExecutor {
             	for (int retries = 0; !added && !isClosed(); retries++) {
             		added = queue.offer(bs, POLL_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
 
-					if (checkThreads(retries)) {
-						retries = 0;
+					if (!added) {
+						if(checkThreads(retries)) {
+							retries = 0;
+						}
 					}
             	}
             	return added;

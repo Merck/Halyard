@@ -169,8 +169,9 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 					}
 				}
 				Result res = rs.next();
-				if (ticker != null)
+				if (ticker != null) {
 					ticker.tick(); // sends a tick for keep alive purposes
+				}
 				if (res == null) { // no more results from this ResultScanner, close and clean up.
 					rs.close();
 					rs = null;
