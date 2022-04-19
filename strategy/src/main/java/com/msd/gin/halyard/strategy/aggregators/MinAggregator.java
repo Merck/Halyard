@@ -36,7 +36,7 @@ public class MinAggregator extends Aggregator {
 		Value v = evaluate(bs);
 		if (v != null && distinctValue(v)) {
 			min.accumulateAndGet(v, (current,next) -> {
-				if (current == null || Aggregator.COMPARATOR.compare(next, current) < 0) {
+				if (current == null || comparator.compare(next, current) < 0) {
 					return next;
 				} else {
 					return current;

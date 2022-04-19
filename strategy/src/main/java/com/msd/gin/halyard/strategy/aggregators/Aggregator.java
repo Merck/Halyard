@@ -30,11 +30,12 @@ import org.eclipse.rdf4j.query.algebra.AbstractAggregateOperator;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExtendedEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
 
 public abstract class Aggregator implements AutoCloseable {
-	protected static final ValueComparator COMPARATOR = new ValueComparator();
 	protected static final Literal ZERO = SimpleValueFactory.getInstance().createLiteral(BigInteger.ZERO);
+	protected final ValueComparator comparator = new ValueComparator();
 	private final ValueExpr arg;
 	private final boolean isDistinct;
 	private final EvaluationStrategy strategy;
@@ -44,6 +45,9 @@ public abstract class Aggregator implements AutoCloseable {
 		this.arg = op.getArg();
 		this.isDistinct = op.isDistinct();
 		this.strategy = strategy;
+		if (strategy instanceof ExtendedEvaluationStrategy) {
+			comparator.setStrict(false);
+		}
 	}
 
 	protected final ValueExpr getArg() {
