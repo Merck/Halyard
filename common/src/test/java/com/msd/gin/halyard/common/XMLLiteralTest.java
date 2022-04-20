@@ -1,20 +1,19 @@
 package com.msd.gin.halyard.common;
 
 import org.eclipse.rdf4j.model.Literal;
-import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
-
-public class XMLLiteralTest {
-	@Test
-	public void testEqualsHashcode() throws Exception {
+public class XMLLiteralTest extends AbstractCustomLiteralTest {
+	@Override
+	protected Literal createLiteral() throws Exception {
 		String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>";
-		Literal expected = SimpleValueFactory.getInstance().createLiteral(xml, RDF.XMLLITERAL);
-		Literal actual = new XMLLiteral(xml);
-		assertEquals(expected.hashCode(), actual.hashCode());
-		assertTrue(expected.equals(actual));
+		return new XMLLiteral(xml);
+	}
+
+	@Override
+	protected Literal createOtherLiteral() throws Exception {
+		String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><test>foobar</test>";
+		return new XMLLiteral(xml);
 	}
 
 	@Test
