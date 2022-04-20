@@ -30,7 +30,7 @@ import org.junit.runners.Parameterized;
 import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
-public class IdentifiableValueIOTest {
+public class RDFFactoryTest {
     private static final RDFFactory rdfFactory = RDFFactory.create();
 	private static final Date NOW = new Date();
 
@@ -84,7 +84,7 @@ public class IdentifiableValueIOTest {
 
 	private Value expected;
 
-	public IdentifiableValueIOTest(Value v) {
+	public RDFFactoryTest(Value v) {
 		this.expected = v;
 	}
 
@@ -139,28 +139,28 @@ public class IdentifiableValueIOTest {
 		assertEquals("isTriple", expected.isTriple(), id.isTriple());
 
 		if (expected instanceof Literal) {
+			IRI dt = ((Literal)expected).getDatatype();
+			assertEquals("isString", XSD.STRING.equals(dt) || RDF.LANGSTRING.equals(dt), id.isString());
 			RDFObject obj = rdfFactory.createObject(expected);
 			assertRDFValueHashes(id, obj);
+		} else if (expected instanceof IRI) {
+			RDFObject obj = rdfFactory.createObject(expected);
+			assertRDFValueHashes(id, obj);
+			RDFSubject subj = rdfFactory.createSubject((IRI) expected);
+			assertRDFValueHashes(id, subj);
+			RDFContext ctx = rdfFactory.createContext((IRI) expected);
+			assertRDFValueHashes(id, ctx);
+			RDFPredicate pred = rdfFactory.createPredicate((IRI) expected);
+			assertRDFValueHashes(id, pred);
+		} else if (expected instanceof BNode) {
+			RDFObject obj = rdfFactory.createObject(expected);
+			assertRDFValueHashes(id, obj);
+			RDFSubject subj = rdfFactory.createSubject((Resource) expected);
+			assertRDFValueHashes(id, subj);
+			RDFContext ctx = rdfFactory.createContext((Resource) expected);
+			assertRDFValueHashes(id, ctx);
 		} else {
-			if (expected instanceof IRI) {
-				RDFObject obj = rdfFactory.createObject(expected);
-				assertRDFValueHashes(id, obj);
-				RDFSubject subj = rdfFactory.createSubject((IRI) expected);
-				assertRDFValueHashes(id, subj);
-				RDFContext ctx = rdfFactory.createContext((IRI) expected);
-				assertRDFValueHashes(id, ctx);
-				RDFPredicate pred = rdfFactory.createPredicate((IRI) expected);
-				assertRDFValueHashes(id, pred);
-			} else if (expected instanceof BNode) {
-				RDFObject obj = rdfFactory.createObject(expected);
-				assertRDFValueHashes(id, obj);
-				RDFSubject subj = rdfFactory.createSubject((Resource) expected);
-				assertRDFValueHashes(id, subj);
-				RDFContext ctx = rdfFactory.createContext((Resource) expected);
-				assertRDFValueHashes(id, ctx);
-			} else {
-				throw new AssertionError();
-			}
+			throw new AssertionError();
 		}
 	}
 

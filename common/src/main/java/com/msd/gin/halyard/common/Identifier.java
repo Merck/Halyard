@@ -2,7 +2,11 @@ package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
 
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 
 public final class Identifier {
 	static final byte LITERAL_STOP_BITS = (byte) 0x40;
@@ -12,13 +16,21 @@ public final class Identifier {
 	private static final byte BNODE_TYPE_BITS = (byte) 0xC0;
 	private static final byte TYPE_MASK = (byte) 0xC0;
 	private static final byte CLEAR_TYPE_MASK = ~TYPE_MASK;
+	private static final byte NONSTRING_DATATYPE_BITS = (byte) 0x00;
+	private static final byte STRING_DATATYPE_BITS = (byte) 0x20;
+	private static final byte DATATYPE_MASK = (byte) 0x20;
+	private static final byte CLEAR_DATATYPE_MASK = ~DATATYPE_MASK;
 
 	static Identifier create(Value v, byte[] hash, int typeIndex) {
 		byte typeBits;
+		byte dtBits = 0;
 		if (v.isIRI()) {
 			typeBits = IRI_TYPE_BITS;
 		} else if (v.isLiteral()) {
 			typeBits = LITERAL_TYPE_BITS;
+			IRI dt = ((Literal)v).getDatatype();
+			boolean isString = XSD.STRING.equals(dt) || RDF.LANGSTRING.equals(dt);
+			dtBits = isString ? STRING_DATATYPE_BITS : NONSTRING_DATATYPE_BITS;
 		} else if (v.isBNode()) {
 			typeBits = BNODE_TYPE_BITS;
 		} else if (v.isTriple()) {
@@ -26,7 +38,11 @@ public final class Identifier {
 		} else {
 			throw new AssertionError(String.format("Unexpected RDF value: %s", v.getClass()));
 		}
-		hash[typeIndex] = (byte) ((hash[typeIndex] & CLEAR_TYPE_MASK) | typeBits);
+		byte typeByte = (byte) ((hash[typeIndex] & CLEAR_TYPE_MASK) | typeBits);
+		if (typeBits == LITERAL_TYPE_BITS) {
+			typeByte = (byte) ((typeByte & CLEAR_DATATYPE_MASK) | dtBits);
+		}
+		hash[typeIndex] = typeByte;
 		return new Identifier(hash, typeIndex);
 	}
 
@@ -62,6 +78,10 @@ public final class Identifier {
 
 	public final boolean isTriple() {
 		return (value[typeIndex] & TYPE_MASK) == TRIPLE_TYPE_BITS;
+	}
+
+	public final boolean isString() {
+		return isLiteral() && (value[typeIndex] & DATATYPE_MASK) == STRING_DATATYPE_BITS;
 	}
 
 	public ByteBuffer writeTo(ByteBuffer bb) {

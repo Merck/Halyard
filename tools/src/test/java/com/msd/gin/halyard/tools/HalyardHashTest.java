@@ -63,6 +63,6 @@ public class HalyardHashTest extends AbstractHalyardToolTest {
         conf.set("halyard.id.hash", "Murmur3-128");
         conf.setInt("halyard.id.size", 1);
         conf.setBoolean("halyard.vocabularies", false);
-        assertEquals(88, run(conf, new String[]{"-s", file.toURI().toURL().toString()}));
+        assertEquals(86, run(conf, new String[]{"-s", file.toURI().toURL().toString()}));
     }
 }

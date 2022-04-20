@@ -10,7 +10,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.*;
 
-public class IdentifiableValueIOExtendedTest {
+public class RDFFactoryExtendedTest {
     private static final RDFFactory rdfFactory = RDFFactory.create();
 
 	@Test
