@@ -61,6 +61,7 @@ public final class WIKIDATA implements Vocabulary {
 
     // common ID namespaces
     public static final Namespace DOI_NS = new SimpleNamespace("doi", "http://dx.doi.org/");
+    public static final Namespace ISBN_NS = new SimpleNamespace("isbn", "urn:ISBN:");
     public static final Namespace ORCID_NS = new SimpleNamespace("orcid", "https://orcid.org/");
     public static final Namespace GKG_NS = new SimpleNamespace("gkg", "http://g.co/kg/g/");
     public static final Namespace FREEBASE_NS = new SimpleNamespace("freebase", "http://g.co/kg/m/");
@@ -71,6 +72,19 @@ public final class WIKIDATA implements Vocabulary {
     public static final Namespace LOC_NS = new SimpleNamespace("loc", "http://id.loc.gov/authorities/names/");
     public static final Namespace VIAF_NS = new SimpleNamespace("viaf", "http://viaf.org/viaf/");
     public static final Namespace MAG_NS = new SimpleNamespace("mag", "http://ma-graph.org/entity/");
+    public static final Namespace MESH_NS = new SimpleNamespace("mesh", "http://id.nlm.nih.gov/mesh/");
+    public static final Namespace EUNIS_NS = new IntegerNamespace("eunis", "http://eunis.eea.europa.eu/species/");
+    public static final Namespace BABELNET_NS = new SimpleNamespace("babel", "http://babelnet.org/rdf/");
+    public static final Namespace OS_NS = new IntegerNamespace("os", "http://data.ordnancesurvey.co.uk/id/");
+    public static final Namespace MUSICBRAINZ_AREA_NS = new UUIDNamespace("mb_area", "http://musicbrainz.org/area/");
+    public static final Namespace MUSICBRAINZ_ARTIST_NS = new UUIDNamespace("mb_artist", "http://musicbrainz.org/artist/");
+    public static final Namespace MUSICBRAINZ_EVENT_NS = new UUIDNamespace("mb_event", "http://musicbrainz.org/event/");
+    public static final Namespace MUSICBRAINZ_INSTRUMENT_NS = new UUIDNamespace("mb_instrument", "http://musicbrainz.org/instrument/");
+    public static final Namespace MUSICBRAINZ_PLACE_NS = new UUIDNamespace("mb_place", "http://musicbrainz.org/place/");
+    public static final Namespace MUSICBRAINZ_RECORDING_NS = new UUIDNamespace("mb_recording", "http://musicbrainz.org/recording/");
+    public static final Namespace MUSICBRAINZ_RELEASE_GROUP_NS = new UUIDNamespace("mb_release_group", "http://musicbrainz.org/release-group/");
+    public static final Namespace MUSICBRAINZ_RELEASE_NS = new UUIDNamespace("mb_release", "http://musicbrainz.org/release/");
+    public static final Namespace MUSICBRAINZ_SERIES_NS = new UUIDNamespace("mb_series", "http://musicbrainz.org/series/");
 
     public static final Namespace EN_WIKIPEDIA = new SimpleNamespace("wiki_en", "https://en.wikipedia.org/");
     public static final Namespace FR_WIKIPEDIA = new SimpleNamespace("wiki_fr", "https://fr.wikipedia.org/");

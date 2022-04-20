@@ -6,7 +6,9 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.kohsuke.MetaInfServices;
 
+@MetaInfServices(Vocabulary.class)
 public final class CC implements Vocabulary {
     private static final SimpleValueFactory SVF = SimpleValueFactory.getInstance();
 

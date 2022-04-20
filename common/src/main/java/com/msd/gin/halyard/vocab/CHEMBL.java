@@ -4,7 +4,9 @@ import com.msd.gin.halyard.common.Vocabulary;
 
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
+import org.kohsuke.MetaInfServices;
 
+@MetaInfServices(Vocabulary.class)
 public final class CHEMBL implements Vocabulary {
 
     public static final String PREFIX = "cco";
