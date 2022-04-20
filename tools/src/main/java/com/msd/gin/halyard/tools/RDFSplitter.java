@@ -37,6 +37,9 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		Path inputFile = Paths.get(args[0]);
 		Path outputDir = Paths.get(args[1]);
 		int numParts = Integer.parseInt(args[2]);
+		if (numParts < 1) {
+			throw new IllegalArgumentException("Number of parts must be at least one.");
+		}
 		String outExt = args.length > 3 ? args[3] : null;
 		int numThreads = args.length > 4 ? Integer.parseInt(args[4]) : 1;
 
@@ -52,8 +55,14 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		RDFFormat outFormat = getWriterFormatForName(outExt);
 
 		RDFFile[] files = new RDFFile[numParts];
-		for (int i=0; i<files.length; i++) {
-			files[i] = new RDFFile(outFormat, outCompression, outputDir.resolve(outBaseName+"_"+(i+1)+outExt));
+		if (numParts > 1) {
+			for (int i=0; i<files.length; i++) {
+				String outName = outBaseName + "_" + Integer.toString(i+1) + outExt;
+				files[i] = new RDFFile(outFormat, outCompression, outputDir.resolve(outName));
+			}
+		} else {
+			String outName = outBaseName + (outExt.equals(inExt) ? "_out" : "") + outExt;
+			files[0] = new RDFFile(outFormat, outCompression, outputDir.resolve(outName));
 		}
 		RDFFile bnodeFile;
 		if (numParts > 1 || numThreads > 1) {
