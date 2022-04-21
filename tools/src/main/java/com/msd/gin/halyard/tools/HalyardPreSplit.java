@@ -150,7 +150,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         );
         addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, optional HBase namespace of the target table must already exist", true, true);
-        addOption("i", "skip-invalid", null, "Optionally skip invalid source files and parsing errors", false, false);
+        addOption("i", "allow-invalid", null, "Optionally allow invalid IRI values (less overhead)", false, false);
         addOption("g", "default-named-graph", "named_graph", "Optionally specify default target named graph", false, true);
         addOption("o", "named-graph-override", null, "Optionally override named graph also for quads, named graph is stripped from quads if --default-named-graph option is not specified", false, false);
         addOption("d", "decimation-factor", "decimation_factor", "Optionally overide pre-split random decimation factor (default is 1000)", false, true);
