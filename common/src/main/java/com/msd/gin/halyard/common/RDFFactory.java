@@ -46,10 +46,10 @@ public class RDFFactory {
 	private final ValueIO valueIO;
 	private final ValueFactory valueFactory;
 	private final ValueFactory tsValueFactory;
-	final RDFRole subject;
-	final RDFRole predicate;
-	final RDFRole object;
-	final RDFRole context;
+	final RDFRole<RDFSubject> subject;
+	final RDFRole<RDFPredicate> predicate;
+	final RDFRole<RDFObject> object;
+	final RDFRole<RDFContext> context;
 
 	public static RDFFactory create() {
 		Configuration conf = HBaseConfiguration.create();
@@ -138,27 +138,33 @@ public class RDFFactory {
 			}
 		}
 
-		this.subject = new RDFRole(
+		this.subject = new RDFRole<>(
+			RDFRole.Name.SUBJECT,
+			idSize,
 			RDFSubject.KEY_SIZE,
 			RDFSubject.END_KEY_SIZE,
-			0, 2, 1
+			0, 2, 1, typeIndex
 		);
-		this.predicate = new RDFRole(
+		this.predicate = new RDFRole<>(
+			RDFRole.Name.PREDICATE,
+			idSize,
 			RDFPredicate.KEY_SIZE,
 			RDFPredicate.END_KEY_SIZE,
-			1, 0, 2
+			1, 0, 2, typeIndex
 		);
-		this.object = new RDFRole(
+		this.object = new RDFRole<>(
+			RDFRole.Name.OBJECT,
+			idSize,
 			RDFObject.KEY_SIZE,
 			RDFObject.END_KEY_SIZE,
-			2, 1,
-			// NB: preserve type flags (isLiteral) for literal scanning
-			0
+			2, 1, 0, typeIndex
 		);
-		this.context = new RDFRole(
+		this.context = new RDFRole<>(
+			RDFRole.Name.CONTEXT,
+			idSize,
 			RDFContext.KEY_SIZE,
 			-1,
-			0, 0, 0
+			0, 0, 0, typeIndex
 		);
 	}
 

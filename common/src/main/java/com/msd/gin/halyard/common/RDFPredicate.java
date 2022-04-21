@@ -5,7 +5,7 @@ import javax.annotation.Nullable;
 import org.eclipse.rdf4j.model.IRI;
 
 public final class RDFPredicate extends RDFValue<IRI> {
-	static RDFPredicate create(RDFRole role, @Nullable IRI pred, RDFFactory rdfFactory) {
+	static RDFPredicate create(RDFRole<RDFPredicate> role, @Nullable IRI pred, RDFFactory rdfFactory) {
 		if(pred == null) {
 			return null;
 		}
@@ -20,7 +20,7 @@ public final class RDFPredicate extends RDFValue<IRI> {
 	static final byte[] STOP_KEY = HalyardTableUtils.STOP_KEY_32;
 	static final byte[] END_STOP_KEY = HalyardTableUtils.STOP_KEY_16;
 
-	private RDFPredicate(RDFRole role, IRI val, RDFFactory rdfFactory) {
+	private RDFPredicate(RDFRole<RDFPredicate> role, IRI val, RDFFactory rdfFactory) {
 		super(role, val, rdfFactory);
 	}
 }

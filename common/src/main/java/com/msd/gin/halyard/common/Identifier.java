@@ -46,54 +46,63 @@ public final class Identifier {
 		return new Identifier(hash, typeIndex);
 	}
 
-	private final byte[] value;
+	private final byte[] idBytes;
 	private final int typeIndex;
 	private final int hashcode;
 
-	Identifier(byte[] value, int typeIndex) {
-		this.value = value;
+	Identifier(byte[] idBytes, int typeIndex) {
+		this.idBytes = idBytes;
 		this.typeIndex = typeIndex;
-		int h = value[0] & 0xFF;
-		for (int i=1; i<Math.min(value.length, 4); i++) {
-			h = (h << 8) | (value[i] & 0xFF);
+		int h = idBytes[0] & 0xFF;
+		for (int i=1; i<Math.min(idBytes.length, 4); i++) {
+			h = (h << 8) | (idBytes[i] & 0xFF);
 		}
 		this.hashcode = h;
 	}
 
 	public int size() {
-		return value.length;
+		return idBytes.length;
 	}
 
-	public final boolean isIRI() {
-		return (value[typeIndex] & TYPE_MASK) == IRI_TYPE_BITS;
+	public boolean isIRI() {
+		return (idBytes[typeIndex] & TYPE_MASK) == IRI_TYPE_BITS;
 	}
 
-	public final boolean isLiteral() {
-		return (value[typeIndex] & TYPE_MASK) == LITERAL_TYPE_BITS;
+	public boolean isLiteral() {
+		return (idBytes[typeIndex] & TYPE_MASK) == LITERAL_TYPE_BITS;
 	}
 
-	public final boolean isBNode() {
-		return (value[typeIndex] & TYPE_MASK) == BNODE_TYPE_BITS;
+	public boolean isBNode() {
+		return (idBytes[typeIndex] & TYPE_MASK) == BNODE_TYPE_BITS;
 	}
 
-	public final boolean isTriple() {
-		return (value[typeIndex] & TYPE_MASK) == TRIPLE_TYPE_BITS;
+	public boolean isTriple() {
+		return (idBytes[typeIndex] & TYPE_MASK) == TRIPLE_TYPE_BITS;
 	}
 
-	public final boolean isString() {
-		return isLiteral() && (value[typeIndex] & DATATYPE_MASK) == STRING_DATATYPE_BITS;
+	public boolean isString() {
+		return isLiteral() && (idBytes[typeIndex] & DATATYPE_MASK) == STRING_DATATYPE_BITS;
 	}
 
 	public ByteBuffer writeTo(ByteBuffer bb) {
-		return bb.put(value);
+		return bb.put(idBytes);
 	}
 
 	ByteBuffer writeSliceTo(int offset, int len, ByteBuffer bb) {
-		return bb.put(value, offset, len);
+		return bb.put(idBytes, offset, len);
 	}
 
-	final byte[] rotate(int offset, int len, int shift, byte[] dest) {
-		return RDFRole.rotateRight(value, offset, len, shift, dest);
+	byte[] rotate(int len, int shift, byte[] dest) {
+		byte[] rotated = RDFRole.rotateRight(idBytes, 0, len, shift, dest);
+		if (shift != 0) {
+			// preserve position of type byte
+			int shiftedTypeIndex = (typeIndex + shift) % len;
+			byte typeByte = rotated[shiftedTypeIndex];
+			byte tmp = rotated[typeIndex];
+			rotated[typeIndex] = typeByte;
+			rotated[shiftedTypeIndex] = tmp;
+		}
+		return rotated;
 	}
 
 	@Override
@@ -105,11 +114,11 @@ public final class Identifier {
 			return false;
 		}
 		Identifier that = (Identifier) o;
-		if (this.value.length != that.value.length) {
+		if (this.idBytes.length != that.idBytes.length) {
 			return false;
 		}
-		for (int i=this.value.length-1; i>=0; i--) {
-			if (this.value[i] != that.value[i]) {
+		for (int i=this.idBytes.length-1; i>=0; i--) {
+			if (this.idBytes[i] != that.idBytes[i]) {
 				return false;
 			}
 		}
@@ -123,6 +132,6 @@ public final class Identifier {
 
 	@Override
 	public String toString() {
-		return Hashes.encode(value);
+		return Hashes.encode(idBytes);
 	}
 }

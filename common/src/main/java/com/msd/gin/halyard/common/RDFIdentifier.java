@@ -3,19 +3,19 @@ package com.msd.gin.halyard.common;
 import java.nio.ByteBuffer;
 
 public class RDFIdentifier {
-	private final RDFRole role;
+	private final RDFRole<?> role;
 	private Identifier id;
 
-	RDFIdentifier(RDFRole role, Identifier id) {
+	RDFIdentifier(RDFRole<?> role, Identifier id) {
 		this(role);
 		this.id = id;
 	}
 
-	protected RDFIdentifier(RDFRole role) {
+	protected RDFIdentifier(RDFRole<?> role) {
 		this.role = role;
 	}
 
-	public final RDFRole getRole() {
+	public final RDFRole<?> getRole() {
 		return role;
 	}
 
@@ -55,11 +55,11 @@ public class RDFIdentifier {
 	}
 
 	final int qualifierHashSize() {
-		return role.qualifierHashSize(getId().size());
+		return role.qualifierHashSize();
 	}
 
 	final int endQualifierHashSize() {
-		return role.endQualifierHashSize(getId().size());
+		return role.endQualifierHashSize();
 	}
 
 	@Override

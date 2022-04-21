@@ -15,7 +15,7 @@ public abstract class RDFValue<V extends Value> extends RDFIdentifier {
 	}
 
 
-	protected RDFValue(RDFRole role, V val, RDFFactory valueIO) {
+	protected RDFValue(RDFRole<?> role, V val, RDFFactory valueIO) {
 		super(role);
 		this.val = Objects.requireNonNull(val);
 		this.rdfFactory = Objects.requireNonNull(valueIO);

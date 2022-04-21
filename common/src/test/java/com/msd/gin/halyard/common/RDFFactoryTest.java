@@ -166,22 +166,25 @@ public class RDFFactoryTest {
 
 	private static void assertRDFValueHashes(Identifier id, RDFValue<?> v) {
 		for(StatementIndex idx : StatementIndex.values()) {
+			String testName = v.toString() + " for " + idx.toString();
 			byte[] keyHash = v.getKeyHash(idx);
-			assertEquals(v.keyHashSize(), keyHash.length);
+			int keyHashSize = v.keyHashSize();
+			assertEquals(testName, keyHashSize, keyHash.length);
 
-			ByteBuffer idxId = ByteBuffer.allocate(rdfFactory.getIdSize());
-			idxId.put(v.getRole().unrotate(keyHash, idx));
-			v.writeQualifierHashTo(idxId);
-			assertEquals(id, rdfFactory.id(idxId.array()));
+			byte[] idxIdBytes = new byte[rdfFactory.getIdSize()];
+			v.getRole().unrotate(keyHash, 0, keyHashSize, idx, idxIdBytes);
+			v.writeQualifierHashTo(ByteBuffer.wrap(idxIdBytes, keyHashSize, idxIdBytes.length-keyHashSize));
+			assertEquals(testName, id, rdfFactory.id(idxIdBytes));
 
 			if(!(v instanceof RDFContext)) { // context doesn't have end-hashes
 				byte[] endKeyHash = v.getEndKeyHash(idx);
-				assertEquals(v.endKeyHashSize(), endKeyHash.length);
+				int endKeyHashSize = v.endKeyHashSize();
+				assertEquals(testName, endKeyHashSize, endKeyHash.length);
 
-				ByteBuffer cidxId = ByteBuffer.allocate(rdfFactory.getIdSize());
-				cidxId.put(v.getRole().unrotate(endKeyHash, idx));
-				v.writeEndQualifierHashTo(cidxId);
-				assertEquals(id, rdfFactory.id(cidxId.array()));
+				byte[] cidxIdBytes = new byte[rdfFactory.getIdSize()];
+				v.getRole().unrotate(endKeyHash, 0, endKeyHashSize, idx, cidxIdBytes);
+				v.writeEndQualifierHashTo(ByteBuffer.wrap(cidxIdBytes, endKeyHashSize, cidxIdBytes.length-endKeyHashSize));
+				assertEquals(testName, id, rdfFactory.id(cidxIdBytes));
 			}
 		}
 	}

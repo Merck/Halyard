@@ -303,7 +303,7 @@ public enum StatementIndex {
 		}
 	}
 
-    private static <V extends Value> V parseShortRDFValue(StatementIndex index, RDFRole role, @Nullable RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader, RDFFactory rdfFactory) {
+    private static <V extends Value, T extends RDFValue<V>> V parseShortRDFValue(StatementIndex index, RDFRole<T> role, @Nullable T pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader, RDFFactory rdfFactory) {
     	byte marker = cv.get(cv.position()); // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -314,7 +314,7 @@ public enum StatementIndex {
    		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, reader, rdfFactory);
     }
 
-    private static <V extends Value> V parseIntRDFValue(StatementIndex index, RDFRole role, @Nullable RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader, RDFFactory rdfFactory) {
+    private static <V extends Value, T extends RDFValue<V>> V parseIntRDFValue(StatementIndex index, RDFRole<T> role, @Nullable T pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader, RDFFactory rdfFactory) {
     	byte marker = cv.get(cv.position()); // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -325,7 +325,7 @@ public enum StatementIndex {
    		return parseRDFValue(index, role, pattern, key, cn, cv, keySize, len, reader, rdfFactory);
     }
 
-    private static <V extends Value> V parseLastRDFValue(StatementIndex index, RDFRole role, @Nullable RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader, RDFFactory rdfFactory) {
+    private static <V extends Value, T extends RDFValue<V>> V parseLastRDFValue(StatementIndex index, RDFRole<T> role, @Nullable T pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, ValueIO.Reader reader, RDFFactory rdfFactory) {
     	byte marker = cv.hasRemaining() ? cv.get(cv.position()) : 0; // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
@@ -337,7 +337,7 @@ public enum StatementIndex {
     }
 
     @SuppressWarnings("unchecked")
-	private static <V extends Value> V parseRDFValue(StatementIndex index, RDFRole role, @Nullable RDFValue<V> pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, int len, ValueIO.Reader reader, RDFFactory rdfFactory) {
+	private static <V extends Value, T extends RDFValue<V>> V parseRDFValue(StatementIndex index, RDFRole<T> role, @Nullable T pattern, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, int keySize, int len, ValueIO.Reader reader, RDFFactory rdfFactory) {
     	if(pattern != null) {
     		// if we have been given the value then don't bother to read it and skip to the next
     		skipId(key, cn, keySize, rdfFactory.getIdSize());
@@ -369,7 +369,7 @@ public enum StatementIndex {
 		}
     }
 
-	private static Identifier parseId(StatementIndex index, RDFRole role, ByteBuffer key, ByteBuffer cn, int keySize, RDFFactory rdfFactory) {
+	private static Identifier parseId(StatementIndex index, RDFRole<?> role, ByteBuffer key, ByteBuffer cn, int keySize, RDFFactory rdfFactory) {
 		byte[] idBytes = new byte[rdfFactory.getIdSize()];
 		role.unrotate(key.array(), key.arrayOffset() + key.position(), keySize, index, idBytes);
 		key.position(key.position()+keySize);

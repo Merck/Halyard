@@ -2,19 +2,26 @@ package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
 
-public final class RDFRole {
+public final class RDFRole<T extends RDFValue<?>> {
+	enum Name {SUBJECT, PREDICATE, OBJECT, CONTEXT};
+	private final Name name;
+	private final int idSize;
 	private final int keyHashSize;
 	private final int endKeyHashSize;
 	private final int sshift;
 	private final int pshift;
 	private final int oshift;
+	private final int typeIndex;
 
-	public RDFRole(int keyHashSize, int endKeyHashSize, int sshift, int pshift, int oshift) {
+	public RDFRole(Name name, int idSize, int keyHashSize, int endKeyHashSize, int sshift, int pshift, int oshift, int typeIndex) {
+		this.name = name;
+		this.idSize = idSize;
 		this.keyHashSize = keyHashSize;
 		this.endKeyHashSize = endKeyHashSize;
 		this.sshift = sshift;
 		this.pshift = pshift;
 		this.oshift = oshift;
+		this.typeIndex = typeIndex;
 	}
 
 	/**
@@ -31,11 +38,11 @@ public final class RDFRole {
 		return endKeyHashSize;
 	}
 
-	int qualifierHashSize(int idSize) {
+	int qualifierHashSize() {
 		return idSize - keyHashSize();
 	}
 
-	int endQualifierHashSize(int idSize) {
+	int endQualifierHashSize() {
 		return idSize - endKeyHashSize();
 	}
 
@@ -43,26 +50,26 @@ public final class RDFRole {
 		int len = keyHashSize();
 		// rotate key so ordering is different for different prefixes
 		// this gives better load distribution when traversing between prefixes
-		return rotate(id, 0, len, index, new byte[len]);
+		return id.rotate(len, toShift(index), new byte[len]);
 	}
 
 	byte[] endKeyHash(StatementIndex index, Identifier id) {
 		int len = endKeyHashSize();
-		return rotate(id, 0, len, index, new byte[len]);
+		return id.rotate(len, toShift(index), new byte[len]);
 	}
 
 	byte[] qualifierHash(Identifier id) {
-		byte[] b = new byte[qualifierHashSize(id.size())];
+		byte[] b = new byte[qualifierHashSize()];
 		writeQualifierHashTo(id, ByteBuffer.wrap(b));
 		return b;
 	}
 
 	ByteBuffer writeQualifierHashTo(Identifier id, ByteBuffer bb) {
-		return id.writeSliceTo(keyHashSize(), qualifierHashSize(id.size()), bb);
+		return id.writeSliceTo(keyHashSize(), qualifierHashSize(), bb);
 	}
 
 	ByteBuffer writeEndQualifierHashTo(Identifier id, ByteBuffer bb) {
-		return id.writeSliceTo(endKeyHashSize(), endQualifierHashSize(id.size()), bb);
+		return id.writeSliceTo(endKeyHashSize(), endQualifierHashSize(), bb);
 	}
 
 	private int toShift(StatementIndex index) {
@@ -81,24 +88,35 @@ public final class RDFRole {
 		}
 	}
 
-	private byte[] rotate(Identifier id, int offset, int len, StatementIndex index, byte[] dest) {
-		return id.rotate(offset, len, toShift(index), dest);
-	}
-
-	byte[] unrotate(byte[] src, StatementIndex index) {
-		return unrotate(src, 0, src.length, index, new byte[src.length]);
-	}
-
 	byte[] unrotate(byte[] src, int offset, int len, StatementIndex index, byte[] dest) {
-		return rotateLeft(src, offset, len, toShift(index), dest);
+		int shift = toShift(index);
+		byte[] rotated = rotateLeft(src, offset, len, shift, dest);
+		if (shift != 0) {
+			// preserve position of type byte
+			int shiftedTypeIndex = (typeIndex + len - shift) % len;
+			byte typeByte = rotated[shiftedTypeIndex];
+			byte tmp = rotated[typeIndex];
+			rotated[typeIndex] = typeByte;
+			rotated[shiftedTypeIndex] = tmp;
+		}
+		return rotated;
+	}
+
+	@Override
+	public String toString() {
+		return name.toString();
 	}
 
 	static byte[] rotateLeft(byte[] src, int offset, int len, int shift, byte[] dest) {
 		if(shift > len) {
 			shift = shift % len;
 		}
-		System.arraycopy(src, offset+shift, dest, 0, len-shift);
-		System.arraycopy(src, offset, dest, len-shift, shift);
+		if (shift != 0) {
+			System.arraycopy(src, offset+shift, dest, 0, len-shift);
+			System.arraycopy(src, offset, dest, len-shift, shift);
+		} else {
+			System.arraycopy(src, offset, dest, 0, len);
+		}
 		return dest;
 	}
 
@@ -106,8 +124,12 @@ public final class RDFRole {
 		if(shift > len) {
 			shift = shift % len;
 		}
-		System.arraycopy(src, offset+len-shift, dest, 0, shift);
-		System.arraycopy(src, offset, dest, shift, len-shift);
+		if (shift != 0) {
+			System.arraycopy(src, offset+len-shift, dest, 0, shift);
+			System.arraycopy(src, offset, dest, shift, len-shift);
+		} else {
+			System.arraycopy(src, offset, dest, 0, len);
+		}
 		return dest;
 	}
 }
