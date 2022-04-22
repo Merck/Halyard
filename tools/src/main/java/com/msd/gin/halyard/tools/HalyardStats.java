@@ -20,9 +20,7 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFIdentifier;
-import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
-import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.sail.HBaseSail;
@@ -101,11 +99,6 @@ public final class HalyardStats extends AbstractHalyardTool {
 
         final ImmutableBytesWritable outputKey = new ImmutableBytesWritable();
         final LongWritable outputValue = new LongWritable();
-        final byte[] lastSubjFragment = new byte[RDFSubject.KEY_SIZE];
-        final byte[] lastPredFragment = new byte[RDFPredicate.KEY_SIZE];
-        final byte[] lastObjFragment = new byte[RDFObject.KEY_SIZE];
-        final byte[] lastCtxFragment = new byte[RDFContext.KEY_SIZE];
-        final byte[] lastClassFragment = new byte[RDFObject.KEY_SIZE];
         final ByteArrayOutputStream baos = new ByteArrayOutputStream(128);
         ByteBuffer bb = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
     	RDFPredicate RDF_TYPE_PREDICATE;
@@ -116,6 +109,15 @@ public final class HalyardStats extends AbstractHalyardTool {
         Table table;
         RDFFactory rdfFactory;
         ValueIO.Reader valueReader;
+        int subjectKeySize;
+        int predicateKeySize;
+        int objectKeySize;
+        int contextKeySize;
+        byte[] lastSubjFragment;
+        byte[] lastPredFragment;
+        byte[] lastObjFragment;
+        byte[] lastCtxFragment;
+        byte[] lastClassFragment;
         StatementIndex lastIndex;
         long counter = 0;
         boolean update;
@@ -136,6 +138,15 @@ public final class HalyardStats extends AbstractHalyardTool {
             rdfFactory = RDFFactory.create(table);
             ValueFactory vf = rdfFactory.getValueFactory();
             valueReader = rdfFactory.createTableReader(table);
+            subjectKeySize = rdfFactory.getSubjectRole().keyHashSize();
+            predicateKeySize = rdfFactory.getPredicateRole().keyHashSize();
+            objectKeySize = rdfFactory.getObjectRole().keyHashSize();
+            contextKeySize = rdfFactory.getContextRole().keyHashSize();
+            lastSubjFragment = new byte[subjectKeySize];
+            lastPredFragment = new byte[predicateKeySize];
+            lastObjFragment = new byte[objectKeySize];
+            lastCtxFragment = new byte[contextKeySize];
+            lastClassFragment = new byte[objectKeySize];
         	RDF_TYPE_PREDICATE = rdfFactory.createPredicate(RDF.TYPE);
         	POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.POS);
         	CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.CPOS);
@@ -177,8 +188,8 @@ public final class HalyardStats extends AbstractHalyardTool {
                 hashShift = 1;
             } else {
             	// quad region
-                hashShift = RDFContext.KEY_SIZE + 1;
-                if (!matchAndCopyKey(key.get(), key.getOffset() + 1, RDFContext.KEY_SIZE, lastCtxFragment) || index != lastIndex) {
+                hashShift = 1 + contextKeySize;
+                if (!matchAndCopyKey(key.get(), key.getOffset() + 1, contextKeySize, lastCtxFragment) || index != lastIndex) {
                     cleanup(output);
 					graph = (IRI) stmts.get(0).getContext();
                 }
@@ -207,17 +218,17 @@ public final class HalyardStats extends AbstractHalyardTool {
             switch (index) {
                 case SPO:
                 case CSPO:
-                	keyLen = RDFSubject.KEY_SIZE;
+                	keyLen = subjectKeySize;
                 	lastKeyFragment = lastSubjFragment;
                     break;
                 case POS:
                 case CPOS:
-                	keyLen = RDFPredicate.KEY_SIZE;
+                	keyLen = predicateKeySize;
                 	lastKeyFragment = lastPredFragment;
                     break;
                 case OSP:
                 case COSP:
-                	keyLen = RDFObject.KEY_SIZE;
+                	keyLen = objectKeySize;
                 	lastKeyFragment = lastObjFragment;
                     break;
                 default:
@@ -271,12 +282,12 @@ public final class HalyardStats extends AbstractHalyardTool {
                     triples += stmtCount;
                     break;
                 case POS:
-                    if (Arrays.equals(POS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + RDFPredicate.KEY_SIZE, RDFObject.KEY_SIZE, lastClassFragment) || hashChange)) {
+                    if (Arrays.equals(POS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + predicateKeySize, objectKeySize, lastClassFragment) || hashChange)) {
                     	classes++;
                     }
                     break;
                 case CPOS:
-                    if (Arrays.equals(CPOS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + RDFPredicate.KEY_SIZE, RDFObject.KEY_SIZE, lastClassFragment) || hashChange)) {
+                    if (Arrays.equals(CPOS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + predicateKeySize, objectKeySize, lastClassFragment) || hashChange)) {
                     	classes++;
                     }
                     break;
@@ -520,8 +531,8 @@ public final class HalyardStats extends AbstractHalyardTool {
         addOption("g", "stats-named-graph", "target_graph", "Optional target named graph of the exported statistics (default value is '" + HALYARD.STATS_GRAPH_CONTEXT.stringValue() + "'), modification is recomended only for external export as internal Halyard optimizers expect the default value", false, true);
     }
 
-    private static Scan scan(TableName sourceTableName, StatementIndex index, RDFIdentifier key) {
-        Scan scan = index.scan(key);
+    private static Scan scan(TableName sourceTableName, StatementIndex index, RDFIdentifier key, RDFFactory rdfFactory) {
+        Scan scan = index.scan(key, rdfFactory);
         scan.setAttribute(Scan.SCAN_ATTRIBUTES_TABLE_NAME, sourceTableName.toBytes());
         return scan;
     }
@@ -563,16 +574,17 @@ public final class HalyardStats extends AbstractHalyardTool {
             scans = new ArrayList<>(4);
             ValueFactory vf = rdfFactory.getValueFactory();
             RDFContext rdfGraphCtx = rdfFactory.createContext(vf.createIRI(graphContext));
-            scans.add(scan(sourceTableName, StatementIndex.CSPO, rdfGraphCtx));
-            scans.add(scan(sourceTableName, StatementIndex.CPOS, rdfGraphCtx));
-            scans.add(scan(sourceTableName, StatementIndex.COSP, rdfGraphCtx));
+            scans.add(scan(sourceTableName, StatementIndex.CSPO, rdfGraphCtx, rdfFactory));
+            scans.add(scan(sourceTableName, StatementIndex.CPOS, rdfGraphCtx, rdfFactory));
+            scans.add(scan(sourceTableName, StatementIndex.COSP, rdfGraphCtx, rdfFactory));
             if (target == null) { //add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
 				scans.add(scan(sourceTableName, StatementIndex.CSPO,
-					rdfFactory.createContext(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : vf.createIRI(targetGraph))
+					rdfFactory.createContext(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : vf.createIRI(targetGraph)),
+					rdfFactory
 				));
             }
         } else {
-            Scan scan = StatementIndex.scanAll();
+            Scan scan = StatementIndex.scanAll(rdfFactory);
             scan.setAttribute(Scan.SCAN_ATTRIBUTES_TABLE_NAME, sourceTableName.toBytes());
             scans = Collections.singletonList(scan);
         }

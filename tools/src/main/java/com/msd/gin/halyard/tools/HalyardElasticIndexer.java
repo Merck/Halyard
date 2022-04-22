@@ -17,9 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.ValueIO;
 
@@ -78,8 +76,10 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         Table table;
         RDFFactory rdfFactory;
         ValueIO.Reader valueReader;
+        int objectKeySize;
+        int contextKeySize;
         long counter = 0, exports = 0, statements = 0;
-        byte[] lastHash = new byte[RDFObject.KEY_SIZE];
+        byte[] lastHash;
         Set<Literal> literals;
 
         @Override
@@ -88,6 +88,9 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             rdfFactory = RDFFactory.create(table);
             valueReader = rdfFactory.createTableReader(table);
+            objectKeySize = rdfFactory.getObjectRole().keyHashSize();
+            contextKeySize = rdfFactory.getContextRole().keyHashSize();
+            lastHash = new byte[objectKeySize];
         }
 
         @Override
@@ -96,8 +99,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 output.setStatus(MessageFormat.format("{0} st:{1} exp:{2} ", counter, statements, exports));
             }
 
-            byte[] hash = new byte[RDFObject.KEY_SIZE];
-            System.arraycopy(key.get(), key.getOffset() + 1 + (StatementIndex.toIndex(key.get()[key.getOffset()]).isQuadIndex() ? RDFContext.KEY_SIZE : 0), hash, 0, RDFObject.KEY_SIZE);
+            byte[] hash = new byte[objectKeySize];
+            System.arraycopy(key.get(), key.getOffset() + 1 + (StatementIndex.toIndex(key.get()[key.getOffset()]).isQuadIndex() ? contextKeySize : 0), hash, 0, objectKeySize);
             if (!Arrays.equals(hash, lastHash)) {
             	literals = new HashSet<>();
             	lastHash = hash;

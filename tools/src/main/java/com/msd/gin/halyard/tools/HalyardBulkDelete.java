@@ -188,7 +188,11 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         job.setJarByClass(HalyardBulkDelete.class);
         TableMapReduceUtil.initCredentials(job);
 
-        Scan scan = StatementIndex.scanAll();
+        RDFFactory rdfFactory;
+        try (Table table = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
+            rdfFactory = RDFFactory.create(table);
+        }
+        Scan scan = StatementIndex.scanAll(rdfFactory);
 
         TableMapReduceUtil.initTableMapperJob(source,
             scan,

@@ -196,7 +196,7 @@ public class HalyardTableUtilsScanTest {
         RDFPredicate pred = rdfFactory.createPredicate(p == null ? null : vf.createIRI(p));
         RDFObject obj = rdfFactory.createObject(o == null ? null : vf.createLiteral(o));
         RDFContext ctx = rdfFactory.createContext(c == null ? null : vf.createIRI(c));
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, ctx))) {
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(subj, pred, obj, ctx, rdfFactory))) {
             Set<Statement> res = new HashSet<>();
             Result r;
             while ((r = rs.next()) != null) {
@@ -217,9 +217,9 @@ public class HalyardTableUtilsScanTest {
                 scans.add(StatementIndex.CPOS.scan(ctx, pred, obj, subj));
                 scans.add(StatementIndex.COSP.scan(ctx, obj, subj, pred));
             } else {
-                scans.add(StatementIndex.SPO.scan(subj, pred, obj));
-                scans.add(StatementIndex.POS.scan(pred, obj, subj));
-                scans.add(StatementIndex.OSP.scan(obj, subj, pred));
+                scans.add(StatementIndex.SPO.scan(subj, pred, obj, rdfFactory));
+                scans.add(StatementIndex.POS.scan(pred, obj, subj, rdfFactory));
+                scans.add(StatementIndex.OSP.scan(obj, subj, pred, rdfFactory));
             }
             for (Scan scan : scans) {
                 try (ResultScanner rs = table.getScanner(scan)) {

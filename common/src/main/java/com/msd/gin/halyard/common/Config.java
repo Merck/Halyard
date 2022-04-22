@@ -5,6 +5,13 @@ import org.apache.hadoop.conf.Configuration;
 public final class Config {
     public static final String ID_HASH_CONFIG = "halyard.id.hash";
     public static final String ID_SIZE_CONFIG = "halyard.id.size";
+    public static final String KEY_SIZE_SUBJECT = "halyard.key.subject.size";
+    public static final String END_KEY_SIZE_SUBJECT = "halyard.endKey.subject.size";
+    public static final String KEY_SIZE_PREDICATE = "halyard.key.predicate.size";
+    public static final String END_KEY_SIZE_PREDICATE = "halyard.endKey.predicate.size";
+    public static final String KEY_SIZE_OBJECT = "halyard.key.object.size";
+    public static final String END_KEY_SIZE_OBJECT = "halyard.endKey.object.size";
+    public static final String KEY_SIZE_CONTEXT = "halyard.key.context.size";
 	
 	public static String getString(String key, String defaultValue) {
 		return System.getProperty(key, defaultValue);

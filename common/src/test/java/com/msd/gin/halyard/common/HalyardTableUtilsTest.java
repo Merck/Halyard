@@ -95,10 +95,10 @@ public class HalyardTableUtilsTest {
         RDFSubject s = rdfFactory.createSubject(subj);
         RDFPredicate p = rdfFactory.createPredicate(pred);
         RDFObject o = rdfFactory.createObject(obj);
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null, rdfFactory))) {
             assertEquals(obj, HalyardTableUtils.parseStatements(s, p, o, null, rs.next(), reader, rdfFactory).iterator().next().getObject());
         }
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, null, null))) {
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, null, null, rdfFactory))) {
             assertEquals(obj, HalyardTableUtils.parseStatements(s, p, null, null, rs.next(), reader, rdfFactory).iterator().next().getObject());
         }
     }
@@ -134,7 +134,7 @@ public class HalyardTableUtilsTest {
         RDFSubject s = rdfFactory.createSubject(subj);
         RDFPredicate p1 = rdfFactory.createPredicate(pred1);
         RDFObject o1 = rdfFactory.createObject(obj1);
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p1, o1, null))) {
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p1, o1, null, rdfFactory))) {
             List<Statement> res = HalyardTableUtils.parseStatements(s, p1, o1, null, rs.next(), reader, rdfFactory);
             assertEquals(1, res.size());
             assertTrue(res.contains(SimpleValueFactory.getInstance().createStatement(subj, pred1, obj1)));
@@ -155,11 +155,11 @@ public class HalyardTableUtilsTest {
         RDFSubject s = rdfFactory.createSubject(subj);
         RDFPredicate p = rdfFactory.createPredicate(pred);
         RDFObject o = rdfFactory.createObject(expl);
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null, rdfFactory))) {
             assertNotNull(rs.next());
         }
 		HalyardTableUtils.truncateTable(conn, table);
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null))) {
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null, rdfFactory))) {
             assertNull(rs.next());
         }
     }

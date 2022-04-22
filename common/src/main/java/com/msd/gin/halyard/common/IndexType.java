@@ -37,11 +37,11 @@ enum IndexType {
     	}
 
 		@Override
-		Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3) {
+		Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3, RDFFactory rdfFactory) {
 			byte[] k1b = k1.getKeyHash(index);
 			byte[] k2b = k2.getKeyHash(index);
 			byte[] k3b = k3.getEndKeyHash(index);
-			byte[][] stopKeys = index.newStopKeys();
+			byte[][] stopKeys = index.newStopKeys(rdfFactory);
 			stopKeys[0] = k1b;
 			stopKeys[1] = k2b;
 			stopKeys[2] = k3b;
@@ -87,11 +87,11 @@ enum IndexType {
 		}
 
 		@Override
-		Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3) {
+		Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3, RDFFactory rdfFactory) {
 			byte[] k1b = k1.getKeyHash(index);
 			byte[] k2b = k2.getKeyHash(index);
 			byte[] k3b = k3.getKeyHash(index);
-			byte[][] stopKeys = index.newStopKeys();
+			byte[][] stopKeys = index.newStopKeys(rdfFactory);
 			stopKeys[0] = k1b;
 			stopKeys[1] = k2b;
 			stopKeys[2] = k3b;
@@ -110,25 +110,25 @@ enum IndexType {
 
 	abstract byte[] row(StatementIndex index, RDFIdentifier v1, RDFIdentifier v2, RDFIdentifier v3, RDFIdentifier v4);
 	abstract byte[] qualifier(StatementIndex index, RDFIdentifier v1, RDFIdentifier v2, RDFIdentifier v3, RDFIdentifier v4);
-	final Scan scan(StatementIndex index) {
-		return scan(index, new byte[0][], index.newStopKeys());
+	final Scan scan(StatementIndex index, RDFFactory rdfFactory) {
+		return scan(index, new byte[0][], index.newStopKeys(rdfFactory));
 	}
 	final Scan scan(StatementIndex index, Identifier id, RDFFactory rdfFactory) {
 		byte[] kb = index.keyHash(id, rdfFactory);
-		byte[][] stopKeys = index.newStopKeys();
+		byte[][] stopKeys = index.newStopKeys(rdfFactory);
 		stopKeys[0] = kb;
 		return scan(index, new byte[][] {kb}, stopKeys).setFilter(new ColumnPrefixFilter(index.qualifierHash(id, rdfFactory)));
 	}
-	final Scan scan(StatementIndex index, RDFIdentifier k) {
+	final Scan scan(StatementIndex index, RDFIdentifier k, RDFFactory rdfFactory) {
 		byte[] kb = k.getKeyHash(index);
-		byte[][] stopKeys = index.newStopKeys();
+		byte[][] stopKeys = index.newStopKeys(rdfFactory);
 		stopKeys[0] = kb;
 		return scan(index, new byte[][] {kb}, stopKeys).setFilter(new ColumnPrefixFilter(index.qualifier(k, null, null, null)));
 	}
-	final Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2) {
+	final Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFFactory rdfFactory) {
 		byte[] k1b = k1.getKeyHash(index);
 		byte[] k2b = k2.getKeyHash(index);
-		byte[][] stopKeys = index.newStopKeys();
+		byte[][] stopKeys = index.newStopKeys(rdfFactory);
 		stopKeys[0] = k1b;
 		stopKeys[1] = k2b;
 		return scan(index, new byte[][] {k1b, k2b}, stopKeys).setFilter(new ColumnPrefixFilter(index.qualifier(k1, k2, null, null)));
@@ -136,6 +136,6 @@ enum IndexType {
 	final Scan scan(StatementIndex index, byte[][] startKeys, byte[][] stopKeys) {
 		return HalyardTableUtils.scan(index.concat(false, startKeys), index.concat(true, stopKeys));
 	}
-	abstract Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3);
+	abstract Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3, RDFFactory rdfFactory);
 	abstract Scan scan(StatementIndex index, RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3, RDFIdentifier k4);
 }

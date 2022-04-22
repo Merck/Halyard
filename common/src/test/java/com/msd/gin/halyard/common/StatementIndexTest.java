@@ -80,7 +80,7 @@ public class StatementIndexTest {
         ValueIO.Reader reader = rdfFactory.createReader(vf);
 
         Set<Statement> actual = new HashSet<>();
-        Scan scan = StatementIndex.scanAll();
+        Scan scan = StatementIndex.scanAll(rdfFactory);
         try (ResultScanner rs = table.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {

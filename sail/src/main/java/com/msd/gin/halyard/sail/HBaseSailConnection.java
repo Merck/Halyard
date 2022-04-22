@@ -295,7 +295,7 @@ public class HBaseSailConnection implements SailConnection {
 
 					StatementScanner() throws IOException {
 						super(sail.getRDFFactory().createTableReader(table), sail.getRDFFactory());
-						rs = table.getScanner(StatementIndex.CSPO.scan());
+						rs = table.getScanner(StatementIndex.CSPO.scan(rdfFactory));
 					}
 
 					@Override

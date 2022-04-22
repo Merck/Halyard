@@ -158,7 +158,7 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 
 						// build a ResultScanner from an HBase Scan that finds potential matches
 						ctx = rdfFactory.createContext(contexts.next());
-						Scan scan = HalyardTableUtils.scan(subj, pred, obj, ctx);
+						Scan scan = HalyardTableUtils.scan(subj, pred, obj, ctx, rdfFactory);
 						if (settings != null) {
 							scan.setTimeRange(settings.minTimestamp, settings.maxTimestamp);
 							scan.readVersions(settings.maxVersions);

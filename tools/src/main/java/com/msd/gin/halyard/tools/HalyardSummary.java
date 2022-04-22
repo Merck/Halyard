@@ -138,7 +138,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 Set<IRI> res = new HashSet<>();
                 RDFSubject s = rdfFactory.createSubject((Resource)instance);
                 RDFPredicate p = rdfFactory.createPredicate(RDF.TYPE);
-                Scan scan = HalyardTableUtils.scan(s, p, null, null);
+                Scan scan = HalyardTableUtils.scan(s, p, null, null, rdfFactory);
                 try (ResultScanner scanner = table.getScanner(scan)) {
                     for (Result r : scanner) {
                         for (Statement st : HalyardTableUtils.parseStatements(s, p, null, null, r, valueReader, rdfFactory)) {
@@ -510,7 +510,11 @@ public final class HalyardSummary extends AbstractHalyardTool {
         job.setJarByClass(HalyardSummary.class);
         TableMapReduceUtil.initCredentials(job);
 
-        Scan scan = StatementIndex.POS.scan();
+        RDFFactory rdfFactory;
+        try (Table table = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
+            rdfFactory = RDFFactory.create(table);
+        }
+        Scan scan = StatementIndex.POS.scan(rdfFactory);
 
         TableMapReduceUtil.initTableMapperJob(source,
                 scan,

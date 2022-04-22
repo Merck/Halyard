@@ -78,30 +78,17 @@ public final class HalyardTableUtils {
 
 	private static final int PREFIXES = 3;
 
-	/** inclusive */
-	static final byte[] STOP_KEY_16 = new byte[2];
-	/** inclusive */
-	static final byte[] STOP_KEY_32 = new byte[4];
-	/** inclusive */
-	static final byte[] STOP_KEY_48 = new byte[6];
-	/** inclusive */
-	static final byte[] STOP_KEY_64 = new byte[8];
-	/** inclusive */
-	static final byte[] STOP_KEY_128 = new byte[16];
-
-	static {
-		Arrays.fill(STOP_KEY_16, (byte) 0xff); /* 0xff is 255 in decimal */
-		Arrays.fill(STOP_KEY_32, (byte) 0xff); /* 0xff is 255 in decimal */
-		Arrays.fill(STOP_KEY_48, (byte) 0xff); /* 0xff is 255 in decimal */
-		Arrays.fill(STOP_KEY_64, (byte) 0xff); /* 0xff is 255 in decimal */
-		Arrays.fill(STOP_KEY_128, (byte) 0xff); /* 0xff is 255 in decimal */
-    }
-
 	static final int READ_VERSIONS = 1;
 	private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
 	private static final long REGION_MAX_FILESIZE = 10000000000l;
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
+
+    static byte[] createStopKey(int size) {
+    	byte[] stopKey = new byte[size];
+    	Arrays.fill(stopKey, (byte) 0xff);
+    	return stopKey;
+    }
 
     /**
 	 * Helper method which locates or creates and returns the specified Table used for triple/ quad storage. The table may be pre-split into regions (rather than HBase's default of
@@ -407,34 +394,34 @@ public final class HalyardTableUtils {
      * @param ctx optional context Resource
      * @return HBase Scan instance to retrieve all data potentially matching the Statement pattern
      */
-	public static Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx) {
+	public static Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, RDFFactory rdfFactory) {
 		if (ctx == null) {
 			if (subj == null) {
 				if (pred == null) {
 					if (obj == null) {
-						return StatementIndex.SPO.scan();
+						return StatementIndex.SPO.scan(rdfFactory);
                     } else {
-						return StatementIndex.OSP.scan(obj);
+						return StatementIndex.OSP.scan(obj, rdfFactory);
                     }
                 } else {
 					if (obj == null) {
-						return StatementIndex.POS.scan(pred);
+						return StatementIndex.POS.scan(pred, rdfFactory);
                     } else {
-						return StatementIndex.POS.scan(pred, obj);
+						return StatementIndex.POS.scan(pred, obj, rdfFactory);
                     }
                 }
             } else {
 				if (pred == null) {
 					if (obj == null) {
-						return StatementIndex.SPO.scan(subj);
+						return StatementIndex.SPO.scan(subj, rdfFactory);
                     } else {
-						return StatementIndex.OSP.scan(obj, subj);
+						return StatementIndex.OSP.scan(obj, subj, rdfFactory);
                     }
                 } else {
 					if (obj == null) {
-						return StatementIndex.SPO.scan(subj, pred);
+						return StatementIndex.SPO.scan(subj, pred, rdfFactory);
                     } else {
-						return StatementIndex.SPO.scan(subj, pred, obj);
+						return StatementIndex.SPO.scan(subj, pred, obj, rdfFactory);
                     }
                 }
             }
@@ -442,27 +429,27 @@ public final class HalyardTableUtils {
 			if (subj == null) {
 				if (pred == null) {
 					if (obj == null) {
-						return StatementIndex.CSPO.scan(ctx);
+						return StatementIndex.CSPO.scan(ctx, rdfFactory);
                     } else {
-						return StatementIndex.COSP.scan(ctx, obj);
+						return StatementIndex.COSP.scan(ctx, obj, rdfFactory);
                     }
                 } else {
 					if (obj == null) {
-						return StatementIndex.CPOS.scan(ctx, pred);
+						return StatementIndex.CPOS.scan(ctx, pred, rdfFactory);
                     } else {
-						return StatementIndex.CPOS.scan(ctx, pred, obj);
+						return StatementIndex.CPOS.scan(ctx, pred, obj, rdfFactory);
                     }
                 }
             } else {
 				if (pred == null) {
 					if (obj == null) {
-						return StatementIndex.CSPO.scan(ctx, subj);
+						return StatementIndex.CSPO.scan(ctx, subj, rdfFactory);
                     } else {
-						return StatementIndex.COSP.scan(ctx, obj, subj);
+						return StatementIndex.COSP.scan(ctx, obj, subj, rdfFactory);
                     }
                 } else {
 					if (obj == null) {
-						return StatementIndex.CSPO.scan(ctx, subj, pred);
+						return StatementIndex.CSPO.scan(ctx, subj, pred, rdfFactory);
                     } else {
 						return StatementIndex.CSPO.scan(ctx, subj, pred, obj);
                     }

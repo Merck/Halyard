@@ -34,15 +34,15 @@ public enum StatementIndex {
 		}
 		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader, RDFFactory rdfFactory) {
-    		Resource s = parseShortRDFValue(this, rdfFactory.subject, subj, key, cn, cv, RDFSubject.KEY_SIZE, reader, rdfFactory);
-    		IRI p = parseShortRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, RDFPredicate.KEY_SIZE, reader, rdfFactory);
-    		Value o = parseIntRDFValue(this, rdfFactory.object, obj, key, cn, cv, RDFObject.END_KEY_SIZE, reader, rdfFactory);
-    		Resource c = parseLastRDFValue(this, rdfFactory.context, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader, rdfFactory);
+    		Resource s = parseShortRDFValue(this, rdfFactory.subject, subj, key, cn, cv, rdfFactory.subject.keyHashSize(), reader, rdfFactory);
+    		IRI p = parseShortRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, rdfFactory.predicate.keyHashSize(), reader, rdfFactory);
+    		Value o = parseIntRDFValue(this, rdfFactory.object, obj, key, cn, cv, rdfFactory.object.endKeyHashSize(), reader, rdfFactory);
+    		Resource c = parseLastRDFValue(this, rdfFactory.context, ctx, key, cn, cv, rdfFactory.context.keyHashSize(), reader, rdfFactory);
     		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
-    	byte[][] newStopKeys() {
-    		return new byte[][] {RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY, RDFContext.STOP_KEY};
+    	byte[][] newStopKeys(RDFFactory rdfFactory) {
+    		return new byte[][] {rdfFactory.getSubjectRole().stopKey(), rdfFactory.getPredicateRole().stopKey(), rdfFactory.getObjectRole().endStopKey(), rdfFactory.getContextRole().stopKey()};
     	}
 		@Override
     	byte[] keyHash(Identifier id, RDFFactory rdfFactory) {
@@ -67,15 +67,15 @@ public enum StatementIndex {
 		}
 		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader, RDFFactory rdfFactory) {
-    		IRI p = parseShortRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, RDFPredicate.KEY_SIZE, reader, rdfFactory);
-    		Value o = parseIntRDFValue(this, rdfFactory.object, obj, key, cn, cv, RDFObject.KEY_SIZE, reader, rdfFactory);
-    		Resource s = parseShortRDFValue(this, rdfFactory.subject, subj, key, cn, cv, RDFSubject.END_KEY_SIZE, reader, rdfFactory);
-    		Resource c = parseLastRDFValue(this, rdfFactory.context, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader, rdfFactory);
+    		IRI p = parseShortRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, rdfFactory.predicate.keyHashSize(), reader, rdfFactory);
+    		Value o = parseIntRDFValue(this, rdfFactory.object, obj, key, cn, cv, rdfFactory.object.keyHashSize(), reader, rdfFactory);
+    		Resource s = parseShortRDFValue(this, rdfFactory.subject, subj, key, cn, cv, rdfFactory.subject.endKeyHashSize(), reader, rdfFactory);
+    		Resource c = parseLastRDFValue(this, rdfFactory.context, ctx, key, cn, cv, rdfFactory.context.keyHashSize(), reader, rdfFactory);
     		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
-    	byte[][] newStopKeys() {
-    		return new byte[][] {RDFPredicate.STOP_KEY, RDFObject.STOP_KEY, RDFSubject.END_STOP_KEY, RDFContext.STOP_KEY};
+    	byte[][] newStopKeys(RDFFactory rdfFactory) {
+    		return new byte[][] {rdfFactory.getPredicateRole().stopKey(), rdfFactory.getObjectRole().stopKey(), rdfFactory.getSubjectRole().endStopKey(), rdfFactory.getContextRole().stopKey()};
     	}
 		@Override
     	byte[] keyHash(Identifier id, RDFFactory rdfFactory) {
@@ -100,15 +100,15 @@ public enum StatementIndex {
 		}
 		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader, RDFFactory rdfFactory) {
-    		Value o = parseIntRDFValue(this, rdfFactory.object, obj, key, cn, cv, RDFObject.KEY_SIZE, reader, rdfFactory);
-    		Resource s = parseShortRDFValue(this, rdfFactory.subject, subj, key, cn, cv, RDFSubject.KEY_SIZE, reader, rdfFactory);
-    		IRI p = parseShortRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, reader, rdfFactory);
-    		Resource c = parseLastRDFValue(this, rdfFactory.context, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader, rdfFactory);
+    		Value o = parseIntRDFValue(this, rdfFactory.object, obj, key, cn, cv, rdfFactory.object.keyHashSize(), reader, rdfFactory);
+    		Resource s = parseShortRDFValue(this, rdfFactory.subject, subj, key, cn, cv, rdfFactory.subject.keyHashSize(), reader, rdfFactory);
+    		IRI p = parseShortRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, rdfFactory.predicate.endKeyHashSize(), reader, rdfFactory);
+    		Resource c = parseLastRDFValue(this, rdfFactory.context, ctx, key, cn, cv, rdfFactory.context.keyHashSize(), reader, rdfFactory);
     		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
-    	byte[][] newStopKeys() {
-    		return new byte[][] {RDFObject.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY, RDFContext.STOP_KEY};
+    	byte[][] newStopKeys(RDFFactory rdfFactory) {
+    		return new byte[][] {rdfFactory.getObjectRole().stopKey(), rdfFactory.getSubjectRole().stopKey(), rdfFactory.getPredicateRole().endStopKey(), rdfFactory.getContextRole().stopKey()};
     	}
 		@Override
     	byte[] keyHash(Identifier id, RDFFactory rdfFactory) {
@@ -131,15 +131,15 @@ public enum StatementIndex {
 		}
 		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader, RDFFactory rdfFactory) {
-    		Resource c = parseShortRDFValue(this, rdfFactory.context, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader, rdfFactory);
-    		Resource s = parseShortRDFValue(this, rdfFactory.subject, subj, key, cn, cv, RDFSubject.KEY_SIZE, reader, rdfFactory);
-    		IRI p = parseShortRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, RDFPredicate.KEY_SIZE, reader, rdfFactory);
-    		Value o = parseLastRDFValue(this, rdfFactory.object, obj, key, cn, cv, RDFObject.END_KEY_SIZE, reader, rdfFactory);
+    		Resource c = parseShortRDFValue(this, rdfFactory.context, ctx, key, cn, cv, rdfFactory.context.keyHashSize(), reader, rdfFactory);
+    		Resource s = parseShortRDFValue(this, rdfFactory.subject, subj, key, cn, cv, rdfFactory.subject.keyHashSize(), reader, rdfFactory);
+    		IRI p = parseShortRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, rdfFactory.predicate.keyHashSize(), reader, rdfFactory);
+    		Value o = parseLastRDFValue(this, rdfFactory.object, obj, key, cn, cv, rdfFactory.object.endKeyHashSize(), reader, rdfFactory);
     		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
-    	byte[][] newStopKeys() {
-    		return new byte[][] {RDFContext.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.END_STOP_KEY};
+    	byte[][] newStopKeys(RDFFactory rdfFactory) {
+    		return new byte[][] {rdfFactory.getContextRole().stopKey(), rdfFactory.getSubjectRole().stopKey(), rdfFactory.getPredicateRole().stopKey(), rdfFactory.getObjectRole().endStopKey()};
     	}
 		@Override
     	byte[] keyHash(Identifier id, RDFFactory rdfFactory) {
@@ -162,15 +162,15 @@ public enum StatementIndex {
 		}
 		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader, RDFFactory rdfFactory) {
-    		Resource c = parseShortRDFValue(this, rdfFactory.context, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader, rdfFactory);
-    		IRI p = parseShortRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, RDFPredicate.KEY_SIZE, reader, rdfFactory);
-    		Value o = parseIntRDFValue(this, rdfFactory.object, obj, key, cn, cv, RDFObject.KEY_SIZE, reader, rdfFactory);
-    		Resource s = parseLastRDFValue(this, rdfFactory.subject, subj, key, cn, cv, RDFSubject.END_KEY_SIZE, reader, rdfFactory);
+    		Resource c = parseShortRDFValue(this, rdfFactory.context, ctx, key, cn, cv, rdfFactory.context.keyHashSize(), reader, rdfFactory);
+    		IRI p = parseShortRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, rdfFactory.predicate.keyHashSize(), reader, rdfFactory);
+    		Value o = parseIntRDFValue(this, rdfFactory.object, obj, key, cn, cv, rdfFactory.object.keyHashSize(), reader, rdfFactory);
+    		Resource s = parseLastRDFValue(this, rdfFactory.subject, subj, key, cn, cv, rdfFactory.subject.endKeyHashSize(), reader, rdfFactory);
     		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
-    	byte[][] newStopKeys() {
-    		return new byte[][] {RDFContext.STOP_KEY, RDFPredicate.STOP_KEY, RDFObject.STOP_KEY, RDFSubject.END_STOP_KEY};
+    	byte[][] newStopKeys(RDFFactory rdfFactory) {
+    		return new byte[][] {rdfFactory.getContextRole().stopKey(), rdfFactory.getPredicateRole().stopKey(), rdfFactory.getObjectRole().stopKey(), rdfFactory.getSubjectRole().endStopKey()};
     	}
 		@Override
     	byte[] keyHash(Identifier id, RDFFactory rdfFactory) {
@@ -193,15 +193,15 @@ public enum StatementIndex {
 		}
 		@Override
     	Statement parseStatement(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader, RDFFactory rdfFactory) {
-    		Resource c = parseShortRDFValue(this, rdfFactory.context, ctx, key, cn, cv, RDFContext.KEY_SIZE, reader, rdfFactory);
-    		Value o = parseIntRDFValue(this, rdfFactory.object, obj, key, cn, cv, RDFObject.KEY_SIZE, reader, rdfFactory);
-    		Resource s = parseShortRDFValue(this, rdfFactory.subject, subj, key, cn, cv, RDFSubject.KEY_SIZE, reader, rdfFactory);
-    		IRI p = parseLastRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, RDFPredicate.END_KEY_SIZE, reader, rdfFactory);
+    		Resource c = parseShortRDFValue(this, rdfFactory.context, ctx, key, cn, cv, rdfFactory.context.keyHashSize(), reader, rdfFactory);
+    		Value o = parseIntRDFValue(this, rdfFactory.object, obj, key, cn, cv, rdfFactory.object.keyHashSize(), reader, rdfFactory);
+    		Resource s = parseShortRDFValue(this, rdfFactory.subject, subj, key, cn, cv, rdfFactory.subject.keyHashSize(), reader, rdfFactory);
+    		IRI p = parseLastRDFValue(this, rdfFactory.predicate, pred, key, cn, cv, rdfFactory.predicate.endKeyHashSize(), reader, rdfFactory);
     		return createStatement(s, p, o, c, reader.getValueFactory());
     	}
 		@Override
-    	byte[][] newStopKeys() {
-    		return new byte[][] {RDFContext.STOP_KEY, RDFObject.STOP_KEY, RDFSubject.STOP_KEY, RDFPredicate.END_STOP_KEY};
+    	byte[][] newStopKeys(RDFFactory rdfFactory) {
+    		return new byte[][] {rdfFactory.getContextRole().stopKey(), rdfFactory.getObjectRole().stopKey(), rdfFactory.getSubjectRole().stopKey(), rdfFactory.getPredicateRole().endStopKey()};
     	}
 		@Override
     	byte[] keyHash(Identifier id, RDFFactory rdfFactory) {
@@ -227,8 +227,8 @@ public enum StatementIndex {
 		}
 	}
 
-	public static final Scan scanAll() {
-		return HalyardTableUtils.scan(SPO.concat(false), COSP.concat(true, COSP.newStopKeys()));
+	public static final Scan scanAll(RDFFactory rdfFactory) {
+		return HalyardTableUtils.scan(SPO.concat(false), COSP.concat(true, COSP.newStopKeys(rdfFactory)));
 	}
 
 	public static final Scan scanLiterals(RDFFactory rdfFactory) {
@@ -240,7 +240,7 @@ public enum StatementIndex {
 			byte[] stopKey = index.concat(false, new byte[] {(byte) i, Identifier.LITERAL_STOP_BITS}); // exclusive
 			ranges.add(new RowRange(startKey, true, stopKey, false));
 		}
-		return index.scan().setFilter(new MultiRowRangeFilter(ranges));
+		return index.scan(rdfFactory).setFilter(new MultiRowRangeFilter(ranges));
 	}
 
 	public static final Scan scanLiterals(Resource graph, RDFFactory rdfFactory) {
@@ -254,7 +254,7 @@ public enum StatementIndex {
 			byte[] stopKey = index.concat(false, ctxb, new byte[] {(byte) i, Identifier.LITERAL_STOP_BITS}); // exclusive
 			ranges.add(new RowRange(startKey, true, stopKey, false));
 		}
-		return index.scan().setFilter(new MultiRowRangeFilter(ranges));
+		return index.scan(rdfFactory).setFilter(new MultiRowRangeFilter(ranges));
 	}
 
     private static Statement createStatement(Resource s, IRI p, Value o, Resource c, ValueFactory vf) {
@@ -404,23 +404,23 @@ public enum StatementIndex {
 
 	abstract byte[] value(RDFValue<?> v1, RDFValue<?> v2, RDFValue<?> v3, RDFValue<?> v4);
 	abstract Statement parseStatement(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader, RDFFactory rdfFactory);
-	abstract byte[][] newStopKeys();
+	abstract byte[][] newStopKeys(RDFFactory rdfFactory);
 	abstract byte[] keyHash(Identifier id, RDFFactory rdfFactory);
 	abstract byte[] qualifierHash(Identifier id, RDFFactory rdfFactory);
-	public final Scan scan() {
-		return indexType.scan(this);
+	public final Scan scan(RDFFactory rdfFactory) {
+		return indexType.scan(this, rdfFactory);
 	}
 	final Scan scan(Identifier id, RDFFactory rdfFactory) {
 		return indexType.scan(this, id, rdfFactory);
 	}
-	public final Scan scan(RDFIdentifier k) {
-		return indexType.scan(this, k);
+	public final Scan scan(RDFIdentifier k, RDFFactory rdfFactory) {
+		return indexType.scan(this, k, rdfFactory);
 	}
-	public final Scan scan(RDFIdentifier k1, RDFIdentifier k2) {
-		return indexType.scan(this, k1, k2);
+	public final Scan scan(RDFIdentifier k1, RDFIdentifier k2, RDFFactory rdfFactory) {
+		return indexType.scan(this, k1, k2, rdfFactory);
 	}
-	public final Scan scan(RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3) {
-		return indexType.scan(this, k1, k2, k3);
+	public final Scan scan(RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3, RDFFactory rdfFactory) {
+		return indexType.scan(this, k1, k2, k3, rdfFactory);
 	}
 	public final Scan scan(RDFIdentifier k1, RDFIdentifier k2, RDFIdentifier k3, RDFIdentifier k4) {
 		return indexType.scan(this, k1, k2, k3, k4);

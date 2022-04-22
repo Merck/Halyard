@@ -8,6 +8,8 @@ public final class RDFRole<T extends RDFValue<?>> {
 	private final int idSize;
 	private final int keyHashSize;
 	private final int endKeyHashSize;
+	private final byte[] stopKey;
+	private final byte[] endStopKey;
 	private final int sshift;
 	private final int pshift;
 	private final int oshift;
@@ -18,6 +20,8 @@ public final class RDFRole<T extends RDFValue<?>> {
 		this.idSize = idSize;
 		this.keyHashSize = keyHashSize;
 		this.endKeyHashSize = endKeyHashSize;
+		this.stopKey = HalyardTableUtils.createStopKey(keyHashSize);
+		this.endStopKey = endKeyHashSize >= 0 ? HalyardTableUtils.createStopKey(endKeyHashSize) : null;
 		this.sshift = sshift;
 		this.pshift = pshift;
 		this.oshift = oshift;
@@ -39,11 +43,11 @@ public final class RDFRole<T extends RDFValue<?>> {
 	}
 
 	int qualifierHashSize() {
-		return idSize - keyHashSize();
+		return idSize - keyHashSize;
 	}
 
 	int endQualifierHashSize() {
-		return idSize - endKeyHashSize();
+		return idSize - endKeyHashSize;
 	}
 
 	byte[] keyHash(StatementIndex index, Identifier id) {
@@ -70,6 +74,14 @@ public final class RDFRole<T extends RDFValue<?>> {
 
 	ByteBuffer writeEndQualifierHashTo(Identifier id, ByteBuffer bb) {
 		return id.writeSliceTo(endKeyHashSize(), endQualifierHashSize(), bb);
+	}
+
+	byte[] stopKey() {
+		return stopKey;
+	}
+
+	byte[] endStopKey() {
+		return endStopKey;
 	}
 
 	private int toShift(StatementIndex index) {

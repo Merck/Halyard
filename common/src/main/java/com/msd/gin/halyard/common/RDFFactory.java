@@ -109,6 +109,13 @@ public class RDFFactory {
 		);
 		String confIdAlgo = Config.getString(config, Config.ID_HASH_CONFIG, "SHA-1");
 		int confIdSize = Config.getInteger(config, Config.ID_SIZE_CONFIG, 0);
+		int subjectKeySize = Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 8);
+		int subjectEndKeySize = Config.getInteger(config, Config.END_KEY_SIZE_SUBJECT, 8);
+		int predicateKeySize = Config.getInteger(config, Config.KEY_SIZE_PREDICATE, 4);
+		int predicateEndKeySize = Config.getInteger(config, Config.END_KEY_SIZE_PREDICATE, 2);
+		int objectKeySize = Config.getInteger(config, Config.KEY_SIZE_OBJECT, 8);
+		int objectEndKeySize = Config.getInteger(config, Config.END_KEY_SIZE_OBJECT, 2);
+		int contextKeySize = Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 6);
 
 		idHash = new ThreadLocal<HashFunction>() {
 			@Override
@@ -141,29 +148,25 @@ public class RDFFactory {
 		this.subject = new RDFRole<>(
 			RDFRole.Name.SUBJECT,
 			idSize,
-			RDFSubject.KEY_SIZE,
-			RDFSubject.END_KEY_SIZE,
+			subjectKeySize, subjectEndKeySize,
 			0, 2, 1, typeIndex
 		);
 		this.predicate = new RDFRole<>(
 			RDFRole.Name.PREDICATE,
 			idSize,
-			RDFPredicate.KEY_SIZE,
-			RDFPredicate.END_KEY_SIZE,
+			predicateKeySize, predicateEndKeySize,
 			1, 0, 2, typeIndex
 		);
 		this.object = new RDFRole<>(
 			RDFRole.Name.OBJECT,
 			idSize,
-			RDFObject.KEY_SIZE,
-			RDFObject.END_KEY_SIZE,
+			objectKeySize, objectEndKeySize,
 			2, 1, 0, typeIndex
 		);
 		this.context = new RDFRole<>(
 			RDFRole.Name.CONTEXT,
 			idSize,
-			RDFContext.KEY_SIZE,
-			-1,
+			contextKeySize, -1,
 			0, 0, 0, typeIndex
 		);
 	}
@@ -197,6 +200,22 @@ public class RDFFactory {
 
 	int getTypeSaltSize() {
 		return typeSaltSize;
+	}
+
+	public RDFRole<RDFSubject> getSubjectRole() {
+		return subject;
+	}
+
+	public RDFRole<RDFPredicate> getPredicateRole() {
+		return predicate;
+	}
+
+	public RDFRole<RDFObject> getObjectRole() {
+		return object;
+	}
+
+	public RDFRole<RDFContext> getContextRole() {
+		return context;
 	}
 
 	public Identifier id(Value v) {
