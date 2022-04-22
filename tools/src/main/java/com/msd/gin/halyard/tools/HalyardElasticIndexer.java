@@ -100,7 +100,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             }
 
             byte[] hash = new byte[objectKeySize];
-            System.arraycopy(key.get(), key.getOffset() + 1 + (StatementIndex.toIndex(key.get()[key.getOffset()]).isQuadIndex() ? contextKeySize : 0), hash, 0, objectKeySize);
+            System.arraycopy(key.get(), key.getOffset() + 1 + (StatementIndex.toIndex(key.get()[key.getOffset()], rdfFactory).isQuadIndex() ? contextKeySize : 0), hash, 0, objectKeySize);
             if (!Arrays.equals(hash, lastHash)) {
             	literals = new HashSet<>();
             	lastHash = hash;

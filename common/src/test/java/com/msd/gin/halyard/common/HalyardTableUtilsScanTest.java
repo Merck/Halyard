@@ -208,18 +208,24 @@ public class HalyardTableUtilsScanTest {
 
         // check all complete combinations
     	if (subj != null && pred != null & obj != null) {
+            StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
+            StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = rdfFactory.getPOSIndex();
+            StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = rdfFactory.getOSPIndex();
+            StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo = rdfFactory.getCSPOIndex();
+            StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos = rdfFactory.getCPOSIndex();
+            StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = rdfFactory.getCOSPIndex();
             List<Scan> scans = new ArrayList<>();
             if (c != null) {
-                scans.add(StatementIndex.SPO.scan(subj, pred, obj, ctx));
-                scans.add(StatementIndex.POS.scan(pred, obj, subj, ctx));
-                scans.add(StatementIndex.OSP.scan(obj, subj, pred, ctx));
-                scans.add(StatementIndex.CSPO.scan(ctx, subj, pred, obj));
-                scans.add(StatementIndex.CPOS.scan(ctx, pred, obj, subj));
-                scans.add(StatementIndex.COSP.scan(ctx, obj, subj, pred));
+                scans.add(spo.scan(subj, pred, obj, ctx));
+                scans.add(pos.scan(pred, obj, subj, ctx));
+                scans.add(osp.scan(obj, subj, pred, ctx));
+                scans.add(cspo.scan(ctx, subj, pred, obj));
+                scans.add(cpos.scan(ctx, pred, obj, subj));
+                scans.add(cosp.scan(ctx, obj, subj, pred));
             } else {
-                scans.add(StatementIndex.SPO.scan(subj, pred, obj, rdfFactory));
-                scans.add(StatementIndex.POS.scan(pred, obj, subj, rdfFactory));
-                scans.add(StatementIndex.OSP.scan(obj, subj, pred, rdfFactory));
+                scans.add(spo.scan(subj, pred, obj));
+                scans.add(pos.scan(pred, obj, subj));
+                scans.add(osp.scan(obj, subj, pred));
             }
             for (Scan scan : scans) {
                 try (ResultScanner rs = table.getScanner(scan)) {

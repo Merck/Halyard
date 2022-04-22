@@ -46,10 +46,18 @@ public class RDFFactory {
 	private final ValueIO valueIO;
 	private final ValueFactory valueFactory;
 	private final ValueFactory tsValueFactory;
-	final RDFRole<RDFSubject> subject;
-	final RDFRole<RDFPredicate> predicate;
-	final RDFRole<RDFObject> object;
-	final RDFRole<RDFContext> context;
+
+	final RDFRole<SPOC.S> subject;
+	final RDFRole<SPOC.P> predicate;
+	final RDFRole<SPOC.O> object;
+	final RDFRole<SPOC.C> context;
+
+	final StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo;
+	final StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos;
+	final StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp;
+	final StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo;
+	final StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos;
+	final StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp;
 
 	public static RDFFactory create() {
 		Configuration conf = HBaseConfiguration.create();
@@ -149,25 +157,56 @@ public class RDFFactory {
 			RDFRole.Name.SUBJECT,
 			idSize,
 			subjectKeySize, subjectEndKeySize,
-			0, 2, 1, typeIndex
+			0, 2, 1, typeIndex, Short.BYTES
 		);
 		this.predicate = new RDFRole<>(
 			RDFRole.Name.PREDICATE,
 			idSize,
 			predicateKeySize, predicateEndKeySize,
-			1, 0, 2, typeIndex
+			1, 0, 2, typeIndex, Short.BYTES
 		);
 		this.object = new RDFRole<>(
 			RDFRole.Name.OBJECT,
 			idSize,
 			objectKeySize, objectEndKeySize,
-			2, 1, 0, typeIndex
+			2, 1, 0, typeIndex, Integer.BYTES
 		);
 		this.context = new RDFRole<>(
 			RDFRole.Name.CONTEXT,
 			idSize,
 			contextKeySize, -1,
-			0, 0, 0, typeIndex
+			0, 0, 0, typeIndex, Short.BYTES
+		);
+
+		this.spo = new StatementIndex<>(
+			StatementIndex.Name.SPO, 0, IndexType.TRIPLE,
+			subject, predicate, object, context,
+			this
+		);
+		this.pos = new StatementIndex<>(
+			StatementIndex.Name.POS, 1, IndexType.TRIPLE,
+			predicate, object, subject, context,
+			this
+		);
+		this.osp = new StatementIndex<>(
+			StatementIndex.Name.OSP, 2, IndexType.TRIPLE,
+			object, subject, predicate, context,
+			this
+		);
+		this.cspo = new StatementIndex<>(
+			StatementIndex.Name.CSPO, 3, IndexType.QUAD,
+			context, subject, predicate, object,
+			this
+		);
+		this.cpos = new StatementIndex<>(
+			StatementIndex.Name.CPOS, 4, IndexType.QUAD,
+			context, predicate, object, subject,
+			this
+		);
+		this.cosp = new StatementIndex<>(
+			StatementIndex.Name.COSP, 5, IndexType.QUAD,
+			context, object, subject, predicate,
+			this
 		);
 	}
 
@@ -202,20 +241,44 @@ public class RDFFactory {
 		return typeSaltSize;
 	}
 
-	public RDFRole<RDFSubject> getSubjectRole() {
+	public RDFRole<SPOC.S> getSubjectRole() {
 		return subject;
 	}
 
-	public RDFRole<RDFPredicate> getPredicateRole() {
+	public RDFRole<SPOC.P> getPredicateRole() {
 		return predicate;
 	}
 
-	public RDFRole<RDFObject> getObjectRole() {
+	public RDFRole<SPOC.O> getObjectRole() {
 		return object;
 	}
 
-	public RDFRole<RDFContext> getContextRole() {
+	public RDFRole<SPOC.C> getContextRole() {
 		return context;
+	}
+
+	public StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> getSPOIndex() {
+		return spo;
+	}
+
+	public StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> getPOSIndex() {
+		return pos;
+	}
+
+	public StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> getOSPIndex() {
+		return osp;
+	}
+
+	public StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> getCSPOIndex() {
+		return cspo;
+	}
+
+	public StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> getCPOSIndex() {
+		return cpos;
+	}
+
+	public StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> getCOSPIndex() {
+		return cosp;
 	}
 
 	public Identifier id(Value v) {
@@ -263,16 +326,16 @@ public class RDFFactory {
 		return buf;
 	}
 
-	public RDFIdentifier createSubjectId(Identifier id) {
-		return new RDFIdentifier(subject, id);
+	public RDFIdentifier<SPOC.S> createSubjectId(Identifier id) {
+		return new RDFIdentifier<>(subject, id);
 	}
 
-	public RDFIdentifier createPredicateId(Identifier id) {
-		return new RDFIdentifier(predicate, id);
+	public RDFIdentifier<SPOC.P> createPredicateId(Identifier id) {
+		return new RDFIdentifier<>(predicate, id);
 	}
 
-	public RDFIdentifier createObjectId(Identifier id) {
-		return new RDFIdentifier(object, id);
+	public RDFIdentifier<SPOC.O> createObjectId(Identifier id) {
+		return new RDFIdentifier<>(object, id);
 	}
 
 	public RDFSubject createSubject(Resource val) {
@@ -332,10 +395,10 @@ public class RDFFactory {
 			b.get(sid).get(pid).get(oid);
 	
 			RDFContext ckey = createContext(HALYARD.TRIPLE_GRAPH_CONTEXT);
-			RDFIdentifier skey = createSubjectId(id(sid));
-			RDFIdentifier pkey = createPredicateId(id(pid));
-			RDFIdentifier okey = createObjectId(id(oid));
-			Scan scan = StatementIndex.CSPO.scan(ckey, skey, pkey, okey);
+			RDFIdentifier<SPOC.S> skey = createSubjectId(id(sid));
+			RDFIdentifier<SPOC.P> pkey = createPredicateId(id(pid));
+			RDFIdentifier<SPOC.O> okey = createObjectId(id(oid));
+			Scan scan = cspo.scan(ckey, skey, pkey, okey);
 			Get get = new Get(scan.getStartRow())
 				.setFilter(new FilterList(scan.getFilter(), new FirstKeyOnlyFilter()));
 			get.addFamily(HalyardTableUtils.CF_NAME);

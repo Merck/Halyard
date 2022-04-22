@@ -2,20 +2,20 @@ package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
 
-public class RDFIdentifier {
-	private final RDFRole<?> role;
+public class RDFIdentifier<T extends SPOC<?>> {
+	private final RDFRole<? extends SPOC<?>> role;
 	private Identifier id;
 
-	RDFIdentifier(RDFRole<?> role, Identifier id) {
+	RDFIdentifier(RDFRole<? extends SPOC<?>> role, Identifier id) {
 		this(role);
 		this.id = id;
 	}
 
-	protected RDFIdentifier(RDFRole<?> role) {
+	protected RDFIdentifier(RDFRole<? extends SPOC<?>> role) {
 		this.role = role;
 	}
 
-	public final RDFRole<?> getRole() {
+	public final RDFRole<? extends SPOC<?>> getRole() {
 		return role;
 	}
 
@@ -30,11 +30,11 @@ public class RDFIdentifier {
 		return id;
 	}
 
-	public final byte[] getKeyHash(StatementIndex index) {
+	public final byte[] getKeyHash(StatementIndex<?,?,?,?> index) {
 		return role.keyHash(index, getId());
 	}
 
-	final byte[] getEndKeyHash(StatementIndex index) {
+	final byte[] getEndKeyHash(StatementIndex<?,?,?,?> index) {
 		return role.endKeyHash(index, getId());
 	}
 

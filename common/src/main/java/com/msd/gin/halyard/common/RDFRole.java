@@ -2,8 +2,8 @@ package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
 
-public final class RDFRole<T extends RDFValue<?>> {
-	enum Name {SUBJECT, PREDICATE, OBJECT, CONTEXT};
+public final class RDFRole<T extends SPOC<?>> {
+	enum Name {SUBJECT, PREDICATE, OBJECT, CONTEXT}
 	private final Name name;
 	private final int idSize;
 	private final int keyHashSize;
@@ -14,18 +14,24 @@ public final class RDFRole<T extends RDFValue<?>> {
 	private final int pshift;
 	private final int oshift;
 	private final int typeIndex;
+	private final int sizeLength;
 
-	public RDFRole(Name name, int idSize, int keyHashSize, int endKeyHashSize, int sshift, int pshift, int oshift, int typeIndex) {
+	public RDFRole(Name name, int idSize, int keyHashSize, int endKeyHashSize, int sshift, int pshift, int oshift, int typeIndex, int sizeLength) {
 		this.name = name;
 		this.idSize = idSize;
 		this.keyHashSize = keyHashSize;
 		this.endKeyHashSize = endKeyHashSize;
 		this.stopKey = HalyardTableUtils.createStopKey(keyHashSize);
-		this.endStopKey = endKeyHashSize >= 0 ? HalyardTableUtils.createStopKey(endKeyHashSize) : null;
+		this.endStopKey = (endKeyHashSize >= 0) ? HalyardTableUtils.createStopKey(endKeyHashSize) : null;
 		this.sshift = sshift;
 		this.pshift = pshift;
 		this.oshift = oshift;
 		this.typeIndex = typeIndex;
+		this.sizeLength = sizeLength;
+	}
+
+	Name getName() {
+		return name;
 	}
 
 	/**
@@ -50,14 +56,18 @@ public final class RDFRole<T extends RDFValue<?>> {
 		return idSize - endKeyHashSize;
 	}
 
-	byte[] keyHash(StatementIndex index, Identifier id) {
+	int sizeLength() {
+		return sizeLength;
+	}
+
+	byte[] keyHash(StatementIndex<?,?,?,?> index, Identifier id) {
 		int len = keyHashSize();
 		// rotate key so ordering is different for different prefixes
 		// this gives better load distribution when traversing between prefixes
 		return id.rotate(len, toShift(index), new byte[len]);
 	}
 
-	byte[] endKeyHash(StatementIndex index, Identifier id) {
+	byte[] endKeyHash(StatementIndex<?,?,?,?> index, Identifier id) {
 		int len = endKeyHashSize();
 		return id.rotate(len, toShift(index), new byte[len]);
 	}
@@ -84,8 +94,8 @@ public final class RDFRole<T extends RDFValue<?>> {
 		return endStopKey;
 	}
 
-	private int toShift(StatementIndex index) {
-		switch(index) {
+	private int toShift(StatementIndex<?,?,?,?> index) {
+		switch(index.getName()) {
 			case SPO:
 			case CSPO:
 				return sshift;
@@ -100,7 +110,7 @@ public final class RDFRole<T extends RDFValue<?>> {
 		}
 	}
 
-	byte[] unrotate(byte[] src, int offset, int len, StatementIndex index, byte[] dest) {
+	byte[] unrotate(byte[] src, int offset, int len, StatementIndex<?,?,?,?> index, byte[] dest) {
 		int shift = toShift(index);
 		byte[] rotated = rotateLeft(src, offset, len, shift, dest);
 		if (shift != 0) {

@@ -164,8 +164,14 @@ public class RDFFactoryTest {
 		}
 	}
 
-	private static void assertRDFValueHashes(Identifier id, RDFValue<?> v) {
-		for(StatementIndex idx : StatementIndex.values()) {
+	private static void assertRDFValueHashes(Identifier id, RDFValue<?,?> v) {
+        StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
+        StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = rdfFactory.getPOSIndex();
+        StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = rdfFactory.getOSPIndex();
+        StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo = rdfFactory.getCSPOIndex();
+        StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos = rdfFactory.getCPOSIndex();
+        StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = rdfFactory.getCOSPIndex();
+		for(StatementIndex<?,?,?,?> idx : new StatementIndex[] {spo, pos, osp, cspo, cpos, cosp}) {
 			String testName = v.toString() + " for " + idx.toString();
 			byte[] keyHash = v.getKeyHash(idx);
 			int keyHashSize = v.keyHashSize();

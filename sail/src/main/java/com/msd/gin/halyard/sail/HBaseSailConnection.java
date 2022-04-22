@@ -20,7 +20,6 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.sail.HBaseSail.SailConnectionFactory;
@@ -295,7 +294,7 @@ public class HBaseSailConnection implements SailConnection {
 
 					StatementScanner() throws IOException {
 						super(sail.getRDFFactory().createTableReader(table), sail.getRDFFactory());
-						rs = table.getScanner(StatementIndex.CSPO.scan(rdfFactory));
+						rs = table.getScanner(rdfFactory.getCSPOIndex().scan());
 					}
 
 					@Override

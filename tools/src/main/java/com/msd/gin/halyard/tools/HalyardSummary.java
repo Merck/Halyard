@@ -22,7 +22,6 @@ import com.msd.gin.halyard.common.Hashes.HashFunction;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
-import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -514,7 +513,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         try (Table table = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
             rdfFactory = RDFFactory.create(table);
         }
-        Scan scan = StatementIndex.POS.scan(rdfFactory);
+        Scan scan = rdfFactory.getPOSIndex().scan();
 
         TableMapReduceUtil.initTableMapperJob(source,
                 scan,

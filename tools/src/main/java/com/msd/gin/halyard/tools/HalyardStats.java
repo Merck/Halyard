@@ -21,6 +21,7 @@ import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFIdentifier;
 import com.msd.gin.halyard.common.RDFPredicate;
+import com.msd.gin.halyard.common.SPOC;
 import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.sail.HBaseSail;
@@ -109,6 +110,12 @@ public final class HalyardStats extends AbstractHalyardTool {
         Table table;
         RDFFactory rdfFactory;
         ValueIO.Reader valueReader;
+    	StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo;
+    	StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos;
+    	StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp;
+    	StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo;
+    	StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos;
+    	StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp;
         int subjectKeySize;
         int predicateKeySize;
         int objectKeySize;
@@ -118,7 +125,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         byte[] lastObjFragment;
         byte[] lastCtxFragment;
         byte[] lastClassFragment;
-        StatementIndex lastIndex;
+        StatementIndex<?,?,?,?> lastIndex;
         long counter = 0;
         boolean update;
 
@@ -138,6 +145,12 @@ public final class HalyardStats extends AbstractHalyardTool {
             rdfFactory = RDFFactory.create(table);
             ValueFactory vf = rdfFactory.getValueFactory();
             valueReader = rdfFactory.createTableReader(table);
+            spo = rdfFactory.getSPOIndex();
+            pos = rdfFactory.getPOSIndex();
+            osp = rdfFactory.getOSPIndex();
+            cspo = rdfFactory.getCSPOIndex();
+            cpos = rdfFactory.getCPOSIndex();
+            cosp = rdfFactory.getCOSPIndex();
             subjectKeySize = rdfFactory.getSubjectRole().keyHashSize();
             predicateKeySize = rdfFactory.getPredicateRole().keyHashSize();
             objectKeySize = rdfFactory.getObjectRole().keyHashSize();
@@ -147,15 +160,16 @@ public final class HalyardStats extends AbstractHalyardTool {
             lastObjFragment = new byte[objectKeySize];
             lastCtxFragment = new byte[contextKeySize];
             lastClassFragment = new byte[objectKeySize];
+            spo = rdfFactory.getSPOIndex();
         	RDF_TYPE_PREDICATE = rdfFactory.createPredicate(RDF.TYPE);
-        	POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.POS);
-        	CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(StatementIndex.CPOS);
+        	POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(pos);
+        	CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(cpos);
             update = conf.get(TARGET) == null;
             threshold = conf.getLong(THRESHOLD, 1000);
             statsContext = vf.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String gc = conf.get(GRAPH_CONTEXT);
             if (gc != null) graphContext = vf.createIRI(gc);
-			cspoStatsContextHash = rdfFactory.createContext(statsContext).getKeyHash(StatementIndex.CSPO);
+			cspoStatsContextHash = rdfFactory.createContext(statsContext).getKeyHash(cspo);
         }
 
         private boolean matchAndCopyKey(byte[] source, int offset, int len, byte[] target) {
@@ -180,7 +194,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
-            StatementIndex index = StatementIndex.toIndex(key.get()[key.getOffset()]);
+            StatementIndex<?,?,?,?> index = StatementIndex.toIndex(key.get()[key.getOffset()], rdfFactory);
 			List<Statement> stmts = HalyardTableUtils.parseStatements(null, null, null, null, value, valueReader, rdfFactory);
             int hashShift;
             if (!index.isQuadIndex()) {
@@ -193,7 +207,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                     cleanup(output);
 					graph = (IRI) stmts.get(0).getContext();
                 }
-                if (update && index == StatementIndex.CSPO) {
+                if (update && index == cspo) {
                     if (Arrays.equals(cspoStatsContextHash, lastCtxFragment)) {
                         if (sail == null) {
                             Configuration conf = output.getConfiguration();
@@ -215,7 +229,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 
             int keyLen;
             byte[] lastKeyFragment;
-            switch (index) {
+            switch (index.getName()) {
                 case SPO:
                 case CSPO:
                 	keyLen = subjectKeySize;
@@ -238,7 +252,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             if (hashChange) {
                 cleanupSubset(output);
 				Statement stmt = stmts.get(0);
-                switch (index) {
+                switch (index.getName()) {
                     case SPO:
                     case CSPO:
                         distinctSubjects++;
@@ -276,7 +290,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                 }
             }
             int stmtCount = stmts.size();
-            switch (index) {
+            switch (index.getName()) {
                 case SPO:
                 case CSPO:
                     triples += stmtCount;
@@ -531,8 +545,8 @@ public final class HalyardStats extends AbstractHalyardTool {
         addOption("g", "stats-named-graph", "target_graph", "Optional target named graph of the exported statistics (default value is '" + HALYARD.STATS_GRAPH_CONTEXT.stringValue() + "'), modification is recomended only for external export as internal Halyard optimizers expect the default value", false, true);
     }
 
-    private static Scan scan(TableName sourceTableName, StatementIndex index, RDFIdentifier key, RDFFactory rdfFactory) {
-        Scan scan = index.scan(key, rdfFactory);
+    private static <T extends SPOC<?>> Scan scan(TableName sourceTableName, StatementIndex<T,?,?,?> index, RDFIdentifier<T> key) {
+        Scan scan = index.scan(key);
         scan.setAttribute(Scan.SCAN_ATTRIBUTES_TABLE_NAME, sourceTableName.toBytes());
         return scan;
     }
@@ -574,13 +588,12 @@ public final class HalyardStats extends AbstractHalyardTool {
             scans = new ArrayList<>(4);
             ValueFactory vf = rdfFactory.getValueFactory();
             RDFContext rdfGraphCtx = rdfFactory.createContext(vf.createIRI(graphContext));
-            scans.add(scan(sourceTableName, StatementIndex.CSPO, rdfGraphCtx, rdfFactory));
-            scans.add(scan(sourceTableName, StatementIndex.CPOS, rdfGraphCtx, rdfFactory));
-            scans.add(scan(sourceTableName, StatementIndex.COSP, rdfGraphCtx, rdfFactory));
+            scans.add(scan(sourceTableName, rdfFactory.getCSPOIndex(), rdfGraphCtx));
+            scans.add(scan(sourceTableName, rdfFactory.getCPOSIndex(), rdfGraphCtx));
+            scans.add(scan(sourceTableName, rdfFactory.getCOSPIndex(), rdfGraphCtx));
             if (target == null) { //add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
-				scans.add(scan(sourceTableName, StatementIndex.CSPO,
-					rdfFactory.createContext(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : vf.createIRI(targetGraph)),
-					rdfFactory
+				scans.add(scan(sourceTableName, rdfFactory.getCSPOIndex(),
+					rdfFactory.createContext(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : vf.createIRI(targetGraph))
 				));
             }
         } else {

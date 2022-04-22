@@ -214,23 +214,29 @@ public final class HalyardTableUtils {
 		return calculateSplits(splitBits, quads, null, rdfFactory);
 	}
 	static byte[][] calculateSplits(final int splitBits, boolean quads, Map<IRI,Float> predicateRatios, RDFFactory rdfFactory) {
+        StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
+        StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = rdfFactory.getPOSIndex();
+        StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = rdfFactory.getOSPIndex();
+        StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo = rdfFactory.getCSPOIndex();
+        StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos = rdfFactory.getCPOSIndex();
+        StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = rdfFactory.getCOSPIndex();
         TreeSet<byte[]> splitKeys = new TreeSet<>(Bytes.BYTES_COMPARATOR);
         //basic presplits
-        splitKeys.add(new byte[]{StatementIndex.POS.prefix});
-        splitKeys.add(new byte[]{StatementIndex.OSP.prefix});
+        splitKeys.add(new byte[]{ pos.prefix });
+        splitKeys.add(new byte[]{ osp.prefix });
 		if (quads) {
-			splitKeys.add(new byte[] { StatementIndex.CSPO.prefix });
-			splitKeys.add(new byte[] { StatementIndex.CPOS.prefix });
-			splitKeys.add(new byte[] { StatementIndex.COSP.prefix });
+			splitKeys.add(new byte[] { cspo.prefix });
+			splitKeys.add(new byte[] { cpos.prefix });
+			splitKeys.add(new byte[] { cosp.prefix });
 		}
         //common presplits
-		addSplits(splitKeys, StatementIndex.SPO.prefix, splitBits, null);
-		addSplits(splitKeys, StatementIndex.POS.prefix, splitBits, transformKeys(predicateRatios, iri -> rdfFactory.createPredicate(iri)));
-        addSplits(splitKeys, StatementIndex.OSP.prefix, splitBits, null);
+		addSplits(splitKeys, spo.prefix, splitBits, null, rdfFactory);
+		addSplits(splitKeys, pos.prefix, splitBits, transformKeys(predicateRatios, iri -> rdfFactory.createPredicate(iri)), rdfFactory);
+        addSplits(splitKeys, osp.prefix, splitBits, null, rdfFactory);
         if (quads) {
-			addSplits(splitKeys, StatementIndex.CSPO.prefix, splitBits/2, null);
-			addSplits(splitKeys, StatementIndex.CPOS.prefix, splitBits/2, null);
-			addSplits(splitKeys, StatementIndex.COSP.prefix, splitBits/2, null);
+			addSplits(splitKeys, cspo.prefix, splitBits/2, null, rdfFactory);
+			addSplits(splitKeys, cpos.prefix, splitBits/2, null, rdfFactory);
+			addSplits(splitKeys, cosp.prefix, splitBits/2, null, rdfFactory);
         }
         return splitKeys.toArray(new byte[splitKeys.size()][]);
     }
@@ -252,8 +258,9 @@ public final class HalyardTableUtils {
 	 * @param splitKeys the {@code TreeSet} to add the collection to.
 	 * @param prefix the prefix to calculate the key for
 	 * @param splitBits between 0 and 15, larger values generate smaller split steps
+	 * @param rdfFactory RDFFactory
 	 */
-	private static void addSplits(TreeSet<byte[]> splitKeys, byte prefix, final int splitBits, Map<? extends RDFIdentifier,Float> keyFractions) {
+	private static void addSplits(TreeSet<byte[]> splitKeys, byte prefix, final int splitBits, Map<? extends RDFIdentifier<?>,Float> keyFractions, RDFFactory rdfFactory) {
         if (splitBits == 0) return;
 		if (splitBits < 0 || splitBits > 15) {
 			throw new IllegalArgumentException("Illegal nunmber of split bits");
@@ -280,8 +287,8 @@ public final class HalyardTableUtils {
 
 		fractionSum = 0.0f;
 		if (keyFractions != null && !keyFractions.isEmpty()) {
-			for (Map.Entry<? extends RDFIdentifier, Float> entry : keyFractions.entrySet()) {
-				byte[] keyHash = entry.getKey().getKeyHash(StatementIndex.toIndex(prefix));
+			for (Map.Entry<? extends RDFIdentifier<?>, Float> entry : keyFractions.entrySet()) {
+				byte[] keyHash = entry.getKey().getKeyHash(StatementIndex.toIndex(prefix, rdfFactory));
 				byte[] keyPrefix = new byte[1+keyHash.length];
 				keyPrefix[0] = prefix;
 				System.arraycopy(keyHash, 0, keyPrefix, 1, keyHash.length);
@@ -343,14 +350,21 @@ public final class HalyardTableUtils {
 		RDFObject ob = rdfFactory.createObject(obj); // object bytes
 		RDFContext cb = rdfFactory.createContext(context); // context (graph) bytes
 
-		// generate HBase key value pairs from: row, family, qualifier, value. Permutations of SPO (and if needed CSPO) are all stored.
-		kvs.add(new KeyValue(StatementIndex.SPO.row(sb, pb, ob, cb), CF_NAME, StatementIndex.SPO.qualifier(sb, pb, ob, cb), timestamp, type, StatementIndex.SPO.value(sb, pb, ob, cb)));
-		kvs.add(new KeyValue(StatementIndex.POS.row(pb, ob, sb, cb), CF_NAME, StatementIndex.POS.qualifier(pb, ob, sb, cb), timestamp, type, StatementIndex.POS.value(pb, ob, sb, cb)));
-		kvs.add(new KeyValue(StatementIndex.OSP.row(ob, sb, pb, cb), CF_NAME, StatementIndex.OSP.qualifier(ob, sb, pb, cb), timestamp, type, StatementIndex.OSP.value(ob, sb, pb, cb)));
+        StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
+        StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = rdfFactory.getPOSIndex();
+        StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = rdfFactory.getOSPIndex();
+        StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo = rdfFactory.getCSPOIndex();
+        StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos = rdfFactory.getCPOSIndex();
+        StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = rdfFactory.getCOSPIndex();
+
+        // generate HBase key value pairs from: row, family, qualifier, value. Permutations of SPO (and if needed CSPO) are all stored.
+		kvs.add(new KeyValue(spo.row(sb, pb, ob, cb), CF_NAME, spo.qualifier(sb, pb, ob, cb), timestamp, type, spo.value(sb, pb, ob, cb)));
+		kvs.add(new KeyValue(pos.row(pb, ob, sb, cb), CF_NAME, pos.qualifier(pb, ob, sb, cb), timestamp, type, pos.value(pb, ob, sb, cb)));
+		kvs.add(new KeyValue(osp.row(ob, sb, pb, cb), CF_NAME, osp.qualifier(ob, sb, pb, cb), timestamp, type, osp.value(ob, sb, pb, cb)));
         if (context != null) {
-        	kvs.add(new KeyValue(StatementIndex.CSPO.row(cb, sb, pb, ob), CF_NAME, StatementIndex.CSPO.qualifier(cb, sb, pb, ob), timestamp, type, StatementIndex.CSPO.value(cb, sb, pb, ob)));
-        	kvs.add(new KeyValue(StatementIndex.CPOS.row(cb, pb, ob, sb), CF_NAME, StatementIndex.CPOS.qualifier(cb, pb, ob, sb), timestamp, type, StatementIndex.CPOS.value(cb, pb, ob, sb)));
-        	kvs.add(new KeyValue(StatementIndex.COSP.row(cb, ob, sb, pb), CF_NAME, StatementIndex.COSP.qualifier(cb, ob, sb, pb), timestamp, type, StatementIndex.COSP.value(cb, ob, sb, pb)));
+        	kvs.add(new KeyValue(cspo.row(cb, sb, pb, ob), CF_NAME, cspo.qualifier(cb, sb, pb, ob), timestamp, type, cspo.value(cb, sb, pb, ob)));
+        	kvs.add(new KeyValue(cpos.row(cb, pb, ob, sb), CF_NAME, cpos.qualifier(cb, pb, ob, sb), timestamp, type, cpos.value(cb, pb, ob, sb)));
+        	kvs.add(new KeyValue(cosp.row(cb, ob, sb, pb), CF_NAME, cosp.qualifier(cb, ob, sb, pb), timestamp, type, cosp.value(cb, ob, sb, pb)));
         }
 
 		if (subj.isTriple()) {
@@ -399,29 +413,29 @@ public final class HalyardTableUtils {
 			if (subj == null) {
 				if (pred == null) {
 					if (obj == null) {
-						return StatementIndex.SPO.scan(rdfFactory);
+						return rdfFactory.getSPOIndex().scan();
                     } else {
-						return StatementIndex.OSP.scan(obj, rdfFactory);
+						return rdfFactory.getOSPIndex().scan(obj);
                     }
                 } else {
 					if (obj == null) {
-						return StatementIndex.POS.scan(pred, rdfFactory);
+						return rdfFactory.getPOSIndex().scan(pred);
                     } else {
-						return StatementIndex.POS.scan(pred, obj, rdfFactory);
+						return rdfFactory.getPOSIndex().scan(pred, obj);
                     }
                 }
             } else {
 				if (pred == null) {
 					if (obj == null) {
-						return StatementIndex.SPO.scan(subj, rdfFactory);
+						return rdfFactory.getSPOIndex().scan(subj);
                     } else {
-						return StatementIndex.OSP.scan(obj, subj, rdfFactory);
+						return rdfFactory.getOSPIndex().scan(obj, subj);
                     }
                 } else {
 					if (obj == null) {
-						return StatementIndex.SPO.scan(subj, pred, rdfFactory);
+						return rdfFactory.getSPOIndex().scan(subj, pred);
                     } else {
-						return StatementIndex.SPO.scan(subj, pred, obj, rdfFactory);
+						return rdfFactory.getSPOIndex().scan(subj, pred, obj);
                     }
                 }
             }
@@ -429,29 +443,29 @@ public final class HalyardTableUtils {
 			if (subj == null) {
 				if (pred == null) {
 					if (obj == null) {
-						return StatementIndex.CSPO.scan(ctx, rdfFactory);
+						return rdfFactory.getCSPOIndex().scan(ctx);
                     } else {
-						return StatementIndex.COSP.scan(ctx, obj, rdfFactory);
+						return rdfFactory.getCOSPIndex().scan(ctx, obj);
                     }
                 } else {
 					if (obj == null) {
-						return StatementIndex.CPOS.scan(ctx, pred, rdfFactory);
+						return rdfFactory.getCPOSIndex().scan(ctx, pred);
                     } else {
-						return StatementIndex.CPOS.scan(ctx, pred, obj, rdfFactory);
+						return rdfFactory.getCPOSIndex().scan(ctx, pred, obj);
                     }
                 }
             } else {
 				if (pred == null) {
 					if (obj == null) {
-						return StatementIndex.CSPO.scan(ctx, subj, rdfFactory);
+						return rdfFactory.getCSPOIndex().scan(ctx, subj);
                     } else {
-						return StatementIndex.COSP.scan(ctx, obj, subj, rdfFactory);
+						return rdfFactory.getCOSPIndex().scan(ctx, obj, subj);
                     }
                 } else {
 					if (obj == null) {
-						return StatementIndex.CSPO.scan(ctx, subj, pred, rdfFactory);
+						return rdfFactory.getCSPOIndex().scan(ctx, subj, pred);
                     } else {
-						return StatementIndex.CSPO.scan(ctx, subj, pred, obj);
+						return rdfFactory.getCSPOIndex().scan(ctx, subj, pred, obj);
                     }
                 }
             }
@@ -460,7 +474,7 @@ public final class HalyardTableUtils {
 
 	public static Resource getSubject(Table table, Identifier id, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(table);
-		Scan scan = scan(StatementIndex.SPO, id, rdfFactory);
+		Scan scan = scan(rdfFactory.getSPOIndex(), id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
@@ -475,7 +489,7 @@ public final class HalyardTableUtils {
 
 	public static IRI getPredicate(Table table, Identifier id, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(table);
-		Scan scan = scan(StatementIndex.POS, id, rdfFactory);
+		Scan scan = scan(rdfFactory.getPOSIndex(), id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
@@ -490,7 +504,7 @@ public final class HalyardTableUtils {
 
 	public static Value getObject(Table table, Identifier id, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(table);
-		Scan scan = scan(StatementIndex.OSP, id, rdfFactory);
+		Scan scan = scan(rdfFactory.getOSPIndex(), id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
@@ -503,8 +517,8 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	private static Scan scan(StatementIndex index, Identifier id, RDFFactory rdfFactory) {
-		Scan scanAll = index.scan(id, rdfFactory);
+	private static Scan scan(StatementIndex<?,?,?,?> index, Identifier id) {
+		Scan scanAll = index.scan(id);
 		return scan(scanAll.getStartRow(), scanAll.getStopRow())
 			.setFilter(new FilterList(scanAll.getFilter(), new FirstKeyOnlyFilter())).setOneRowLimit();
 	}
@@ -554,8 +568,8 @@ public final class HalyardTableUtils {
     	ByteBuffer key = ByteBuffer.wrap(cell.getRowArray(), cell.getRowOffset(), cell.getRowLength());
         ByteBuffer cn = ByteBuffer.wrap(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
         ByteBuffer cv = ByteBuffer.wrap(cell.getValueArray(), cell.getValueOffset(), cell.getValueLength());
-    	StatementIndex index = StatementIndex.toIndex(key.get());
-        Statement stmt = index.parseStatement(subj, pred, obj, ctx, key, cn, cv, valueReader, rdfFactory);
+    	StatementIndex<?,?,?,?> index = StatementIndex.toIndex(key.get(), rdfFactory);
+        Statement stmt = index.parseStatement(subj, pred, obj, ctx, key, cn, cv, valueReader);
 		if (stmt instanceof Timestamped) {
 			((Timestamped) stmt).setTimestamp(fromHalyardTimestamp(cell.getTimestamp()));
         }

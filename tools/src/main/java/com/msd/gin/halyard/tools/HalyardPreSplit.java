@@ -86,7 +86,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
             rdfFactory = RDFFactory.create(conf);
             decimationFactor = conf.getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
             // prefix splits
-            for (byte b = 1; b < StatementIndex.values().length; b++) {
+            for (byte b = 1; b < StatementIndex.Name.values().length; b++) {
                 context.write(new ImmutableBytesWritable(new byte[] {b}), new LongWritable(1));
             }
             timestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
