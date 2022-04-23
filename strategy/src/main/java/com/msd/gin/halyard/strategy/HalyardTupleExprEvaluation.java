@@ -34,12 +34,13 @@ import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -50,6 +51,7 @@ import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
 import org.eclipse.rdf4j.common.iteration.SilentIteration;
+import org.eclipse.rdf4j.common.lang.ObjectUtil;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
@@ -122,7 +124,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.TupleFunctionEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.DescribeIteration;
-import org.eclipse.rdf4j.query.algebra.evaluation.iterator.GroupIterator;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.HashJoinIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.PathIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ProjectionIterator;
@@ -876,56 +877,157 @@ final class HalyardTupleExprEvaluation {
     private void evaluateGroup(BindingSetPipe parent, Group group, BindingSet bindings) {
     	if (group.getGroupBindingNames().isEmpty()) {
     		// no GROUP BY present
-			final Map<String,Aggregator> aggregators = new LinkedHashMap<>();
-			for (GroupElem ge : group.getGroupElements()) {
-				Aggregator agg = createAggregator(ge.getOperator(), bindings);
-				if (agg != null) {
-					aggregators.put(ge.getName(), agg);
-				}
-			}
+			final GroupValue aggregators = createGroupValue(group, bindings);
     		evaluateTupleExpr(new BindingSetPipe(parent) {
 				@Override
 				protected boolean next(BindingSet bs) throws InterruptedException {
-					for(Aggregator agg : aggregators.values()) {
-						agg.process(bs);
-					}
+					aggregators.addValues(bs);
 					return true;
 				}
 				@Override
 				public void close() throws InterruptedException {
-					QueryBindingSet result = new QueryBindingSet();
-					for(Map.Entry<String,Aggregator> entry : aggregators.entrySet()) {
-						try(Aggregator agg = entry.getValue()) {
-							Value v = agg.getValue();
-							if (v != null) {
-								result.setBinding(entry.getKey(), v);
-							}
-						} catch (ValueExprEvaluationException ignore) {
-							// There was a type error when calculating the value of the
-							// aggregate.
-							// We silently ignore the error, resulting in no result value
-							// being bound.
-						}
-					}
+					QueryBindingSet result = new QueryBindingSet(bindings);
+					aggregators.bindResult(result);
 					parent.pushLast(result);
+				}
+				@Override
+				public String toString() {
+					return "AggregateBindingSetPipe-noGroupBy";
+				}
+    		}, group.getArg(), bindings);
+    	} else {
+			final Map<GroupKey,GroupValue> groupByMap = new ConcurrentHashMap<>();
+    		evaluateTupleExpr(new BindingSetPipe(parent) {
+				@Override
+				protected boolean next(BindingSet bs) throws InterruptedException {
+					GroupValue aggregators = groupByMap.computeIfAbsent(new GroupKey(bs, group), k -> createGroupValue(group, bindings));
+					aggregators.addValues(bs);
+					return true;
+				}
+				@Override
+				public void close() throws InterruptedException {
+					for(Map.Entry<GroupKey,GroupValue> aggEntry : groupByMap.entrySet()) {
+						QueryBindingSet result = new QueryBindingSet(bindings);
+						for (String name : group.getGroupBindingNames()) {
+							Value v = aggEntry.getKey().bindingSet.getValue(name);
+							if (v != null) {
+								result.setBinding(name, v);
+							}
+						}
+						aggEntry.getValue().bindResult(result);
+						parent.push(result);
+					}
+					parent.close();
 				}
 				@Override
 				public String toString() {
 					return "AggregateBindingSetPipe";
 				}
     		}, group.getArg(), bindings);
-    	} else {
-	        //temporary solution using copy of the original iterator
-	        //re-writing this to push model is a bit more complex task
-	        try {
-				pullAndPushAsync(parent, new GroupIterator(parentStrategy, group, bindings), group);
-	        } catch (QueryEvaluationException e) {
-	            parent.handleException(e);
-	        }
     	}
     }
 
-    private Aggregator createAggregator(AggregateOperator operator, BindingSet bindings) {
+    private GroupValue createGroupValue(Group group, BindingSet parentBindings) {
+		Map<String,Aggregator> aggregators = new HashMap<>();
+		for (GroupElem ge : group.getGroupElements()) {
+			Aggregator agg = createAggregator(ge.getOperator(), parentBindings);
+			if (agg != null) {
+				aggregators.put(ge.getName(), agg);
+			}
+		}
+		return new GroupValue(aggregators);
+    }
+
+    private static final class GroupKey implements Serializable {
+		private static final long serialVersionUID = 2483566881092991496L;
+		private final BindingSet bindingSet;
+		private final Group group;
+		private final int hash;
+
+		GroupKey(BindingSet bindingSet, Group group) {
+			this.bindingSet = bindingSet;
+			this.group = group;
+
+			int nextHash = 0;
+			for (String name : group.getGroupBindingNames()) {
+				Value value = bindingSet.getValue(name);
+				if (value != null) {
+					nextHash ^= value.hashCode();
+				}
+			}
+			this.hash = nextHash;
+		}
+
+		@Override
+		public int hashCode() {
+			return hash;
+		}
+
+		@Override
+		public boolean equals(Object other) {
+			if (other instanceof GroupKey && other.hashCode() == hash) {
+				BindingSet otherSolution = ((GroupKey) other).bindingSet;
+				for (String name : group.getGroupBindingNames()) {
+					Value v1 = bindingSet.getValue(name);
+					Value v2 = otherSolution.getValue(name);
+					if (!ObjectUtil.nullEquals(v1, v2)) {
+						return false;
+					}
+				}
+				return true;
+			}
+			return false;
+		}
+
+		@Override
+		public String toString() {
+			QueryBindingSet keybs = new QueryBindingSet();
+			for (String name : group.getGroupBindingNames()) {
+				Value value = bindingSet.getValue(name);
+				if (value != null) {
+					keybs.addBinding(name, value);
+				}
+			}
+			return keybs.toString();
+		}
+    }
+
+    private static final class GroupValue {
+		private final Map<String, Aggregator> aggregators;
+
+		GroupValue(Map<String, Aggregator> aggregators) {
+			this.aggregators = aggregators;
+		}
+
+		void addValues(BindingSet bindingSet) {
+			for(Aggregator agg : aggregators.values()) {
+				agg.process(bindingSet);
+			}
+		}
+
+		void bindResult(QueryBindingSet bs) {
+			for(Map.Entry<String,Aggregator> entry : aggregators.entrySet()) {
+				try(Aggregator agg = entry.getValue()) {
+					Value v = agg.getValue();
+					if (v != null) {
+						bs.setBinding(entry.getKey(), v);
+					}
+				} catch (ValueExprEvaluationException ignore) {
+					// There was a type error when calculating the value of the
+					// aggregate.
+					// We silently ignore the error, resulting in no result value
+					// being bound.
+				}
+			}
+		}
+
+		@Override
+		public String toString() {
+			return aggregators.toString();
+		}
+    }
+
+    private Aggregator createAggregator(AggregateOperator operator, BindingSet parentBindings) {
 		if (operator instanceof Count) {
 			return new CountAggregator((Count) operator, parentStrategy, tripleSource.getValueFactory());
 		} else if (operator instanceof Min) {
@@ -939,7 +1041,7 @@ final class HalyardTupleExprEvaluation {
 		} else if (operator instanceof Sample) {
 			return new SampleAggregator((Sample) operator, parentStrategy);
 		} else if (operator instanceof GroupConcat) {
-			return new ConcatAggregator((GroupConcat) operator, parentStrategy, bindings, tripleSource.getValueFactory());
+			return new ConcatAggregator((GroupConcat) operator, parentStrategy, parentBindings, tripleSource.getValueFactory());
 		} else {
 			return null;
 		}

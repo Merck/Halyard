@@ -94,4 +94,9 @@ public abstract class Aggregator implements AutoCloseable {
 			return true;
 		}
 	}
+
+	@Override
+	public String toString() {
+		return getValue().toString();
+	}
 }

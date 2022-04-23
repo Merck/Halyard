@@ -66,6 +66,8 @@ abstract class BindingSetPipe {
 
     public final boolean pushLast(BindingSet bs) throws InterruptedException {
     	if (push(bs)) {
+    		// push() returned true indicating more BindingSets are expected
+    		// so need to call close() to indicate that there are no more
     		close();
     	}
     	return false;
