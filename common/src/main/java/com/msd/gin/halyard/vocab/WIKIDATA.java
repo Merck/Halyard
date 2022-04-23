@@ -5,6 +5,7 @@ import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.common.Vocabulary;
 
 import java.lang.reflect.Field;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,22 +61,23 @@ public final class WIKIDATA implements Vocabulary {
     public static final Namespace PRN_NS = new EntityNamespace("prn", PRN_NAMESPACE);
 
     // common ID namespaces
-    public static final Namespace DOI_NS = new SimpleNamespace("doi", "http://dx.doi.org/");
     public static final Namespace ISBN_NS = new SimpleNamespace("isbn", "urn:ISBN:");
-    public static final Namespace ORCID_NS = new SimpleNamespace("orcid", "https://orcid.org/");
+    public static final Namespace ORCID_NS = new OrcidNamespace("orcid", "https://orcid.org/");
     public static final Namespace GKG_NS = new SimpleNamespace("gkg", "http://g.co/kg/g/");
     public static final Namespace FREEBASE_NS = new SimpleNamespace("freebase", "http://g.co/kg/m/");
     public static final Namespace GEONAMES_NS = new SimpleNamespace("geonames", "http://sws.geonames.org/");
-    public static final Namespace ENTREZ_NS = new SimpleNamespace("entrez", "http://purl.uniprot.org/geneid/");
+    public static final Namespace ENTREZ_NS = new IntegerNamespace("entrez", "http://purl.uniprot.org/geneid/");
     public static final Namespace UNIPROT_NS = new SimpleNamespace("uniprot", "http://purl.uniprot.org/uniprot/");
     public static final Namespace GND_NS = new SimpleNamespace("gnd", "https://d-nb.info/gnd/");
     public static final Namespace LOC_NS = new SimpleNamespace("loc", "http://id.loc.gov/authorities/names/");
-    public static final Namespace VIAF_NS = new SimpleNamespace("viaf", "http://viaf.org/viaf/");
-    public static final Namespace MAG_NS = new SimpleNamespace("mag", "http://ma-graph.org/entity/");
+    public static final Namespace VIAF_NS = new IntegerNamespace("viaf", "http://viaf.org/viaf/");
+    public static final Namespace MAG_NS = new IntegerNamespace("mag", "http://ma-graph.org/entity/");
     public static final Namespace MESH_NS = new SimpleNamespace("mesh", "http://id.nlm.nih.gov/mesh/");
     public static final Namespace EUNIS_NS = new IntegerNamespace("eunis", "http://eunis.eea.europa.eu/species/");
     public static final Namespace BABELNET_NS = new SimpleNamespace("babel", "http://babelnet.org/rdf/");
     public static final Namespace OS_NS = new IntegerNamespace("os", "http://data.ordnancesurvey.co.uk/id/");
+    public static final Namespace PUBCHEM_CID_NS = new PrefixedIntegerNamespace("pubchem_cid", "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/", "CID");
+    public static final Namespace PUBCHEM_SID_NS = new PrefixedIntegerNamespace("pubchem_sid", "http://rdf.ncbi.nlm.nih.gov/pubchem/substance/", "SID");
     public static final Namespace MUSICBRAINZ_AREA_NS = new UUIDNamespace("mb_area", "http://musicbrainz.org/area/");
     public static final Namespace MUSICBRAINZ_ARTIST_NS = new UUIDNamespace("mb_artist", "http://musicbrainz.org/artist/");
     public static final Namespace MUSICBRAINZ_EVENT_NS = new UUIDNamespace("mb_event", "http://musicbrainz.org/event/");
@@ -86,12 +88,14 @@ public final class WIKIDATA implements Vocabulary {
     public static final Namespace MUSICBRAINZ_RELEASE_NS = new UUIDNamespace("mb_release", "http://musicbrainz.org/release/");
     public static final Namespace MUSICBRAINZ_SERIES_NS = new UUIDNamespace("mb_series", "http://musicbrainz.org/series/");
 
-    public static final Namespace EN_WIKIPEDIA = new SimpleNamespace("wiki_en", "https://en.wikipedia.org/");
-    public static final Namespace FR_WIKIPEDIA = new SimpleNamespace("wiki_fr", "https://fr.wikipedia.org/");
-    public static final Namespace DE_WIKIPEDIA = new SimpleNamespace("wiki_de", "https://de.wikipedia.org/");
-    public static final Namespace ES_WIKIPEDIA = new SimpleNamespace("wiki_es", "https://es.wikipedia.org/");
-    public static final Namespace IT_WIKIPEDIA = new SimpleNamespace("wiki_it", "https://it.wikipedia.org/");
-    public static final Namespace WIKIMEDIA = new SimpleNamespace("wikimedia", "https://commons.wikimedia.org/");
+    public static final Namespace EN_WIKIPEDIA_NS = new SimpleNamespace("wiki_en", "https://en.wikipedia.org/wiki/");
+    public static final Namespace CEB_WIKIPEDIA_NS = new SimpleNamespace("wiki_ceb", "https://ceb.wikipedia.org/wiki/");
+    public static final Namespace SV_WIKIPEDIA_NS = new SimpleNamespace("wiki_sv", "https://sv.wikipedia.org/wiki/");
+    public static final Namespace FR_WIKIPEDIA_NS = new SimpleNamespace("wiki_fr", "https://fr.wikipedia.org/wiki/");
+    public static final Namespace DE_WIKIPEDIA_NS = new SimpleNamespace("wiki_de", "https://de.wikipedia.org/wiki/");
+    public static final Namespace ES_WIKIPEDIA_NS = new SimpleNamespace("wiki_es", "https://es.wikipedia.org/wiki/");
+    public static final Namespace IT_WIKIPEDIA_NS = new SimpleNamespace("wiki_it", "https://it.wikipedia.org/wiki/");
+    public static final Namespace WIKIMEDIA_NS = new SimpleNamespace("wikimedia", "https://commons.wikimedia.org/wiki/");
 
     // popular items
     public static final IRI HUMAN = SVF.createIRI(WD_NAMESPACE, "Q5");
@@ -113,6 +117,15 @@ public final class WIKIDATA implements Vocabulary {
     public static final IRI SCHOLARLY_ARTICLE = SVF.createIRI(WD_NAMESPACE, "Q13442814");
     public static final IRI FREEBASE = SVF.createIRI(WD_NAMESPACE, "Q15241312");
 
+    public static final IRI EN_WIKIPEDIA = SVF.createIRI("https://en.wikipedia.org/");
+    public static final IRI CEB_WIKIPEDIA = SVF.createIRI("https://ceb.wikipedia.org/");
+    public static final IRI SV_WIKIPEDIA = SVF.createIRI("https://sv.wikipedia.org/");
+    public static final IRI FR_WIKIPEDIA = SVF.createIRI("https://fr.wikipedia.org/");
+    public static final IRI DE_WIKIPEDIA = SVF.createIRI("https://de.wikipedia.org/");
+    public static final IRI ES_WIKIPEDIA = SVF.createIRI("https://es.wikipedia.org/");
+    public static final IRI IT_WIKIPEDIA = SVF.createIRI("https://it.wikipedia.org/");
+    public static final IRI WIKIMEDIA = SVF.createIRI("https://commons.wikimedia.org/");
+
     public static final class Properties {
         // popular properties
         public static final String COUNTRY = "P17";
@@ -126,8 +139,10 @@ public final class WIKIDATA implements Vocabulary {
         public static final String EDUCATED_AT = "P69";
         public static final String OCCUPATION = "P106";
         public static final String EMPLOYER = "P108";
+        public static final String IMPORTED_FROM_WIKIMEDIA_PROJECT = "P143";
         public static final String FOLLOWS = "P155";
         public static final String FOLLOWED_BY= "P156";
+        public static final String VIAF_ID = "P214";
         public static final String GND_ID = "P227";
         public static final String STATED_IN = "P248";
         public static final String LOCATION = "P276";
@@ -146,12 +161,14 @@ public final class WIKIDATA implements Vocabulary {
         public static final String DATE_OF_DEATH = "P570";
         public static final String INCEPTION = "P571";
         public static final String PUBLICATION_DATE = "P577";
+        public static final String START_TIME = "P580";
         public static final String END_TIME = "P582";
         public static final String POINT_IN_TIME = "P585";
         public static final String COORDINATE_LOCATION = "P625";
         public static final String OF = "P642";
         public static final String FREEBASE_ID = "P646";
         public static final String STREET_NUMBER = "P670";
+        public static final String ORTHOLOG = "P684";
         public static final String PUBMED_ID = "P698";
         public static final String FAMILY_NAME = "P734";
         public static final String GIVEN_NAME = "P735";
@@ -185,9 +202,13 @@ public final class WIKIDATA implements Vocabulary {
         public static final String PARALLAX = "P2214";
         public static final String PROPER_MOTION = "P2215";
         public static final String RADIAL_VELOCITY = "P2216";
+        public static final String BABELNET_ID = "P2581";
         public static final String GOOGLE_KNOWLEDGE_GRAPH_ID = "P2671";
         public static final String CITES_WORK = "P2860";
         public static final String EXACT_MATCH = "P2888";
+        public static final String SIMBAD_ID = "P3083";
+        public static final String WIKIMEDIA_IMPORT_URL = "P4656";
+        public static final String EUNIS_ID = "P6177";
         public static final String RIGHT_ASCENSION = "P6257";
         public static final String DECLINATION = "P6258";
         public static final String EPOCH = "P6259";
@@ -310,6 +331,39 @@ public final class WIKIDATA implements Vocabulary {
 			String id = ValueIO.readCompressedInteger(b);
 			UUID uuid = new UUID(uuidMost, uuidLeast);
 			return type + id + "-" + uuid.toString();
+		}
+	}
+
+	static final class OrcidNamespace extends AbstractIRIEncodingNamespace {
+		private static final long serialVersionUID = -8193568694174435059L;
+
+		public OrcidNamespace(String prefix, String name) {
+			super(prefix, name);
+		}
+
+		@Override
+		public ByteBuffer writeBytes(String localName, ByteBuffer b) {
+			if (localName.length() != 19) {
+				throw new IllegalArgumentException(String.format("Invalid length for ORCID: %s", localName));
+			}
+			int checksumPos = localName.length()-1;
+			char checksum = localName.charAt(checksumPos);
+			// prefix with 1 to maintain leading zeros
+			BigInteger id = new BigInteger("1"+localName.substring(0, checksumPos).replace("-", ""));
+			byte[] bytes = id.toByteArray();
+			b = ValueIO.ensureCapacity(b, 1+bytes.length+1);
+			return b.put((byte) bytes.length).put(bytes).put((byte)checksum);
+		}
+
+		@Override
+		public String readBytes(ByteBuffer b) {
+			int len = b.get();
+			byte[] idBytes = new byte[len];
+			b.get(idBytes);
+			char checksum = (char) b.get();
+			BigInteger id = new BigInteger(idBytes);
+			String idStr = id.toString();
+			return idStr.substring(1, 5) + "-" + idStr.substring(5, 9) + "-" + idStr.substring(9, 13) + "-" + idStr.substring(13) + checksum;
 		}
 	}
 }

@@ -5,7 +5,7 @@ import com.msd.gin.halyard.common.ValueIO;
 
 import java.nio.ByteBuffer;
 
-public final class IntegerNamespace extends AbstractIRIEncodingNamespace {
+public class IntegerNamespace extends AbstractIRIEncodingNamespace {
 	private static final long serialVersionUID = 571723932297421854L;
 
 	IntegerNamespace(String prefix, String ns) {

@@ -41,6 +41,8 @@ public class IdValueFactoryExtendedTest {
 			vf.createIRI("test:/foo"),
 			vf.createIRI("http://www.testmyiri.com"),
 			vf.createIRI("https://www.testmyiri.com"),
+			vf.createIRI("http://dx.doi.org/", "blah"),
+			vf.createIRI("https://dx.doi.org/", "blah"),
 			vf.createLiteral("5423"),
 			vf.createLiteral("\u98DF"),
 			vf.createLiteral(true),
@@ -68,13 +70,9 @@ public class IdValueFactoryExtendedTest {
 			vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL),
 			vf.createLiteral("invalid xml still works", RDF.XMLLITERAL),
 			vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME),
-			vf.createIRI(WIKIDATA.WD_NAMESPACE, "Q51515413"),
-			vf.createIRI(WIKIDATA.WD_NAMESPACE, "L252248-F2"),
-			vf.createIRI(WIKIDATA.WDS_NAMESPACE, "Q78246295-047c20cf-4fd2-8173-f044-c04d3ec21f45"),
 			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "400f9abd3fd761c62af23dbe8f8432158a6ce272"),
-			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "invalid"),
-			vf.createIRI(WIKIDATA.OS_NS.getName(), "4000000074547913"),
-			vf.createIRI(WIKIDATA.MUSICBRAINZ_ARTIST_NS.getName(), "78b00a09-a941-413c-a917-691111608daa"));
+			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "invalid")
+		);
 	}
 
 	@Parameterized.Parameters(name = "{0}")

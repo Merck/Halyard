@@ -164,6 +164,8 @@ public class ValueIO {
 
 	private static final byte HTTP_SCHEME = 'h';
 	private static final byte HTTPS_SCHEME = 's';
+	private static final byte DOI_HTTP_SCHEME = 'd';
+	private static final byte DOI_HTTPS_SCHEME = 'D';
 
 	private static ByteBuffer calendarTypeToBytes(byte type, XMLGregorianCalendar cal, ByteBuffer b) {
 		b = ensureCapacity(b, 11);
@@ -406,11 +408,20 @@ public class ValueIO {
 		for (Locale l : getLanguages()) {
 			String langTag = l.toLanguageTag();
 			LOGGER.debug("Loading language {}", langTag);
-			Short hash = Hashes.hash16(Bytes.toBytes(langTag));
-			if (wellKnownLangs.putIfAbsent(hash, langTag) != null) {
-				throw new AssertionError(String.format("Hash collision between %s and %s",
-						wellKnownLangs.get(hash), langTag));
+			addLanguageTag(langTag);
+			// add lowercase alternative
+			String lcLangTag = langTag.toLowerCase();
+			if (!lcLangTag.equals(langTag)) {
+				addLanguageTag(lcLangTag);
 			}
+		}
+	}
+
+	private void addLanguageTag(String langTag) {
+		Short hash = Hashes.hash16(Bytes.toBytes(langTag));
+		if (wellKnownLangs.putIfAbsent(hash, langTag) != null) {
+			throw new AssertionError(String.format("Hash collision between %s and %s",
+					wellKnownLangs.get(hash), langTag));
 		}
 	}
 
@@ -890,12 +901,23 @@ public class ValueIO {
 					byte schemeType;
 					int prefixLen;
 					if (s.startsWith("http")) {
-						if (s.startsWith("://", 4)) {
-							schemeType = HTTP_SCHEME;
-							prefixLen = 7;
-						} else if (s.startsWith("s://", 4)) {
-							schemeType = HTTPS_SCHEME;
-							prefixLen = 8;
+						prefixLen = 4;
+						if (s.startsWith("://", prefixLen)) {
+							prefixLen += 3;
+							if (s.startsWith("dx.doi.org/", prefixLen)) {
+								schemeType = DOI_HTTP_SCHEME;
+								prefixLen += 11;
+							} else {
+								schemeType = HTTP_SCHEME;
+							}
+						} else if (s.startsWith("s://", prefixLen)) {
+							prefixLen += 4;
+							if (s.startsWith("dx.doi.org/", prefixLen)) {
+								schemeType = DOI_HTTPS_SCHEME;
+								prefixLen += 11;
+							} else {
+								schemeType = HTTPS_SCHEME;
+							}
 						} else {
 							schemeType = 0;
 							prefixLen = 0;
@@ -1018,6 +1040,12 @@ public class ValueIO {
 							break;
 						case HTTPS_SCHEME:
 							prefix = "https://";
+							break;
+						case DOI_HTTP_SCHEME:
+							prefix = "http://dx.doi.org/";
+							break;
+						case DOI_HTTPS_SCHEME:
+							prefix = "https://dx.doi.org/";
 							break;
 						default:
 							throw new AssertionError(String.format("Unexpected scheme type: %d", schemeType));
