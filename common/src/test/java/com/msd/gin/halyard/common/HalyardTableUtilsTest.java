@@ -45,7 +45,8 @@ import static org.junit.Assert.*;
  * @author Adam Sotona (MSD)
  */
 public class HalyardTableUtilsTest {
-
+	private static final int ID_SIZE = 8;
+	private static final int OBJECT_KEY_SIZE = 5;
 	private static Connection conn;
 	private static Table table;
 	private static RDFFactory rdfFactory;
@@ -53,6 +54,8 @@ public class HalyardTableUtilsTest {
     @BeforeClass
     public static void setup() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+		conf.setInt(Config.ID_SIZE, ID_SIZE);
+		conf.setInt(Config.KEY_SIZE_OBJECT, OBJECT_KEY_SIZE);
 		conn = HalyardTableUtils.getConnection(conf);
 		table = HalyardTableUtils.getTable(conn, "testUtils", true, -1);
 		rdfFactory = RDFFactory.create(table);
@@ -65,17 +68,15 @@ public class HalyardTableUtilsTest {
     }
 
     @Test
-    public void testGetTheSameTableAgain() throws Exception {
-        table.close();
-        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, 1);
+    public void testConfig() {
+    	assertEquals(ID_SIZE, rdfFactory.getIdSize());
+    	assertEquals(OBJECT_KEY_SIZE, rdfFactory.getObjectRole().keyHashSize());
     }
 
     @Test
-    public void testIdIsUnique() {
-        ValueFactory vf = SimpleValueFactory.getInstance();
-        assertNotEquals(
-        	rdfFactory.id(vf.createLiteral("1", vf.createIRI("local:type1"))),
-        	rdfFactory.id(vf.createLiteral("1", vf.createIRI("local:type2"))));
+    public void testGetTheSameTableAgain() throws Exception {
+        table.close();
+        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, 1);
     }
 
     @Test
@@ -165,16 +166,6 @@ public class HalyardTableUtilsTest {
     }
 
     @Test
-    public void testNewInstance() {
-        new HalyardTableUtils();
-    }
-
-    @Test(expected = RuntimeException.class)
-    public void testGetInvalidMessageDigest() {
-        Hashes.getMessageDigest("invalid");
-    }
-
-    @Test
     public void testNoResult() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
         ValueIO.Reader reader = rdfFactory.createReader(vf);
@@ -200,10 +191,5 @@ public class HalyardTableUtilsTest {
         for (Cell kv : kvs) {
             assertEquals(Cell.Type.DeleteColumn, kv.getType());
         }
-    }
-
-    @Test
-    public void testEncode() {
-        assertEquals("AQIDBAU", Hashes.encode(new byte[]{1, 2, 3, 4, 5}));
     }
 }

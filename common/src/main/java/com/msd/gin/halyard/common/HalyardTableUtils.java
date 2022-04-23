@@ -18,6 +18,7 @@ package com.msd.gin.halyard.common;
 
 import com.msd.gin.halyard.vocab.HALYARD;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -73,8 +74,7 @@ public final class HalyardTableUtils {
 
     static final byte[] CF_NAME = Bytes.toBytes("e");
     public static final byte[] CONFIG_ROW_KEY = new byte[] {(byte) 0xff};
-    static final byte[] ID_HASH_CONFIG_COL = Bytes.toBytes("id.hash");
-    static final byte[] ID_SIZE_CONFIG_COL = Bytes.toBytes("id.size");
+    static final byte[] CONFIG_COL = Bytes.toBytes("config");
 
 	private static final int PREFIXES = 3;
 
@@ -83,6 +83,8 @@ public final class HalyardTableUtils {
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
 	private static final long REGION_MAX_FILESIZE = 10000000000l;
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
+
+    private HalyardTableUtils() {}
 
     static byte[] createStopKey(int size) {
     	byte[] stopKey = new byte[size];
@@ -175,11 +177,14 @@ public final class HalyardTableUtils {
 		}
 		Table table = conn.getTable(htableName);
 		Configuration config = conn.getConfiguration();
-		String confIdAlgo = Config.getString(config, Config.ID_HASH_CONFIG, "SHA-1");
-		int confIdSize = Config.getInteger(config, Config.ID_SIZE_CONFIG, 0);
+		Configuration halyardConf = new Configuration(false);
+		for (Map.Entry<String, String> entry : config.getPropsWithPrefix("halyard.").entrySet()) {
+			halyardConf.set("halyard." + entry.getKey(), entry.getValue());
+		}
+		ByteArrayOutputStream bout = new ByteArrayOutputStream(1024);
+		halyardConf.writeXml(bout);
 		Put configPut = new Put(CONFIG_ROW_KEY)
-			.addColumn(CF_NAME, ID_HASH_CONFIG_COL, Bytes.toBytes(confIdAlgo))
-			.addColumn(CF_NAME, ID_SIZE_CONFIG_COL, Bytes.toBytes(confIdSize));
+			.addColumn(CF_NAME, CONFIG_COL, bout.toByteArray());
 		table.put(configPut);
 		return table;
 	}

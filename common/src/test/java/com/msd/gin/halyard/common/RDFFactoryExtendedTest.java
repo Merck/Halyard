@@ -2,9 +2,15 @@ package com.msd.gin.halyard.common;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.junit.Test;
 
@@ -28,6 +34,26 @@ public class RDFFactoryExtendedTest {
 			}
 		}
 	}
+
+	@Test
+	public void testIdIsEqual() {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        assertEquals(
+	    	rdfFactory.id(vf.createLiteral("1", vf.createIRI("local:type"))),
+	    	rdfFactory.id(vf.createLiteral("1", vf.createIRI("local:type")))
+	    );
+	}
+
+	@Test
+    public void testIdIsUnique() {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        List<Value> values = RDFFactoryTest.createData(vf);
+        Set<Identifier> ids = new HashSet<>(values.size());
+        for (Value v : values) {
+        	ids.add(rdfFactory.id(v));
+        }
+        assertEquals(values.size(), ids.size());
+    }
 
 	@Test
 	public void testWellKnownId() {

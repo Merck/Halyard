@@ -27,4 +27,14 @@ public class HashesTest {
 		byte[] h64 = hf.apply(ByteBuffer.wrap(Bytes.toBytes("foobar")));
 		assertEquals(8, h64.length);
 	}
+
+    @Test(expected = RuntimeException.class)
+    public void testInvalidHadh() {
+        Hashes.getHash("invalid", 0);
+    }
+
+    @Test
+    public void testEncode() {
+        assertEquals("AQIDBAU", Hashes.encode(new byte[]{1, 2, 3, 4, 5}));
+    }
 }

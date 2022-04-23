@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.common.Config;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 
 import java.io.File;
@@ -44,8 +45,8 @@ public class HalyardHashTest extends AbstractHalyardToolTest {
         }
 
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-        conf.set("halyard.id.hash", "Murmur3-128");
-        conf.setInt("halyard.id.size", 8);
+        conf.set(Config.ID_HASH, "Murmur3-128");
+        conf.setInt(Config.ID_SIZE, 8);
         assertEquals(0, run(conf, new String[]{"-s", file.toURI().toURL().toString()}));
     }
 
@@ -60,9 +61,17 @@ public class HalyardHashTest extends AbstractHalyardToolTest {
         }
 
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-        conf.set("halyard.id.hash", "Murmur3-128");
-        conf.setInt("halyard.id.size", 1);
-        conf.setBoolean("halyard.vocabularies", false);
+        conf.set(Config.ID_HASH, "Murmur3-128");
+        conf.setInt(Config.ID_SIZE, 1);
+        conf.setInt(Config.ID_TYPE_INDEX, 0);
+        conf.setInt(Config.KEY_SIZE_SUBJECT, 1);
+        conf.setInt(Config.END_KEY_SIZE_SUBJECT, 1);
+        conf.setInt(Config.KEY_SIZE_PREDICATE, 1);
+        conf.setInt(Config.END_KEY_SIZE_PREDICATE, 1);
+        conf.setInt(Config.KEY_SIZE_OBJECT, 1);
+        conf.setInt(Config.END_KEY_SIZE_OBJECT, 1);
+        conf.setInt(Config.KEY_SIZE_CONTEXT, 1);
+        conf.setBoolean(Config.VOCAB, false);
         assertEquals(86, run(conf, new String[]{"-s", file.toURI().toURL().toString()}));
     }
 }

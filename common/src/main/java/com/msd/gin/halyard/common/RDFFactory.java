@@ -7,6 +7,7 @@ import com.msd.gin.halyard.common.ValueIO.StreamTripleReader;
 import com.msd.gin.halyard.common.ValueIO.StreamTripleWriter;
 import com.msd.gin.halyard.vocab.HALYARD;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -20,7 +21,6 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
@@ -70,60 +70,41 @@ public class RDFFactory {
 
 	public static RDFFactory create(Table table) throws IOException {
 		Get getConfig = new Get(HalyardTableUtils.CONFIG_ROW_KEY)
-				.addColumn(HalyardTableUtils.CF_NAME, HalyardTableUtils.ID_HASH_CONFIG_COL)
-				.addColumn(HalyardTableUtils.CF_NAME, HalyardTableUtils.ID_SIZE_CONFIG_COL);
-			Result res = table.get(getConfig);
-			Cell[] cells = res.rawCells();
-			if (cells == null) {
-				throw new IOException("No config found");
-			}
-			String idAlgo = null;
-			int idSize = -1; 
-			for (Cell cell : cells) {
-				ByteBuffer q = ByteBuffer.wrap(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
-				if (ByteBuffer.wrap(HalyardTableUtils.ID_HASH_CONFIG_COL).equals(q)) {
-					idAlgo = Bytes.toString(cell.getValueArray(), cell.getValueOffset(), cell.getValueLength());
-				} else if (ByteBuffer.wrap(HalyardTableUtils.ID_SIZE_CONFIG_COL).equals(q)) {
-					idSize = Bytes.toInt(cell.getValueArray(), cell.getValueOffset(), cell.getValueLength());
-				}
-			}
-			if (idAlgo == null) {
-				throw new IOException("Identifier hash missing from table");
-			}
-			if (idSize == -1) {
-				throw new IOException("Identifier size missing from table");
-			}
-			Configuration conf = table.getConfiguration();
+				.addColumn(HalyardTableUtils.CF_NAME, HalyardTableUtils.CONFIG_COL);
+		Result res = table.get(getConfig);
+		Cell[] cells = res.rawCells();
+		if (cells == null || cells.length == 0) {
+			throw new IOException("No config found");
+		}
+		Cell cell = cells[0];
+		Configuration halyardConf = new Configuration(false);
+		ByteArrayInputStream bin = new ByteArrayInputStream(cell.getValueArray(), cell.getValueOffset(), cell.getValueLength());
+		halyardConf.addResource(bin);
+		return create(halyardConf);
+	}
 
-			String confIdAlgo = conf.get(Config.ID_HASH_CONFIG);
-			if (confIdAlgo != null && !confIdAlgo.equals(idAlgo)) {
-				throw new IOException(String.format("Identifier hash mismatch: table contains %s but configuration says %s", idAlgo, confIdAlgo));
-			}
-			conf.set(Config.ID_HASH_CONFIG, idAlgo);
+	private static int lessThan(int x, int upperLimit) {
+		if (x >= upperLimit) {
+			throw new IllegalArgumentException(String.format("%d must be less than %d", x, upperLimit));
+		}
+		return x;
+	}
 
-			int confIdSize = conf.getInt(Config.ID_SIZE_CONFIG, -1);
-			if (confIdSize != -1 && confIdSize != idSize) {
-				throw new IOException(String.format("Identifier size mismatch: table contains %s but configuration says %s", idSize, confIdSize));
-			}
-			conf.setInt(Config.ID_SIZE_CONFIG, idSize);
-			return create(conf);
+	private static int lessThanOrEqual(int x, int upperLimit) {
+		if (x > upperLimit) {
+			throw new IllegalArgumentException(String.format("%d must be less than or equal to %d", x, upperLimit));
+		}
+		return x;
 	}
 
 	private RDFFactory(Configuration config) {
 		valueIO = new ValueIO(
-			Config.getBoolean(config, "halyard.vocabularies", true),
-			Config.getBoolean(config, "halyard.languages", true),
-			Config.getInteger(config, "halyard.string.compressionThreshold", 200)
+			Config.getBoolean(config, Config.VOCAB, true),
+			Config.getBoolean(config, Config.LANG, true),
+			Config.getInteger(config, Config.STRING_COMPRESSION, 200)
 		);
-		String confIdAlgo = Config.getString(config, Config.ID_HASH_CONFIG, "SHA-1");
-		int confIdSize = Config.getInteger(config, Config.ID_SIZE_CONFIG, 0);
-		int subjectKeySize = Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 8);
-		int subjectEndKeySize = Config.getInteger(config, Config.END_KEY_SIZE_SUBJECT, 8);
-		int predicateKeySize = Config.getInteger(config, Config.KEY_SIZE_PREDICATE, 4);
-		int predicateEndKeySize = Config.getInteger(config, Config.END_KEY_SIZE_PREDICATE, 2);
-		int objectKeySize = Config.getInteger(config, Config.KEY_SIZE_OBJECT, 8);
-		int objectEndKeySize = Config.getInteger(config, Config.END_KEY_SIZE_OBJECT, 2);
-		int contextKeySize = Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 6);
+		String confIdAlgo = Config.getString(config, Config.ID_HASH, "SHA-1");
+		int confIdSize = Config.getInteger(config, Config.ID_SIZE, 0);
 
 		idHash = new ThreadLocal<HashFunction>() {
 			@Override
@@ -135,7 +116,15 @@ public class RDFFactory {
 		idSize = hashInstance.size();
 		LOGGER.info("Identifier hash: {} {}-bit ({} bytes)", hashInstance.getName(), idSize*Byte.SIZE, idSize);
 
-		typeIndex = (idSize > 1) ? 1 : 0;
+		int subjectKeySize = lessThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 8), idSize);
+		int subjectEndKeySize = lessThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_SUBJECT, 8), idSize);
+		int predicateKeySize = lessThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_PREDICATE, 4), idSize);
+		int predicateEndKeySize = lessThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_PREDICATE, 2), idSize);
+		int objectKeySize = lessThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_OBJECT, 8), idSize);
+		int objectEndKeySize = lessThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_OBJECT, 2), idSize);
+		int contextKeySize = lessThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 6), idSize);
+
+		typeIndex = lessThan(Config.getInteger(config, Config.ID_TYPE_INDEX, 1), idSize);
 		typeSaltSize = 1 << (8*typeIndex);
 
 		valueFactory = new IdValueFactory(this);

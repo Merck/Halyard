@@ -40,7 +40,7 @@ public class RDFFactoryTest {
 		return String.join(" ", copies);
 	}
 
-	private static List<Value> createData(ValueFactory vf) {
+	static List<Value> createData(ValueFactory vf) {
 		return Arrays.asList(RDF.TYPE, vf.createLiteral("foo"), vf.createBNode("__foobar__"),
 			vf.createIRI("test:/foo"),
 			vf.createIRI("http://www.testmyiri.com"),
