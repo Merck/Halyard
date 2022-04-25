@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.msd.gin.halyard.sail;
+package com.msd.gin.halyard.repository;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 

@@ -90,7 +90,7 @@
 										<include name="WEB-INF/rdf4j-http-server-servlet.xml" />
 									</patternset>
 								</unzip>
-								<replace file="target/rdf4j-server-patch/WEB-INF/rdf4j-http-server-servlet.xml" token="org.eclipse.rdf4j.repository.manager.LocalRepositoryManager" value="com.msd.gin.halyard.sail.HBaseRepositoryManager" />
+								<replace file="target/rdf4j-server-patch/WEB-INF/rdf4j-http-server-servlet.xml" token="org.eclipse.rdf4j.repository.manager.LocalRepositoryManager" value="com.msd.gin.halyard.repository.HBaseRepositoryManager" />
 								<zip destfile="${project.build.directory}/rdf4j-server.war" update="true">
 									<fileset dir="target/rdf4j-server-patch" />
 									<zipfileset dir="../common/target" includes="halyard-common-${project.version}.jar" prefix="WEB-INF/lib" />
