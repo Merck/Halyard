@@ -96,10 +96,11 @@ public final class HalyardQueryJoinOptimizer extends QueryJoinOptimizer {
             private void meetStarJoin(StarJoin node) {
             	Join joins = node.toJoins();
             	QueryRoot root = new QueryRoot(joins);
+            	// optimize the join order
             	meet(joins);
         		StatementPatternCollector spc = new StatementPatternCollector();
         		root.visit(spc);
-            	node.setArgs(spc.getStatementPatterns());
+            	node.setStatementPatterns(spc.getStatementPatterns());
             }
 
             @Override

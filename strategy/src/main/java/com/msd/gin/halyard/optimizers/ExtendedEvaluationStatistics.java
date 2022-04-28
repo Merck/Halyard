@@ -6,7 +6,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
-import org.eclipse.rdf4j.query.algebra.StatementPattern;
+import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
@@ -38,9 +38,11 @@ public class ExtendedEvaluationStatistics extends EvaluationStatistics {
         }
 
         protected void meetStarJoin(StarJoin node) {
+        	// cardinality is dominated by the largest argument
         	double card = Double.POSITIVE_INFINITY;
-        	for (StatementPattern sp : node.getArgs()) {
-        		card = Math.min(card, getCardinality(sp));
+        	for (TupleExpr sp : node.getArgs()) {
+        		sp.visit(this);
+        		card = Math.min(card, this.cardinality);
         	}
         	Set<Var> vars = new HashSet<>();
         	node.getVars(vars);

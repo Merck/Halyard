@@ -72,10 +72,10 @@ public class StarJoinOptimizer implements QueryOptimizer {
 			for(Map.Entry<Pair<Var,Var>, Collection<StatementPattern>> entry : spByCtxSubj.asMap().entrySet()) {
 				List<StatementPattern> subjSps = (List<StatementPattern>) entry.getValue();
 				if(subjSps.size() > 1) {
-					starJoins.add(new StarJoin(entry.getKey().getRight(), entry.getKey().getLeft(), subjSps));
 					for(StatementPattern sp : subjSps) {
 						sp.replaceWith(new SingletonSet());
 					}
+					starJoins.add(new StarJoin(entry.getKey().getRight(), entry.getKey().getLeft(), subjSps));
 				}
 			}
 

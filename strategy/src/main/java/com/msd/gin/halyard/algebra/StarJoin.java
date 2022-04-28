@@ -30,6 +30,7 @@ import org.eclipse.rdf4j.query.algebra.QueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
+import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
 
 public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	private static final long serialVersionUID = -4523270958311045771L;
@@ -45,13 +46,13 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 
 	private Var commonVar;
 	private Var contextVar;
-	private List<StatementPattern> args;
+	private List<TupleExpr> args;
 
-	public StarJoin(Var commonVar, Var contextVar, List<StatementPattern> sps) {
-		assert sps.size() > 1;
+	public StarJoin(Var commonVar, Var contextVar, List<StatementPattern> exprs) {
+		assert exprs.size() > 1;
 		this.commonVar = commonVar;
 		this.contextVar = contextVar;
-		this.args = sps;
+		setStatementPatterns(exprs);
 	}
 
 	public Var getCommonVar() {
@@ -62,12 +63,15 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 		return contextVar;
 	}
 
-	public List<StatementPattern> getArgs() {
+	public List<? extends TupleExpr> getArgs() {
 		return Collections.unmodifiableList(args);
 	}
 
-	public void setArgs(List<StatementPattern> sps) {
-		this.args = sps;
+	public void setStatementPatterns(List<StatementPattern> exprs) {
+		this.args = new ArrayList<>(exprs);
+		for (StatementPattern sp : exprs) {
+			sp.setParentNode(this);
+		}
 	}
 
 	public List<Var> getVarList() {
@@ -75,7 +79,11 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	}
 
 	public <L extends Collection<Var>> L getVars(L varCollection) {
-		for(StatementPattern sp : args) {
+		StatementPatternCollector spc = new StatementPatternCollector();
+		for(TupleExpr expr : args) {
+			expr.visit(spc);
+		}
+		for(StatementPattern sp : spc.getStatementPatterns()) {
 			sp.getVars(varCollection);
 		}
 		return varCollection;
@@ -96,7 +104,7 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 		if (contextVar != null) {
 			contextVar.visit(visitor);
 		}
-		for (StatementPattern arg : args) {
+		for (TupleExpr arg : args) {
 			arg.visit(visitor);
 		}
 	}
@@ -110,7 +118,8 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 		} else {
 			final int index = args.indexOf(current);
 			if (index >= 0) {
-				args.set(index, (StatementPattern) replacement);
+				args.set(index, (TupleExpr) replacement);
+				replacement.setParentNode(this);
 			} else {
 				super.replaceChildNode(current, replacement);
 			}
@@ -120,7 +129,7 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	@Override
 	public Set<String> getBindingNames() {
 		Set<String> bindingNames = new LinkedHashSet<>(16);
-		for (StatementPattern arg : args) {
+		for (TupleExpr arg : args) {
 			bindingNames.addAll(arg.getBindingNames());
 		}
 		return bindingNames;
@@ -129,7 +138,7 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	@Override
 	public Set<String> getAssuredBindingNames() {
 		Set<String> bindingNames = new LinkedHashSet<>(16);
-		for (StatementPattern arg : args) {
+		for (TupleExpr arg : args) {
 			bindingNames.addAll(arg.getAssuredBindingNames());
 		}
 		return bindingNames;

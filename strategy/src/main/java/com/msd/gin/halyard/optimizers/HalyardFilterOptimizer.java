@@ -16,9 +16,12 @@
  */
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.StarJoin;
+
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.algebra.Filter;
+import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.FilterOptimizer;
 
@@ -37,6 +40,25 @@ public final class HalyardFilterOptimizer extends FilterOptimizer {
                     {
                         filterVars.retainAll(filter.getArg().getBindingNames());
                     }
+
+            		@Override
+            		protected void meetNode(QueryModelNode node) {
+                    	if (node instanceof StarJoin) {
+                    		meetStarJoin((StarJoin) node);
+                    	} else {
+                    		super.meetNode(node);
+                    	}
+            		}
+
+            		private void meetStarJoin(StarJoin node) {
+            			for (TupleExpr expr : node.getArgs()) {
+            				if (expr.getBindingNames().containsAll(filterVars)) {
+            					expr.visit(this);
+            					return;
+            				}
+            			}
+            			relocate(filter, node);
+            		}
                 });
             }
         });

@@ -55,4 +55,17 @@ public class HalyardFilterOptimizerTest {
         new HalyardFilterOptimizer().optimize(clone, null, null);
         assertEquals(expr, clone);
     }
+
+    @Test
+    public void testPushFilterIntoStarJoins() {
+        TupleExpr expr = new SPARQLParser().parseQuery("select * {?s <:p1> ?o1; <:p2> ?o2; <:p3> ?o3 filter(?o1 = \"x\")}", null).getTupleExpr();
+        new StarJoinOptimizer().optimize(expr, null, null);
+        new HalyardFilterOptimizer().optimize(expr, null, null);
+        expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
+            @Override
+            public void meet(Filter node) throws RuntimeException {
+                assertEquals(expr.toString(), "StarJoin", node.getParentNode().getSignature());
+            }
+        });
+    }
 }
