@@ -5,9 +5,9 @@ import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.XMLLiteral;
 import com.msd.gin.halyard.vocab.HALYARD;
 
-import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import javax.xml.namespace.QName;
 import javax.xml.xpath.XPathConstants;
@@ -35,7 +35,7 @@ import org.w3c.dom.ls.LSSerializer;
 
 @MetaInfServices(TupleFunction.class)
 public class XPathTupleFunction implements TupleFunction, InverseMagicProperty {
-	private static final Cache<String, XPathExpression> XPATH_CACHE = CacheBuilder.newBuilder().maximumSize(100).expireAfterAccess(Duration.ofSeconds(10)).concurrencyLevel(1).build();
+	private static final Cache<String, XPathExpression> XPATH_CACHE = CacheBuilder.newBuilder().maximumSize(100).expireAfterAccess(10, TimeUnit.SECONDS).concurrencyLevel(1).build();
 
 	private static final ThreadLocal<XPathFactory> XPATH_FACTORY = new ThreadLocal<XPathFactory>() {
 		@Override

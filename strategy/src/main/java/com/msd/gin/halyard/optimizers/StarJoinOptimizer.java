@@ -22,6 +22,7 @@ import com.google.common.collect.Multimaps;
 import com.msd.gin.halyard.algebra.StarJoin;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -68,8 +69,8 @@ public class StarJoinOptimizer implements QueryOptimizer {
 				spByCtxSubj.put(Pair.of(sp.getContextVar(), sp.getSubjectVar()), sp);
 			}
 			List<StarJoin> starJoins = new ArrayList<>(sps.size());
-			for(Map.Entry<Pair<Var,Var>, List<StatementPattern>> entry : Multimaps.asMap(spByCtxSubj).entrySet()) {
-				List<StatementPattern> subjSps = entry.getValue();
+			for(Map.Entry<Pair<Var,Var>, Collection<StatementPattern>> entry : spByCtxSubj.asMap().entrySet()) {
+				List<StatementPattern> subjSps = (List<StatementPattern>) entry.getValue();
 				if(subjSps.size() > 1) {
 					starJoins.add(new StarJoin(entry.getKey().getRight(), entry.getKey().getLeft(), subjSps));
 					for(StatementPattern sp : subjSps) {
