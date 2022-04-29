@@ -292,8 +292,8 @@ public class HBaseSailConnection implements SailConnection {
 				class StatementScanner extends AbstractStatementScanner {
 					final ResultScanner rs;
 
-					StatementScanner() throws IOException {
-						super(sail.getRDFFactory().createTableReader(table), sail.getRDFFactory());
+					StatementScanner(RDFFactory rdfFactory) throws IOException {
+						super(rdfFactory.createTableReader(sail.getValueFactory(), table), rdfFactory);
 						rs = table.getScanner(rdfFactory.getCSPOIndex().scan());
 					}
 
@@ -310,7 +310,7 @@ public class HBaseSailConnection implements SailConnection {
 
 				try {
 					return new TimeLimitIteration<Resource, SailException>(
-							new ReducedIteration<Resource, SailException>(new ConvertingIteration<Statement, Resource, SailException>(new ExceptionConvertingIteration<Statement, SailException>(new StatementScanner()) {
+							new ReducedIteration<Resource, SailException>(new ConvertingIteration<Statement, Resource, SailException>(new ExceptionConvertingIteration<Statement, SailException>(new StatementScanner(sail.getRDFFactory())) {
 								@Override
 								protected SailException convert(Exception e) {
 									return new SailException(e);

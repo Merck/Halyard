@@ -44,7 +44,7 @@ public class RDFFactory {
 	private final int typeSaltSize;
 
 	private final ValueIO valueIO;
-	private final ValueFactory valueFactory;
+	private final ValueFactory idValueFactory;
 	private final ValueFactory tsValueFactory;
 
 	final RDFRole<SPOC.S> subject;
@@ -97,6 +97,13 @@ public class RDFFactory {
 		return x;
 	}
 
+	private static int greaterThanOrEqual(int x, int lowerLimit) {
+		if (x < lowerLimit) {
+			throw new IllegalArgumentException(String.format("%d must be greater than or equal to %d", x, lowerLimit));
+		}
+		return x;
+	}
+
 	private RDFFactory(Configuration config) {
 		valueIO = new ValueIO(
 			Config.getBoolean(config, Config.VOCAB, true),
@@ -116,22 +123,23 @@ public class RDFFactory {
 		idSize = hashInstance.size();
 		LOGGER.info("Identifier hash: {} {}-bit ({} bytes)", hashInstance.getName(), idSize*Byte.SIZE, idSize);
 
-		int subjectKeySize = lessThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 8), idSize);
-		int subjectEndKeySize = lessThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_SUBJECT, 8), idSize);
-		int predicateKeySize = lessThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_PREDICATE, 4), idSize);
-		int predicateEndKeySize = lessThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_PREDICATE, 2), idSize);
-		int objectKeySize = lessThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_OBJECT, 8), idSize);
-		int objectEndKeySize = lessThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_OBJECT, 2), idSize);
-		int contextKeySize = lessThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 6), idSize);
-
 		typeIndex = lessThan(lessThanOrEqual(Config.getInteger(config, Config.ID_TYPE_INDEX, 1), Short.BYTES), idSize);
 		typeSaltSize = 1 << (8*typeIndex);
 
-		valueFactory = new IdValueFactory(this);
+		int minKeySize = typeIndex + 2;
+		int subjectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 8), minKeySize), idSize);
+		int subjectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_SUBJECT, 8), minKeySize), idSize);
+		int predicateKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_PREDICATE, 4), minKeySize), idSize);
+		int predicateEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_PREDICATE, 2), minKeySize), idSize);
+		int objectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_OBJECT, 8), minKeySize), idSize);
+		int objectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_OBJECT, 2), minKeySize), idSize);
+		int contextKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 6), minKeySize), idSize);
+
+		idValueFactory = new IdValueFactory(this);
 		tsValueFactory = new TimestampedValueFactory(this);
 		idTripleWriter = valueIO.createWriter(new IdTripleWriter());
 		streamWriter = valueIO.createWriter(new StreamTripleWriter());
-		streamReader = valueIO.createReader(valueFactory, new StreamTripleReader());
+		streamReader = valueIO.createReader(idValueFactory, new StreamTripleReader());
 
 		for (IRI iri : valueIO.wellKnownIris.values()) {
 			IdentifiableIRI idIri = new IdentifiableIRI(iri.stringValue(), this);
@@ -199,8 +207,8 @@ public class RDFFactory {
 		);
 	}
 
-	public ValueFactory getValueFactory() {
-		return valueFactory;
+	public ValueFactory getIdValueFactory() {
+		return idValueFactory;
 	}
 
 	public ValueFactory getTimestampedValueFactory() {
@@ -360,12 +368,8 @@ public class RDFFactory {
 		return valueIO.createReader(vf, null);
 	}
 
-	public ValueIO.Reader createTableReader(Table table) {
-		return valueIO.createReader(valueFactory, new TableTripleReader(table));
-	}
-
-	public ValueIO.Reader createTimestampedTableReader(Table table) {
-		return valueIO.createReader(tsValueFactory, new TableTripleReader(table));
+	public ValueIO.Reader createTableReader(ValueFactory vf, Table table) {
+		return valueIO.createReader(vf, new TableTripleReader(table));
 	}
 
 

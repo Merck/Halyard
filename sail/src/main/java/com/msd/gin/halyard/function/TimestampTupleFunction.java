@@ -65,7 +65,7 @@ public class TimestampTupleFunction extends AbstractSpinFunction implements Tupl
 		}
 
 		Resource[] contexts = (args.length == 4) ? new Resource[] { (Resource) args[3] } : new Resource[0];
-		CloseableIteration<? extends Statement, QueryEvaluationException> iter = ((HBaseTripleSource) tripleSource).getTimestampedStatements((Resource) args[0], (IRI) args[1], args[2], contexts);
+		CloseableIteration<? extends Statement, QueryEvaluationException> iter = ((HBaseTripleSource) tripleSource).getTimestampedTripleSource().getStatements((Resource) args[0], (IRI) args[1], args[2], contexts);
 		return new ConvertingIteration<Statement, List<? extends Value>, QueryEvaluationException>(iter) {
 			@Override
 			protected List<? extends Value> convert(Statement stmt) throws QueryEvaluationException {

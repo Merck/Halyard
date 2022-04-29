@@ -129,7 +129,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             this.table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             rdfFactory = RDFFactory.create(table);
-            this.valueReader = rdfFactory.createTableReader(table);
+            this.valueReader = rdfFactory.createTableReader(rdfFactory.getIdValueFactory(), table);
         }
 
         private Set<IRI> queryForClasses(Value instance) throws IOException {

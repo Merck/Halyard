@@ -219,7 +219,7 @@ public class HBaseSail implements Sail {
 		} catch (IOException e) {
 			throw new SailException(e);
 		}
-		this.valueFactory = rdfFactory.getValueFactory();
+		this.valueFactory = rdfFactory.getIdValueFactory();
 
 		if (includeNamespaces) {
 			addNamespaces();

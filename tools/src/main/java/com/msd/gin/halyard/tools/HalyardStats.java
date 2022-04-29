@@ -143,8 +143,8 @@ public final class HalyardStats extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             rdfFactory = RDFFactory.create(table);
-            ValueFactory vf = rdfFactory.getValueFactory();
-            valueReader = rdfFactory.createTableReader(table);
+            ValueFactory vf = rdfFactory.getIdValueFactory();
+            valueReader = rdfFactory.createTableReader(vf, table);
             spo = rdfFactory.getSPOIndex();
             pos = rdfFactory.getPOSIndex();
             osp = rdfFactory.getOSPIndex();
@@ -417,9 +417,9 @@ public final class HalyardStats extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             rdfFactory = RDFFactory.create(table);
-            vf = rdfFactory.getValueFactory();
+            vf = rdfFactory.getIdValueFactory();
             statsGraphContext = vf.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
-            valueReader = rdfFactory.createTableReader(table);
+            valueReader = rdfFactory.createTableReader(vf, table);
             String targetUrl = conf.get(TARGET);
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
@@ -586,7 +586,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         List<Scan> scans;
         if (graphContext != null) { //restricting stats to scan given graph context only
             scans = new ArrayList<>(4);
-            ValueFactory vf = rdfFactory.getValueFactory();
+            ValueFactory vf = rdfFactory.getIdValueFactory();
             RDFContext rdfGraphCtx = rdfFactory.createContext(vf.createIRI(graphContext));
             scans.add(scan(sourceTableName, rdfFactory.getCSPOIndex(), rdfGraphCtx));
             scans.add(scan(sourceTableName, rdfFactory.getCPOSIndex(), rdfGraphCtx));

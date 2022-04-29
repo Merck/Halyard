@@ -25,24 +25,36 @@ import static org.junit.Assert.*;
 public class TimestampTupleFunctionTest {
 	private static final RDFFactory rdfFactory = RDFFactory.create();
 
+	private TripleSource getStubTripleSource(long ts) {
+		return new HBaseTripleSource(null, SimpleValueFactory.getInstance(), rdfFactory, 0) {
+			@Override
+			public TripleSource getTimestampedTripleSource() {
+				return new TripleSource() {
+					@Override
+					public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
+						Statement stmt = getValueFactory().createStatement(subj, pred, obj);
+						((Timestamped) stmt).setTimestamp(ts);
+						return new SingletonIteration<Statement, QueryEvaluationException>(stmt);
+					}
+
+					@Override
+					public ValueFactory getValueFactory() {
+						return rdfFactory.getTimestampedValueFactory();
+					}
+				};
+			}
+		};
+	}
+
 	@Test
 	public void testTimestampedStatements() {
 		long ts = System.currentTimeMillis();
-		ValueFactory SVF = SimpleValueFactory.getInstance();
-		Resource subj = SVF.createBNode();
-		IRI pred = SVF.createIRI(":prop");
-		Value obj = SVF.createBNode();
-		TripleSource tripleSource = new HBaseTripleSource(null, SVF, rdfFactory, 0) {
-			ValueFactory TVF = rdfFactory.getTimestampedValueFactory();
-
-			@Override
-			public CloseableIteration<? extends Statement, QueryEvaluationException> getTimestampedStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
-				Statement stmt = TVF.createStatement(subj, pred, obj);
-				((Timestamped) stmt).setTimestamp(ts);
-				return new SingletonIteration<Statement, QueryEvaluationException>(stmt);
-			}
-		};
-		CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> iter = new TimestampTupleFunction().evaluate(tripleSource, SVF, subj, pred, obj);
+		TripleSource tripleSource = getStubTripleSource(ts);
+		ValueFactory vf = tripleSource.getValueFactory();
+		Resource subj = vf.createBNode();
+		IRI pred = vf.createIRI(":prop");
+		Value obj = vf.createBNode();
+		CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> iter = new TimestampTupleFunction().evaluate(tripleSource, vf, subj, pred, obj);
 		assertTrue(iter.hasNext());
 		List<? extends Value> bindings = iter.next();
 		assertEquals(1, bindings.size());
@@ -54,21 +66,12 @@ public class TimestampTupleFunctionTest {
 	@Test
 	public void testTripleTimestamp() {
 		long ts = System.currentTimeMillis();
-		ValueFactory SVF = SimpleValueFactory.getInstance();
-		Resource subj = SVF.createBNode();
-		IRI pred = SVF.createIRI(":prop");
-		Value obj = SVF.createBNode();
-		TripleSource tripleSource = new HBaseTripleSource(null, SVF, rdfFactory, 0) {
-			ValueFactory TVF = rdfFactory.getTimestampedValueFactory();
-
-			@Override
-			public CloseableIteration<? extends Statement, QueryEvaluationException> getTimestampedStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
-				Statement stmt = TVF.createStatement(subj, pred, obj);
-				((Timestamped) stmt).setTimestamp(ts);
-				return new SingletonIteration<Statement, QueryEvaluationException>(stmt);
-			}
-		};
-		CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> iter = new TimestampTupleFunction().evaluate(tripleSource, SVF, SVF.createTriple(subj, pred, obj));
+		TripleSource tripleSource = getStubTripleSource(ts);
+		ValueFactory vf = tripleSource.getValueFactory();
+		Resource subj = vf.createBNode();
+		IRI pred = vf.createIRI(":prop");
+		Value obj = vf.createBNode();
+		CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> iter = new TimestampTupleFunction().evaluate(tripleSource, vf, vf.createTriple(subj, pred, obj));
 		assertTrue(iter.hasNext());
 		List<? extends Value> bindings = iter.next();
 		assertEquals(1, bindings.size());

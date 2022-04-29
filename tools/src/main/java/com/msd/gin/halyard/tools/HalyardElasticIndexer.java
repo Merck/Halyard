@@ -87,7 +87,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             rdfFactory = RDFFactory.create(table);
-            valueReader = rdfFactory.createTableReader(table);
+            valueReader = rdfFactory.createTableReader(rdfFactory.getIdValueFactory(), table);
             objectKeySize = rdfFactory.getObjectRole().keyHashSize();
             contextKeySize = rdfFactory.getContextRole().keyHashSize();
             lastHash = new byte[objectKeySize];

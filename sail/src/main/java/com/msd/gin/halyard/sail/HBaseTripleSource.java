@@ -51,6 +51,7 @@ import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SPIN;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
+import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,10 +59,8 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseTripleSource.class);
 
 	private final Table table;
-	private final ValueFactory valueFactory;
 	protected final RDFFactory rdfFactory;
 	private final ValueIO.Reader valueReader;
-	private final ValueIO.Reader tsValueReader;
 	private final long timeoutSecs;
 	private final HBaseSail.ScanSettings settings;
 	private final HBaseSail.Ticker ticker;
@@ -70,12 +69,14 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 		this(table, vf, rdfFactory, timeoutSecs, null, null);
 	}
 
-	public HBaseTripleSource(Table table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
+	HBaseTripleSource(Table table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
+		this(table, rdfFactory.createTableReader(vf, table), rdfFactory, timeoutSecs, settings, ticker);
+	}
+
+	private HBaseTripleSource(Table table, ValueIO.Reader valueReader, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
 		this.table = table;
-		this.valueFactory = vf;
 		this.rdfFactory = rdfFactory;
-		this.valueReader = rdfFactory.createTableReader(table);
-		this.tsValueReader = rdfFactory.createTimestampedTableReader(table);
+		this.valueReader = valueReader;
 		this.timeoutSecs = timeoutSecs;
 		this.settings = settings;
 		this.ticker = ticker;
@@ -91,8 +92,9 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 		}
 	}
 
-	public CloseableIteration<? extends Statement, QueryEvaluationException> getTimestampedStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
-		return getStatementsInternal(subj, pred, obj, contexts, tsValueReader);
+	public TripleSource getTimestampedTripleSource() {
+		ValueIO.Reader tsValueReader = rdfFactory.createTableReader(rdfFactory.getTimestampedValueFactory(), table);
+		return new HBaseTripleSource(table, tsValueReader, rdfFactory, timeoutSecs, settings, ticker);
 	}
 
 	private CloseableIteration<? extends Statement, QueryEvaluationException> getStatementsInternal(Resource subj, IRI pred, Value obj, Resource[] contexts, ValueIO.Reader reader) {
@@ -132,7 +134,7 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 
 	@Override
 	public final ValueFactory getValueFactory() {
-		return valueFactory;
+		return valueReader.getValueFactory();
 	}
 
 	protected class StatementScanner extends AbstractStatementScanner {
@@ -199,9 +201,11 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 					return new QueryEvaluationException(e);
 				}
 			}) {
+			final ValueFactory vf = valueReader.getValueFactory();
+
 			@Override
 			protected Triple convert(Statement stmt) {
-				return valueFactory.createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
+				return vf.createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
 			}
 		};
 		return timeLimit(iter, timeoutSecs);

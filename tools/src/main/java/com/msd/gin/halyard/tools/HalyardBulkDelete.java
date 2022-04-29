@@ -50,6 +50,7 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
@@ -84,18 +85,19 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
             rdfFactory = RDFFactory.create(table);
-            valueReader = rdfFactory.createTableReader(table);
+            ValueFactory vf = rdfFactory.getIdValueFactory();
+            valueReader = rdfFactory.createTableReader(vf, table);
             String s = conf.get(SUBJECT);
             if (s!= null) {
-                subj = NTriplesUtil.parseResource(s, rdfFactory.getValueFactory());
+                subj = NTriplesUtil.parseResource(s, vf);
             }
             String p = conf.get(PREDICATE);
             if (p!= null) {
-                pred = NTriplesUtil.parseURI(p, rdfFactory.getValueFactory());
+                pred = NTriplesUtil.parseURI(p, vf);
             }
             String o = conf.get(OBJECT);
             if (o!= null) {
-                obj = NTriplesUtil.parseValue(o, rdfFactory.getValueFactory());
+                obj = NTriplesUtil.parseValue(o, vf);
             }
             String cs[] = conf.getStrings(CONTEXTS);
             if (cs != null) {
@@ -104,7 +106,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
                     if ("NONE".equals(c)) {
                         ctx.add(null);
                     } else {
-                        ctx.add(NTriplesUtil.parseResource(c, rdfFactory.getValueFactory()));
+                        ctx.add(NTriplesUtil.parseResource(c, vf));
                     }
                 }
             }

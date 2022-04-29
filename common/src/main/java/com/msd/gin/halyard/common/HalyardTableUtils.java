@@ -63,6 +63,7 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.ValueFactory;
 
 /**
  * Core Halyard utility class performing RDF to HBase mappings and base HBase table and key management. The methods of this class define how
@@ -477,8 +478,8 @@ public final class HalyardTableUtils {
         }
     }
 
-	public static Resource getSubject(Table table, Identifier id, RDFFactory rdfFactory) throws IOException {
-		ValueIO.Reader valueReader = rdfFactory.createTableReader(table);
+	public static Resource getSubject(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, table);
 		Scan scan = scan(rdfFactory.getSPOIndex(), id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
@@ -492,8 +493,8 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static IRI getPredicate(Table table, Identifier id, RDFFactory rdfFactory) throws IOException {
-		ValueIO.Reader valueReader = rdfFactory.createTableReader(table);
+	public static IRI getPredicate(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, table);
 		Scan scan = scan(rdfFactory.getPOSIndex(), id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
@@ -507,8 +508,8 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static Value getObject(Table table, Identifier id, RDFFactory rdfFactory) throws IOException {
-		ValueIO.Reader valueReader = rdfFactory.createTableReader(table);
+	public static Value getObject(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, table);
 		Scan scan = scan(rdfFactory.getOSPIndex(), id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {

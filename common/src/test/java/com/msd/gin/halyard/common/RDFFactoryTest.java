@@ -76,7 +76,7 @@ public class RDFFactoryTest {
 		Function<Value,Object[]> toArg = v -> new Object[] {v};
 		List<Object[]> testValues = new ArrayList<>();
 		testValues.addAll(createData(SimpleValueFactory.getInstance()).stream().map(toArg).collect(Collectors.toList()));
-		testValues.addAll(createData(rdfFactory.getValueFactory()).stream().map(toArg).collect(Collectors.toList()));
+		testValues.addAll(createData(rdfFactory.getIdValueFactory()).stream().map(toArg).collect(Collectors.toList()));
 		return testValues;
 	}
 
@@ -98,7 +98,7 @@ public class RDFFactoryTest {
 
 	private void testToAndFromBytes(int bufferSize) {
         ValueIO.Writer writer = rdfFactory.createWriter();
-        ValueIO.Reader reader = rdfFactory.createReader(rdfFactory.getValueFactory());
+        ValueIO.Reader reader = rdfFactory.createReader(rdfFactory.getIdValueFactory());
 
         ByteBuffer buf = ByteBuffer.allocate(bufferSize);
 		buf = writer.writeTo(expected, buf);

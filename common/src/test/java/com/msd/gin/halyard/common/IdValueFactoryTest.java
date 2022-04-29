@@ -8,7 +8,7 @@ public class IdValueFactoryTest extends ValueFactoryTest {
 
 	@Override
 	protected ValueFactory factory() {
-		return rdfFactory.getValueFactory();
+		return rdfFactory.getIdValueFactory();
 	}
 
 }
