@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 public class RDFFactory {
 	private static final Logger LOGGER = LoggerFactory.getLogger(RDFFactory.class);
+	private static final int MIN_KEY_SIZE = 1;
 
 	public final ValueIO.Writer idTripleWriter;
 	public final ValueIO.Writer streamWriter;
@@ -126,14 +127,13 @@ public class RDFFactory {
 		typeIndex = lessThan(lessThanOrEqual(Config.getInteger(config, Config.ID_TYPE_INDEX, 1), Short.BYTES), idSize);
 		typeSaltSize = 1 << (8*typeIndex);
 
-		int minKeySize = typeIndex + 2;
-		int subjectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 8), minKeySize), idSize);
-		int subjectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_SUBJECT, 8), minKeySize), idSize);
-		int predicateKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_PREDICATE, 4), minKeySize), idSize);
-		int predicateEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_PREDICATE, 2), minKeySize), idSize);
-		int objectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_OBJECT, 8), minKeySize), idSize);
-		int objectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_OBJECT, 2), minKeySize), idSize);
-		int contextKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 6), minKeySize), idSize);
+		int subjectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 5), MIN_KEY_SIZE), idSize);
+		int subjectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_SUBJECT, 3), MIN_KEY_SIZE), idSize);
+		int predicateKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_PREDICATE, 3), MIN_KEY_SIZE), idSize);
+		int predicateEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_PREDICATE, 3), MIN_KEY_SIZE), idSize);
+		int objectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_OBJECT, 5), MIN_KEY_SIZE), idSize);
+		int objectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_OBJECT, 3), MIN_KEY_SIZE), idSize);
+		int contextKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 3), MIN_KEY_SIZE), idSize);
 
 		idValueFactory = new IdValueFactory(this);
 		tsValueFactory = new TimestampedValueFactory(this);

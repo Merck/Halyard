@@ -79,6 +79,7 @@ public final class HalyardTableUtils {
 
 	private static final int PREFIXES = 3;
 
+	static final int DEFAULT_MAX_VERSIONS = 1;
 	static final int READ_VERSIONS = 1;
 	private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
@@ -129,10 +130,10 @@ public final class HalyardTableUtils {
 		return getTable(conn, tableName, create, splitBits, true);
 	}
 	public static Table getTable(Connection conn, String tableName, boolean create, int splitBits, boolean quads) throws IOException {
-		RDFFactory rdfFactory = RDFFactory.create(conn.getConfiguration());
 		TableName htableName = TableName.valueOf(tableName);
-        if (create) {
-            return createTableIfNotExists(conn, htableName, splitBits < 0 ? null : calculateSplits(splitBits, quads, rdfFactory));
+        if (create && !tableExists(conn, htableName)) {
+    		RDFFactory rdfFactory = RDFFactory.create(conn.getConfiguration());
+            return createTable(conn, htableName, splitBits < 0 ? null : calculateSplits(splitBits, quads, rdfFactory), DEFAULT_MAX_VERSIONS);
         } else {
         	return conn.getTable(htableName);
         }
@@ -150,20 +151,16 @@ public final class HalyardTableUtils {
 			throws IOException {
 		TableName htableName = TableName.valueOf(tableName);
 		Connection conn = getConnection(config);
-		return createTableIfNotExists(conn, htableName, splits);
-	}
-
-	private static Table createTableIfNotExists(Connection conn, TableName htableName, byte[][] splits)
-		throws IOException {
-		boolean tableAlreadyExists;
-		try (Admin admin = conn.getAdmin()) {
-			tableAlreadyExists = admin.tableExists(htableName);
-		}
-		// check if the table exists and if it doesn't, make it
-		if (!tableAlreadyExists) {
-			return createTable(conn, htableName, splits, 1);
+		if (!tableExists(conn, htableName)) {
+			return createTable(conn, htableName, splits, DEFAULT_MAX_VERSIONS);
 		} else {
 			return conn.getTable(htableName);
+		}
+	}
+
+	private static boolean tableExists(Connection conn, TableName htableName) throws IOException {
+		try (Admin admin = conn.getAdmin()) {
+			return admin.tableExists(htableName);
 		}
 	}
 
