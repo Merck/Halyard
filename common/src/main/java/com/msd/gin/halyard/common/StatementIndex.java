@@ -42,29 +42,41 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	}
 
 	public static final Scan scanLiterals(RDFFactory rdfFactory) {
-		int typeSaltSize = rdfFactory.getTypeSaltSize();
 		StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> index = rdfFactory.getOSPIndex();
-		List<RowRange> ranges = new ArrayList<>(typeSaltSize);
-		for (int i=0; i<typeSaltSize; i++) {
-			byte[] startKey = index.concat(false, new byte[] {(byte) i}); // inclusive
-			byte[] stopKey = index.concat(false, new byte[] {(byte) i, Identifier.LITERAL_STOP_BITS}); // exclusive
-			ranges.add(new RowRange(startKey, true, stopKey, false));
+		int typeSaltSize = rdfFactory.getTypeSaltSize();
+		if (typeSaltSize == 1) {
+			byte[] startKey = index.concat(false, rdfFactory.createTypeSalt(0, (byte)0)); // inclusive
+			byte[] stopKey = index.concat(false, rdfFactory.createTypeSalt(0, Identifier.LITERAL_STOP_BITS)); // exclusive
+			return HalyardTableUtils.scan(startKey, stopKey);
+		} else {
+			List<RowRange> ranges = new ArrayList<>(typeSaltSize);
+			for (int i=0; i<typeSaltSize; i++) {
+				byte[] startKey = index.concat(false, rdfFactory.createTypeSalt(i, (byte)0)); // inclusive
+				byte[] stopKey = index.concat(false, rdfFactory.createTypeSalt(i, Identifier.LITERAL_STOP_BITS)); // exclusive
+				ranges.add(new RowRange(startKey, true, stopKey, false));
+			}
+			return index.scan().setFilter(new MultiRowRangeFilter(ranges));
 		}
-		return index.scan().setFilter(new MultiRowRangeFilter(ranges));
 	}
 
 	public static final Scan scanLiterals(Resource graph, RDFFactory rdfFactory) {
 		RDFContext ctx = rdfFactory.createContext(graph);
-		int typeSaltSize = rdfFactory.getTypeSaltSize();
 		StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> index = rdfFactory.getCOSPIndex();
 		byte[] ctxb = ctx.getKeyHash(index);
-		List<RowRange> ranges = new ArrayList<>(typeSaltSize);
-		for (int i=0; i<typeSaltSize; i++) {
-			byte[] startKey = index.concat(false, ctxb, new byte[] {(byte) i}); // inclusive
-			byte[] stopKey = index.concat(false, ctxb, new byte[] {(byte) i, Identifier.LITERAL_STOP_BITS}); // exclusive
-			ranges.add(new RowRange(startKey, true, stopKey, false));
+		int typeSaltSize = rdfFactory.getTypeSaltSize();
+		if (typeSaltSize == 1) {
+			byte[] startKey = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, (byte)0)); // inclusive
+			byte[] stopKey = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, Identifier.LITERAL_STOP_BITS)); // exclusive
+			return HalyardTableUtils.scan(startKey, stopKey);
+		} else {
+			List<RowRange> ranges = new ArrayList<>(typeSaltSize);
+			for (int i=0; i<typeSaltSize; i++) {
+				byte[] startKey = index.concat(false, ctxb, rdfFactory.createTypeSalt(i, (byte)0)); // inclusive
+				byte[] stopKey = index.concat(false, ctxb, rdfFactory.createTypeSalt(i, Identifier.LITERAL_STOP_BITS)); // exclusive
+				ranges.add(new RowRange(startKey, true, stopKey, false));
+			}
+			return index.scan().setFilter(new MultiRowRangeFilter(ranges));
 		}
-		return index.scan().setFilter(new MultiRowRangeFilter(ranges));
 	}
 
 	/**

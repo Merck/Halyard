@@ -124,7 +124,7 @@ public class RDFFactory {
 		int objectEndKeySize = lessThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_OBJECT, 2), idSize);
 		int contextKeySize = lessThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 6), idSize);
 
-		typeIndex = lessThan(Config.getInteger(config, Config.ID_TYPE_INDEX, 1), idSize);
+		typeIndex = lessThan(lessThanOrEqual(Config.getInteger(config, Config.ID_TYPE_INDEX, 1), Short.BYTES), idSize);
 		typeSaltSize = 1 << (8*typeIndex);
 
 		valueFactory = new IdValueFactory(this);
@@ -230,6 +230,15 @@ public class RDFFactory {
 		return typeSaltSize;
 	}
 
+	byte[] createTypeSalt(int salt, byte typeBits) {
+		byte[] b = new byte[typeIndex + 1];
+		b[typeIndex] = typeBits;
+		for (int i=typeIndex-1; i>=0; i--) {
+			b[i] = (byte) salt;
+			salt >>= 8;
+		}
+		return b;
+	}
 	public RDFRole<SPOC.S> getSubjectRole() {
 		return subject;
 	}
