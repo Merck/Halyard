@@ -2,6 +2,7 @@ package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.annotation.Nullable;
@@ -49,11 +50,11 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> index = rdfFactory.getOSPIndex();
 		int typeSaltSize = rdfFactory.getTypeSaltSize();
 		if (typeSaltSize == 1) {
-			byte[] startKey = index.concat(false, rdfFactory.createTypeSalt(0, (byte)0)); // inclusive
-			byte[] stopKey = index.concat(false, rdfFactory.createTypeSalt(0, Identifier.LITERAL_STOP_BITS)); // exclusive
-			return HalyardTableUtils.scan(startKey, stopKey);
+			byte[] startRow = index.concat(false, rdfFactory.createTypeSalt(0, (byte)0)); // inclusive
+			byte[] stopRow = index.concat(false, rdfFactory.createTypeSalt(0, Identifier.LITERAL_STOP_BITS)); // exclusive
+			return HalyardTableUtils.scan(startRow, stopRow);
 		} else {
-			return index.scan(true);
+			return index.scanWithConstraints(new LiteralConstraints());
 		}
 	}
 
@@ -63,16 +64,12 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		int typeSaltSize = rdfFactory.getTypeSaltSize();
 		if (typeSaltSize == 1) {
 			byte[] ctxb = ctx.getKeyHash(index);
-			byte[] startKey = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, (byte)0)); // inclusive
-			byte[] stopKey = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, Identifier.LITERAL_STOP_BITS)); // exclusive
-			return HalyardTableUtils.scan(startKey, stopKey);
+			byte[] startRow = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, (byte)0)); // inclusive
+			byte[] stopRow = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, Identifier.LITERAL_STOP_BITS)); // exclusive
+			return HalyardTableUtils.scan(startRow, stopRow);
 		} else {
-			return index.scan(ctx, true);
+			return index.scanWithConstraints(ctx, new LiteralConstraints());
 		}
-	}
-
-	private static Scan withFilters(Scan scan, List<Filter> filters) {
-		return scan.setFilter(filters.size() == 1 ? filters.get(0) : new FilterList(filters));
 	}
 
 	/**
@@ -118,23 +115,45 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		cn.position(cn.position() + idSize - keySize);
 	}
 
+	private static byte[] concat2(byte[] b1, byte[] b2) {
+		byte[] b = new byte[b1.length + b2.length];
+		System.arraycopy(b1, 0, b, 0, b1.length);
+		System.arraycopy(b2, 0, b, b1.length, b2.length);
+		return b;
+	}
+
+	private static byte[] concat3(byte[] b1, byte[] b2, byte[] b3) {
+		byte[] b = new byte[b1.length + b2.length + b3.length];
+		System.arraycopy(b1, 0, b, 0, b1.length);
+		System.arraycopy(b2, 0, b, b1.length, b2.length);
+		System.arraycopy(b3, 0, b, b1.length + b2.length, b3.length);
+		return b;
+	}
+
 	private final Name name;
 	final byte prefix;
-	private final IndexType indexType;
-	private final RDFRole<?>[] roles;
+	private final boolean isQuadIndex;
+	private final RDFRole<T1> role1;
+	private final RDFRole<T2> role2;
+	private final RDFRole<T3> role3;
+	private final RDFRole<T4> role4;
 	private final int[] argIndices;
 	private final int[] spocIndices;
 	private final RDFFactory rdfFactory;
 
-	StatementIndex(Name name, int prefix, IndexType type, RDFRole<T1> role1, RDFRole<T2> role2, RDFRole<T3> role3, RDFRole<T4> role4, RDFFactory rdfFactory) {
+	StatementIndex(Name name, int prefix, boolean isQuadIndex, RDFRole<T1> role1, RDFRole<T2> role2, RDFRole<T3> role3, RDFRole<T4> role4, RDFFactory rdfFactory) {
 		this.name = name;
 		this.prefix = (byte) prefix;
-		this.indexType = type;
-		this.roles = new RDFRole<?>[] {role1, role2, role3, role4};
+		this.isQuadIndex = isQuadIndex;
+		this.role1 = role1;
+		this.role2 = role2;
+		this.role3 = role3;
+		this.role4 = role4;
 		this.rdfFactory = rdfFactory;
 
 		this.argIndices = new int[4];
 		this.spocIndices = new int[4];
+		RDFRole<?>[] roles = new RDFRole<?>[] {role1, role2, role3, role4};
 		for (int i=0; i<roles.length; i++) {
 			int spocIndex = roles[i].getName().ordinal();
 			this.argIndices[i] = spocIndex;
@@ -147,44 +166,60 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	}
 
 	public boolean isQuadIndex() {
-		return indexType == IndexType.QUAD;
+		return isQuadIndex;
 	}
 
-	byte[][] newStopKeys() {
-		return indexType.newStopKeys(this.roles);
+	private int get3KeyHashSize(RDFRole<?> role) {
+		return isQuadIndex ? role.keyHashSize() : role.endKeyHashSize();
 	}
-	byte[] keyHash(Identifier id) {
-		return roles[0].keyHash(this, id);
+	private <T extends SPOC<?>> byte[] get3KeyHash(StatementIndex<?,?,T,?> index, RDFIdentifier<T> k) {
+		return isQuadIndex ? k.getKeyHash(index) : k.getEndKeyHash(index);
 	}
-	byte[] qualifierHash(Identifier id) {
-		return roles[0].qualifierHash(id);
+	private int get3QualifierHashSize(RDFRole<?> role) {
+		return isQuadIndex ? role.qualifierHashSize() : role.endQualifierHashSize();
+	}
+	private void write3QualifierHashTo(RDFIdentifier<?> k, ByteBuffer b) {
+		if (isQuadIndex) {
+			k.writeQualifierHashTo(b);
+		} else {
+			k.writeEndQualifierHashTo(b);
+		}
+	}
+
+	private byte[][] newStopKeys() {
+		return isQuadIndex ? new byte[][] {role1.stopKey(), role2.stopKey(), role3.stopKey(), role4.endStopKey()} : new byte[][] {role1.stopKey(), role2.stopKey(), role3.endStopKey()};
+	}
+	private byte[] keyHash(Identifier id) {
+		return role1.keyHash(this, id);
+	}
+	private byte[] qualifierHash(Identifier id) {
+		return role1.qualifierHash(id);
 	}
 
 	byte[] row(RDFIdentifier<T1> v1, RDFIdentifier<T2> v2, RDFIdentifier<T3> v3, @Nullable RDFIdentifier<T4> v4) {
-		boolean isQuadIndex = isQuadIndex();
 		if (isQuadIndex && v4 == null) {
 			throw new NullPointerException("Missing value from quad.");
 		}
-		ByteBuffer r = ByteBuffer.allocate(1 + v1.keyHashSize() + v2.keyHashSize() + indexType.get3KeyHashSize(v3.getRole()) + (isQuadIndex ? indexType.get4KeyHashSize(v4.getRole()) : 0));
+		ByteBuffer r = ByteBuffer.allocate(1 + role1.keyHashSize() + role2.keyHashSize() + get3KeyHashSize(role3) + (isQuadIndex ? role4.endKeyHashSize() : 0));
 		r.put(prefix);
 		r.put(v1.getKeyHash(this));
 		r.put(v2.getKeyHash(this));
-		r.put(indexType.get3KeyHash(this, v3));
+		r.put(get3KeyHash(this, v3));
 		if(isQuadIndex) {
-			r.put(indexType.get4KeyHash(this, v4));
+			r.put(v4.getEndKeyHash(this));
 		}
 		return r.array();
 	}
 
 	byte[] qualifier(RDFIdentifier<T1> v1, @Nullable RDFIdentifier<T2> v2, @Nullable RDFIdentifier<T3> v3, @Nullable RDFIdentifier<T4> v4) {
-		ByteBuffer cq = ByteBuffer.allocate(v1.qualifierHashSize() + (v2 != null ? v2.qualifierHashSize() : 0) + (v3 != null ? indexType.get3QualifierHashSize(v3.getRole()) : 0) + (v4 != null ? indexType.get4QualifierHashSize(v4.getRole()) : 0));
+		ByteBuffer cq = ByteBuffer.allocate(role1.qualifierHashSize() + (v2 != null ? role2.qualifierHashSize() : 0) + (v3 != null ? get3QualifierHashSize(role3) : 0) + (v4 != null ? role4.endQualifierHashSize() : 0));
 		v1.writeQualifierHashTo(cq);
 		if(v2 != null) {
 			v2.writeQualifierHashTo(cq);
     		if(v3 != null) {
-				indexType.write3QualifierHashTo(v3, cq);
+				write3QualifierHashTo(v3, cq);
         		if(v4 != null) {
-					indexType.write4QualifierHashTo(v4, cq);
+					v4.writeEndQualifierHashTo(cq);
         		}
     		}
 		}
@@ -193,12 +228,12 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 
 	byte[] value(RDFValue<?,T1> v1, RDFValue<?,T2> v2, RDFValue<?,T3> v3, @Nullable RDFValue<?,T4> v4) {
 		boolean hasQuad = (v4 != null);
-		if (isQuadIndex() && !hasQuad) {
+		if (isQuadIndex && !hasQuad) {
 			throw new NullPointerException("Missing value from quad.");
 		}
-		int sizeLen1 = roles[0].sizeLength();
-		int sizeLen2 = roles[1].sizeLength();
-		int sizeLen3 = roles[2].sizeLength();
+		int sizeLen1 = role1.sizeLength();
+		int sizeLen2 = role2.sizeLength();
+		int sizeLen3 = role3.sizeLength();
 		ByteBuffer cv = ByteBuffer.allocate(valueSize(v1, sizeLen1) + valueSize(v2, sizeLen2) + valueSize(v3, sizeLen3) + (hasQuad ? valueSize(v4, 0) : 0));
 		putRDFValue(cv, v1, sizeLen1);
 		putRDFValue(cv, v2, sizeLen2);
@@ -211,10 +246,10 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 
 	Statement parseStatement(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, ByteBuffer key, ByteBuffer cn, ByteBuffer cv, ValueIO.Reader reader) {
 		RDFValue<?,?>[] args = new RDFValue<?,?>[] {subj, pred, obj, ctx};
-		Value v1 = parseRDFValue(roles[0], args[argIndices[0]], key, cn, cv, roles[0].keyHashSize(), reader);
-		Value v2 = parseRDFValue(roles[1], args[argIndices[1]], key, cn, cv, roles[1].keyHashSize(), reader);
-		Value v3 = parseRDFValue(roles[2], args[argIndices[2]], key, cn, cv, indexType.get3KeyHashSize(roles[2]), reader);
-		Value v4 = parseLastRDFValue(roles[3], args[argIndices[3]], key, cn, cv, indexType.get4KeyHashSize(roles[3]), reader);
+		Value v1 = parseRDFValue(role1, args[argIndices[0]], key, cn, cv, role1.keyHashSize(), reader);
+		Value v2 = parseRDFValue(role2, args[argIndices[1]], key, cn, cv, role2.keyHashSize(), reader);
+		Value v3 = parseRDFValue(role3, args[argIndices[2]], key, cn, cv, get3KeyHashSize(role3), reader);
+		Value v4 = parseLastRDFValue(role4, args[argIndices[3]], key, cn, cv, role4.endKeyHashSize(), reader);
 		return createStatement(new Value[] {v1, v2, v3, v4}, reader.getValueFactory());
 	}
 
@@ -305,71 +340,142 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return HalyardTableUtils.scan(concat(false, startKeys), concat(true, stopKeys));
 	}
 
-	public Scan scan() {
-		return scan(false);
-	}
-	public Scan scan(boolean literalsOnly) {
-		List<Filter> filters = new ArrayList<>(1);
-		if (literalsOnly) {
-			filters.add(createLiteralFilter(EMPTY_1D));
-		}
-		return withFilters(scan(EMPTY_2D, newStopKeys()), filters);
-	}
 	Scan scan(Identifier id) {
 		byte[] kb = keyHash(id);
 		byte[][] stopKeys = newStopKeys();
 		stopKeys[0] = kb;
 		return scan(new byte[][] {kb}, stopKeys).setFilter(new ColumnPrefixFilter(qualifierHash(id)));
 	}
-	public Scan scan(RDFIdentifier<T1> k) {
-		return scan(k, false);
+	public Scan scan() {
+		return scanWithConstraints(null);
 	}
-	public Scan scan(RDFIdentifier<T1> k, boolean literalsOnly) {
+	public Scan scanWithConstraints(LiteralConstraints constraints) {
+		Scan scan = scan(EMPTY_2D, newStopKeys());
+		if (constraints != null) {
+			List<Filter> filters = new ArrayList<>();
+			appendLiteralFilters(EMPTY_1D, EMPTY_1D, constraints, filters);
+			scan.setFilter(new FilterList(filters));
+		}
+		return scan;
+	}
+	public Scan scan(RDFIdentifier<T1> k) {
+		return scanWithConstraints(k, null);
+	}
+	public Scan scanWithConstraints(RDFIdentifier<T1> k, LiteralConstraints constraints) {
 		byte[] kb = k.getKeyHash(this);
 		byte[][] stopKeys = newStopKeys();
 		stopKeys[0] = kb;
-		List<Filter> filters = new ArrayList<>(2);
-		filters.add(new ColumnPrefixFilter(qualifier(k, null, null, null)));
-		if (literalsOnly) {
-			filters.add(createLiteralFilter(kb));
+		Scan scan = scan(new byte[][] {kb}, stopKeys);
+		Filter qf = new ColumnPrefixFilter(qualifier(k, null, null, null));
+		if (constraints != null) {
+			List<Filter> filters = new ArrayList<>();
+			filters.add(qf);
+			appendLiteralFilters(kb, kb, constraints, filters);
+			scan.setFilter(new FilterList(filters));
+		} else {
+			scan.setFilter(qf);
 		}
-		return withFilters(scan(new byte[][] {kb}, stopKeys), filters);
+		return scan;
 	}
 	public Scan scan(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2) {
+		return scanWithConstraints(k1, k2, null);
+	}
+	public Scan scanWithConstraints(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2, LiteralConstraints constraints) {
 		byte[] k1b = k1.getKeyHash(this);
-		byte[] k2b = k2.getKeyHash(this);
+		byte[] k2b, stop2;
+		if (k2 != null) {
+			k2b = k2.getKeyHash(this);
+			stop2 = k2b;
+		} else {
+			int k2size = role2.keyHashSize();
+			k2b = new byte[k2size];
+			stop2 = new byte[k2size];
+			Arrays.fill(stop2, (byte) 0xFF);
+		}
 		byte[][] stopKeys = newStopKeys();
 		stopKeys[0] = k1b;
-		stopKeys[1] = k2b;
-		return scan(new byte[][] {k1b, k2b}, stopKeys).setFilter(new ColumnPrefixFilter(qualifier(k1, k2, null, null)));
+		stopKeys[1] = stop2;
+		Scan scan = scan(new byte[][] {k1b, k2b}, stopKeys);
+		Filter qf = new ColumnPrefixFilter(qualifier(k1, k2, null, null));
+		if (constraints != null) {
+			List<Filter> filters = new ArrayList<>();
+			filters.add(qf);
+			appendLiteralFilters(concat2(k1b, k2b), concat2(k1b, stop2), constraints, filters);
+			scan.setFilter(new FilterList(filters));
+		} else {
+			scan.setFilter(qf);
+		}
+		return scan;
 	}
 	public Scan scan(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2, RDFIdentifier<T3> k3) {
 		byte[] k1b = k1.getKeyHash(this);
 		byte[] k2b = k2.getKeyHash(this);
-		byte[] k3b = indexType.get3KeyHash(this, k3);
+		byte[] k3b = get3KeyHash(this, k3);
 		byte[][] stopKeys = newStopKeys();
 		stopKeys[0] = k1b;
 		stopKeys[1] = k2b;
 		stopKeys[2] = k3b;
 		return scan(new byte[][] {k1b, k2b, k3b}, stopKeys).setFilter(new ColumnPrefixFilter(qualifier(k1, k2, k3, null)));
 	}
+	public Scan scanWithConstraints(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2, RDFIdentifier<T3> k3, LiteralConstraints constraints) {
+		byte[] k1b = k1.getKeyHash(this);
+		byte[] k2b = k2.getKeyHash(this);
+		byte[] k3b, stop3;
+		if (k3 != null) {
+			k3b = get3KeyHash(this, k3);
+			stop3 = k3b;
+		} else {
+			int k3size = get3KeyHashSize(role3);
+			k3b = new byte[k3size];
+			stop3 = new byte[k3size];
+			Arrays.fill(stop3, (byte) 0xFF);
+		}
+		byte[][] stopKeys = newStopKeys();
+		stopKeys[0] = k1b;
+		stopKeys[1] = k2b;
+		stopKeys[2] = stop3;
+		Scan scan = scan(new byte[][] {k1b, k2b, k3b}, stopKeys);
+		Filter qf = new ColumnPrefixFilter(qualifier(k1, k2, k3, null));
+		if (constraints != null) {
+			List<Filter> filters = new ArrayList<>();
+			filters.add(qf);
+			appendLiteralFilters(concat3(k1b, k2b, k3b), concat3(k1b, k2b, stop3), constraints, filters);
+			scan.setFilter(new FilterList(filters));
+		} else {
+			scan.setFilter(qf);
+		}
+		return scan;
+	}
 	public Scan scan(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2, RDFIdentifier<T3> k3, RDFIdentifier<T4> k4) {
 		byte[] k1b = k1.getKeyHash(this);
 		byte[] k2b = k2.getKeyHash(this);
-		byte[] k3b = indexType.get3KeyHash(this, k3);
-		byte[] k4b = indexType.get4KeyHash(this, k4);
+		byte[] k3b = get3KeyHash(this, k3);
+		byte[] k4b = k4.getEndKeyHash(this);
 		return scan(new byte[][] {k1b, k2b, k3b, k4b}, new byte[][] {k1b, k2b, k3b, k4b}).setFilter(new ColumnPrefixFilter(qualifier(k1, k2, k3, k4)));
 	}
 
-	private MultiRowRangeFilter createLiteralFilter(byte[] kb) {
+	private void appendLiteralFilters(byte[] startPrefix, byte[] stopPrefix, LiteralConstraints constraints, List<Filter> filters) {
+		byte startTypeBits;
+		byte endTypeBits;
+		if (constraints.allLiterals()) {
+			startTypeBits = (byte) 0;
+			endTypeBits = Identifier.LITERAL_STOP_BITS;
+		} else if (constraints.stringsOnly()) {
+			startTypeBits = Identifier.STRING_DATATYPE_BITS;
+			endTypeBits = Identifier.LITERAL_STOP_BITS;
+		} else {
+			// non-string literals
+			startTypeBits = Identifier.NONSTRING_DATATYPE_BITS;
+			endTypeBits = Identifier.STRING_DATATYPE_BITS;
+		}
 		int typeSaltSize = rdfFactory.getTypeSaltSize();
 		List<RowRange> ranges = new ArrayList<>(typeSaltSize);
 		for (int i=0; i<typeSaltSize; i++) {
-			byte[] startKey = concat(false, kb, rdfFactory.createTypeSalt(i, (byte)0)); // inclusive
-			byte[] stopKey = concat(false, kb, rdfFactory.createTypeSalt(i, Identifier.LITERAL_STOP_BITS)); // exclusive
-			ranges.add(new RowRange(startKey, true, stopKey, false));
+			byte[] startRow = concat(false, startPrefix, rdfFactory.createTypeSalt(i, startTypeBits)); // inclusive
+			byte[] stopRow = concat(false, stopPrefix, rdfFactory.createTypeSalt(i, endTypeBits)); // exclusive
+			ranges.add(new RowRange(startRow, true, stopRow, false));
 		}
-		return new MultiRowRangeFilter(ranges);
+		filters.add(new MultiRowRangeFilter(ranges));
 	}
 
 	/**
@@ -378,7 +484,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
      * @param fragments variable number of the key fragments as byte arrays
      * @return concatenated key as byte array
      */
-    byte[] concat(boolean trailingZero, byte[]... fragments) {
+    private byte[] concat(boolean trailingZero, byte[]... fragments) {
         int totalLen = 1; // for prefix
         for (byte[] fr : fragments) {
             totalLen += fr.length;

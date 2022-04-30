@@ -475,6 +475,38 @@ public final class HalyardTableUtils {
         }
     }
 
+	public static Scan scanWithConstraints(RDFSubject subj, RDFPredicate pred, LiteralConstraints constraints, RDFContext ctx, RDFFactory rdfFactory) {
+		if (ctx == null) {
+			if (subj == null) {
+				if (pred == null) {
+					return rdfFactory.getOSPIndex().scanWithConstraints(constraints);
+                } else {
+					return rdfFactory.getPOSIndex().scanWithConstraints(pred, constraints);
+                }
+            } else {
+				if (pred == null) {
+					return rdfFactory.getSPOIndex().scanWithConstraints(subj, null, constraints);
+                } else {
+					return rdfFactory.getSPOIndex().scanWithConstraints(subj, pred, constraints);
+                }
+            }
+        } else {
+			if (subj == null) {
+				if (pred == null) {
+					return rdfFactory.getCOSPIndex().scanWithConstraints(ctx, constraints);
+                } else {
+					return rdfFactory.getCPOSIndex().scanWithConstraints(ctx, pred, constraints);
+                }
+            } else {
+				if (pred == null) {
+					return rdfFactory.getCSPOIndex().scanWithConstraints(ctx, subj, null, constraints);
+                } else {
+					return rdfFactory.getCSPOIndex().scanWithConstraints(ctx, subj, pred, constraints);
+                }
+            }
+        }
+    }
+
 	public static Resource getSubject(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, table);
 		Scan scan = scan(rdfFactory.getSPOIndex(), id);

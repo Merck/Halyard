@@ -34,6 +34,7 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -203,7 +204,7 @@ public class HalyardTableUtilsScanTest {
                 res.addAll(HalyardTableUtils.parseStatements(subj, pred, obj, ctx, r, reader, rdfFactory));
             }
             assertTrue(allStatements.containsAll(res));
-            assertEquals(expRes, res.size());
+            assertEquals(s+", "+p+", "+o+", "+c, expRes, res.size());
         }
 
         // check all complete combinations
@@ -235,9 +236,31 @@ public class HalyardTableUtilsScanTest {
                         res.addAll(HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory));
                     }
                     assertTrue(allStatements.containsAll(res));
-                    assertEquals(expRes, res.size());
+                    assertEquals(s+", "+p+", "+o+", "+c, expRes, res.size());
                 }
             }
+    	}
+    }
+
+    @Test
+    public void testScanWithConstraints() throws Exception {
+    	if (o == null) {
+	        ValueFactory vf = SimpleValueFactory.getInstance();
+	        ValueIO.Reader reader = rdfFactory.createReader(vf);
+	
+	        RDFSubject subj = rdfFactory.createSubject(s == null ? null : vf.createIRI(s));
+	        RDFPredicate pred = rdfFactory.createPredicate(p == null ? null : vf.createIRI(p));
+	
+	        RDFContext ctx = rdfFactory.createContext(c == null ? null : vf.createIRI(c));
+	        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scanWithConstraints(subj, pred, new LiteralConstraints(XSD.STRING), ctx, rdfFactory))) {
+	            Set<Statement> res = new HashSet<>();
+	            Result r;
+	            while ((r = rs.next()) != null) {
+	                res.addAll(HalyardTableUtils.parseStatements(subj, pred, null, ctx, r, reader, rdfFactory));
+	            }
+	            assertTrue(allStatements.containsAll(res));
+	            assertEquals(s+", "+p+", "+c, expRes, res.size());
+	        }
     	}
     }
 }

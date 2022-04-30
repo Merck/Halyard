@@ -20,6 +20,8 @@ import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPush
 import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPushAsync;
 
 import com.msd.gin.halyard.algebra.StarJoin;
+import com.msd.gin.halyard.common.LiteralConstraints;
+import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
 import com.msd.gin.halyard.strategy.aggregators.Aggregator;
 import com.msd.gin.halyard.strategy.aggregators.AvgAggregator;
 import com.msd.gin.halyard.strategy.aggregators.ConcatAggregator;
@@ -61,6 +63,7 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.RDF4J;
 import org.eclipse.rdf4j.model.vocabulary.SESAME;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
@@ -71,7 +74,10 @@ import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
 import org.eclipse.rdf4j.query.algebra.Avg;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
+import org.eclipse.rdf4j.query.algebra.Compare;
+import org.eclipse.rdf4j.query.algebra.Compare.CompareOp;
 import org.eclipse.rdf4j.query.algebra.Count;
+import org.eclipse.rdf4j.query.algebra.Datatype;
 import org.eclipse.rdf4j.query.algebra.DescribeOperator;
 import org.eclipse.rdf4j.query.algebra.Difference;
 import org.eclipse.rdf4j.query.algebra.Distinct;
@@ -84,6 +90,7 @@ import org.eclipse.rdf4j.query.algebra.GroupConcat;
 import org.eclipse.rdf4j.query.algebra.GroupElem;
 import org.eclipse.rdf4j.query.algebra.Intersection;
 import org.eclipse.rdf4j.query.algebra.Join;
+import org.eclipse.rdf4j.query.algebra.Lang;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.Max;
 import org.eclipse.rdf4j.query.algebra.Min;
@@ -107,7 +114,9 @@ import org.eclipse.rdf4j.query.algebra.TripleRef;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
+import org.eclipse.rdf4j.query.algebra.UnaryValueOperator;
 import org.eclipse.rdf4j.query.algebra.Union;
+import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
@@ -225,6 +234,51 @@ final class HalyardTupleExprEvaluation {
      * results of the evaluation of this statement pattern
      */
     private void evaluateStatementPattern(final BindingSetPipe parent, final StatementPattern sp, final BindingSet bindings) {
+    	TripleSource ts = null;
+		Var objVar = sp.getObjectVar();
+		if (!objVar.hasValue() && !bindings.hasBinding(objVar.getName()) && (tripleSource instanceof ConstrainedTripleSourceFactory)) {
+	    	QueryModelNode parentNode = sp.getParentNode();
+	    	if (parentNode instanceof Filter) {
+	    		Filter filter = (Filter) parentNode;
+	    		if (filter.getCondition() instanceof Compare) {
+					Compare cmp = (Compare) filter.getCondition();
+					if ((cmp.getLeftArg() instanceof UnaryValueOperator) && cmp.getOperator() == CompareOp.EQ) {
+						UnaryValueOperator func = (UnaryValueOperator) cmp.getLeftArg();
+						if (func.getArg() instanceof Var) {
+							Var litVar = (Var) func.getArg();
+							if (litVar.getName().equals(objVar.getName())) {
+								Value v;
+								if (cmp.getRightArg() instanceof ValueConstant) {
+									v = ((ValueConstant) cmp.getRightArg()).getValue();
+								} else if (cmp.getRightArg() instanceof Var) {
+									v = ((Var) cmp.getRightArg()).getValue();
+								} else {
+									v = null;
+								}
+								if (v != null) {
+									if ((func instanceof Datatype) && v.isIRI()) {
+										IRI dt = (IRI) v;
+										ts = ((ConstrainedTripleSourceFactory)tripleSource).getTripleSource(new LiteralConstraints(dt));
+									} else if ((cmp.getLeftArg() instanceof Lang) && v.isLiteral()) {
+										Literal lang = (Literal) v;
+										if (XSD.STRING.equals(lang.getDatatype())) {
+											ts = ((ConstrainedTripleSourceFactory)tripleSource).getTripleSource(new LiteralConstraints(lang.getLabel()));
+										}
+									}
+								}
+							}
+						}
+					}
+	    		}
+	    	}
+		}
+		if (ts == null) {
+			ts = tripleSource;
+		}
+    	evaluateStatementPattern(parent, sp, bindings, ts);
+    }
+
+    private void evaluateStatementPattern(final BindingSetPipe parent, final StatementPattern sp, final BindingSet bindings, TripleSource tripleSource) {
         final Var subjVar = sp.getSubjectVar(); //subject
         final Var predVar = sp.getPredicateVar(); //predicate
         final Var objVar = sp.getObjectVar(); //object

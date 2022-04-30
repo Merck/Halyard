@@ -16,8 +16,8 @@ public final class Identifier {
 	private static final byte BNODE_TYPE_BITS = (byte) 0xC0;
 	private static final byte TYPE_MASK = (byte) 0xC0;
 	private static final byte CLEAR_TYPE_MASK = ~TYPE_MASK;
-	private static final byte NONSTRING_DATATYPE_BITS = (byte) 0x00;
-	private static final byte STRING_DATATYPE_BITS = (byte) 0x20;
+	static final byte NONSTRING_DATATYPE_BITS = (byte) 0x00;
+	static final byte STRING_DATATYPE_BITS = (byte) 0x20;
 	private static final byte DATATYPE_MASK = (byte) 0x20;
 	private static final byte CLEAR_DATATYPE_MASK = ~DATATYPE_MASK;
 

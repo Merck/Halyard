@@ -177,32 +177,32 @@ public class RDFFactory {
 		);
 
 		this.spo = new StatementIndex<>(
-			StatementIndex.Name.SPO, 0, IndexType.TRIPLE,
+			StatementIndex.Name.SPO, 0, false,
 			subject, predicate, object, context,
 			this
 		);
 		this.pos = new StatementIndex<>(
-			StatementIndex.Name.POS, 1, IndexType.TRIPLE,
+			StatementIndex.Name.POS, 1, false,
 			predicate, object, subject, context,
 			this
 		);
 		this.osp = new StatementIndex<>(
-			StatementIndex.Name.OSP, 2, IndexType.TRIPLE,
+			StatementIndex.Name.OSP, 2, false,
 			object, subject, predicate, context,
 			this
 		);
 		this.cspo = new StatementIndex<>(
-			StatementIndex.Name.CSPO, 3, IndexType.QUAD,
+			StatementIndex.Name.CSPO, 3, true,
 			context, subject, predicate, object,
 			this
 		);
 		this.cpos = new StatementIndex<>(
-			StatementIndex.Name.CPOS, 4, IndexType.QUAD,
+			StatementIndex.Name.CPOS, 4, true,
 			context, predicate, object, subject,
 			this
 		);
 		this.cosp = new StatementIndex<>(
-			StatementIndex.Name.COSP, 5, IndexType.QUAD,
+			StatementIndex.Name.COSP, 5, true,
 			context, object, subject, predicate,
 			this
 		);
@@ -248,6 +248,7 @@ public class RDFFactory {
 		}
 		return b;
 	}
+
 	public RDFRole<SPOC.S> getSubjectRole() {
 		return subject;
 	}

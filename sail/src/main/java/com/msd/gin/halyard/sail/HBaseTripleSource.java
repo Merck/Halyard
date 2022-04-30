@@ -17,8 +17,14 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.LiteralConstraints;
+import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.RDFPredicate;
+import com.msd.gin.halyard.common.RDFSubject;
 import com.msd.gin.halyard.common.ValueIO;
+import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
@@ -55,7 +61,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HBaseTripleSource implements RDFStarTripleSource {
+public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTripleSourceFactory {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseTripleSource.class);
 
 	private final Table table;
@@ -97,6 +103,15 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 		return new HBaseTripleSource(table, tsValueReader, rdfFactory, timeoutSecs, settings, ticker);
 	}
 
+	public TripleSource getTripleSource(LiteralConstraints constraints) {
+		return new HBaseTripleSource(table, valueReader, rdfFactory, timeoutSecs, settings, ticker) {
+			protected Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, RDFFactory rdfFactory) {
+				assert obj == null;
+				return HalyardTableUtils.scanWithConstraints(subj, pred, constraints, ctx, rdfFactory);
+			}
+		};
+	}
+
 	private CloseableIteration<? extends Statement, QueryEvaluationException> getStatementsInternal(Resource subj, IRI pred, Value obj, Resource[] contexts, ValueIO.Reader reader) {
 		List<Resource> contextsToScan;
 		if (contexts == null || contexts.length == 0) {
@@ -132,6 +147,10 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 		return new StatementScanner(subj, pred, obj, contexts, reader);
 	}
 
+	protected Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, RDFFactory rdfFactory) {
+		return HalyardTableUtils.scan(subj, pred, obj, ctx, rdfFactory);
+	}
+
 	@Override
 	public final ValueFactory getValueFactory() {
 		return valueReader.getValueFactory();
@@ -160,7 +179,7 @@ public class HBaseTripleSource implements RDFStarTripleSource {
 
 						// build a ResultScanner from an HBase Scan that finds potential matches
 						ctx = rdfFactory.createContext(contexts.next());
-						Scan scan = HalyardTableUtils.scan(subj, pred, obj, ctx, rdfFactory);
+						Scan scan = scan(subj, pred, obj, ctx, rdfFactory);
 						if (settings != null) {
 							scan.setTimeRange(settings.minTimestamp, settings.maxTimestamp);
 							scan.readVersions(settings.maxVersions);

@@ -172,7 +172,7 @@ public class RDFFactoryTest {
 		for(StatementIndex<?,?,?,?> idx : new StatementIndex[] {spo, pos, osp, cspo, cpos, cosp}) {
 			String testName = v.toString() + " for " + idx.toString();
 			byte[] keyHash = v.getKeyHash(idx);
-			int keyHashSize = v.keyHashSize();
+			int keyHashSize = v.getRole().keyHashSize();
 			assertEquals(testName, keyHashSize, keyHash.length);
 
 			byte[] idxIdBytes = new byte[rdfFactory.getIdSize()];
@@ -182,7 +182,7 @@ public class RDFFactoryTest {
 
 			if(!(v instanceof RDFContext)) { // context doesn't have end-hashes
 				byte[] endKeyHash = v.getEndKeyHash(idx);
-				int endKeyHashSize = v.endKeyHashSize();
+				int endKeyHashSize = v.getRole().endKeyHashSize();
 				assertEquals(testName, endKeyHashSize, endKeyHash.length);
 
 				byte[] cidxIdBytes = new byte[rdfFactory.getIdSize()];

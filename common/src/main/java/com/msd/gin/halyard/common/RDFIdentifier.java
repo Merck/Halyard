@@ -46,22 +46,6 @@ public class RDFIdentifier<T extends SPOC<?>> {
 		return role.writeEndQualifierHashTo(getId(), bb);
 	}
 
-	final int keyHashSize() {
-		return role.keyHashSize();
-	}
-
-	final int endKeyHashSize() {
-		return role.endKeyHashSize();
-	}
-
-	final int qualifierHashSize() {
-		return role.qualifierHashSize();
-	}
-
-	final int endQualifierHashSize() {
-		return role.endQualifierHashSize();
-	}
-
 	@Override
 	public String toString() {
 		return "["+getId()+", "+role+"]";
