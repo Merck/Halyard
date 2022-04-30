@@ -82,7 +82,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	/**
 	 * @param sizeLen length of size field, 2 for short, 4 for int.
 	 */
-	private static int len(RDFValue<?,?> v, int sizeLen) {
+	private static int valueSize(RDFValue<?,?> v, int sizeLen) {
 		if (v.isWellKnownIRI()) {
 			return 1;
 		} else {
@@ -164,20 +164,23 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return roles[0].qualifierHash(id);
 	}
 
-	byte[] row(RDFIdentifier<T1> v1, RDFIdentifier<T2> v2, RDFIdentifier<T3> v3, RDFIdentifier<T4> v4) {
-		boolean hasQuad = isQuadIndex() || (v4 != null);
-		ByteBuffer r = ByteBuffer.allocate(1 + v1.keyHashSize() + v2.keyHashSize() + indexType.get3KeyHashSize(v3.getRole()) + (hasQuad ? indexType.get4KeyHashSize(v4.getRole()) : 0));
+	byte[] row(RDFIdentifier<T1> v1, RDFIdentifier<T2> v2, RDFIdentifier<T3> v3, @Nullable RDFIdentifier<T4> v4) {
+		boolean isQuadIndex = isQuadIndex();
+		if (isQuadIndex && v4 == null) {
+			throw new NullPointerException("Missing value from quad.");
+		}
+		ByteBuffer r = ByteBuffer.allocate(1 + v1.keyHashSize() + v2.keyHashSize() + indexType.get3KeyHashSize(v3.getRole()) + (isQuadIndex ? indexType.get4KeyHashSize(v4.getRole()) : 0));
 		r.put(prefix);
 		r.put(v1.getKeyHash(this));
 		r.put(v2.getKeyHash(this));
 		r.put(indexType.get3KeyHash(this, v3));
-		if(hasQuad) {
+		if(isQuadIndex) {
 			r.put(indexType.get4KeyHash(this, v4));
 		}
 		return r.array();
 	}
 
-	byte[] qualifier(RDFIdentifier<T1> v1, RDFIdentifier<T2> v2, RDFIdentifier<T3> v3, RDFIdentifier<T4> v4) {
+	byte[] qualifier(RDFIdentifier<T1> v1, @Nullable RDFIdentifier<T2> v2, @Nullable RDFIdentifier<T3> v3, @Nullable RDFIdentifier<T4> v4) {
 		ByteBuffer cq = ByteBuffer.allocate(v1.qualifierHashSize() + (v2 != null ? v2.qualifierHashSize() : 0) + (v3 != null ? indexType.get3QualifierHashSize(v3.getRole()) : 0) + (v4 != null ? indexType.get4QualifierHashSize(v4.getRole()) : 0));
 		v1.writeQualifierHashTo(cq);
 		if(v2 != null) {
@@ -192,12 +195,15 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return cq.array();
 	}
 
-	byte[] value(RDFValue<?,T1> v1, RDFValue<?,T2> v2, RDFValue<?,T3> v3, RDFValue<?,T4> v4) {
-		boolean hasQuad = isQuadIndex() || (v4 != null);
+	byte[] value(RDFValue<?,T1> v1, RDFValue<?,T2> v2, RDFValue<?,T3> v3, @Nullable RDFValue<?,T4> v4) {
+		boolean hasQuad = (v4 != null);
+		if (isQuadIndex() && !hasQuad) {
+			throw new NullPointerException("Missing value from quad.");
+		}
 		int sizeLen1 = roles[0].sizeLength();
 		int sizeLen2 = roles[1].sizeLength();
 		int sizeLen3 = roles[2].sizeLength();
-		ByteBuffer cv = ByteBuffer.allocate(len(v1, sizeLen1) + len(v2, sizeLen2) + len(v3, sizeLen3) + (hasQuad ? len(v4, 0) : 0));
+		ByteBuffer cv = ByteBuffer.allocate(valueSize(v1, sizeLen1) + valueSize(v2, sizeLen2) + valueSize(v3, sizeLen3) + (hasQuad ? valueSize(v4, 0) : 0));
 		putRDFValue(cv, v1, sizeLen1);
 		putRDFValue(cv, v2, sizeLen2);
 		putRDFValue(cv, v3, sizeLen3);

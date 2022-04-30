@@ -134,6 +134,7 @@ public class RDFFactory {
 		int objectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_OBJECT, 5), MIN_KEY_SIZE), idSize);
 		int objectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_OBJECT, 3), MIN_KEY_SIZE), idSize);
 		int contextKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 3), MIN_KEY_SIZE), idSize);
+		int contextEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_CONTEXT, 0), 0), idSize);
 
 		idValueFactory = new IdValueFactory(this);
 		tsValueFactory = new TimestampedValueFactory(this);
@@ -171,7 +172,7 @@ public class RDFFactory {
 		this.context = new RDFRole<>(
 			RDFRole.Name.CONTEXT,
 			idSize,
-			contextKeySize, -1,
+			contextKeySize, contextEndKeySize,
 			0, 0, 0, typeIndex, Short.BYTES
 		);
 

@@ -13,6 +13,7 @@ public final class Config {
     public static final String KEY_SIZE_OBJECT = "halyard.key.object.size";
     public static final String END_KEY_SIZE_OBJECT = "halyard.endKey.object.size";
     public static final String KEY_SIZE_CONTEXT = "halyard.key.context.size";
+    public static final String END_KEY_SIZE_CONTEXT = "halyard.endKey.context.size";
 
 	public static final String VOCAB = "halyard.vocabularies";
 	public static final String LANG = "halyard.languages";

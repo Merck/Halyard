@@ -42,9 +42,6 @@ public final class RDFRole<T extends SPOC<?>> {
 	}
 
 	public int endKeyHashSize() {
-		if (endKeyHashSize == -1) {
-			throw new AssertionError("This role should never appear at the end of a key");
-		}
 		return endKeyHashSize;
 	}
 
