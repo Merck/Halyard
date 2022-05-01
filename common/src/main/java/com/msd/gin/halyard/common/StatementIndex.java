@@ -8,6 +8,8 @@ import javax.annotation.Nullable;
 
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.filter.ColumnPrefixFilter;
+import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.MultiRowRangeFilter;
 import org.apache.hadoop.hbase.filter.MultiRowRangeFilter.RowRange;
 import org.eclipse.rdf4j.model.IRI;
@@ -21,6 +23,8 @@ import org.eclipse.rdf4j.model.ValueFactory;
  */
 public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 extends SPOC<?>,T4 extends SPOC<?>> {
 	public enum Name {SPO, POS, OSP, CSPO, CPOS, COSP};
+	private static final byte[] EMPTY_1D = new byte[0];
+	private static final byte[][] EMPTY_2D = new byte[0][];
 	private static final byte WELL_KNOWN_IRI_MARKER = (byte) ('#' | 0x80);  // marker must be negative (msb set) so it is distinguishable from a length (>=0)
 
 	public static StatementIndex<?,?,?,?> toIndex(byte prefix, RDFFactory rdfFactory) {
@@ -49,34 +53,26 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 			byte[] stopKey = index.concat(false, rdfFactory.createTypeSalt(0, Identifier.LITERAL_STOP_BITS)); // exclusive
 			return HalyardTableUtils.scan(startKey, stopKey);
 		} else {
-			List<RowRange> ranges = new ArrayList<>(typeSaltSize);
-			for (int i=0; i<typeSaltSize; i++) {
-				byte[] startKey = index.concat(false, rdfFactory.createTypeSalt(i, (byte)0)); // inclusive
-				byte[] stopKey = index.concat(false, rdfFactory.createTypeSalt(i, Identifier.LITERAL_STOP_BITS)); // exclusive
-				ranges.add(new RowRange(startKey, true, stopKey, false));
-			}
-			return index.scan().setFilter(new MultiRowRangeFilter(ranges));
+			return index.scan(true);
 		}
 	}
 
 	public static final Scan scanLiterals(Resource graph, RDFFactory rdfFactory) {
 		RDFContext ctx = rdfFactory.createContext(graph);
 		StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> index = rdfFactory.getCOSPIndex();
-		byte[] ctxb = ctx.getKeyHash(index);
 		int typeSaltSize = rdfFactory.getTypeSaltSize();
 		if (typeSaltSize == 1) {
+			byte[] ctxb = ctx.getKeyHash(index);
 			byte[] startKey = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, (byte)0)); // inclusive
 			byte[] stopKey = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, Identifier.LITERAL_STOP_BITS)); // exclusive
 			return HalyardTableUtils.scan(startKey, stopKey);
 		} else {
-			List<RowRange> ranges = new ArrayList<>(typeSaltSize);
-			for (int i=0; i<typeSaltSize; i++) {
-				byte[] startKey = index.concat(false, ctxb, rdfFactory.createTypeSalt(i, (byte)0)); // inclusive
-				byte[] stopKey = index.concat(false, ctxb, rdfFactory.createTypeSalt(i, Identifier.LITERAL_STOP_BITS)); // exclusive
-				ranges.add(new RowRange(startKey, true, stopKey, false));
-			}
-			return index.scan().setFilter(new MultiRowRangeFilter(ranges));
+			return index.scan(ctx, true);
 		}
+	}
+
+	private static Scan withFilters(Scan scan, List<Filter> filters) {
+		return scan.setFilter(filters.size() == 1 ? filters.get(0) : new FilterList(filters));
 	}
 
 	/**
@@ -310,7 +306,14 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	}
 
 	public Scan scan() {
-		return scan(new byte[0][], newStopKeys());
+		return scan(false);
+	}
+	public Scan scan(boolean literalsOnly) {
+		List<Filter> filters = new ArrayList<>(1);
+		if (literalsOnly) {
+			filters.add(createLiteralFilter(EMPTY_1D));
+		}
+		return withFilters(scan(EMPTY_2D, newStopKeys()), filters);
 	}
 	Scan scan(Identifier id) {
 		byte[] kb = keyHash(id);
@@ -319,10 +322,18 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return scan(new byte[][] {kb}, stopKeys).setFilter(new ColumnPrefixFilter(qualifierHash(id)));
 	}
 	public Scan scan(RDFIdentifier<T1> k) {
+		return scan(k, false);
+	}
+	public Scan scan(RDFIdentifier<T1> k, boolean literalsOnly) {
 		byte[] kb = k.getKeyHash(this);
 		byte[][] stopKeys = newStopKeys();
 		stopKeys[0] = kb;
-		return scan(new byte[][] {kb}, stopKeys).setFilter(new ColumnPrefixFilter(qualifier(k, null, null, null)));
+		List<Filter> filters = new ArrayList<>(2);
+		filters.add(new ColumnPrefixFilter(qualifier(k, null, null, null)));
+		if (literalsOnly) {
+			filters.add(createLiteralFilter(kb));
+		}
+		return withFilters(scan(new byte[][] {kb}, stopKeys), filters);
 	}
 	public Scan scan(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2) {
 		byte[] k1b = k1.getKeyHash(this);
@@ -350,7 +361,18 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return scan(new byte[][] {k1b, k2b, k3b, k4b}, new byte[][] {k1b, k2b, k3b, k4b}).setFilter(new ColumnPrefixFilter(qualifier(k1, k2, k3, k4)));
 	}
 
-    /**
+	private MultiRowRangeFilter createLiteralFilter(byte[] kb) {
+		int typeSaltSize = rdfFactory.getTypeSaltSize();
+		List<RowRange> ranges = new ArrayList<>(typeSaltSize);
+		for (int i=0; i<typeSaltSize; i++) {
+			byte[] startKey = concat(false, kb, rdfFactory.createTypeSalt(i, (byte)0)); // inclusive
+			byte[] stopKey = concat(false, kb, rdfFactory.createTypeSalt(i, Identifier.LITERAL_STOP_BITS)); // exclusive
+			ranges.add(new RowRange(startKey, true, stopKey, false));
+		}
+		return new MultiRowRangeFilter(ranges);
+	}
+
+	/**
      * Helper method concatenating keys
      * @param trailingZero boolean switch adding trailing zero to the resulting key
      * @param fragments variable number of the key fragments as byte arrays
