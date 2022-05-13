@@ -6,7 +6,7 @@
     <parent>
         <groupId>io.github.pulquero.halyard</groupId>
         <artifactId>halyard</artifactId>
-        <version>3.7</version>
+        <version>3.8-SNAPSHOT</version>
     </parent>
     <dependencies>
         <dependency>
@@ -28,7 +28,7 @@
                 <version>2.10</version>
                 <executions>
                     <execution>
-                        <id>copy-depenndencies-for-patching</id>
+                        <id>copy-dependencies-for-patching</id>
                         <phase>process-classes</phase>
                         <goals>
                             <goal>copy</goal>

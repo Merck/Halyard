@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.pulquero.halyard</groupId>
     <artifactId>halyard</artifactId>
-    <version>3.7</version>
+    <version>3.8-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Halyard*</name>
     <description>A fork of Halyard with support for RDF*</description>
