@@ -156,6 +156,7 @@ public final class HalyardHash extends AbstractHalyardTool {
 		String source = cmd.getOptionValue('s');
 		getConf().set(SOURCE_PROPERTY, source);
 		getConf().setInt(DECIMATION_FACTOR_PROPERTY, Integer.parseInt(cmd.getOptionValue('d', String.valueOf(DEFAULT_DECIMATION_FACTOR))));
+		getConf().setBoolean(HalyardBulkLoad.SKIP_INVALID_PROPERTY, true);
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                 NTriplesUtil.class,
                 Rio.class,

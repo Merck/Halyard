@@ -100,7 +100,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     public static final String TRUNCATE_PROPERTY = "halyard.table.truncate";
 
     /**
-     * Boolean property skipping RDF parsing errors
+     * Boolean property ignoring RDF parsing errors
      */
     public static final String SKIP_INVALID_PROPERTY = "halyard.parser.skipinvalid";
 
