@@ -640,10 +640,10 @@ hdfs:/my_folder/my_dataset_summary-{0}.nq.gz
 
 #### Installation
 
-1. Install Apache Tomcat 8 (or similar) server on a configured Hadoop and HBase cluster node.
+1. Install Apache Tomcat 9 (or similar) server on a configured Hadoop and HBase cluster node.
 2. On a secured cluster create a service account and assign it adequate permissions for HDFS and HBase. Don't forget to setup a process to assure the user running the Apache Tomcat is always authenticated in Kerberos.
 3. Secure the Apache Tomcat server as necessary.
-4. Add the Apache Hadoop and the Apache HBase classpaths to the Tomcat classpath by creating `setenv.sh` file in the Apache Tomcat `bin` folder, with the content: ``` export CLASSPATH="$CATALINA_HOME/lib/servlet-api.jar:"`hadoop classpath`:`hbase classpath` ```
+4. Add the Apache Hadoop and the Apache HBase classpaths to the Tomcat classpath by creating `setenv.sh` file in the Apache Tomcat `bin` folder, with the content: ``` export CLASSPATH="$CATALINA_HOME/lib/*:"`hadoop classpath`:`hbase classpath` ```
 5. Download `rdf4j-server.war` and `rdf4j-workbench.war` application bundles from the Halyard distribution into the Apache Tomcat (into folder `webapps`).
 6. Start the Apache Tomcat server (if not already started) and check logs if both applications started correctly.
 7. Open a web browser and verify the connection to `<Apache_Tomcat_address>/rdf4j-workbench` by creating a repository. If the server authentication is enabled, you have to enter the credentials into the workbench to allow connections between rdf4j-workbench and rdf4j-server applications. Entering the right location of the `<Apache_Tomcat_address>/rdf4j-server` into the workbench might be required too.
