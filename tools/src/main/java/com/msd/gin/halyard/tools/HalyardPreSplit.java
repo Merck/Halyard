@@ -63,9 +63,12 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
     private static final String TABLE_PROPERTY = "halyard.presplit.table";
     private static final String SPLIT_LIMIT_PROPERTY = "halyard.presplit.limit";
     private static final String DECIMATION_FACTOR_PROPERTY = "halyard.presplit.decimation";
+    private static final String OVERWRITE_PROPERTY = "halyard.presplit.overwrite";
+    private static final String MAX_VERSIONS_PROPERTY = "halyard.presplit.maxVersions";
 
     private static final long DEFAULT_SPLIT_LIMIT = 80000000l;
     private static final int DEFAULT_DECIMATION_FACTOR = 1000;
+    private static final int DEFAULT_MAX_VERSIONS = 1;
 
     /**
      * Mapper class transforming randomly selected sample of parsed Statement into set of HBase Keys and sizes
@@ -134,7 +137,20 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            HalyardTableUtils.createTableIfNotExists(conf, conf.get(TABLE_PROPERTY), splits.toArray(new byte[splits.size()][])).close();
+            TableName tableName = TableName.valueOf(conf.get(TABLE_PROPERTY));
+            int maxVersions = conf.getInt(MAX_VERSIONS_PROPERTY, DEFAULT_MAX_VERSIONS);
+            boolean overwrite = conf.getBoolean(OVERWRITE_PROPERTY, false);
+            try (Connection conn = HalyardTableUtils.getConnection(conf)) {
+            	if (overwrite) {
+		    		try (Admin admin = conn.getAdmin()) {
+		    			if (admin.tableExists(tableName)) {
+		    				admin.disableTable(tableName);
+		    				admin.deleteTable(tableName);
+		    			}
+		    		}
+            	}
+	            HalyardTableUtils.createTable(conn, tableName, splits.toArray(new byte[splits.size()][]), maxVersions).close();
+            }
         }
     }
 
@@ -153,24 +169,32 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         addOption("i", "allow-invalid", null, "Optionally allow invalid IRI values (less overhead)", false, false);
         addOption("g", "default-named-graph", "named_graph", "Optionally specify default target named graph", false, true);
         addOption("o", "named-graph-override", null, "Optionally override named graph also for quads, named graph is stripped from quads if --default-named-graph option is not specified", false, false);
-        addOption("d", "decimation-factor", "decimation_factor", "Optionally overide pre-split random decimation factor (default is 1000)", false, true);
-        addOption("l", "split-limit-size", "size", "Optionally override calculated split size (default is 80000000)", false, true);
+        addOption("d", "decimation-factor", "decimation_factor", String.format("Optionally overide pre-split random decimation factor (default is %d)", DEFAULT_DECIMATION_FACTOR), false, true);
+        addOption("l", "split-limit-size", "size", String.format("Optionally override calculated split size (default is %d)", DEFAULT_SPLIT_LIMIT), false, true);
+        addOption("f", "force", null, "Overwrite existing table", false, false);
+        addOption("n", "max-versions", "versions", String.format("Optionally set the maximum number of versions for the table (default is %d)", DEFAULT_MAX_VERSIONS), false, true);
     }
 
     @Override
     protected int run(CommandLine cmd) throws Exception {
         String source = cmd.getOptionValue('s');
         String target = cmd.getOptionValue('t');
-        try (Connection con = ConnectionFactory.createConnection(getConf())) {
-            try (Admin admin = con.getAdmin()) {
-                if (admin.tableExists(TableName.valueOf(target))) {
-                    LOG.warn("Pre-split cannot modify already existing table {}", target);
-                    return -1;
-                }
-            }
+        if (cmd.hasOption('f')) {
+        	getConf().setBoolean(OVERWRITE_PROPERTY, true);
+        } else {
+	        try (Connection con = ConnectionFactory.createConnection(getConf())) {
+	            try (Admin admin = con.getAdmin()) {
+	                if (admin.tableExists(TableName.valueOf(target))) {
+	                    LOG.warn("Pre-split cannot modify already existing table {}", target);
+	                    return -1;
+	                }
+	            }
+	        }
         }
         getConf().setBoolean(SKIP_INVALID_PROPERTY, cmd.hasOption('i'));
-        if (cmd.hasOption('g')) getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
+        if (cmd.hasOption('g')) {
+        	getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
+        }
         getConf().setBoolean(OVERRIDE_CONTEXT_PROPERTY, cmd.hasOption('o'));
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                 NTriplesUtil.class,
