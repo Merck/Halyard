@@ -8,8 +8,10 @@ public final class RDFRole<T extends SPOC<?>> {
 	private final int idSize;
 	private final int keyHashSize;
 	private final int endKeyHashSize;
-	private final byte[] stopKey;
-	private final byte[] endStopKey;
+	private final ByteFiller startKey;
+	private final ByteFiller stopKey;
+	private final ByteFiller endStartKey;
+	private final ByteFiller endStopKey;
 	private final int sshift;
 	private final int pshift;
 	private final int oshift;
@@ -21,8 +23,10 @@ public final class RDFRole<T extends SPOC<?>> {
 		this.idSize = idSize;
 		this.keyHashSize = keyHashSize;
 		this.endKeyHashSize = endKeyHashSize;
-		this.stopKey = HalyardTableUtils.createStopKey(keyHashSize);
-		this.endStopKey = (endKeyHashSize >= 0) ? HalyardTableUtils.createStopKey(endKeyHashSize) : null;
+		this.startKey = new ByteFiller((byte)0x00, keyHashSize);
+		this.stopKey = new ByteFiller((byte)0xFF, keyHashSize);
+		this.endStartKey = new ByteFiller((byte)0x00, endKeyHashSize);
+		this.endStopKey = new ByteFiller((byte)0xFF, endKeyHashSize);
 		this.sshift = sshift;
 		this.pshift = pshift;
 		this.oshift = oshift;
@@ -67,7 +71,7 @@ public final class RDFRole<T extends SPOC<?>> {
 
 	byte[] endKeyHash(StatementIndex<?,?,?,?> index, Identifier id) {
 		int len = endKeyHashSize();
-		return id.rotate(len, toShift(index), new byte[len]);
+		return len > 0 ? id.rotate(len, toShift(index), new byte[len]) : new byte[0];
 	}
 
 	byte[] qualifierHash(Identifier id) {
@@ -84,11 +88,19 @@ public final class RDFRole<T extends SPOC<?>> {
 		return id.writeSliceTo(endKeyHashSize(), endQualifierHashSize(), bb);
 	}
 
-	byte[] stopKey() {
+	ByteFiller startKey() {
+		return startKey;
+	}
+
+	ByteFiller stopKey() {
 		return stopKey;
 	}
 
-	byte[] endStopKey() {
+	ByteFiller endStartKey() {
+		return endStartKey;
+	}
+
+	ByteFiller endStopKey() {
 		return endStopKey;
 	}
 

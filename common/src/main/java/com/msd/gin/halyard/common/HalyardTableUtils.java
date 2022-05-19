@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.TreeSet;
 import java.util.function.Function;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import org.apache.hadoop.conf.Configuration;
@@ -87,12 +88,6 @@ public final class HalyardTableUtils {
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
 
     private HalyardTableUtils() {}
-
-    static byte[] createStopKey(int size) {
-    	byte[] stopKey = new byte[size];
-    	Arrays.fill(stopKey, (byte) 0xff);
-    	return stopKey;
-    }
 
     /**
 	 * Helper method which locates or creates and returns the specified Table used for triple/ quad storage. The table may be pre-split into regions (rather than HBase's default of
@@ -482,33 +477,75 @@ public final class HalyardTableUtils {
         }
     }
 
-	public static Scan scanWithConstraints(RDFSubject subj, RDFPredicate pred, LiteralConstraints constraints, RDFContext ctx, RDFFactory rdfFactory) {
+	public static Scan scanWithConstraints(RDFSubject subj, ValueConstraint subjConstraint, RDFPredicate pred, RDFObject obj, ObjectConstraint objConstraint, RDFContext ctx, RDFFactory rdfFactory) {
+		if (subj == null && subjConstraint != null && (pred == null || objConstraint == null)) {
+			return scanWithSubjectConstraint(subjConstraint, pred, obj, ctx, rdfFactory);
+		} else if (obj == null && objConstraint != null) {
+			return scanWithObjectConstraint(subj, pred, objConstraint, ctx, rdfFactory);
+		} else {
+			return scan(subj, pred, obj, ctx, rdfFactory);
+		}
+	}
+
+	private static Scan scanWithSubjectConstraint(@Nonnull ValueConstraint subjConstraint, RDFPredicate pred, RDFObject obj, RDFContext ctx, RDFFactory rdfFactory) {
+		if (ctx == null) {
+			if (pred == null) {
+				if (obj == null) {
+					return rdfFactory.getSPOIndex().scanWithConstraint(subjConstraint);
+                } else {
+					return rdfFactory.getOSPIndex().scanWithConstraint(obj, subjConstraint);
+                }
+            } else {
+				if (obj == null) {
+					return rdfFactory.getPOSIndex().scanWithConstraint(pred, null, subjConstraint);
+                } else {
+					return rdfFactory.getPOSIndex().scanWithConstraint(pred, obj, subjConstraint);
+                }
+            }
+        } else {
+			if (pred == null) {
+				if (obj == null) {
+					return rdfFactory.getCSPOIndex().scanWithConstraint(ctx, subjConstraint);
+                } else {
+					return rdfFactory.getCOSPIndex().scanWithConstraint(ctx, obj, subjConstraint);
+                }
+            } else {
+				if (obj == null) {
+					return rdfFactory.getCPOSIndex().scanWithConstraint(ctx, pred, null, subjConstraint);
+                } else {
+					return rdfFactory.getCPOSIndex().scanWithConstraint(ctx, pred, obj, subjConstraint);
+                }
+            }
+        }
+    }
+
+	private static Scan scanWithObjectConstraint(RDFSubject subj, RDFPredicate pred, @Nonnull ObjectConstraint objConstraint, RDFContext ctx, RDFFactory rdfFactory) {
 		if (ctx == null) {
 			if (subj == null) {
 				if (pred == null) {
-					return rdfFactory.getOSPIndex().scanWithConstraints(constraints);
+					return rdfFactory.getOSPIndex().scanWithConstraint(objConstraint);
                 } else {
-					return rdfFactory.getPOSIndex().scanWithConstraints(pred, constraints);
+					return rdfFactory.getPOSIndex().scanWithConstraint(pred, objConstraint);
                 }
             } else {
 				if (pred == null) {
-					return rdfFactory.getSPOIndex().scanWithConstraints(subj, null, constraints);
+					return rdfFactory.getSPOIndex().scanWithConstraint(subj, null, objConstraint);
                 } else {
-					return rdfFactory.getSPOIndex().scanWithConstraints(subj, pred, constraints);
+					return rdfFactory.getSPOIndex().scanWithConstraint(subj, pred, objConstraint);
                 }
             }
         } else {
 			if (subj == null) {
 				if (pred == null) {
-					return rdfFactory.getCOSPIndex().scanWithConstraints(ctx, constraints);
+					return rdfFactory.getCOSPIndex().scanWithConstraint(ctx, objConstraint);
                 } else {
-					return rdfFactory.getCPOSIndex().scanWithConstraints(ctx, pred, constraints);
+					return rdfFactory.getCPOSIndex().scanWithConstraint(ctx, pred, objConstraint);
                 }
             } else {
 				if (pred == null) {
-					return rdfFactory.getCSPOIndex().scanWithConstraints(ctx, subj, null, constraints);
+					return rdfFactory.getCSPOIndex().scanWithConstraint(ctx, subj, null, objConstraint);
                 } else {
-					return rdfFactory.getCSPOIndex().scanWithConstraints(ctx, subj, pred, constraints);
+					return rdfFactory.getCSPOIndex().scanWithConstraint(ctx, subj, pred, objConstraint);
                 }
             }
         }
@@ -607,11 +644,14 @@ public final class HalyardTableUtils {
 	 * @return Statements
 	 */
     public static Statement parseStatement(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, Cell cell, ValueIO.Reader valueReader, RDFFactory rdfFactory) {
-    	ByteBuffer key = ByteBuffer.wrap(cell.getRowArray(), cell.getRowOffset(), cell.getRowLength());
-        ByteBuffer cn = ByteBuffer.wrap(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
+    	ByteBuffer row = ByteBuffer.wrap(cell.getRowArray(), cell.getRowOffset(), cell.getRowLength());
+        ByteBuffer cq = ByteBuffer.wrap(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
         ByteBuffer cv = ByteBuffer.wrap(cell.getValueArray(), cell.getValueOffset(), cell.getValueLength());
-    	StatementIndex<?,?,?,?> index = StatementIndex.toIndex(key.get(), rdfFactory);
-        Statement stmt = index.parseStatement(subj, pred, obj, ctx, key, cn, cv, valueReader);
+    	StatementIndex<?,?,?,?> index = StatementIndex.toIndex(row.get(), rdfFactory);
+        Statement stmt = index.parseStatement(subj, pred, obj, ctx, row, cq, cv, valueReader);
+        assert !row.hasRemaining();
+        assert !cq.hasRemaining();
+        assert !cv.hasRemaining();
 		if (stmt instanceof Timestamped) {
 			((Timestamped) stmt).setTimestamp(fromHalyardTimestamp(cell.getTimestamp()));
         }

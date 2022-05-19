@@ -62,6 +62,7 @@ import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardBulkDelete extends AbstractHalyardTool {
+	static final String DEFAULT_GRAPH_KEYWORD = "DEFAULT";
     private static final String SOURCE = "halyard.delete.source";
     private static final String SUBJECT = "halyard.delete.subject";
     private static final String PREDICATE = "halyard.delete.predicate";
@@ -103,7 +104,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
             if (cs != null) {
                 ctx = new ArrayList<>();
                 for (String c : cs) {
-                    if ("NONE".equals(c)) {
+                    if (DEFAULT_GRAPH_KEYWORD.equals(c)) {
                         ctx.add(null);
                     } else {
                         ctx.add(NTriplesUtil.parseResource(c, vf));
@@ -134,7 +135,6 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
                     LOG.info(msg);
                 }
             }
-
         }
 
         @Override
@@ -157,7 +157,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         addOption("s", "subject", "subject", "Optional subject to delete", false, true);
         addOption("p", "predicate", "predicate", "Optional predicate to delete", false, true);
         addOption("o", "object", "object", "Optional object to delete", false, true);
-        addOption("g", "named-graph", "named_graph", "Optional named graph(s) to delete, NONE represents triples outside of any named graph", false, false);
+        addOption("g", "named-graph", "named_graph", "Optional named graph(s) to delete, "+DEFAULT_GRAPH_KEYWORD+" represents triples outside of any named graph", false, false);
     }
 
     @Override

@@ -202,7 +202,7 @@ public class HalyardStrategyExtendedTest {
 
     @Test
     public void testAggregates() {
-    	String q ="SELECT (MAX(?x) as ?maxx) (MIN(?x) as ?minx) (AVG(?x) as ?avgx) (SUM(?x) as ?sumx) (COUNT(?x) as ?countx) (SAMPLE(?x) as ?samplex) (GROUP_CONCAT(?x) as ?concatx) { VALUES ?x {1 2 2 3} }";
+    	String q = "SELECT (MAX(?x) as ?maxx) (MIN(?x) as ?minx) (AVG(?x) as ?avgx) (SUM(?x) as ?sumx) (COUNT(?x) as ?countx) (SAMPLE(?x) as ?samplex) (GROUP_CONCAT(?x) as ?concatx) { VALUES ?x {1 2 2 3} }";
         TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
         assertTrue(res.hasNext());
         BindingSet bs = res.next();
@@ -217,7 +217,7 @@ public class HalyardStrategyExtendedTest {
 
     @Test
     public void testDistinctAggregates() {
-    	String q ="SELECT (MAX(distinct ?x) as ?maxx) (MIN(distinct ?x) as ?minx) (AVG(distinct ?x) as ?avgx) (SUM(distinct ?x) as ?sumx) (COUNT(distinct ?x) as ?countx) (SAMPLE(distinct ?x) as ?samplex) (GROUP_CONCAT(distinct ?x) as ?concatx) { VALUES ?x {1 2 2 3} }";
+    	String q = "SELECT (MAX(distinct ?x) as ?maxx) (MIN(distinct ?x) as ?minx) (AVG(distinct ?x) as ?avgx) (SUM(distinct ?x) as ?sumx) (COUNT(distinct ?x) as ?countx) (SAMPLE(distinct ?x) as ?samplex) (GROUP_CONCAT(distinct ?x) as ?concatx) { VALUES ?x {1 2 2 3} }";
         TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
         assertTrue(res.hasNext());
         BindingSet bs = res.next();
@@ -232,7 +232,7 @@ public class HalyardStrategyExtendedTest {
 
     @Test
     public void testEmptyAggregate() {
-    	String q ="SELECT (MAX(?x) as ?maxx) {}";
+    	String q = "SELECT (MAX(?x) as ?maxx) {}";
         TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
         assertTrue(res.hasNext());
         BindingSet bs = res.next();
@@ -241,7 +241,7 @@ public class HalyardStrategyExtendedTest {
 
     @Test
     public void testConstantAggregates() {
-    	String q ="SELECT (MAX(-2) as ?maxx) (MIN(3) as ?minx) (AVG(1) as ?avgx) (SUM(7) as ?sumx) (COUNT('foo') as ?countx) (SAMPLE('bar') as ?samplex) (GROUP_CONCAT('foobar') as ?concatx) { }";
+    	String q = "SELECT (MAX(-2) as ?maxx) (MIN(3) as ?minx) (AVG(1) as ?avgx) (SUM(7) as ?sumx) (COUNT('foo') as ?countx) (SAMPLE('bar') as ?samplex) (GROUP_CONCAT('foobar') as ?concatx) { }";
         TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
         assertTrue(res.hasNext());
         BindingSet bs = res.next();
@@ -259,10 +259,41 @@ public class HalyardStrategyExtendedTest {
         ValueFactory vf = con.getValueFactory();
         con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));
         con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1), vf.createIRI("http://whatever/graph"));
-    	String q ="SELECT (count(*) as ?c) { {?s ?p ?o} }";
+    	String q = "SELECT (count(*) as ?c) { ?s ?p ?o }";
         TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
         assertTrue(res.hasNext());
         BindingSet bs = res.next();
         assertEquals(2, ((Literal)bs.getValue("c")).intValue());
+    }
+
+    @Test
+    public void testTripleValue() {
+    	String q = "SELECT (<< <http://whatever/a> <http://whatever/val> 1 >> as ?t) {}";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+        BindingSet bs = res.next();
+        assertTrue(bs.getValue("t").isTriple());
+    }
+
+    @Test
+    public void testNestedTriples1() {
+        ValueFactory vf = con.getValueFactory();
+        con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createTriple(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1)));
+    	String q = "SELECT ?o { <http://whatever/a> <http://whatever/val> << ?s ?p ?o >> }";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+        BindingSet bs = res.next();
+        assertEquals(1, ((Literal)bs.getValue("o")).intValue());
+    }
+
+    @Test
+    public void testNestedTriples2() {
+        ValueFactory vf = con.getValueFactory();
+        con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createTriple(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1)));
+    	String q = "SELECT ?o { ?s ?p << <http://whatever/a> <http://whatever/val> ?o >> }";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+        BindingSet bs = res.next();
+        assertEquals(1, ((Literal)bs.getValue("o")).intValue());
     }
 }

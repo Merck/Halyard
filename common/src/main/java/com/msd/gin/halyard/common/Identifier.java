@@ -8,13 +8,14 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.XSD;
 
-public final class Identifier {
+public final class Identifier implements ByteSequence {
 	enum TypeNibble {
 		BIG_NIBBLE(
 			(byte) 0x00 /* literal type bits */,
 			(byte) 0x40 /* triple type bits */,
 			(byte) 0x80 /* IRI type bits */,
 			(byte) 0xC0 /* BNode type bits */,
+			(byte) 0x3F /* size of each type */,
 
 			(byte) 0x00 /* non-string datatype bits */,
 			(byte) 0x20 /* string datatype bits */
@@ -24,59 +25,75 @@ public final class Identifier {
 			(byte) 0x04 /* triple type bits */,
 			(byte) 0x08 /* IRI type bits */,
 			(byte) 0x0C /* BNode type bits */,
+			(byte) 0x03 /* size of each type */,
 
 			(byte) 0x00 /* non-string datatype bits */,
 			(byte) 0x02 /* string datatype bits */
 		);
+
 		final byte literalTypeBits;
 		final byte tripleTypeBits;
 		final byte iriTypeBits;
 		final byte bnodeTypeBits;
+		final byte typeSize;
 		final byte typeMask;
 		final byte clearTypeMask;
 		final byte nonstringDatatypeBits;
 		final byte stringDatatypeBits;
 		final byte datatypeMask;
 		final byte clearDatatypeMask;
-		final byte literalStopBits;
-		private TypeNibble(byte literalTypeBits, byte tripleTypeBits, byte iriTypeBits, byte bnodeTypeBits, byte nonstringDatatypeBits, byte stringDatatypeBits) {
+
+		private TypeNibble(byte literalTypeBits, byte tripleTypeBits, byte iriTypeBits, byte bnodeTypeBits, byte typeSize, byte nonstringDatatypeBits, byte stringDatatypeBits) {
 			this.literalTypeBits = literalTypeBits;
 			this.tripleTypeBits = tripleTypeBits;
 			this.iriTypeBits = iriTypeBits;
 			this.bnodeTypeBits = bnodeTypeBits;
+			this.typeSize = typeSize;
 			this.typeMask = bnodeTypeBits;
 			this.clearTypeMask = (byte) ~typeMask;
 			this.nonstringDatatypeBits = nonstringDatatypeBits;
 			this.stringDatatypeBits = stringDatatypeBits;
 			this.datatypeMask = stringDatatypeBits;
 			this.clearDatatypeMask = (byte) ~datatypeMask;
-			this.literalStopBits = tripleTypeBits;
 		}
 	}
 
 	static Identifier create(Value v, byte[] hash, int typeIndex, TypeNibble typeNibble) {
-		byte typeBits;
-		byte dtBits = 0;
-		if (v.isIRI()) {
-			typeBits = typeNibble.iriTypeBits;
-		} else if (v.isLiteral()) {
-			typeBits = typeNibble.literalTypeBits;
-			IRI dt = ((Literal)v).getDatatype();
-			boolean isString = XSD.STRING.equals(dt) || RDF.LANGSTRING.equals(dt);
-			dtBits = isString ? typeNibble.stringDatatypeBits : typeNibble.nonstringDatatypeBits;
-		} else if (v.isBNode()) {
-			typeBits = typeNibble.bnodeTypeBits;
-		} else if (v.isTriple()) {
-			typeBits = typeNibble.tripleTypeBits;
-		} else {
-			throw new AssertionError(String.format("Unexpected RDF value: %s", v.getClass()));
+		ValueType type = ValueType.valueOf(v);
+		writeType(type, v.isLiteral() ? ((Literal)v).getDatatype() : null, hash, 0, typeIndex, typeNibble);
+		return new Identifier(hash, typeIndex, typeNibble);
+	}
+
+	static byte[] writeType(ValueType type, IRI datatype, byte[] arr, int offset, int typeIndex, TypeNibble typeNibble) {
+		int typeBits;
+		int dtBits = 0;
+		switch (type) {
+			case LITERAL:
+				typeBits = typeNibble.literalTypeBits;
+				dtBits = isString(datatype) ? typeNibble.stringDatatypeBits : typeNibble.nonstringDatatypeBits;
+				break;
+			case TRIPLE:
+				typeBits = typeNibble.tripleTypeBits;
+				break;
+			case IRI:
+				typeBits = typeNibble.iriTypeBits;
+				break;
+			case BNODE:
+				typeBits = typeNibble.bnodeTypeBits;
+				break;
+			default:
+				throw new AssertionError();
 		}
-		byte typeByte = (byte) ((hash[typeIndex] & typeNibble.clearTypeMask) | typeBits);
-		if (typeBits == typeNibble.literalTypeBits) {
+		byte typeByte = (byte) ((arr[offset+typeIndex] & typeNibble.clearTypeMask) | typeBits);
+		if (datatype != null) {
 			typeByte = (byte) ((typeByte & typeNibble.clearDatatypeMask) | dtBits);
 		}
-		hash[typeIndex] = typeByte;
-		return new Identifier(hash, typeIndex, typeNibble);
+		arr[offset+typeIndex] = typeByte;
+		return arr;
+	}
+
+	static boolean isString(IRI dt) {
+		return XSD.STRING.equals(dt) || RDF.LANGSTRING.equals(dt);
 	}
 
 	private final byte[] idBytes;
@@ -95,6 +112,7 @@ public final class Identifier {
 		this.hashcode = h;
 	}
 
+	@Override
 	public int size() {
 		return idBytes.length;
 	}
@@ -119,6 +137,7 @@ public final class Identifier {
 		return isLiteral() && (idBytes[typeIndex] & typeNibble.datatypeMask) == typeNibble.stringDatatypeBits;
 	}
 
+	@Override
 	public ByteBuffer writeTo(ByteBuffer bb) {
 		return bb.put(idBytes);
 	}

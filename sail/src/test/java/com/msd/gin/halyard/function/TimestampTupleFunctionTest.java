@@ -81,8 +81,23 @@ public class TimestampTupleFunctionTest {
 	}
 
 	@Test(expected = ValueExprEvaluationException.class)
-	public void testIncorrectArgs() {
+	public void testIncorrectNumberOfArgs() {
+		TripleSource ts = null;
 		SimpleValueFactory SVF = SimpleValueFactory.getInstance();
-		new TimestampTupleFunction().evaluate(null, SVF, SVF.createBNode());
+		new TimestampTupleFunction().evaluate(ts, SVF, SVF.createBNode());
+	}
+
+	@Test(expected = ValueExprEvaluationException.class)
+	public void testIncorrectNumberArgType1() {
+		TripleSource ts = null;
+		SimpleValueFactory SVF = SimpleValueFactory.getInstance();
+		new TimestampTupleFunction().evaluate(ts, SVF, SVF.createLiteral("foo"), null, null);
+	}
+
+	@Test(expected = ValueExprEvaluationException.class)
+	public void testIncorrectNumberArgType2() {
+		TripleSource ts = null;
+		SimpleValueFactory SVF = SimpleValueFactory.getInstance();
+		new TimestampTupleFunction().evaluate(ts, SVF, SVF.createBNode(), SVF.createLiteral("foo"), null);
 	}
 }

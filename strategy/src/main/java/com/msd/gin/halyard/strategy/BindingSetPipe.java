@@ -73,7 +73,7 @@ abstract class BindingSetPipe {
     	return false;
     }
 
-    protected boolean handleException(Exception e) {
+    protected boolean handleException(Throwable e) {
         if (parent != null) {
             parent.handleException(e);
         }

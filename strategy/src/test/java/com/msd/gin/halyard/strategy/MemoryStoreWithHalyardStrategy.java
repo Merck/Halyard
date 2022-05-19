@@ -24,11 +24,13 @@ import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
+import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.sail.NotifyingSailConnection;
 import org.eclipse.rdf4j.sail.SailException;
@@ -56,7 +58,7 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
     }
 
 
-    static class MockTripleSource implements TripleSource {
+    static class MockTripleSource implements RDFStarTripleSource {
         private final TripleSource tripleSource;
 
         MockTripleSource(TripleSource tripleSource) {
@@ -93,5 +95,10 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
         public ValueFactory getValueFactory() {
             return tripleSource.getValueFactory();
         }
+
+		@Override
+		public CloseableIteration<? extends Triple, QueryEvaluationException> getRdfStarTriples(Resource subj, IRI pred, Value obj) throws QueryEvaluationException {
+			return ((RDFStarTripleSource)tripleSource).getRdfStarTriples(subj, pred, obj);
+		}
     }
 }

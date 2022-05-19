@@ -246,21 +246,35 @@ public class RDFFactory {
 		return idSize;
 	}
 
-	byte[] createTypeSalt(int salt, byte typeBits) {
+	ByteSequence writeSaltAndType(final int salt, ValueType type, IRI datatype, ByteSequence seq) {
 		if (salt >= typeSaltSize) {
-			throw new IllegalArgumentException(String.format("Salt must be between 0 (inclusive) and %d (exclusive)", typeSaltSize));
+			throw new IllegalArgumentException(String.format("Salt must be between 0 (inclusive) and %d (exclusive): %d", typeSaltSize, salt));
 		}
-		byte[] b = new byte[typeIndex + 1];
-		b[typeIndex] = typeBits;
-		if (typeNibble == Identifier.TypeNibble.LITTLE_NIBBLE) {
-			b[typeIndex] |= (byte) ((salt&0x0F) << 4);
-			salt >>= 4;
-		}
-		for (int i=typeIndex-1; i>=0; i--) {
-			b[i] = (byte) salt;
-			salt >>= 8;
-		}
-		return b;
+		return new ByteSequence() {
+			@Override
+			public ByteBuffer writeTo(ByteBuffer bb) {
+				int saltBits = salt;
+				byte[] arr = bb.array();
+				int offset = bb.arrayOffset() + bb.position();
+				seq.writeTo(bb);
+				// overwrite type bits
+				Identifier.writeType(type, datatype, arr, offset, typeIndex, typeNibble);
+				if (typeNibble == Identifier.TypeNibble.LITTLE_NIBBLE) {
+					arr[offset+typeIndex] = (byte) ((arr[offset+typeIndex] & 0x0F) | ((saltBits&0x0F) << 4));
+					saltBits >>= 4;
+				}
+				for (int i=typeIndex-1; i>=0; i--) {
+					arr[offset+i] = (byte) saltBits;
+					saltBits >>= 8;
+				}
+				return bb;
+			}
+
+			@Override
+			public int size() {
+				return seq.size();
+			}
+		};
 	}
 
 	public RDFRole<SPOC.S> getSubjectRole() {

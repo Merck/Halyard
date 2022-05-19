@@ -43,6 +43,8 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
 import static org.junit.Assert.*;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
 
 /**
  *
@@ -243,24 +245,72 @@ public class HalyardTableUtilsScanTest {
     }
 
     @Test
-    public void testScanWithConstraints() throws Exception {
-    	if (o == null) {
-	        ValueFactory vf = SimpleValueFactory.getInstance();
-	        ValueIO.Reader reader = rdfFactory.createReader(vf);
-	
-	        RDFSubject subj = rdfFactory.createSubject(s == null ? null : vf.createIRI(s));
-	        RDFPredicate pred = rdfFactory.createPredicate(p == null ? null : vf.createIRI(p));
-	
-	        RDFContext ctx = rdfFactory.createContext(c == null ? null : vf.createIRI(c));
-	        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scanWithConstraints(subj, pred, new LiteralConstraints(XSD.STRING), ctx, rdfFactory))) {
-	            Set<Statement> res = new HashSet<>();
-	            Result r;
-	            while ((r = rs.next()) != null) {
-	                res.addAll(HalyardTableUtils.parseStatements(subj, pred, null, ctx, r, reader, rdfFactory));
-	            }
-	            assertTrue(allStatements.containsAll(res));
-	            assertEquals(s+", "+p+", "+c, expRes, res.size());
-	        }
-    	}
+    public void testScanWithSubjectAndObjectConstraint() throws Exception {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        ValueIO.Reader reader = rdfFactory.createReader(vf);
+
+        RDFSubject subj = rdfFactory.createSubject(s == null ? null : vf.createIRI(s));
+        RDFPredicate pred = rdfFactory.createPredicate(p == null ? null : vf.createIRI(p));
+        RDFObject obj = rdfFactory.createObject(o == null ? null : vf.createLiteral(o));
+        RDFContext ctx = rdfFactory.createContext(c == null ? null : vf.createIRI(c));
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scanWithConstraints(subj, new ValueConstraint(ValueType.IRI), pred, obj, new ObjectConstraint(XSD.STRING), ctx, rdfFactory))) {
+            Set<Statement> res = new HashSet<>();
+            Result r;
+            while ((r = rs.next()) != null) {
+                res.addAll(HalyardTableUtils.parseStatements(subj, pred, null, ctx, r, reader, rdfFactory));
+            }
+            assertTrue(allStatements.containsAll(res));
+            assertEquals(s+", "+p+", "+o+", "+c, expRes, res.size());
+        }
+    }
+
+    @Test
+    public void testScanWithSubjectConstraint() throws Exception {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        ValueIO.Reader reader = rdfFactory.createReader(vf);
+
+        RDFSubject subj = rdfFactory.createSubject(s == null ? null : vf.createIRI(s));
+        RDFPredicate pred = rdfFactory.createPredicate(p == null ? null : vf.createIRI(p));
+        RDFObject obj = rdfFactory.createObject(o == null ? null : vf.createLiteral(o));
+        RDFContext ctx = rdfFactory.createContext(c == null ? null : vf.createIRI(c));
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scanWithConstraints(subj, new ValueConstraint(ValueType.IRI), pred, obj, null, ctx, rdfFactory))) {
+            Set<Statement> res = new HashSet<>();
+            Result r;
+            while ((r = rs.next()) != null) {
+                res.addAll(HalyardTableUtils.parseStatements(subj, pred, null, ctx, r, reader, rdfFactory));
+            }
+            assertTrue(allStatements.containsAll(res));
+            if (pred == null || obj != null) {
+            	assertEquals(s+", "+p+", "+o+", "+c, expRes, res.size());
+            } else {
+            	// scan is going to be a superset
+            	assertThat(s+", "+p+", "+o+", "+c, expRes, lessThanOrEqualTo(res.size()));
+            }
+        }
+    }
+
+    @Test
+    public void testScanWithObjectConstraint() throws Exception {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        ValueIO.Reader reader = rdfFactory.createReader(vf);
+
+        RDFSubject subj = rdfFactory.createSubject(s == null ? null : vf.createIRI(s));
+        RDFPredicate pred = rdfFactory.createPredicate(p == null ? null : vf.createIRI(p));
+        RDFObject obj = rdfFactory.createObject(o == null ? null : vf.createLiteral(o));
+        RDFContext ctx = rdfFactory.createContext(c == null ? null : vf.createIRI(c));
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scanWithConstraints(subj, null, pred, obj, new ObjectConstraint(XSD.STRING), ctx, rdfFactory))) {
+            Set<Statement> res = new HashSet<>();
+            Result r;
+            while ((r = rs.next()) != null) {
+                res.addAll(HalyardTableUtils.parseStatements(subj, pred, null, ctx, r, reader, rdfFactory));
+            }
+            assertTrue(allStatements.containsAll(res));
+            if (subj == null || pred != null) {
+            	assertEquals(s+", "+p+", "+o+", "+c, expRes, res.size());
+            } else {
+            	// scan is going to be a superset
+            	assertThat(s+", "+p+", "+o+", "+c, expRes, lessThanOrEqualTo(res.size()));
+            }
+        }
     }
 }

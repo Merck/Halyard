@@ -19,8 +19,11 @@ package com.msd.gin.halyard.strategy;
 import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPush;
 import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPushAsync;
 
+import com.msd.gin.halyard.algebra.ConstrainedStatementPattern;
 import com.msd.gin.halyard.algebra.StarJoin;
-import com.msd.gin.halyard.common.LiteralConstraints;
+import com.msd.gin.halyard.common.ObjectConstraint;
+import com.msd.gin.halyard.common.ValueConstraint;
+import com.msd.gin.halyard.common.ValueType;
 import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
 import com.msd.gin.halyard.strategy.aggregators.Aggregator;
 import com.msd.gin.halyard.strategy.aggregators.AvgAggregator;
@@ -60,10 +63,10 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.impl.BooleanLiteral;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.RDF4J;
 import org.eclipse.rdf4j.model.vocabulary.SESAME;
-import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
@@ -74,8 +77,6 @@ import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
 import org.eclipse.rdf4j.query.algebra.Avg;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
-import org.eclipse.rdf4j.query.algebra.Compare;
-import org.eclipse.rdf4j.query.algebra.Compare.CompareOp;
 import org.eclipse.rdf4j.query.algebra.Count;
 import org.eclipse.rdf4j.query.algebra.Datatype;
 import org.eclipse.rdf4j.query.algebra.DescribeOperator;
@@ -89,6 +90,7 @@ import org.eclipse.rdf4j.query.algebra.Group;
 import org.eclipse.rdf4j.query.algebra.GroupConcat;
 import org.eclipse.rdf4j.query.algebra.GroupElem;
 import org.eclipse.rdf4j.query.algebra.Intersection;
+import org.eclipse.rdf4j.query.algebra.IsNumeric;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.Lang;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
@@ -235,43 +237,59 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateStatementPattern(final BindingSetPipe parent, final StatementPattern sp, final BindingSet bindings) {
     	TripleSource ts = null;
-		Var objVar = sp.getObjectVar();
-		if (!objVar.hasValue() && !bindings.hasBinding(objVar.getName()) && (tripleSource instanceof ConstrainedTripleSourceFactory)) {
-	    	QueryModelNode parentNode = sp.getParentNode();
-	    	if (parentNode instanceof Filter) {
-	    		Filter filter = (Filter) parentNode;
-	    		if (filter.getCondition() instanceof Compare) {
-					Compare cmp = (Compare) filter.getCondition();
-					if ((cmp.getLeftArg() instanceof UnaryValueOperator) && cmp.getOperator() == CompareOp.EQ) {
-						UnaryValueOperator func = (UnaryValueOperator) cmp.getLeftArg();
-						if (func.getArg() instanceof Var) {
-							Var litVar = (Var) func.getArg();
-							if (litVar.getName().equals(objVar.getName())) {
-								Value v;
-								if (cmp.getRightArg() instanceof ValueConstant) {
-									v = ((ValueConstant) cmp.getRightArg()).getValue();
-								} else if (cmp.getRightArg() instanceof Var) {
-									v = ((Var) cmp.getRightArg()).getValue();
+    	if ((sp instanceof ConstrainedStatementPattern) && (tripleSource instanceof ConstrainedTripleSourceFactory)) {
+    		ConstrainedStatementPattern csp = (ConstrainedStatementPattern) sp;
+    		ValueConstraint subjConstraint = null;
+    		if (csp.getSubjectType() != null) {
+    			subjConstraint = new ValueConstraint(csp.getSubjectType());
+    		}
+    		ObjectConstraint objConstraint = null;
+    		if (csp.getObjectType() != null) {
+				if (csp.getObjectType() == ValueType.LITERAL) {
+					UnaryValueOperator constraintFunc = csp.getLiteralConstraintFunction();
+					if (constraintFunc != null) {
+						ValueExpr constraintValue = csp.getLiteralConstraintValue();
+						Value v;
+						if (constraintValue instanceof ValueConstant) {
+							v = ((ValueConstant) constraintValue).getValue();
+						} else if (constraintValue instanceof Var) {
+							v = ((Var) constraintValue).getValue();
+						} else {
+							v = null;
+						}
+						if (v != null) {
+							if (constraintFunc instanceof Datatype) {
+								if (!v.isIRI()) {
+									parent.empty();
+									return;
+								}
+								IRI dt = (IRI) v;
+				    			objConstraint = new ObjectConstraint(dt);
+							} else if (constraintFunc instanceof Lang) {
+								if (!v.isLiteral()) {
+									parent.empty();
+									return;
+								}
+								Literal lang = (Literal) v;
+								String label = lang.getLabel();
+								if (!label.isEmpty()) {
+					    			objConstraint = new ObjectConstraint(lang.getLabel());
 								} else {
-									v = null;
+					    			objConstraint = new ObjectConstraint(ValueType.LITERAL);
 								}
-								if (v != null) {
-									if ((func instanceof Datatype) && v.isIRI()) {
-										IRI dt = (IRI) v;
-										ts = ((ConstrainedTripleSourceFactory)tripleSource).getTripleSource(new LiteralConstraints(dt));
-									} else if ((cmp.getLeftArg() instanceof Lang) && v.isLiteral()) {
-										Literal lang = (Literal) v;
-										if (XSD.STRING.equals(lang.getDatatype())) {
-											ts = ((ConstrainedTripleSourceFactory)tripleSource).getTripleSource(new LiteralConstraints(lang.getLabel()));
-										}
-									}
-								}
+							} else if ((constraintFunc instanceof IsNumeric) && BooleanLiteral.TRUE.equals(v)) {
+				    			objConstraint = new ObjectConstraint(HALYARD.ANY_NUMERIC);
 							}
 						}
-					}
+	    			} else {
+		    			objConstraint = new ObjectConstraint(ValueType.LITERAL);
+	    			}
+	    		} else {
+	    			objConstraint = new ObjectConstraint(csp.getObjectType());
 	    		}
-	    	}
-		}
+    		}
+			ts = ((ConstrainedTripleSourceFactory)tripleSource).getTripleSource(subjConstraint, objConstraint);
+    	}
 		if (ts == null) {
 			ts = tripleSource;
 		}
@@ -363,8 +381,7 @@ final class HalyardTupleExprEvaluation {
 
 	            if (contexts.length == 0 && sp.getScope() == StatementPattern.Scope.NAMED_CONTEXTS) {
 	                // Named contexts are matched by retrieving all statements from
-	                // the store and filtering out the statements that do not have a
-	                // context.
+	                // the store and filtering out the statements that do not have a context.
 	                stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
 	
 	                    @Override
@@ -880,7 +897,7 @@ final class HalyardTupleExprEvaluation {
                 final AtomicLong minorOrder = new AtomicLong();
 
                 @Override
-                protected boolean handleException(Exception e) {
+                protected boolean handleException(Throwable e) {
                     sorter.close();
                     return parent.handleException(e);
                 }
@@ -1138,7 +1155,7 @@ final class HalyardTupleExprEvaluation {
         evaluateTupleExpr(new BindingSetPipe(parent) {
             private final BigHashSet<BindingSet> set = BigHashSet.create();
             @Override
-            protected boolean handleException(Exception e) {
+            protected boolean handleException(Throwable e) {
                 set.close();
                 return parent.handleException(e);
             }
@@ -1558,7 +1575,7 @@ final class HalyardTupleExprEvaluation {
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
             private final BigHashSet<BindingSet> secondSet = BigHashSet.create();
             @Override
-            protected boolean handleException(Exception e) {
+            protected boolean handleException(Throwable e) {
                 secondSet.close();
                 return parent.handleException(e);
             }
@@ -1610,7 +1627,7 @@ final class HalyardTupleExprEvaluation {
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
             private final BigHashSet<BindingSet> excludeSet = BigHashSet.create();
             @Override
-            protected boolean handleException(Exception e) {
+            protected boolean handleException(Throwable e) {
                 excludeSet.close();
                 return parent.handleException(e);
             }

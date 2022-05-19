@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.optimizers.ConstrainedValueOptimizer;
 import com.msd.gin.halyard.optimizers.ExtendedEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardConstantOptimizer;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
@@ -77,6 +78,7 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 			// new SubSelectJoinOptimizer(),
 			new IterativeEvaluationOptimizer(),
 			new HalyardFilterOptimizer(), // apply filter optimizer twice (before and after Joins and Unions shaking)
+			new ConstrainedValueOptimizer(),
 			new OrderLimitOptimizer(),
 			new ParentReferenceCleaner()
 		);

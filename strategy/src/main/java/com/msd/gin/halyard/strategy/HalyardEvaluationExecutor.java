@@ -248,8 +248,9 @@ final class HalyardEvaluationExecutor {
             	} else {
             		iter.close();
             	}
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 pipe.handleException(e);
+                iter.close();
             }
         	return false;
 		}
@@ -282,7 +283,7 @@ final class HalyardEvaluationExecutor {
 		public void run() {
 			try {
 				pushAction.accept(pipe);
-			} catch(RuntimeException e) {
+			} catch(Throwable e) {
 				pipe.handleException(e);
 			}
 		}
@@ -300,7 +301,7 @@ final class HalyardEvaluationExecutor {
     static final class BindingSetPipeQueue {
 
         private final LinkedBlockingQueue<BindingSet> queue = new LinkedBlockingQueue<>(MAX_QUEUE_SIZE);
-        private volatile Exception exception;
+        private volatile Throwable exception;
 
         final BindingSetPipeIteration iteration = new BindingSetPipeIteration();
         final QueueingBindingSetPipe pipe = new QueueingBindingSetPipe();
@@ -384,7 +385,7 @@ final class HalyardEvaluationExecutor {
             }
 
             @Override
-            protected boolean handleException(Exception e) {
+            protected boolean handleException(Throwable e) {
                 if (exception != null) {
                 	e.addSuppressed(exception);
                 }
