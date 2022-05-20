@@ -45,6 +45,7 @@ public class SimpleHttpServer {
      * @param port    number of port
      * @param context context path
      * @param handler handler for handling HTTP requests
+     * @throws IOException if could not create the server
      */
     public SimpleHttpServer(int port, String context, HttpHandler handler) throws IOException {
         // Maximum number of incoming TCP connections is set to system default value

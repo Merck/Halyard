@@ -469,6 +469,7 @@ public final class HalyardExport extends AbstractHalyardTool {
      * @param driverClasspath String with JDBC Driver classpath delimited by : (for DB export only)
      * @param jdbcProperties Arrays of String JDBC connection properties (for DB export only)
      * @param trimTable boolean option to trim target JDBC table before export (for DB export only)
+     * @param elasticIndexURL elastic index URL (if query requires it)
      * @throws ExportException in case of an export problem
      */
     public static void export(Configuration conf, StatusLog log, String source, String query, String targetUrl, String driverClass, String driverClasspath, String[] jdbcProperties, boolean trimTable, String elasticIndexURL) throws ExportException {
