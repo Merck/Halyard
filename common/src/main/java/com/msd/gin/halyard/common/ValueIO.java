@@ -3,8 +3,11 @@ package com.msd.gin.halyard.common;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -13,7 +16,6 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -21,7 +23,6 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -95,13 +96,6 @@ public class ValueIO {
 		}
 
 		return Collections.unmodifiableList(vocabs);
-	}
-
-	private static Locale[] getLanguages() {
-		LOGGER.debug("Searching for languages...");
-		Locale[] locales = Locale.getAvailableLocales();
-		Arrays.sort(locales, (l1, l2) -> l1.toLanguageTag().compareTo(l2.toLanguageTag()));
-		return locales;
 	}
 
 	interface ByteWriter {
@@ -362,7 +356,11 @@ public class ValueIO {
 			}
 		}
 		if (loadLanguages) {
-			loadLanguageTags();
+			try {
+				loadLanguageTags();
+			} catch (IOException ioe) {
+				throw new UncheckedIOException(ioe);
+			}
 		}
 
 		addByteReaderWriters();
@@ -406,16 +404,17 @@ public class ValueIO {
 		}
 	}
 
-	private void loadLanguageTags() {
-		for (Locale l : getLanguages()) {
-			String langTag = l.toLanguageTag();
-			LOGGER.debug("Loading language {}", langTag);
-			addLanguageTag(langTag);
-			// add lowercase alternative
-			String lcLangTag = langTag.toLowerCase();
-			if (!lcLangTag.equals(langTag)) {
-				addLanguageTag(lcLangTag);
-			}
+	private void loadLanguageTags() throws IOException {
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(getClass().getResourceAsStream("languageTags"), "US-ASCII"))) {
+			reader.lines().forEach(langTag -> {
+				LOGGER.debug("Loading language {}", langTag);
+				addLanguageTag(langTag);
+				// add lowercase alternative
+				String lcLangTag = langTag.toLowerCase();
+				if (!lcLangTag.equals(langTag)) {
+					addLanguageTag(lcLangTag);
+				}
+			});
 		}
 	}
 
