@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Value;
@@ -47,7 +48,7 @@ public class RDFFactoryExtendedTest {
 	@Test
     public void testIdIsUnique() {
         ValueFactory vf = SimpleValueFactory.getInstance();
-        List<Value> values = RDFFactoryTest.createData(vf);
+        List<Value> values = RDFFactoryTest.createData(vf).stream().map(arr -> (Value)arr[0]).collect(Collectors.toList());
         Set<Identifier> ids = new HashSet<>(values.size());
         for (Value v : values) {
         	ids.add(rdfFactory.id(v));

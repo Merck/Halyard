@@ -131,37 +131,39 @@ public class ValueIO {
 		return cal;
 	}
 
-	private static final byte IRI_TYPE = '<';
-	private static final byte COMPRESSED_IRI_TYPE = 'w';
-	private static final byte IRI_HASH_TYPE = '#';
-	private static final byte NAMESPACE_HASH_TYPE = ':';
-	private static final byte ENCODED_IRI_TYPE = '{';
-	private static final byte BNODE_TYPE = '_';
-	private static final byte DATATYPE_LITERAL_TYPE = '\"';
-	private static final byte LANGUAGE_LITERAL_TYPE = '@';
-	private static final byte TRIPLE_TYPE = '*';
-	private static final byte FALSE_TYPE = '0';
-	private static final byte TRUE_TYPE = '1';
-	private static final byte LANGUAGE_HASH_LITERAL_TYPE = 'a';
-	private static final byte BYTE_TYPE = 'b';
-	private static final byte SHORT_TYPE = 's';
-	private static final byte INT_TYPE = 'i';
-	private static final byte LONG_TYPE = 'l';
-	private static final byte FLOAT_TYPE = 'f';
-	private static final byte DOUBLE_TYPE = 'd';
-	private static final byte COMPRESSED_STRING_TYPE = 'z';
-	private static final byte UNCOMPRESSED_STRING_TYPE = 'Z';
-	private static final byte TIME_TYPE = 't';
-	private static final byte DATE_TYPE = 'D';
-	private static final byte BIG_FLOAT_TYPE = 'F';
-	private static final byte BIG_INT_TYPE = 'I';
-	private static final byte LONG_COMPRESSED_BIG_INT_TYPE = '8';
-	private static final byte INT_COMPRESSED_BIG_INT_TYPE = '4';
-	private static final byte SHORT_COMPRESSED_BIG_INT_TYPE = '2';
-	private static final byte DATETIME_TYPE = 'T';
-	private static final byte WKT_LITERAL_TYPE = 'W';
-	private static final byte XML_TYPE = 'x';
+	static final byte IRI_TYPE = '<';
+	static final byte COMPRESSED_IRI_TYPE = 'w';
+	static final byte IRI_HASH_TYPE = '#';
+	static final byte NAMESPACE_HASH_TYPE = ':';
+	static final byte ENCODED_IRI_TYPE = '{';
+	static final byte END_SLASH_ENCODED_IRI_TYPE = '}';
+	static final byte BNODE_TYPE = '_';
+	static final byte DATATYPE_LITERAL_TYPE = '\"';
+	static final byte LANGUAGE_LITERAL_TYPE = '@';
+	static final byte TRIPLE_TYPE = '*';
+	static final byte FALSE_TYPE = '0';
+	static final byte TRUE_TYPE = '1';
+	static final byte LANGUAGE_HASH_LITERAL_TYPE = 'a';
+	static final byte BYTE_TYPE = 'b';
+	static final byte SHORT_TYPE = 's';
+	static final byte INT_TYPE = 'i';
+	static final byte LONG_TYPE = 'l';
+	static final byte FLOAT_TYPE = 'f';
+	static final byte DOUBLE_TYPE = 'd';
+	static final byte COMPRESSED_STRING_TYPE = 'z';
+	static final byte UNCOMPRESSED_STRING_TYPE = 'Z';
+	static final byte TIME_TYPE = 't';
+	static final byte DATE_TYPE = 'D';
+	static final byte BIG_FLOAT_TYPE = 'F';
+	static final byte BIG_INT_TYPE = 'I';
+	static final byte LONG_COMPRESSED_BIG_INT_TYPE = '8';
+	static final byte INT_COMPRESSED_BIG_INT_TYPE = '4';
+	static final byte SHORT_COMPRESSED_BIG_INT_TYPE = '2';
+	static final byte DATETIME_TYPE = 'T';
+	static final byte WKT_LITERAL_TYPE = 'W';
+	static final byte XML_TYPE = 'x';
 
+	// compressed IRI types
 	private static final byte HTTP_SCHEME = 'h';
 	private static final byte HTTPS_SCHEME = 's';
 	private static final byte DOI_HTTP_SCHEME = 'd';
@@ -730,10 +732,11 @@ public class ValueIO {
 					b.put(WKT_LITERAL_TYPE); // mark as valid
 					return b.put(wkb);
 				} catch (ParseException | IOException e) {
-					b = ensureCapacity(b, 2);
+					ByteBuffer wktBytes = writeUncompressedString(l.getLabel());
+					b = ensureCapacity(b, 2 + wktBytes.remaining());
 					b.put(WKT_LITERAL_TYPE);
 					b.put(UNCOMPRESSED_STRING_TYPE); // mark as invalid
-					return b.put(writeUncompressedString(l.getLabel()));
+					return b.put(wktBytes);
 				}
 			}
 		});
@@ -873,33 +876,50 @@ public class ValueIO {
 				return b;
 			} else {
 				String ns = iri.getNamespace();
+				String localName = iri.getLocalName();
+				boolean endSlashEncodable = false;
 				Short nshash = wellKnownNamespaces.inverse().get(ns);
+				if (nshash == null) {
+					// is it end-slash encodable?
+					String s = iri.stringValue();
+					int iriLen = s.length();
+					// has to be at least x//
+					if (iriLen >= 3 && s.charAt(iriLen-1) == '/') {
+						int sepPos = s.lastIndexOf('/', iriLen-2);
+						if (sepPos > 0) {
+							ns = s.substring(0, sepPos+1);
+							localName = s.substring(sepPos+1, iriLen-1);
+							nshash = wellKnownNamespaces.inverse().get(ns);
+							endSlashEncodable = true;
+						}
+					}
+				}
 				if (nshash != null) {
-					IRIEncodingNamespace iriEncoder = iriEncoders.get(nshash);
+					IRIEncodingNamespace iriEncoder = !localName.isEmpty() ? iriEncoders.get(nshash) : null;
 					if (iriEncoder != null) {
 						b = ensureCapacity(b, 1 + NAMESPACE_HASH_SIZE);
 						final int failsafeMark = b.position();
-						b.put(ENCODED_IRI_TYPE);
+						b.put(endSlashEncodable ? END_SLASH_ENCODED_IRI_TYPE : ENCODED_IRI_TYPE);
 						b.putShort(nshash);
 						try {
-							return iriEncoder.writeBytes(iri.getLocalName(), b);
+							return iriEncoder.writeBytes(localName, b);
 						} catch (Exception e) {
-							LOGGER.warn("Possibly invalid IRI for namespace {}: {} ({})", iri, ns, e.getMessage());
+							LOGGER.warn("Possibly invalid IRI for namespace {}: {} ({})", ns, iri, e.getMessage());
 							LOGGER.debug("{} for {} failed", IRIEncodingNamespace.class.getSimpleName(), ns, e);
 							// if the dedicated namespace encoder fails then fallback to the generic encoder
 							b.position(failsafeMark);
 						}
 					}
-					ByteBuffer localBytes = writeUncompressedString(iri.getLocalName());
+					ByteBuffer localBytes = writeUncompressedString(localName);
 					b = ensureCapacity(b, 1 + NAMESPACE_HASH_SIZE + localBytes.remaining());
 					b.put(NAMESPACE_HASH_TYPE);
 					b.putShort(nshash);
 					b.put(localBytes);
 					return b;
 				} else {
-					String s = iri.stringValue();
 					byte schemeType;
 					int prefixLen;
+					String s = iri.stringValue();
 					if (s.startsWith("http")) {
 						prefixLen = 4;
 						if (s.startsWith("://", prefixLen)) {
@@ -962,7 +982,7 @@ public class ValueIO {
 					try {
 						return writer.writeBytes(l, b);
 					} catch (Exception e) {
-						LOGGER.warn("Possibly invalid literal: {} ({})", l, e.getMessage());
+						LOGGER.warn("Possibly invalid literal: {} ({})", l, e.toString());
 						LOGGER.debug("{} for {} failed", ByteWriter.class.getSimpleName(), l.getDatatype(), e);
 						// if the dedicated writer fails then fallback to the generic writer
 						b.position(failsafeMark);
@@ -1084,6 +1104,15 @@ public class ValueIO {
 						throw new IllegalStateException(String.format("Unknown IRI encoder hash: %s", Hashes.encode(b)));
 					}
 					return vf.createIRI(iriEncoder.getName(), iriEncoder.readBytes(b));
+				case END_SLASH_ENCODED_IRI_TYPE:
+					b.mark();
+					nshash = b.getShort(); // 16-bit hash
+					iriEncoder = iriEncoders.get(nshash);
+					if (iriEncoder == null) {
+						b.limit(b.position()).reset();
+						throw new IllegalStateException(String.format("Unknown IRI encoder hash: %s", Hashes.encode(b)));
+					}
+					return vf.createIRI(iriEncoder.getName()+iriEncoder.readBytes(b)+'/');
 				case BNODE_TYPE:
 					return bnodeTransformer.apply(readUncompressedString(b), vf);
 				case LANGUAGE_HASH_LITERAL_TYPE:

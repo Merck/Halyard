@@ -35,7 +35,8 @@ public final class RDFRole<T extends SPOC<?>> {
 	}
 
 	/**
-	 * Key hash size in bytes
+	 * Key hash size in bytes.
+	 * @return size in bytes.
 	 */
 	public int keyHashSize() {
 		return keyHashSize;

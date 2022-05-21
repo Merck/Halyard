@@ -10,8 +10,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
@@ -40,50 +38,65 @@ public class RDFFactoryTest {
 		return String.join(" ", copies);
 	}
 
-	static List<Value> createData(ValueFactory vf) {
-		return Arrays.asList(RDF.TYPE, vf.createLiteral("foo"), vf.createBNode("__foobar__"),
-			vf.createIRI("test:/foo"),
-			vf.createIRI("http://www.testmyiri.com"),
-			vf.createIRI("https://www.testmyiri.com"),
-			vf.createIRI("http://dx.doi.org/", "blah"),
-			vf.createIRI("https://dx.doi.org/", "blah"),
-			vf.createLiteral("5423"), vf.createLiteral("\u98DF"),
-			vf.createLiteral(true), vf.createLiteral((byte) 6), vf.createLiteral((short) 7843),
-			vf.createLiteral(34), vf.createLiteral(87.232), vf.createLiteral(74234l), vf.createLiteral(4.809f),
-			vf.createLiteral(BigInteger.valueOf(96)),
-			vf.createLiteral(BigInteger.valueOf(Integer.MIN_VALUE)),
-			vf.createLiteral(String.valueOf(Long.MAX_VALUE)+String.valueOf(Long.MAX_VALUE), XSD.INTEGER),
-			vf.createLiteral(BigDecimal.valueOf(856.03)),
-			vf.createLiteral("z", XSD.INT),
-			vf.createIRI(RDF.NAMESPACE), vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)),
-			vf.createLiteral(NOW), vf.createLiteral("13:03:22.000", XSD.TIME),
-			vf.createLiteral("1980-02-14", XSD.DATE),
-			vf.createLiteral("foo", vf.createIRI("urn:bar:1")), vf.createLiteral("foo", "en-GB"), vf.createLiteral("bar", "zx-XY"),
-			vf.createLiteral("POINT (139.81 35.6972)", GEO.WKT_LITERAL),
-			vf.createLiteral("invalid still works (139.81 35.6972)", GEO.WKT_LITERAL),
-			vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL),
-			vf.createLiteral("invalid xml still works", RDF.XMLLITERAL),
-			vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME),
-			vf.createLiteral(longString("The cat slept on the mat.")),
-			vf.createLiteral(longString("¿Dónde está el gato?"), "es"),
-			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "400f9abd3fd761c62af23dbe8f8432158a6ce272"),
-			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "invalid")
+	static List<Object[]> createData(ValueFactory vf) {
+		return Arrays.asList(
+			new Object[] {RDF.TYPE, ValueIO.IRI_HASH_TYPE},
+			new Object[] {vf.createLiteral("foo"), ValueIO.UNCOMPRESSED_STRING_TYPE},
+			new Object[] {vf.createBNode("__foobar__"), ValueIO.BNODE_TYPE},
+			new Object[] {vf.createIRI("test:/foo"), ValueIO.IRI_TYPE},
+			new Object[] {vf.createIRI("http://www.testmyiri.com"), ValueIO.COMPRESSED_IRI_TYPE},
+			new Object[] {vf.createIRI("https://www.testmyiri.com"), ValueIO.COMPRESSED_IRI_TYPE},
+			new Object[] {vf.createIRI("http://dx.doi.org/", "blah"), ValueIO.COMPRESSED_IRI_TYPE},
+			new Object[] {vf.createIRI("https://dx.doi.org/", "blah"), ValueIO.COMPRESSED_IRI_TYPE},
+			new Object[] {vf.createLiteral("5423"), ValueIO.UNCOMPRESSED_STRING_TYPE},
+			new Object[] {vf.createLiteral("\u98DF"), ValueIO.UNCOMPRESSED_STRING_TYPE},
+			new Object[] {vf.createLiteral(true), ValueIO.TRUE_TYPE},
+			new Object[] {vf.createLiteral((byte) 6), ValueIO.BYTE_TYPE},
+			new Object[] {vf.createLiteral((short) 7843), ValueIO.SHORT_TYPE},
+			new Object[] {vf.createLiteral(34), ValueIO.INT_TYPE},
+			new Object[] {vf.createLiteral(87.232), ValueIO.DOUBLE_TYPE},
+			new Object[] {vf.createLiteral(74234l), ValueIO.LONG_TYPE},
+			new Object[] {vf.createLiteral(4.809f), ValueIO.FLOAT_TYPE},
+			new Object[] {vf.createLiteral(BigInteger.valueOf(96)), ValueIO.SHORT_COMPRESSED_BIG_INT_TYPE},
+			new Object[] {vf.createLiteral(BigInteger.valueOf(Integer.MIN_VALUE)), ValueIO.INT_COMPRESSED_BIG_INT_TYPE},
+			new Object[] {vf.createLiteral(String.valueOf(Long.MAX_VALUE)+String.valueOf(Long.MAX_VALUE), XSD.INTEGER), ValueIO.BIG_INT_TYPE},
+			new Object[] {vf.createLiteral(BigDecimal.valueOf(856.03)), ValueIO.BIG_FLOAT_TYPE},
+			new Object[] {vf.createLiteral("z", XSD.INT), ValueIO.DATATYPE_LITERAL_TYPE},
+			new Object[] {vf.createIRI(RDF.NAMESPACE), ValueIO.NAMESPACE_HASH_TYPE},
+			new Object[] {vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)), ValueIO.DATATYPE_LITERAL_TYPE},
+			new Object[] {vf.createLiteral(NOW), ValueIO.DATETIME_TYPE},
+			new Object[] {vf.createLiteral("13:03:22.000", XSD.TIME), ValueIO.TIME_TYPE},
+			new Object[] {vf.createLiteral("1980-02-14", XSD.DATE), ValueIO.DATE_TYPE},
+			new Object[] {vf.createLiteral("foo", vf.createIRI("urn:bar:1")), ValueIO.DATATYPE_LITERAL_TYPE},
+			new Object[] {vf.createLiteral("foo", "en-GB"), ValueIO.LANGUAGE_HASH_LITERAL_TYPE},
+			new Object[] {vf.createLiteral("bar", "zx-XY"), ValueIO.LANGUAGE_LITERAL_TYPE},
+			new Object[] {vf.createLiteral("POINT (139.81 35.6972)", GEO.WKT_LITERAL), ValueIO.WKT_LITERAL_TYPE},
+			new Object[] {vf.createLiteral("invalid still works (139.81 35.6972)", GEO.WKT_LITERAL), ValueIO.WKT_LITERAL_TYPE},
+			new Object[] {vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL), ValueIO.XML_TYPE},
+			new Object[] {vf.createLiteral("<invalid xml still works", RDF.XMLLITERAL), ValueIO.XML_TYPE},
+			new Object[] {vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME), ValueIO.DATATYPE_LITERAL_TYPE},
+			new Object[] {vf.createLiteral(longString("The cat slept on the mat.")), ValueIO.COMPRESSED_STRING_TYPE},
+			new Object[] {vf.createLiteral(longString("¿Dónde está el gato?"), "es"), ValueIO.LANGUAGE_HASH_LITERAL_TYPE},
+			new Object[] {vf.createIRI(WIKIDATA.WDV_NAMESPACE, "400f9abd3fd761c62af23dbe8f8432158a6ce272"), ValueIO.ENCODED_IRI_TYPE},
+			new Object[] {vf.createIRI(WIKIDATA.WDV_NAMESPACE, "invalid"), ValueIO.NAMESPACE_HASH_TYPE},
+			new Object[] {vf.createIRI(WIKIDATA.WDV_NAMESPACE+"400f9abd3fd761c62af23dbe8f8432158a6ce272/"), ValueIO.END_SLASH_ENCODED_IRI_TYPE}
 		);
 	}
 
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> data() {
-		Function<Value,Object[]> toArg = v -> new Object[] {v};
 		List<Object[]> testValues = new ArrayList<>();
-		testValues.addAll(createData(SimpleValueFactory.getInstance()).stream().map(toArg).collect(Collectors.toList()));
-		testValues.addAll(createData(rdfFactory.getIdValueFactory()).stream().map(toArg).collect(Collectors.toList()));
+		testValues.addAll(createData(SimpleValueFactory.getInstance()));
+		testValues.addAll(createData(rdfFactory.getIdValueFactory()));
 		return testValues;
 	}
 
-	private Value expected;
+	private Value expectedValue;
+	private byte expectedEncodingType;
 
-	public RDFFactoryTest(Value v) {
-		this.expected = v;
+	public RDFFactoryTest(Value v, byte encodingType) {
+		this.expectedValue = v;
+		this.expectedEncodingType = encodingType;
 	}
 
 	@Test
@@ -101,61 +114,65 @@ public class RDFFactoryTest {
         ValueIO.Reader reader = rdfFactory.createReader(rdfFactory.getIdValueFactory());
 
         ByteBuffer buf = ByteBuffer.allocate(bufferSize);
-		buf = writer.writeTo(expected, buf);
+		buf = writer.writeTo(expectedValue, buf);
 		buf.flip();
+		byte actualEncodingType = buf.get(0);
+		assertEquals(expectedEncodingType, actualEncodingType);
 		int size = buf.limit();
 		Value actual = reader.readValue(buf);
-		assertEquals(expected, actual);
-		assertEquals(actual, expected);
-		assertEquals(expected.hashCode(), actual.hashCode());
+		assertEquals(expectedValue, actual);
+		assertEquals(actual, expectedValue);
+		assertEquals(expectedValue.hashCode(), actual.hashCode());
 
 		// check readValue() works on a subsequence
-		ByteBuffer extbuf = ByteBuffer.allocate(3 + size + 7);
+		int beforeLen = 3;
+		int afterLen = 7;
+		ByteBuffer extbuf = ByteBuffer.allocate(beforeLen + size + afterLen);
 		// place b somewhere in the middle
-		extbuf.position(extbuf.position() + 3);
+		extbuf.position(beforeLen);
 		extbuf.mark();
 		buf.flip();
 		extbuf.put(buf);
 		extbuf.limit(extbuf.position());
 		extbuf.reset();
 		actual = reader.readValue(extbuf);
-		assertEquals("Buffer position", 3 + size, extbuf.position());
+		assertEquals("Buffer position", beforeLen + size, extbuf.position());
 		assertEquals("Buffer state", extbuf.limit(), extbuf.position());
-		assertEquals(expected, actual);
+		assertEquals(expectedValue, actual);
 	}
 
 	@Test
 	public void testRDFValue() {
-		Identifier id = rdfFactory.id(expected);
-		if (expected instanceof Identifiable) {
-			assertEquals(id, ((Identifiable)expected).getId());
+		Identifier id = rdfFactory.id(expectedValue);
+		if (expectedValue instanceof Identifiable) {
+			assertEquals(id, ((Identifiable)expectedValue).getId());
 		}
 
-		assertEquals("isIRI", expected.isIRI(), id.isIRI());
-		assertEquals("isLiteral", expected.isLiteral(), id.isLiteral());
-		assertEquals("isBNode", expected.isBNode(), id.isBNode());
-		assertEquals("isTriple", expected.isTriple(), id.isTriple());
+		assertEquals("isIRI", expectedValue.isIRI(), id.isIRI());
+		assertEquals("isLiteral", expectedValue.isLiteral(), id.isLiteral());
+		assertEquals("isBNode", expectedValue.isBNode(), id.isBNode());
+		assertEquals("isTriple", expectedValue.isTriple(), id.isTriple());
 
-		if (expected instanceof Literal) {
-			IRI dt = ((Literal)expected).getDatatype();
+		if (expectedValue instanceof Literal) {
+			IRI dt = ((Literal)expectedValue).getDatatype();
 			assertEquals("isString", XSD.STRING.equals(dt) || RDF.LANGSTRING.equals(dt), id.isString());
-			RDFObject obj = rdfFactory.createObject(expected);
+			RDFObject obj = rdfFactory.createObject(expectedValue);
 			assertRDFValueHashes(id, obj);
-		} else if (expected instanceof IRI) {
-			RDFObject obj = rdfFactory.createObject(expected);
+		} else if (expectedValue instanceof IRI) {
+			RDFObject obj = rdfFactory.createObject(expectedValue);
 			assertRDFValueHashes(id, obj);
-			RDFSubject subj = rdfFactory.createSubject((IRI) expected);
+			RDFSubject subj = rdfFactory.createSubject((IRI) expectedValue);
 			assertRDFValueHashes(id, subj);
-			RDFContext ctx = rdfFactory.createContext((IRI) expected);
+			RDFContext ctx = rdfFactory.createContext((IRI) expectedValue);
 			assertRDFValueHashes(id, ctx);
-			RDFPredicate pred = rdfFactory.createPredicate((IRI) expected);
+			RDFPredicate pred = rdfFactory.createPredicate((IRI) expectedValue);
 			assertRDFValueHashes(id, pred);
-		} else if (expected instanceof BNode) {
-			RDFObject obj = rdfFactory.createObject(expected);
+		} else if (expectedValue instanceof BNode) {
+			RDFObject obj = rdfFactory.createObject(expectedValue);
 			assertRDFValueHashes(id, obj);
-			RDFSubject subj = rdfFactory.createSubject((Resource) expected);
+			RDFSubject subj = rdfFactory.createSubject((Resource) expectedValue);
 			assertRDFValueHashes(id, subj);
-			RDFContext ctx = rdfFactory.createContext((Resource) expected);
+			RDFContext ctx = rdfFactory.createContext((Resource) expectedValue);
 			assertRDFValueHashes(id, ctx);
 		} else {
 			throw new AssertionError();

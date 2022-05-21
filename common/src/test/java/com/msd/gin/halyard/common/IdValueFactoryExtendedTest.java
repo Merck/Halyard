@@ -68,10 +68,11 @@ public class IdValueFactoryExtendedTest {
 			vf.createLiteral("POINT (139.81 35.6972)", GEO.WKT_LITERAL),
 			vf.createLiteral("invalid still works (139.81 35.6972)", GEO.WKT_LITERAL),
 			vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL),
-			vf.createLiteral("invalid xml still works", RDF.XMLLITERAL),
+			vf.createLiteral("<invalid xml still works", RDF.XMLLITERAL),
 			vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME),
 			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "400f9abd3fd761c62af23dbe8f8432158a6ce272"),
-			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "invalid")
+			vf.createIRI(WIKIDATA.WDV_NAMESPACE, "invalid"),
+			vf.createIRI(WIKIDATA.WDV_NAMESPACE+"400f9abd3fd761c62af23dbe8f8432158a6ce272/")
 		);
 	}
 
