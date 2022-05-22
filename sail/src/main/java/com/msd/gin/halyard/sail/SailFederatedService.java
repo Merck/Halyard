@@ -1,12 +1,20 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
+import org.eclipse.rdf4j.common.iteration.EmptyIteration;
+import org.eclipse.rdf4j.common.iteration.SilentIteration;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
+import org.eclipse.rdf4j.repository.sparql.federation.JoinExecutorBase;
 import org.eclipse.rdf4j.repository.sparql.query.InsertBindingSetCursor;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
@@ -58,14 +66,34 @@ public class SailFederatedService implements FederatedService {
 	public CloseableIteration<BindingSet, QueryEvaluationException> select(Service service, Set<String> projectionVars,
 			BindingSet bindings, String baseUri) throws QueryEvaluationException {
 		CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = getConnection().evaluate(new ServiceRoot(service.getArg()), null, bindings, true);
-		return new InsertBindingSetCursor((CloseableIteration<BindingSet, QueryEvaluationException>) iter, bindings);
+		CloseableIteration<BindingSet, QueryEvaluationException> result = new InsertBindingSetCursor((CloseableIteration<BindingSet, QueryEvaluationException>) iter, bindings);
+		if (service.isSilent()) {
+			return new SilentIteration<>(result);
+		} else {
+			return result;
+		}
 	}
 
 	@Override
 	public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(Service service,
 			CloseableIteration<BindingSet, QueryEvaluationException> bindings, String baseUri)
 			throws QueryEvaluationException {
-		throw new UnsupportedOperationException();
+		List<BindingSet> allBindings = new ArrayList<>();
+		while (bindings.hasNext()) {
+			allBindings.add(bindings.next());
+		}
+
+		if (allBindings.isEmpty()) {
+			return new EmptyIteration<>();
+		}
+
+		CloseableIteration<BindingSet, QueryEvaluationException> result = new SimpleServiceIteration(service, allBindings, baseUri);
+
+		if (service.isSilent()) {
+			return new SilentIteration<>(result);
+		} else {
+			return result;
+		}
 	}
 
 	protected SailConnection getConnection() {
@@ -73,5 +101,29 @@ public class SailFederatedService implements FederatedService {
 			conn = sail.getConnection();
 		}
 		return conn;
+	}
+
+
+	private final class SimpleServiceIteration extends JoinExecutorBase<BindingSet> {
+
+		private final Service service;
+		private final List<BindingSet> allBindings;
+		private final String baseUri;
+
+		public SimpleServiceIteration(Service service, List<BindingSet> allBindings, String baseUri) {
+			super(null, null, null);
+			this.service = service;
+			this.allBindings = allBindings;
+			this.baseUri = baseUri;
+			run();
+		}
+
+		@Override
+		protected void handleBindings() throws Exception {
+			Set<String> projectionVars = new HashSet<>(service.getServiceVars());
+			for (BindingSet b : allBindings) {
+				addResult(select(service, projectionVars, b, baseUri));
+			}
+		}
 	}
 }

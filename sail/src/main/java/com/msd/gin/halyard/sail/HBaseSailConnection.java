@@ -557,7 +557,7 @@ public class HBaseSailConnection implements SailConnection {
         try {
 			Get getConfig = new Get(HalyardTableUtils.CONFIG_ROW_KEY);
 			Result config = table.get(getConfig);
-			HalyardTableUtils.truncateTable(sail.hConnection, table); // delete all triples, the whole DB but retains splits!
+			HalyardTableUtils.truncateTable(sail.hConnection, sail.tableName); // delete all triples, the whole DB but retains splits!
 			// rewrite config
 			Put putConfig = new Put(HalyardTableUtils.CONFIG_ROW_KEY);
 			for (Cell cell : config.rawCells()) {

@@ -200,14 +200,21 @@ public final class HalyardTableUtils {
 	 * @param table Table to truncate
 	 * @throws IOException throws IOException in case of any HBase IO problems
 	 */
-	public static void truncateTable(Connection conn, Table table) throws IOException {
+	public static void truncateTable(Connection conn, TableName table) throws IOException {
 		try (Admin admin = conn.getAdmin()) {
-			admin.disableTable(table.getName());
-			admin.truncateTable(table.getName(), true);
+			admin.disableTable(table);
+			admin.truncateTable(table, true);
 		}
     }
 
-    /**
+	public static void deleteTable(Connection conn, TableName table) throws IOException {
+		try (Admin admin = conn.getAdmin()) {
+			admin.disableTable(table);
+			admin.deleteTable(table);
+		}
+    }
+
+	/**
 	 * Calculates the split keys (one for each permutation of the CSPO HBase Key prefix).
 	 * 
 	 * @param splitBits must be between 0 and 15, larger values result in more keys.

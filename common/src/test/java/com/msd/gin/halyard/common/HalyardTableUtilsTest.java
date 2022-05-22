@@ -159,7 +159,7 @@ public class HalyardTableUtilsTest {
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null, rdfFactory))) {
             assertNotNull(rs.next());
         }
-		HalyardTableUtils.truncateTable(conn, table);
+		HalyardTableUtils.truncateTable(conn, table.getName());
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null, rdfFactory))) {
             assertNull(rs.next());
         }
