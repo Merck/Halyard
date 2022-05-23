@@ -47,8 +47,8 @@ public class HalyardTableUtilsCalculateSplitsTest {
 			{ 0, false, null, new String[] { "01", "02" } },
 			{ 1, false, null, new String[] { "008000", "01", "018000", "02", "028000" } },
 			{ 2, false, null, new String[] { "004000", "008000", "00c000", "01", "014000", "018000", "01c000", "02", "024000", "028000", "02c000" } },
-			{ 2, false, Collections.singletonMap(RDF.VALUE, 0.5f), new String[] { "004000", "008000", "00c000", "01", "016b8c84",     "016b8c848000", "018000", "02", "024000", "028000", "02c000" } },
-			{ 2, false, Collections.singletonMap(RDF.VALUE, 0.8f), new String[] { "004000", "008000", "00c000", "01", "016b8c844000", "016b8c848000", "016b8c84c000", "02", "024000", "028000", "02c000" } },
+			{ 2, false, Collections.singletonMap(RDF.VALUE, 0.5f), new String[] { "004000", "008000", "00c000", "01", "016b4c84",     "016b4c848000", "018000", "02", "024000", "028000", "02c000" } },
+			{ 2, false, Collections.singletonMap(RDF.VALUE, 0.8f), new String[] { "004000", "008000", "00c000", "01", "016b4c844000", "016b4c848000", "016b4c84c000", "02", "024000", "028000", "02c000" } },
         });
     }
 

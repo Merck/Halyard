@@ -42,7 +42,8 @@ public class RDFFactory {
 	private final ThreadLocal<HashFunction> idHash;
 	private final int idSize;
 	private final int typeIndex;
-	private final int typeSaltSize;
+	final Identifier.TypeNibble typeNibble;
+	final int typeSaltSize;
 
 	private final ValueIO valueIO;
 	private final ValueFactory idValueFactory;
@@ -124,8 +125,18 @@ public class RDFFactory {
 		idSize = hashInstance.size();
 		LOGGER.info("Identifier hash: {} {}-bit ({} bytes)", hashInstance.getName(), idSize*Byte.SIZE, idSize);
 
-		typeIndex = lessThan(lessThanOrEqual(Config.getInteger(config, Config.ID_TYPE_INDEX, 1), Short.BYTES), idSize);
-		typeSaltSize = 1 << (8*typeIndex);
+		typeIndex = lessThan(lessThanOrEqual(Config.getInteger(config, Config.ID_TYPE_INDEX, 0), Short.BYTES), idSize);
+		typeNibble = Config.getBoolean(config, Config.ID_TYPE_NIBBLE, true) ? Identifier.TypeNibble.LITTLE_NIBBLE : Identifier.TypeNibble.BIG_NIBBLE;
+		switch (typeNibble) {
+			case BIG_NIBBLE:
+				typeSaltSize = 1 << (8*typeIndex);
+				break;
+			case LITTLE_NIBBLE:
+				typeSaltSize = 1 << (4*(typeIndex+1));
+				break;
+			default:
+				throw new AssertionError();
+		}
 
 		int subjectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 5), MIN_KEY_SIZE), idSize);
 		int subjectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_SUBJECT, 3), MIN_KEY_SIZE), idSize);
@@ -235,13 +246,16 @@ public class RDFFactory {
 		return idSize;
 	}
 
-	int getTypeSaltSize() {
-		return typeSaltSize;
-	}
-
 	byte[] createTypeSalt(int salt, byte typeBits) {
+		if (salt >= typeSaltSize) {
+			throw new IllegalArgumentException(String.format("Salt must be between 0 (inclusive) and %d (exclusive)", typeSaltSize));
+		}
 		byte[] b = new byte[typeIndex + 1];
 		b[typeIndex] = typeBits;
+		if (typeNibble == Identifier.TypeNibble.LITTLE_NIBBLE) {
+			b[typeIndex] |= (byte) ((salt&0x0F) << 4);
+			salt >>= 4;
+		}
 		for (int i=typeIndex-1; i>=0; i--) {
 			b[i] = (byte) salt;
 			salt >>= 8;
@@ -307,14 +321,14 @@ public class RDFFactory {
 
 	Identifier id(Value v, ByteBuffer ser) {
 		byte[] hash = idHash.get().apply(ser);
-		return Identifier.create(v, hash, typeIndex);
+		return Identifier.create(v, hash, typeIndex, typeNibble);
 	}
 
 	public Identifier id(byte[] idBytes) {
 		if (idBytes.length != idSize) {
 			throw new IllegalArgumentException("Byte array has incorrect length");
 		}
-		return new Identifier(idBytes, typeIndex);
+		return new Identifier(idBytes, typeIndex, typeNibble);
 	}
 
 	public byte[] statementId(Resource subj, IRI pred, Value obj) {

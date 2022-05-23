@@ -64,6 +64,7 @@ public class HalyardHashTest extends AbstractHalyardToolTest {
         conf.set(Config.ID_HASH, "Murmur3-128");
         conf.setInt(Config.ID_SIZE, 1);
         conf.setInt(Config.ID_TYPE_INDEX, 0);
+        conf.setBoolean(Config.ID_TYPE_NIBBLE, false);
         conf.setInt(Config.KEY_SIZE_SUBJECT, 1);
         conf.setInt(Config.END_KEY_SIZE_SUBJECT, 1);
         conf.setInt(Config.KEY_SIZE_PREDICATE, 1);

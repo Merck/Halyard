@@ -48,10 +48,10 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 
 	public static final Scan scanLiterals(RDFFactory rdfFactory) {
 		StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> index = rdfFactory.getOSPIndex();
-		int typeSaltSize = rdfFactory.getTypeSaltSize();
+		int typeSaltSize = rdfFactory.typeSaltSize;
 		if (typeSaltSize == 1) {
-			byte[] startRow = index.concat(false, rdfFactory.createTypeSalt(0, (byte)0)); // inclusive
-			byte[] stopRow = index.concat(false, rdfFactory.createTypeSalt(0, Identifier.LITERAL_STOP_BITS)); // exclusive
+			byte[] startRow = index.concat(false, rdfFactory.createTypeSalt(0, rdfFactory.typeNibble.literalTypeBits)); // inclusive
+			byte[] stopRow = index.concat(false, rdfFactory.createTypeSalt(0, rdfFactory.typeNibble.literalStopBits)); // exclusive
 			return HalyardTableUtils.scan(startRow, stopRow);
 		} else {
 			return index.scanWithConstraints(new LiteralConstraints());
@@ -61,11 +61,11 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	public static final Scan scanLiterals(Resource graph, RDFFactory rdfFactory) {
 		RDFContext ctx = rdfFactory.createContext(graph);
 		StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> index = rdfFactory.getCOSPIndex();
-		int typeSaltSize = rdfFactory.getTypeSaltSize();
+		int typeSaltSize = rdfFactory.typeSaltSize;
 		if (typeSaltSize == 1) {
 			byte[] ctxb = ctx.getKeyHash(index);
-			byte[] startRow = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, (byte)0)); // inclusive
-			byte[] stopRow = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, Identifier.LITERAL_STOP_BITS)); // exclusive
+			byte[] startRow = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, rdfFactory.typeNibble.literalTypeBits)); // inclusive
+			byte[] stopRow = index.concat(false, ctxb, rdfFactory.createTypeSalt(0, rdfFactory.typeNibble.literalStopBits)); // exclusive
 			return HalyardTableUtils.scan(startRow, stopRow);
 		} else {
 			return index.scanWithConstraints(ctx, new LiteralConstraints());
@@ -458,17 +458,17 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		byte startTypeBits;
 		byte endTypeBits;
 		if (constraints.allLiterals()) {
-			startTypeBits = (byte) 0;
-			endTypeBits = Identifier.LITERAL_STOP_BITS;
+			startTypeBits = rdfFactory.typeNibble.literalTypeBits;
+			endTypeBits = rdfFactory.typeNibble.literalStopBits;
 		} else if (constraints.stringsOnly()) {
-			startTypeBits = Identifier.STRING_DATATYPE_BITS;
-			endTypeBits = Identifier.LITERAL_STOP_BITS;
+			startTypeBits = rdfFactory.typeNibble.stringDatatypeBits;
+			endTypeBits = rdfFactory.typeNibble.literalStopBits;
 		} else {
 			// non-string literals
-			startTypeBits = Identifier.NONSTRING_DATATYPE_BITS;
-			endTypeBits = Identifier.STRING_DATATYPE_BITS;
+			startTypeBits = rdfFactory.typeNibble.nonstringDatatypeBits;
+			endTypeBits = rdfFactory.typeNibble.stringDatatypeBits;
 		}
-		int typeSaltSize = rdfFactory.getTypeSaltSize();
+		int typeSaltSize = rdfFactory.typeSaltSize;
 		List<RowRange> ranges = new ArrayList<>(typeSaltSize);
 		for (int i=0; i<typeSaltSize; i++) {
 			byte[] startRow = concat(false, startPrefix, rdfFactory.createTypeSalt(i, startTypeBits)); // inclusive

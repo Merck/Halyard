@@ -118,7 +118,7 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
         }
         w.endRDF();
         if (any) {
-            sb.append("Missing statements:\n").append(out.toString()).append('\n');
+            sb.append("Expected but missing statements:\n").append(out.toString()).append('\n');
         }
         out = new ByteArrayOutputStream();
         w = Rio.createWriter(RDFFormat.TRIG, out);

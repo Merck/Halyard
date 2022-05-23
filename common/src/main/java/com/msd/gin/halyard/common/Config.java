@@ -6,6 +6,7 @@ public final class Config {
     public static final String ID_HASH = "halyard.id.hash";
     public static final String ID_SIZE = "halyard.id.size";
     public static final String ID_TYPE_INDEX = "halyard.id.type.index";
+    public static final String ID_TYPE_NIBBLE = "halyard.id.type.nibble";
     public static final String KEY_SIZE_SUBJECT = "halyard.key.subject.size";
     public static final String END_KEY_SIZE_SUBJECT = "halyard.endKey.subject.size";
     public static final String KEY_SIZE_PREDICATE = "halyard.key.predicate.size";
