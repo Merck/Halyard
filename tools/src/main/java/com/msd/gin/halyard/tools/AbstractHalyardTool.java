@@ -16,6 +16,12 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Keyspace;
+import com.msd.gin.halyard.common.KeyspaceConnection;
+import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.ValueIO;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -32,6 +38,8 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.mapreduce.TableMapper;
+import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.util.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -158,6 +166,57 @@ public abstract class AbstractHalyardTool implements Tool {
             printHelp();
             throw exp;
         }
+    }
 
+
+    static class RdfTableMapper<K,V> extends TableMapper<K,V> {
+        protected Keyspace keyspace;
+        protected KeyspaceConnection keyspaceConn;
+        protected RDFFactory rdfFactory;
+        protected ValueIO.Reader valueReader;
+
+        protected final void openKeyspace(Configuration conf, String source, String restorePath) throws IOException {
+            keyspace = HalyardTableUtils.getKeyspace(conf, source, restorePath);
+            keyspaceConn = keyspace.getConnection();
+            rdfFactory = RDFFactory.create(keyspaceConn);
+            valueReader = rdfFactory.createTableReader(rdfFactory.getIdValueFactory(), keyspaceConn);
+        }
+
+        protected void closeKeyspace() throws IOException {
+            if (keyspaceConn != null) {
+            	keyspaceConn.close();
+            	keyspaceConn = null;
+            }
+            if (keyspace != null) {
+                keyspace.close();
+                keyspace = null;
+            }
+        }
+    }
+
+
+    static class RdfReducer<KEYIN,VALUEIN,KEYOUT,VALUEOUT> extends Reducer<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
+        protected Keyspace keyspace;
+        protected KeyspaceConnection keyspaceConn;
+        protected RDFFactory rdfFactory;
+        protected ValueIO.Reader valueReader;
+
+        protected final void openKeyspace(Configuration conf, String source, String restorePath) throws IOException {
+            keyspace = HalyardTableUtils.getKeyspace(conf, source, restorePath);
+            keyspaceConn = keyspace.getConnection();
+            rdfFactory = RDFFactory.create(keyspaceConn);
+            valueReader = rdfFactory.createTableReader(rdfFactory.getIdValueFactory(), keyspaceConn);
+        }
+
+        protected void closeKeyspace() throws IOException {
+            if (keyspaceConn != null) {
+            	keyspaceConn.close();
+            	keyspaceConn = null;
+            }
+            if (keyspace != null) {
+                keyspace.close();
+                keyspace = null;
+            }
+        }
     }
 }

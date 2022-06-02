@@ -17,6 +17,8 @@
          halyard:tableName "{%HBase Table Name|%}" ;
          halyard:createTable "{%Create HBase Table if missing|true|false%}" ;
          halyard:splitBits "{%HBase Table presplit bits|0%}" ;
+         halyard:snapshotName "{%HBase Snapshot Name|%}" ;
+         halyard:snapshotRestorePath "{%HBase Snapshot restore path|%}" ;
          halyard:pushStrategy "{%Use Halyard Push Evaluation Strategy|true|false%}" ;
          halyard:evaluationTimeout "{%Query Evaluation Timeout|180%}" ;
          halyard:elasticIndexURL "{%Optional ElasticSearch Index URL|%}" ;

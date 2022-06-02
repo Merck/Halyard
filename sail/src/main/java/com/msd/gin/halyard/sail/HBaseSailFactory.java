@@ -54,8 +54,17 @@ public final class HBaseSailFactory implements SailFactory {
         }
         if (config instanceof HBaseSailConfig) {
             HBaseSailConfig hconfig = (HBaseSailConfig) config;
-            //instantiate the sail
-            HBaseSail sail = new HBaseSail(HBaseConfiguration.create(), hconfig.getTablespace(), hconfig.isCreate(), hconfig.getSplitBits(), hconfig.isPush(), hconfig.getEvaluationTimeout(), hconfig.getElasticIndexURL(), null);
+			HBaseSail sail;
+			if (hconfig.getTableName() != null && (hconfig.getSnapshotName() != null || hconfig.getSnapshotRestorePath() != null)) {
+				throw new SailConfigException("Invalid sail configuration: cannot specify both table and snapshot");
+			}
+			if (hconfig.getTableName() != null) {
+				sail = new HBaseSail(HBaseConfiguration.create(), hconfig.getTableName(), hconfig.isCreate(), hconfig.getSplitBits(), hconfig.isPush(), hconfig.getEvaluationTimeout(), hconfig.getElasticIndexURL(), null);
+			} else if (hconfig.getSnapshotName() != null && hconfig.getSnapshotRestorePath() != null) {
+				sail = new HBaseSail(HBaseConfiguration.create(), hconfig.getSnapshotName(), hconfig.getSnapshotRestorePath(), hconfig.isPush(), hconfig.getEvaluationTimeout(), hconfig.getElasticIndexURL(), null);
+			} else {
+				throw new SailConfigException("Invalid sail configuration: missing table name or snapshot");
+			}
 			sail.includeNamespaces = true;
             return sail;
         } else {

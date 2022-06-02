@@ -17,6 +17,8 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Keyspace;
+import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.function.DynamicFunctionRegistry;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
@@ -29,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Connection;
@@ -83,7 +86,7 @@ public class HBaseSail implements Sail {
 	 * Interface to make it easy to change connection implementations.
 	 */
 	public interface SailConnectionFactory {
-		SailConnection createConnection(HBaseSail sail);
+		SailConnection createConnection(HBaseSail sail) throws IOException;
 	}
 
 	static final class ScanSettings {
@@ -96,14 +99,16 @@ public class HBaseSail implements Sail {
 
     private final Configuration config; //the configuration of the HBase database
 	final TableName tableName;
+	final String snapshotName;
+	final Path snapshotRestorePath;
 	final boolean create;
     final boolean pushStrategy;
 	final int splitBits;
 	private SailConnection statsConnection;
 	protected HalyardEvaluationStatistics statistics;
 	final int evaluationTimeout; // secs
-    private boolean readOnly = false;
-    private long readOnlyTimestamp = -1;
+	private boolean readOnly = true;
+	private long readOnlyTimestamp = 0L;
     final String elasticIndexURL;
 	boolean includeNamespaces = false;
     final Ticker ticker;
@@ -118,6 +123,7 @@ public class HBaseSail implements Sail {
 	final SailConnectionFactory connFactory;
 	Connection hConnection;
 	final boolean hConnectionIsShared; //whether a Connection is provided or we need to create our own
+	Keyspace keyspace;
 
 
 	private HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
@@ -132,6 +138,25 @@ public class HBaseSail implements Sail {
 		this.tableName = TableName.valueOf(tableName);
 		this.create = create;
 		this.splitBits = splitBits;
+		this.snapshotName = null;
+		this.snapshotRestorePath = null;
+		this.pushStrategy = pushStrategy;
+		this.evaluationTimeout = evaluationTimeout;
+		this.elasticIndexURL = elasticIndexURL;
+		this.ticker = ticker;
+		this.connFactory = connFactory;
+		this.federatedServiceResolver = fsr;
+	}
+
+	HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory, FederatedServiceResolver fsr) {
+		this.hConnection = null;
+		this.hConnectionIsShared = false;
+		this.config = config;
+		this.tableName = null;
+		this.create = false;
+		this.splitBits = -1;
+		this.snapshotName = snapshotName;
+		this.snapshotRestorePath = new Path(snapshotRestorePath);
 		this.pushStrategy = pushStrategy;
 		this.evaluationTimeout = evaluationTimeout;
 		this.elasticIndexURL = elasticIndexURL;
@@ -166,6 +191,10 @@ public class HBaseSail implements Sail {
 		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE);
 	}
 
+	public HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker) {
+		this(config, snapshotName, snapshotRestorePath, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE, null);
+	}
+
     /**
      * Not used in Halyard
      */
@@ -181,20 +210,12 @@ public class HBaseSail implements Sail {
         throw new UnsupportedOperationException();
     }
 
-    /**
-     * Returns a new HTable connection.
-     */
-	Table getTable() {
-        try {
-			return hConnection.getTable(tableName);
-		} catch (IOException e) {
-			throw new SailException(e);
+	BufferedMutator getBufferedMutator() {
+		if (hConnection == null) {
+			throw new SailException("Snapshots are not modifiable");
 		}
-    }
-
-	BufferedMutator getBufferedMutator(Table table) {
 		try {
-			return hConnection.getBufferedMutator(table.getName());
+			return hConnection.getBufferedMutator(tableName);
 		} catch (IOException e) {
 			throw new SailException(e);
 		}
@@ -202,20 +223,24 @@ public class HBaseSail implements Sail {
 
 	@Override
     public void initialize() throws SailException { //initialize the SAIL
-    	if (!hConnectionIsShared) {
-			// connections are thread-safe and very heavyweight - only do it once
-        	if (hConnection != null) {
-        		throw new IllegalStateException("Sail has already been initialized");
-        	}
-			try {
-				hConnection = HalyardTableUtils.getConnection(config);
-			} catch (IOException e) {
-				throw new SailException(e);
+		try {
+			if (tableName != null) {
+				if (!hConnectionIsShared) {
+					// connections are thread-safe and very heavyweight - only do it once
+					if (hConnection != null) {
+						throw new IllegalStateException("Sail has already been initialized");
+					}
+					hConnection = HalyardTableUtils.getConnection(config);
+				}
+				if (create) {
+					HalyardTableUtils.createTableIfNotExists(hConnection, tableName, splitBits);
+				}
 			}
-    	}
 
-		try (Table table = HalyardTableUtils.getTable(hConnection, tableName.getNameAsString(), create, splitBits)) {
-			rdfFactory = RDFFactory.create(table);
+			keyspace = HalyardTableUtils.getKeyspace(hConnection, tableName, config, snapshotName, snapshotRestorePath);
+			try (KeyspaceConnection keyspaceConn = keyspace.getConnection()) {
+				rdfFactory = RDFFactory.create(keyspaceConn);
+			}
 		} catch (IOException e) {
 			throw new SailException(e);
 		}
@@ -226,7 +251,7 @@ public class HBaseSail implements Sail {
 		}
 
 		statsConnection = getConnection();
-		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(new SailConnectionTripleSource(statsConnection, false, getValueFactory()), rdfFactory), service -> {
+		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(new SailConnectionTripleSource(statsConnection, false, valueFactory), rdfFactory), service -> {
 			HalyardEvaluationStatistics fedStats = null;
 			FederatedService fedServ = federatedServiceResolver.getService(service);
 			if (fedServ instanceof SailFederatedService) {
@@ -241,6 +266,10 @@ public class HBaseSail implements Sail {
 		registerSpinParsingFunctions();
 		registerSpinParsingTupleFunctions();
     }
+
+	private boolean isInitialized() {
+		return (keyspace != null) && (rdfFactory != null);
+	}
 
 	private void addNamespaces() {
 		try (SailConnection conn = getConnection()) {
@@ -327,12 +356,12 @@ public class HBaseSail implements Sail {
 
     @Override
     public void shutDown() throws SailException { //release resources
-		if (statsConnection == null) {
-			throw new IllegalStateException("Sail has not been initialized");
-		}
-		try {
-			statsConnection.close();
-		} catch (SailException ignore) {
+		if (statsConnection != null) {
+			try {
+				statsConnection.close();
+			} catch (SailException ignore) {
+			}
+			statsConnection = null;
 		}
 		if (!hConnectionIsShared) {
 			if (federatedServiceResolver instanceof AbstractFederatedServiceResolver) {
@@ -342,34 +371,46 @@ public class HBaseSail implements Sail {
 			if (hConnection != null) {
 				try {
 					hConnection.close();
-					hConnection = null;
-				} catch (IOException e) {
-					throw new SailException(e);
+				} catch (IOException ignore) {
 				}
+				hConnection = null;
 			}
+		}
+		if (keyspace != null) {
+			try {
+				keyspace.destroy();
+			} catch (IOException ignore) {
+			}
+			keyspace = null;
 		}
     }
 
     @Override
     public boolean isWritable() throws SailException {
-		long time = System.currentTimeMillis();
-		if (readOnlyTimestamp + STATUS_CACHING_TIMEOUT < time) {
-			try (Table table = getTable()) {
-				readOnly = table.getDescriptor().isReadOnly();
-				readOnlyTimestamp = time;
-	        } catch (IOException ex) {
-	            throw new SailException(ex);
-	        }
-	    }
+		if (hConnection != null) {
+			long time = System.currentTimeMillis();
+			if ((readOnlyTimestamp == 0) || (time > readOnlyTimestamp + STATUS_CACHING_TIMEOUT)) {
+				try (Table table = hConnection.getTable(tableName)) {
+					readOnly = table.getDescriptor().isReadOnly();
+					readOnlyTimestamp = time;
+				} catch (IOException ex) {
+					throw new SailException(ex);
+				}
+			}
+		}
         return !readOnly;
     }
 
     @Override
 	public SailConnection getConnection() throws SailException {
-		if (hConnection == null) {
+		if (!isInitialized()) {
 			throw new IllegalStateException("Sail is not initialized or has been shut down");
 		}
-		return connFactory.createConnection(this);
+		try {
+			return connFactory.createConnection(this);
+		} catch (IOException ioe) {
+			throw new SailException(ioe);
+		}
     }
 
     @Override

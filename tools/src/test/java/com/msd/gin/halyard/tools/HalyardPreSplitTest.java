@@ -70,7 +70,9 @@ public class HalyardPreSplitTest extends AbstractHalyardToolTest {
             ps.println("<http://whatever/NTsubj2> <http://whatever/NTpred2> \"whatever NT value 2\" <http://whatever/ctx2> .");
         }
 
-        HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "preSplitTable2", true, -1).close();
+		try (Connection conn = HalyardTableUtils.getConnection(HBaseServerTestInstance.getInstanceConfig())) {
+			HalyardTableUtils.getTable(conn, "preSplitTable2", true, -1).close();
+		}
 
         assertEquals(-1, run(new String[]{"-d", "1", "-l",  "0", "-s", file.toURI().toURL().toString(), "-t", "preSplitTable2"}));
     }

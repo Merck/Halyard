@@ -35,9 +35,10 @@ import static org.junit.Assert.*;
 public class HBaseSailConfigTest {
 
     @Test
-    public void testTablespace() {
+    public void testTableName() {
         HBaseSailConfig cfg = new HBaseSailConfig();
-        cfg.setTablespace("whatevertable");
+        cfg.setTableName("whatevertable");
+		assertEquals("whatevertable", cfg.getTableName());
     }
 
     @Test
@@ -57,6 +58,20 @@ public class HBaseSailConfigTest {
     }
 
     @Test
+	public void testSnapshotName() {
+		HBaseSailConfig cfg = new HBaseSailConfig();
+		cfg.setSnapshotName("whateversnapshot");
+		assertEquals("whateversnapshot", cfg.getSnapshotName());
+	}
+
+	@Test
+	public void testSnapshotRestorePath() {
+		HBaseSailConfig cfg = new HBaseSailConfig();
+		cfg.setSnapshotRestorePath("/path");
+		assertEquals("/path", cfg.getSnapshotRestorePath());
+	}
+
+	@Test
     public void testPush() {
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.setPush(false);
@@ -82,7 +97,7 @@ public class HBaseSailConfigTest {
     @Test
     public void testExportAndParse() throws Exception {
         HBaseSailConfig cfg = new HBaseSailConfig();
-        cfg.setTablespace("whatevertable");
+        cfg.setTableName("whatevertable");
         cfg.setSplitBits(7);
         cfg.setCreate(false);
         cfg.setPush(false);
@@ -91,7 +106,7 @@ public class HBaseSailConfigTest {
         cfg.export(g);
         cfg = new HBaseSailConfig();
         cfg.parse(g, null);
-        assertEquals("whatevertable", cfg.getTablespace());
+        assertEquals("whatevertable", cfg.getTableName());
         assertEquals(7, cfg.getSplitBits());
         assertFalse(cfg.isCreate());
         assertFalse(cfg.isPush());
@@ -101,7 +116,7 @@ public class HBaseSailConfigTest {
     @Test
     public void testExportAndParse2() throws Exception {
         HBaseSailConfig cfg = new HBaseSailConfig();
-        cfg.setTablespace(null);
+        cfg.setTableName(null);
         cfg.setSplitBits(5);
         cfg.setCreate(true);
         cfg.setPush(true);
@@ -109,7 +124,7 @@ public class HBaseSailConfigTest {
         cfg.export(g);
         cfg = new HBaseSailConfig();
         cfg.parse(g, null);
-        assertNull(cfg.getTablespace());
+        assertNull(cfg.getTableName());
         assertEquals(5, cfg.getSplitBits());
         assertTrue(cfg.isCreate());
         assertTrue(cfg.isPush());
@@ -117,11 +132,28 @@ public class HBaseSailConfigTest {
     }
 
     @Test
+	public void testExportAndParse3() throws Exception {
+		HBaseSailConfig cfg = new HBaseSailConfig();
+		cfg.setSnapshotName("snapshot");
+		cfg.setSnapshotRestorePath("/path");
+		cfg.setPush(true);
+		TreeModel g = new TreeModel();
+		cfg.export(g);
+		cfg = new HBaseSailConfig();
+		cfg.parse(g, null);
+		assertNull(cfg.getTableName());
+		assertEquals("snapshot", cfg.getSnapshotName());
+		assertEquals("/path", cfg.getSnapshotRestorePath());
+		assertTrue(cfg.isPush());
+		assertEquals("", cfg.getElasticIndexURL());
+	}
+
+	@Test
     public void testParseEmpty() throws Exception {
         TreeModel g = new TreeModel();
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.parse(g, null);
-        assertNull(cfg.getTablespace());
+        assertNull(cfg.getTableName());
         assertEquals(0, cfg.getSplitBits());
         assertTrue(cfg.isCreate());
         assertTrue(cfg.isPush());
@@ -129,17 +161,17 @@ public class HBaseSailConfigTest {
     }
 
     @Test
-    public void testEmptyTableSpace() throws Exception {
+    public void testEmptyTableName() throws Exception {
         TreeModel g = new TreeModel();
         IRI node = SimpleValueFactory.getInstance().createIRI("http://node");
         g.add(node, HALYARD.TABLE_NAME_PROPERTY, SimpleValueFactory.getInstance().createLiteral(""));
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.parse(g, null);
-        assertNull(cfg.getTablespace());
+        assertNull(cfg.getTableName());
     }
 
     @Test
-    public void testDefaultTableSpaceFromRepositoryId() throws Exception {
+    public void testDefaultTableNameFromRepositoryId() throws Exception {
         TreeModel g = new TreeModel();
         IRI node = SimpleValueFactory.getInstance().createIRI("http://node");
         Literal id =  SimpleValueFactory.getInstance().createLiteral("testId");
@@ -149,28 +181,28 @@ public class HBaseSailConfigTest {
         g.add(node, RepositoryConfigSchema.REPOSITORYID, id);
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.parse(g, null);
-        assertEquals(id.stringValue(), cfg.getTablespace());
+        assertEquals(id.stringValue(), cfg.getTableName());
     }
 
     @Test
-    public void testDefaultTableSpaceFromMissingRepositoryId() throws Exception {
+    public void testDefaultTableNameFromMissingRepositoryId() throws Exception {
         TreeModel g = new TreeModel();
         IRI node = SimpleValueFactory.getInstance().createIRI("http://node");
         g.add(node, SailRepositorySchema.SAILIMPL, node);
         g.add(node, RepositoryConfigSchema.REPOSITORYIMPL, node);
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.parse(g, null);
-        assertNull(cfg.getTablespace());
+        assertNull(cfg.getTableName());
     }
 
     @Test
-    public void testDefaultTableSpaceFromMissingRepoImpl() throws Exception {
+    public void testDefaultTableNameFromMissingRepoImpl() throws Exception {
         TreeModel g = new TreeModel();
         IRI node = SimpleValueFactory.getInstance().createIRI("http://node");
         g.add(node, SailRepositorySchema.SAILIMPL, node);
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.parse(g, null);
-        assertNull(cfg.getTablespace());
+        assertNull(cfg.getTableName());
     }
 
     @Test(expected = SailConfigException.class)

@@ -21,6 +21,7 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.vocab.HALYARD;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -134,7 +135,7 @@ public class HBaseSailTest {
 		sail.initialize();
 		TableDescriptor desc;
 		try {
-			desc = sail.getTable().getDescriptor();
+			desc = hconn.getTable(sail.tableName).getDescriptor();
 			assertTrue(sail.isWritable());
 		} finally {
 			sail.shutDown();
@@ -159,7 +160,7 @@ public class HBaseSailTest {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertableRO"), true, 0, usePushStrategy, 0, null, null);
         sail.initialize();
         try {
-			TableDescriptor desc = sail.getTable().getDescriptor();
+			TableDescriptor desc = hconn.getTable(sail.tableName).getDescriptor();
             try (Admin ha = hconn.getAdmin()) {
 				desc = TableDescriptorBuilder.newBuilder(desc).setReadOnly(true).build();
 				ha.modifyTable(desc);
@@ -715,4 +716,38 @@ public class HBaseSailTest {
 		}
         rep.shutDown();
     }
+
+	@Test
+    public void testSnapshot() throws Exception {
+		String table = "whatevertable";
+		HBaseSail sail = new HBaseSail(hconn, useTable(table), true, 0, usePushStrategy, 0, null, null);
+		sail.initialize();
+		ValueFactory vf = sail.getValueFactory();
+		try (SailConnection conn = sail.getConnection()) {
+			conn.addStatement(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createLiteral("whatever"));
+		}
+		sail.shutDown();
+
+		String snapshot = table + "Snapshot";
+		try (Admin admin = hconn.getAdmin()) {
+			admin.snapshot(snapshot, TableName.valueOf(table));
+		}
+
+		File restorePath = File.createTempFile("snapshot", "");
+		restorePath.delete();
+		restorePath.deleteOnExit();
+
+		sail = new HBaseSail(hconn.getConfiguration(), snapshot, restorePath.toURI().toURL().toString(), usePushStrategy, 0, null, null);
+		sail.initialize();
+		try (SailConnection conn = sail.getConnection()) {
+			try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, false)) {
+				assertTrue(iter.hasNext());
+			}
+		}
+		sail.shutDown();
+
+		try (Admin admin = hconn.getAdmin()) {
+			admin.deleteSnapshot(snapshot);
+		}
+	}
 }

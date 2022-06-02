@@ -17,13 +17,18 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HBaseSail;
 
 import java.io.File;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.util.ToolRunner;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -46,39 +51,66 @@ public class HalyardBulkDeleteTest extends AbstractHalyardToolTest {
 		return new HalyardBulkDelete();
 	}
 
-	@Test
-    public void testBulkDelete() throws Exception {
+	private static void createData() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(conf, TABLE, true, -1, true, 0, null, null);
         sail.initialize();
+        IRI pred = vf.createIRI("http://whatever/pred");
 		try (SailConnection conn = sail.getConnection()) {
 			for (int i = 0; i < 5; i++) {
 				for (int j = 0; j < 5; j++) {
-					conn.addStatement(vf.createIRI("http://whatever/subj" + i), vf.createIRI("http://whatever/pred"), vf.createIRI("http://whatever/obj" + j), i == 0 ? null : vf.createIRI("http://whatever/ctx" + i));
+					Resource subj = vf.createIRI("http://whatever/subj" + i);
+					Resource obj = vf.createIRI("http://whatever/obj" + j);
+					Resource ctx = (i == 0) ? null : vf.createIRI("http://whatever/ctx" + i);
+					conn.addStatement(subj, pred, obj, ctx);
 				}
 			}
         }
         sail.shutDown();
-        File htableDir = File.createTempFile("test_htable", "");
-        htableDir.delete();
+	}
 
-        assertEquals(0, run(conf, new String[]{ "-t", TABLE, "-o", "<http://whatever/obj0>", "-g", HalyardBulkDelete.DEFAULT_GRAPH_KEYWORD, "-g", "<http://whatever/ctx1>", "-f", htableDir.toURI().toURL().toString()}));
-
+	@Test
+    public void testBulkDelete() throws Exception {
+		createData();
+        Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+        File htableDir = getTempHTableDir("test_htable");
+        assertEquals(0, run(conf, new String[]{ "-t", TABLE, "-o", "<http://whatever/obj0>", "-g", HalyardBulkDelete.DEFAULT_GRAPH_KEYWORD, "-g", "<http://whatever/ctx1>", "-w", htableDir.toURI().toURL().toString()}));
         assertCount(23);
 
-        htableDir = File.createTempFile("test_htable", "");
-        htableDir.delete();
-
-        assertEquals(0, run(conf, new String[]{ "-t", TABLE, "-s", "<http://whatever/subj2>", "-f", htableDir.toURI().toURL().toString()}));
-
+        htableDir = getTempHTableDir("test_htable");
+        assertEquals(0, run(conf, new String[]{ "-t", TABLE, "-s", "<http://whatever/subj2>", "-w", htableDir.toURI().toURL().toString()}));
         assertCount(18);
 
-        htableDir = File.createTempFile("test_htable", "");
-        htableDir.delete();
+        htableDir = getTempHTableDir("test_htable");
+        assertEquals(0, run(conf, new String[]{ "-t", TABLE, "-p", "<http://whatever/pred>", "-w", htableDir.toURI().toURL().toString()}));
+        assertCount(0);
+    }
 
-        assertEquals(0, ToolRunner.run(conf, new HalyardBulkDelete(), new String[]{ "-t", TABLE, "-p", "<http://whatever/pred>", "-f", htableDir.toURI().toURL().toString()}));
+	@Test
+    public void testBulkDelete_snapshot() throws Exception {
+		createData();
+		String snapshot = TABLE + "Snapshot";
+        Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+    	try (Connection conn = HalyardTableUtils.getConnection(conf)) {
+        	try (Admin admin = conn.getAdmin()) {
+        		admin.snapshot(snapshot, TableName.valueOf(TABLE));
+        	}
+    	}
 
+    	File htableDir = getTempHTableDir("test_htable_snapshot");
+        File restoredSnapshot = getTempSnapshotDir("restored_snapshot");
+        assertEquals(0, run(conf, new String[]{ "-n", snapshot, "-t", TABLE, "-o", "<http://whatever/obj0>", "-g", HalyardBulkDelete.DEFAULT_GRAPH_KEYWORD, "-g", "<http://whatever/ctx1>", "-w", htableDir.toURI().toURL().toString(), "-u", restoredSnapshot.toURI().toURL().toString()}));
+        assertCount(23);
+
+        htableDir = getTempHTableDir("test_htable_snapshot");
+        restoredSnapshot = getTempSnapshotDir("restored_snapshot");
+        assertEquals(0, run(conf, new String[]{ "-n", snapshot, "-t", TABLE, "-s", "<http://whatever/subj2>", "-w", htableDir.toURI().toURL().toString(), "-u", restoredSnapshot.toURI().toURL().toString()}));
+        assertCount(18);
+
+        htableDir = getTempHTableDir("test_htable_snapshot");
+        restoredSnapshot = getTempSnapshotDir("restored_snapshot");
+        assertEquals(0, run(conf, new String[]{ "-n", snapshot, "-t", TABLE, "-p", "<http://whatever/pred>", "-w", htableDir.toURI().toURL().toString(), "-u", restoredSnapshot.toURI().toURL().toString()}));
         assertCount(0);
     }
 

@@ -19,10 +19,11 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.Hashes.HashFunction;
+import com.msd.gin.halyard.common.Keyspace;
+import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
-import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.vocab.HALYARD;
 
@@ -57,8 +58,8 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
-import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
+import org.apache.hadoop.hbase.util.CommonFSUtils;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
@@ -100,6 +101,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
     private static final String FILTER_NAMESPACE_PREFIX = "http://merck.github.io/Halyard/";
     private static final String SOURCE = "halyard.summary.source";
+    private static final String SNAPSHOT_PATH = "halyard.summary.snapshot";
     private static final String TARGET = "halyard.summary.target";
     private static final String TARGET_GRAPH = "halyard.summary.target.graph";
     private static final String DECIMATION_FACTOR = "halyard.summary.decimation";
@@ -113,23 +115,18 @@ public final class HalyardSummary extends AbstractHalyardTool {
         return SVF.createIRI(NAMESPACE, type + cardinality);
     }
 
-    static final class SummaryMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
+    static final class SummaryMapper extends RdfTableMapper<ImmutableBytesWritable, LongWritable>  {
 
         private final ImmutableBytesWritable outputKey = new ImmutableBytesWritable();
         private final LongWritable outputValue = new LongWritable();
         private final Random random = new Random(0);
         private int decimationFactor;
-        private Table table;
-        private RDFFactory rdfFactory;
-        private ValueIO.Reader valueReader;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
-            this.table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            rdfFactory = RDFFactory.create(table);
-            this.valueReader = rdfFactory.createTableReader(rdfFactory.getIdValueFactory(), table);
+            decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
+            openKeyspace(conf, conf.get(SOURCE), conf.get(SNAPSHOT_PATH));
         }
 
         private Set<IRI> queryForClasses(Value instance) throws IOException {
@@ -138,7 +135,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 RDFSubject s = rdfFactory.createSubject((Resource)instance);
                 RDFPredicate p = rdfFactory.createPredicate(RDF.TYPE);
                 Scan scan = HalyardTableUtils.scan(s, p, null, null, rdfFactory);
-                try (ResultScanner scanner = table.getScanner(scan)) {
+                try (ResultScanner scanner = keyspaceConn.getScanner(scan)) {
                     for (Result r : scanner) {
                         for (Statement st : HalyardTableUtils.parseStatements(s, p, null, null, r, valueReader, rdfFactory)) {
 	                        if (st.getSubject().equals(instance) && st.getPredicate().equals(RDF.TYPE) && (st.getObject() instanceof IRI)) {
@@ -269,12 +266,8 @@ public final class HalyardSummary extends AbstractHalyardTool {
         @Override
         protected void cleanup(Context output) throws IOException, InterruptedException {
             statementChange(output, null);
-            if (table != null) {
-                table.close();;
-                table = null;
-            }
+            closeKeyspace();
         }
-
     }
 
     static final class SummaryCombiner extends Reducer<ImmutableBytesWritable, LongWritable, ImmutableBytesWritable, LongWritable>  {
@@ -486,6 +479,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         addOption("t", "target-file", "target_url", "Target file to export the summary (instead of update) hdfs://<path>/<file_name>{0}.<RDF_ext>[.<compression>], usage of {0} pattern is optional and it will split output into multiple files for large summaries.", true, true);
         addOption("g", "summary-named-graph", "target_graph", "Optional target named graph of the exported graph summary", false, true);
         addOption("d", "decimation-factor", "decimation_factor", "Optionally overide summary random decimation factor (default is " + DEFAULT_DECIMATION_FACTOR + ")", false, true);
+        addOption("u", "restore-dir", "restore_folder", "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
     }
 
     @Override
@@ -503,34 +497,55 @@ public final class HalyardSummary extends AbstractHalyardTool {
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardSummary " + source + (target == null ? " update" : " -> " + target));
         job.getConfiguration().set(SOURCE, source);
-        if (target != null) job.getConfiguration().set(TARGET, target);
-        if (cmd.hasOption('g')) job.getConfiguration().set(TARGET_GRAPH, cmd.getOptionValue('g'));
-        if (cmd.hasOption('d')) job.getConfiguration().setInt(DECIMATION_FACTOR, Integer.parseInt(cmd.getOptionValue('d')));
+        if (cmd.hasOption('u')) {
+			FileSystem fs = CommonFSUtils.getRootDirFileSystem(getConf());
+        	if (fs.exists(new Path(cmd.getOptionValue('u')))) {
+        		throw new IOException("Snapshot restore directory already exists");
+        	}
+            job.getConfiguration().set(SNAPSHOT_PATH, cmd.getOptionValue('u'));
+        }
+        if (target != null) {
+            job.getConfiguration().set(TARGET, target);
+        }
+        if (cmd.hasOption('g')) {
+            job.getConfiguration().set(TARGET_GRAPH, cmd.getOptionValue('g'));
+        }
+        if (cmd.hasOption('d')) {
+            job.getConfiguration().setInt(DECIMATION_FACTOR, Integer.parseInt(cmd.getOptionValue('d')));
+        }
         job.setJarByClass(HalyardSummary.class);
         TableMapReduceUtil.initCredentials(job);
 
         RDFFactory rdfFactory;
-        try (Table table = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
-            rdfFactory = RDFFactory.create(table);
-        }
+        Keyspace keyspace = HalyardTableUtils.getKeyspace(getConf(), source, cmd.getOptionValue('u'));
+        try {
+        	try (KeyspaceConnection kc = keyspace.getConnection()) {
+        		rdfFactory = RDFFactory.create(kc);
+        	}
+		} finally {
+			keyspace.close();
+		}
         Scan scan = rdfFactory.getPOSIndex().scan();
-
-        TableMapReduceUtil.initTableMapperJob(source,
-                scan,
-                SummaryMapper.class,
-                ImmutableBytesWritable.class,
-                LongWritable.class,
-                job);
+        keyspace.initMapperJob(
+            scan,
+            SummaryMapper.class,
+            ImmutableBytesWritable.class,
+            LongWritable.class,
+            job);
         job.setNumReduceTasks(1);
         job.setCombinerClass(SummaryCombiner.class);
         job.setReducerClass(SummaryReducer.class);
         job.setOutputFormatClass(NullOutputFormat.class);
-        if (job.waitForCompletion(true)) {
-            LOG.info("Summary Generation completed.");
-            return 0;
-        } else {
-    		LOG.error("Summary Generation failed to complete.");
-            return -1;
+        try {
+	        if (job.waitForCompletion(true)) {
+	            LOG.info("Summary Generation completed.");
+	            return 0;
+	        } else {
+	    		LOG.error("Summary Generation failed to complete.");
+	            return -1;
+	        }
+        } finally {
+        	keyspace.destroy();
         }
     }
 }

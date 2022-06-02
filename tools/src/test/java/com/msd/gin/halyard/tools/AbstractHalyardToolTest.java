@@ -2,6 +2,8 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -65,5 +67,26 @@ public abstract class AbstractHalyardToolTest {
 
     protected int run(Configuration conf, String ... args) throws Exception {
         return ToolRunner.run(conf, createTool(), args);
+    }
+
+    private static File getTempDir(String name) throws IOException {
+        File dir = File.createTempFile(name, "");
+        dir.delete();
+        dir.deleteOnExit();
+        return dir;
+    }
+
+    static File getTempHTableDir(String name) throws IOException {
+    	return getTempDir(name);
+    }
+
+    static File getTempSnapshotDir(String name) throws IOException {
+    	return getTempDir(name);
+    }
+
+    static File createTempDir(String name) throws IOException {
+        File dir = getTempDir(name);
+        dir.mkdir();
+        return dir;
     }
 }

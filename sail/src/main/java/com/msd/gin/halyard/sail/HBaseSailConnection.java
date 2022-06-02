@@ -19,6 +19,7 @@ package com.msd.gin.halyard.sail;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
@@ -45,7 +46,6 @@ import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -92,38 +92,38 @@ public class HBaseSailConnection implements SailConnection {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseSailConnection.class);
 
 	public static final String SOURCE_STRING_BINDING = "__source__";
-	public static final String QUERY_CONTEXT_TABLE_ATTRIBUTE = Table.class.getName();
+	public static final String QUERY_CONTEXT_KEYSPACE_ATTRIBUTE = KeyspaceConnection.class.getName();
 	public static final String QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE = RDFFactory.class.getName();
 
 	private final Cache<PreparedQueryKey, TupleExpr> queryCache = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(5000).expireAfterWrite(1L, TimeUnit.HOURS).build();
 
     private final HBaseSail sail;
-	private Table table;
+	private KeyspaceConnection keyspaceConn;
 	private BufferedMutator mutator;
 	private boolean pendingUpdates;
 	private long lastTimestamp = Long.MIN_VALUE;
 	private boolean lastUpdateWasDelete;
 
-    public HBaseSailConnection(HBaseSail sail) {
+	public HBaseSailConnection(HBaseSail sail) throws IOException {
     	this.sail = sail;
 		// tables are lightweight but not thread-safe so get a new instance per sail
 		// connection
-    	this.table = sail.getTable();
+		this.keyspaceConn = sail.keyspace.getConnection();
     }
 
     private BufferedMutator getBufferedMutator() {
-		if (table == null) {
+		if (keyspaceConn == null) {
 			throw new SailException("Table closed");
 		}
 		if (mutator == null) {
-    		mutator = sail.getBufferedMutator(table);
+			mutator = sail.getBufferedMutator();
     	}
     	return mutator;
     }
 
     @Override
     public boolean isOpen() throws SailException {
-        return table != null;  //if the table exists the table is open
+        return keyspaceConn != null;  //if the table exists the table is open
     }
 
     @Override
@@ -138,25 +138,25 @@ public class HBaseSailConnection implements SailConnection {
 			}
 		}
 
-		if (table != null) {
+		if (keyspaceConn != null) {
 			try {
-				table.close();
+				keyspaceConn.close();
 			} catch (IOException e) {
 				throw new SailException(e);
 			} finally {
-				table = null;
+				keyspaceConn = null;
 			}
 		}
     }
 
 	private RDFStarTripleSource createTripleSource() {
-		return new HBaseSearchTripleSource(table, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeout, sail.scanSettings, sail.elasticIndexURL, sail.ticker);
+		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeout, sail.scanSettings, sail.elasticIndexURL, sail.ticker);
 	}
 
 	private QueryContext createQueryContext(TripleSource source, boolean includeInferred) {
 		SailConnectionQueryPreparer queryPreparer = new SailConnectionQueryPreparer(this, includeInferred, source);
 		QueryContext queryContext = new QueryContext(queryPreparer);
-		queryContext.setAttribute(QUERY_CONTEXT_TABLE_ATTRIBUTE, table);
+		queryContext.setAttribute(QUERY_CONTEXT_KEYSPACE_ATTRIBUTE, keyspaceConn);
 		queryContext.setAttribute(QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE, sail.getRDFFactory());
 		return queryContext;
 	}
@@ -293,8 +293,8 @@ public class HBaseSailConnection implements SailConnection {
 					final ResultScanner rs;
 
 					StatementScanner(RDFFactory rdfFactory) throws IOException {
-						super(rdfFactory.createTableReader(sail.getValueFactory(), table), rdfFactory);
-						rs = table.getScanner(rdfFactory.getCSPOIndex().scan());
+						super(rdfFactory.createTableReader(sail.getValueFactory(), keyspaceConn), rdfFactory);
+						rs = keyspaceConn.getScanner(rdfFactory.getCSPOIndex().scan());
 					}
 
 					@Override
@@ -458,7 +458,7 @@ public class HBaseSailConnection implements SailConnection {
     }
 
     private void checkWritable() {
-		if (table == null)
+		if (keyspaceConn == null)
 			throw new IllegalStateException("Connection is closed");
         if (!sail.isWritable()) throw new SailException(sail.tableName + " is read only");
     }
@@ -556,14 +556,16 @@ public class HBaseSailConnection implements SailConnection {
     	checkWritable();
         try {
 			Get getConfig = new Get(HalyardTableUtils.CONFIG_ROW_KEY);
-			Result config = table.get(getConfig);
+			Result config = keyspaceConn.get(getConfig);
 			HalyardTableUtils.truncateTable(sail.hConnection, sail.tableName); // delete all triples, the whole DB but retains splits!
 			// rewrite config
 			Put putConfig = new Put(HalyardTableUtils.CONFIG_ROW_KEY);
 			for (Cell cell : config.rawCells()) {
 				putConfig.add(cell);
 			}
-			table.put(putConfig);
+			BufferedMutator mutator = getBufferedMutator();
+			mutator.mutate(putConfig);
+			mutator.flush();
         } catch (IOException ex) {
             throw new SailException(ex);
         }
@@ -677,11 +679,11 @@ public class HBaseSailConnection implements SailConnection {
 		}
 	}
 
-	public static class Factory implements SailConnectionFactory {
+	static final class Factory implements SailConnectionFactory {
 		public static final SailConnectionFactory INSTANCE = new Factory();
 
 		@Override
-		public SailConnection createConnection(HBaseSail sail) {
+		public SailConnection createConnection(HBaseSail sail) throws IOException {
 			return new HBaseSailConnection(sail);
 		}
 	}

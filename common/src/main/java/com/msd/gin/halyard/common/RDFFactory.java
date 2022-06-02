@@ -18,7 +18,6 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.eclipse.rdf4j.model.IRI;
@@ -70,10 +69,13 @@ public class RDFFactory {
 		return new RDFFactory(config);
 	}
 
-	public static RDFFactory create(Table table) throws IOException {
+	public static RDFFactory create(KeyspaceConnection conn) throws IOException {
 		Get getConfig = new Get(HalyardTableUtils.CONFIG_ROW_KEY)
 				.addColumn(HalyardTableUtils.CF_NAME, HalyardTableUtils.CONFIG_COL);
-		Result res = table.get(getConfig);
+		Result res = conn.get(getConfig);
+		if (res == null) {
+			throw new IOException("No config found");
+		}
 		Cell[] cells = res.rawCells();
 		if (cells == null || cells.length == 0) {
 			throw new IOException("No config found");
@@ -398,8 +400,8 @@ public class RDFFactory {
 		return valueIO.createReader(vf, null);
 	}
 
-	public ValueIO.Reader createTableReader(ValueFactory vf, Table table) {
-		return valueIO.createReader(vf, new TableTripleReader(table));
+	public ValueIO.Reader createTableReader(ValueFactory vf, KeyspaceConnection conn) {
+		return valueIO.createReader(vf, new TableTripleReader(conn));
 	}
 
 
@@ -412,10 +414,10 @@ public class RDFFactory {
 
 
 	private final class TableTripleReader implements TripleReader {
-		private final Table table;
+		private final KeyspaceConnection conn;
 	
-		public TableTripleReader(Table table) {
-			this.table = table;
+		public TableTripleReader(KeyspaceConnection conn) {
+			this.conn = conn;
 		}
 	
 		@Override
@@ -436,7 +438,7 @@ public class RDFFactory {
 			get.addFamily(HalyardTableUtils.CF_NAME);
 			try {
 				get.readVersions(HalyardTableUtils.READ_VERSIONS);
-				Result result = table.get(get);
+				Result result = conn.get(get);
 				assert result.rawCells().length == 1;
 				Statement stmt = HalyardTableUtils.parseStatement(null, null, null, ckey, result.rawCells()[0], valueReader, RDFFactory.this);
 				return valueReader.getValueFactory().createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());

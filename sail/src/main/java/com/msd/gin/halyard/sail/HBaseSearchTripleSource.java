@@ -18,6 +18,7 @@ package com.msd.gin.halyard.sail;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.ValueIO;
@@ -35,7 +36,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -57,7 +57,7 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 
 	private final String elasticSearchURL;
 
-	public HBaseSearchTripleSource(Table table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, String elasticSearchURL, HBaseSail.Ticker ticker) {
+	public HBaseSearchTripleSource(KeyspaceConnection table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, String elasticSearchURL, HBaseSail.Ticker ticker) {
 		super(table, vf, rdfFactory, timeoutSecs, settings, ticker);
 		this.elasticSearchURL = elasticSearchURL;
 	}

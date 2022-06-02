@@ -141,7 +141,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                         }
 					}, new HBaseSail.SailConnectionFactory() {
 						@Override
-						public SailConnection createConnection(HBaseSail sail) {
+						public SailConnection createConnection(HBaseSail sail) throws IOException {
 							return new HBaseSailConnection(sail) {
 								private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
 

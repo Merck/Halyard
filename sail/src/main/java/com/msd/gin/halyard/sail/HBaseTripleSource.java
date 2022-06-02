@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.ObjectConstraint;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFFactory;
@@ -41,7 +42,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.EmptyIteration;
@@ -65,22 +65,22 @@ import org.slf4j.LoggerFactory;
 public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTripleSourceFactory {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseTripleSource.class);
 
-	private final Table table;
+	private final KeyspaceConnection table;
 	protected final RDFFactory rdfFactory;
 	private final ValueIO.Reader valueReader;
 	private final long timeoutSecs;
 	private final HBaseSail.ScanSettings settings;
 	private final HBaseSail.Ticker ticker;
 
-	public HBaseTripleSource(Table table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs) {
+	public HBaseTripleSource(KeyspaceConnection table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs) {
 		this(table, vf, rdfFactory, timeoutSecs, null, null);
 	}
 
-	HBaseTripleSource(Table table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
+	HBaseTripleSource(KeyspaceConnection table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
 		this(table, rdfFactory.createTableReader(vf, table), rdfFactory, timeoutSecs, settings, ticker);
 	}
 
-	private HBaseTripleSource(Table table, ValueIO.Reader valueReader, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
+	private HBaseTripleSource(KeyspaceConnection table, ValueIO.Reader valueReader, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
 		this.table = table;
 		this.rdfFactory = rdfFactory;
 		this.valueReader = valueReader;

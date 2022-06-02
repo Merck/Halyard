@@ -17,9 +17,10 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Keyspace;
+import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.RDFIdentifier;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.SPOC;
 import com.msd.gin.halyard.common.StatementIndex;
@@ -39,6 +40,7 @@ import java.nio.ByteBuffer;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +48,7 @@ import java.util.Optional;
 import java.util.WeakHashMap;
 
 import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -58,13 +61,12 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
-import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
+import org.apache.hadoop.hbase.util.CommonFSUtils;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Partitioner;
-import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
@@ -91,12 +93,13 @@ import org.eclipse.rdf4j.sail.SailConnection;
 public final class HalyardStats extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.stats.source";
+    private static final String SNAPSHOT_PATH = "halyard.stats.snapshot";
     private static final String TARGET = "halyard.stats.target";
     private static final String THRESHOLD = "halyard.stats.threshold";
     private static final String TARGET_GRAPH = "halyard.stats.target.graph";
     private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
 
-    static final class StatsMapper extends TableMapper<ImmutableBytesWritable, LongWritable>  {
+    static final class StatsMapper extends RdfTableMapper<ImmutableBytesWritable, LongWritable>  {
 
         final ImmutableBytesWritable outputKey = new ImmutableBytesWritable();
         final LongWritable outputValue = new LongWritable();
@@ -107,9 +110,6 @@ public final class HalyardStats extends AbstractHalyardTool {
     	byte[] CPOS_TYPE_HASH;
         IRI statsContext, graphContext;
         byte[] cspoStatsContextHash;
-        Table table;
-        RDFFactory rdfFactory;
-        ValueIO.Reader valueReader;
     	StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo;
     	StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos;
     	StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp;
@@ -141,10 +141,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            rdfFactory = RDFFactory.create(table);
-            ValueFactory vf = rdfFactory.getIdValueFactory();
-            valueReader = rdfFactory.createTableReader(vf, table);
+            openKeyspace(conf, conf.get(SOURCE), conf.get(SNAPSHOT_PATH));
             spo = rdfFactory.getSPOIndex();
             pos = rdfFactory.getPOSIndex();
             osp = rdfFactory.getOSPIndex();
@@ -166,9 +163,12 @@ public final class HalyardStats extends AbstractHalyardTool {
         	CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(cpos);
             update = conf.get(TARGET) == null;
             threshold = conf.getLong(THRESHOLD, 1000);
+            ValueFactory vf = rdfFactory.getIdValueFactory();
             statsContext = vf.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String gc = conf.get(GRAPH_CONTEXT);
-            if (gc != null) graphContext = vf.createIRI(gc);
+            if (gc != null) {
+            	graphContext = vf.createIRI(gc);
+            }
 			cspoStatsContextHash = rdfFactory.createContext(statsContext).getKeyHash(cspo);
         }
 
@@ -380,10 +380,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 				sail.shutDown();
                 sail = null;
             }
-        	if (table != null) {
-        		table.close();
-        		table = null;
-        	}
+            closeKeyspace();
         }
 
     }
@@ -399,15 +396,13 @@ public final class HalyardStats extends AbstractHalyardTool {
         }
     }
 
-    static final class StatsReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
+    static final class StatsReducer extends RdfReducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
 
         OutputStream out;
         RDFWriter writer;
         Map<String, Boolean> graphs;
         IRI statsGraphContext;
-        RDFFactory rdfFactory;
         ValueFactory vf;
-        ValueIO.Reader valueReader;
         HBaseSail sail;
 		SailConnection conn;
         long removed = 0, added = 0;
@@ -415,11 +410,9 @@ public final class HalyardStats extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            Table table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            rdfFactory = RDFFactory.create(table);
+            openKeyspace(conf, conf.get(SOURCE), conf.get(SNAPSHOT_PATH));
             vf = rdfFactory.getIdValueFactory();
             statsGraphContext = vf.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
-            valueReader = rdfFactory.createTableReader(vf, table);
             String targetUrl = conf.get(TARGET);
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
@@ -444,7 +437,9 @@ public final class HalyardStats extends AbstractHalyardTool {
                     throw new IOException(ce);
                 }
                 Optional<RDFFormat> form = Rio.getWriterFormatForFileName(targetUrl);
-                if (!form.isPresent()) throw new IOException("Unsupported target file format extension: " + targetUrl);
+                if (!form.isPresent()) {
+                	throw new IOException("Unsupported target file format extension: " + targetUrl);
+                }
                 writer = Rio.createWriter(form.get(), out);
                 writer.startRDF();
                 writer.handleNamespace(SD.PREFIX, SD.NAMESPACE);
@@ -513,9 +508,10 @@ public final class HalyardStats extends AbstractHalyardTool {
         }
 
         private void writeStatement(Resource subj, IRI pred, Value obj) {
-            if (writer == null) {
+            if (conn != null) {
 				conn.addStatement(subj, pred, obj, statsGraphContext);
-            } else {
+            }
+            if (writer != null) {
                 writer.handleStatement(vf.createStatement(subj, pred, obj, statsGraphContext));
             }
             added++;
@@ -523,13 +519,15 @@ public final class HalyardStats extends AbstractHalyardTool {
 
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
-            if (writer == null) {
+            if (conn != null) {
 				conn.close();
 				sail.shutDown();
-            } else {
+            }
+            if (writer != null) {
                 writer.endRDF();
                 out.close();
             }
+            closeKeyspace();
         }
     }
 
@@ -543,16 +541,14 @@ public final class HalyardStats extends AbstractHalyardTool {
         addOption("r", "threshold", "size", "Optional minimal size of a named graph to calculate statistics for (default is 1000)", false, true);
         addOption("c", "named-graph", "named_graph", "Optional restrict stats calculation to the given named graph only", false, true);
         addOption("g", "stats-named-graph", "target_graph", "Optional target named graph of the exported statistics (default value is '" + HALYARD.STATS_GRAPH_CONTEXT.stringValue() + "'), modification is recomended only for external export as internal Halyard optimizers expect the default value", false, true);
-    }
-
-    private static <T extends SPOC<?>> Scan scan(TableName sourceTableName, StatementIndex<T,?,?,?> index, RDFIdentifier<T> key) {
-        Scan scan = index.scan(key);
-        scan.setAttribute(Scan.SCAN_ATTRIBUTES_TABLE_NAME, sourceTableName.toBytes());
-        return scan;
+        addOption("u", "restore-dir", "restore_folder", "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
     }
 
     @Override
     public int run(CommandLine cmd) throws Exception {
+    	if (cmd.hasOption('u') && !cmd.hasOption('t')) {
+    		throw new MissingOptionException("Statistics cannot be written to a snapshot, please specify -t.");
+    	}
         String source = cmd.getOptionValue('s');
         String target = cmd.getOptionValue('t');
         String targetGraph = cmd.getOptionValue('g');
@@ -570,52 +566,89 @@ public final class HalyardStats extends AbstractHalyardTool {
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardStats " + source + (target == null ? " update" : " -> " + target));
         job.getConfiguration().set(SOURCE, source);
-        if (target != null) job.getConfiguration().set(TARGET, target);
-        if (targetGraph != null) job.getConfiguration().set(TARGET_GRAPH, targetGraph);
-        if (graphContext != null) job.getConfiguration().set(GRAPH_CONTEXT, graphContext);
-        if (thresh != null) job.getConfiguration().setLong(THRESHOLD, Long.parseLong(thresh));
+        if (cmd.hasOption('u')) {
+			FileSystem fs = CommonFSUtils.getRootDirFileSystem(getConf());
+        	if (fs.exists(new Path(cmd.getOptionValue('u')))) {
+        		throw new IOException("Snapshot restore directory already exists");
+        	}
+            job.getConfiguration().set(SNAPSHOT_PATH, cmd.getOptionValue('u'));
+        }
+        if (target != null) {
+            job.getConfiguration().set(TARGET, target);
+        }
+        if (targetGraph != null) {
+            job.getConfiguration().set(TARGET_GRAPH, targetGraph);
+        }
+        if (graphContext != null) {
+            job.getConfiguration().set(GRAPH_CONTEXT, graphContext);
+        }
+        if (thresh != null) {
+            job.getConfiguration().setLong(THRESHOLD, Long.parseLong(thresh));
+        }
         job.setJarByClass(HalyardStats.class);
         TableMapReduceUtil.initCredentials(job);
 
-        TableName sourceTableName;
         RDFFactory rdfFactory;
-        try (Table table = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
-        	sourceTableName = table.getName();
-            rdfFactory = RDFFactory.create(table);
-        }
+        Keyspace keyspace = HalyardTableUtils.getKeyspace(getConf(), source, cmd.getOptionValue('u'));
+        try {
+        	try (KeyspaceConnection kc = keyspace.getConnection()) {
+        		rdfFactory = RDFFactory.create(kc);
+        	}
+		} finally {
+			keyspace.close();
+		}
         List<Scan> scans;
         if (graphContext != null) { //restricting stats to scan given graph context only
             scans = new ArrayList<>(4);
             ValueFactory vf = rdfFactory.getIdValueFactory();
             RDFContext rdfGraphCtx = rdfFactory.createContext(vf.createIRI(graphContext));
-            scans.add(scan(sourceTableName, rdfFactory.getCSPOIndex(), rdfGraphCtx));
-            scans.add(scan(sourceTableName, rdfFactory.getCPOSIndex(), rdfGraphCtx));
-            scans.add(scan(sourceTableName, rdfFactory.getCOSPIndex(), rdfGraphCtx));
-            if (target == null) { //add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
-				scans.add(scan(sourceTableName, rdfFactory.getCSPOIndex(),
+            scans.add(rdfFactory.getCSPOIndex().scan(rdfGraphCtx));
+            scans.add(rdfFactory.getCPOSIndex().scan(rdfGraphCtx));
+            scans.add(rdfFactory.getCOSPIndex().scan(rdfGraphCtx));
+            if (target == null) {
+                // add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
+				scans.add(rdfFactory.getCSPOIndex().scan(
 					rdfFactory.createContext(targetGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : vf.createIRI(targetGraph))
 				));
             }
         } else {
-            Scan scan = StatementIndex.scanAll(rdfFactory);
-            scan.setAttribute(Scan.SCAN_ATTRIBUTES_TABLE_NAME, sourceTableName.toBytes());
-            scans = Collections.singletonList(scan);
+            scans = Collections.singletonList(StatementIndex.scanAll(rdfFactory));
         }
-        TableMapReduceUtil.initTableMapperJob(
+        TableName sourceTableName = keyspace.getTableName();
+        if (sourceTableName != null) {
+	        byte[] sourceTableNameBytes = sourceTableName.toBytes();
+	        for (Scan scan : scans) {
+	            scan.setAttribute(Scan.SCAN_ATTRIBUTES_TABLE_NAME, sourceTableNameBytes);
+	        }
+	        TableMapReduceUtil.initTableMapperJob(
                 scans,
                 StatsMapper.class,
                 ImmutableBytesWritable.class,
                 LongWritable.class,
                 job);
+        } else {
+	        TableMapReduceUtil.initMultiTableSnapshotMapperJob(
+                Collections.singletonMap(source, (Collection<Scan>) scans),
+                StatsMapper.class,
+                ImmutableBytesWritable.class,
+                LongWritable.class,
+                job,
+                true,
+                new Path(cmd.getOptionValue('u')));
+        }
         job.setPartitionerClass(StatsPartitioner.class);
         job.setReducerClass(StatsReducer.class);
         job.setOutputFormatClass(NullOutputFormat.class);
-        if (job.waitForCompletion(true)) {
-            LOG.info("Stats Generation completed.");
-            return 0;
-        } else {
-    		LOG.error("Stats Generation failed to complete.");
-            return -1;
+        try {
+	        if (job.waitForCompletion(true)) {
+	            LOG.info("Stats Generation completed.");
+	            return 0;
+	        } else {
+	    		LOG.error("Stats Generation failed to complete.");
+	            return -1;
+	        }
+        } finally {
+        	keyspace.destroy();
         }
     }
 }

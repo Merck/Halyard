@@ -17,9 +17,10 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Keyspace;
+import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.StatementIndex;
-import com.msd.gin.halyard.common.ValueIO;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -35,6 +36,8 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.StringBuilderWriter;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
@@ -44,9 +47,9 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
-import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.CommonFSUtils;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -69,13 +72,11 @@ import org.json.JSONObject;
 public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     private static final String SOURCE = "halyard.elastic.source";
+    private static final String SNAPSHOT_PATH = "halyard.elastic.snapshot";
 
-    static final class IndexerMapper extends TableMapper<NullWritable, Text>  {
+    static final class IndexerMapper extends RdfTableMapper<NullWritable, Text>  {
 
         final Text outputJson = new Text();
-        Table table;
-        RDFFactory rdfFactory;
-        ValueIO.Reader valueReader;
         int objectKeySize;
         int contextKeySize;
         long counter = 0, exports = 0, statements = 0;
@@ -85,9 +86,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException {
             Configuration conf = context.getConfiguration();
-            table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            rdfFactory = RDFFactory.create(table);
-            valueReader = rdfFactory.createTableReader(rdfFactory.getIdValueFactory(), table);
+            openKeyspace(conf, conf.get(SOURCE), conf.get(SNAPSHOT_PATH));
             objectKeySize = rdfFactory.getObjectRole().keyHashSize();
             contextKeySize = rdfFactory.getContextRole().keyHashSize();
             lastHash = new byte[objectKeySize];
@@ -133,10 +132,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
         @Override
         protected void cleanup(Context output) throws IOException {
-        	if (table != null) {
-        		table.close();
-        		table = null;
-        	}
+        	closeKeyspace();
         }
     }
 
@@ -153,6 +149,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         addOption("t", "target-index", "target_url", "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
         addOption("c", "create-index", null, "Optionally create Elasticsearch index", false, true);
         addOption("g", "named-graph", "named_graph", "Optional restrict indexing to the given named graph only", false, true);
+        addOption("u", "restore-dir", "restore_folder", "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
     }
 
     private static String getMappingConfig(String linePrefix, String shards, String replicas) {
@@ -194,6 +191,13 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardElasticIndexer " + source + " -> " + target);
         job.getConfiguration().set(SOURCE, source);
+        if (cmd.hasOption('u')) {
+			FileSystem fs = CommonFSUtils.getRootDirFileSystem(getConf());
+        	if (fs.exists(new Path(cmd.getOptionValue('u')))) {
+        		throw new IOException("Snapshot restore directory already exists");
+        	}
+            job.getConfiguration().set(SNAPSHOT_PATH, cmd.getOptionValue('u'));
+        }
         if (cmd.hasOption('c')) {
             int shards;
             int replicas = 1;
@@ -236,10 +240,14 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         TableMapReduceUtil.initCredentials(job);
 
         RDFFactory rdfFactory;
-        try (Table table = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
-            rdfFactory = RDFFactory.create(table);
-        }
-
+        Keyspace keyspace = HalyardTableUtils.getKeyspace(getConf(), source, cmd.getOptionValue('u'));
+        try {
+        	try (KeyspaceConnection kc = keyspace.getConnection()) {
+        		rdfFactory = RDFFactory.create(kc);
+        	}
+		} finally {
+			keyspace.close();
+		}
         Scan scan;
         if (cmd.hasOption('g')) {
             //scan only given named graph from COSP literal region(s)
@@ -249,13 +257,12 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             //scan OSP literal region(s)
         	scan = StatementIndex.scanLiterals(rdfFactory);
         }
-        TableMapReduceUtil.initTableMapperJob(
-                source,
-                scan,
-                IndexerMapper.class,
-                NullWritable.class,
-                Text.class,
-                job);
+        keyspace.initMapperJob(
+            scan,
+            IndexerMapper.class,
+            NullWritable.class,
+            Text.class,
+            job);
         job.getConfiguration().setBoolean("mapreduce.map.speculative", false);    
         job.getConfiguration().setBoolean("mapreduce.reduce.speculative", false); 
         job.getConfiguration().set("es.nodes", targetUrl.getHost()+":"+targetUrl.getPort());
@@ -266,15 +273,19 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         job.getConfiguration().set("es.input.json", "yes");
         job.setOutputFormatClass(EsOutputFormat.class);
         job.setNumReduceTasks(0);
-        if (job.waitForCompletion(true)) {
-            HttpURLConnection http = (HttpURLConnection)new URL(target + "_refresh").openConnection();
-            http.connect();
-            http.disconnect();
-            LOG.info("Elastic indexing completed.");
-            return 0;
-        } else {
-    		LOG.error("Elastic indexing failed to complete.");
-            return -1;
+	    try {
+	        if (job.waitForCompletion(true)) {
+	            HttpURLConnection http = (HttpURLConnection)new URL(target + "_refresh").openConnection();
+	            http.connect();
+	            http.disconnect();
+	            LOG.info("Elastic indexing completed.");
+	            return 0;
+	        } else {
+	    		LOG.error("Elastic indexing failed to complete.");
+	            return -1;
+	        }
+        } finally {
+        	keyspace.destroy();
         }
     }
 }

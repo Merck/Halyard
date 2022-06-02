@@ -17,9 +17,10 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Keyspace;
+import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.StatementIndex;
-import com.msd.gin.halyard.common.ValueIO;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -27,11 +28,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.MissingOptionException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Result;
@@ -40,9 +44,9 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
-import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.hbase.tool.BulkLoadHFiles;
+import org.apache.hadoop.hbase.util.CommonFSUtils;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -64,17 +68,15 @@ import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
 public final class HalyardBulkDelete extends AbstractHalyardTool {
 	static final String DEFAULT_GRAPH_KEYWORD = "DEFAULT";
     private static final String SOURCE = "halyard.delete.source";
+    private static final String SNAPSHOT_PATH = "halyard.delete.snapshot";
     private static final String SUBJECT = "halyard.delete.subject";
     private static final String PREDICATE = "halyard.delete.predicate";
     private static final String OBJECT = "halyard.delete.object";
     private static final String CONTEXTS = "halyard.delete.contexts";
 
-    static final class DeleteMapper extends TableMapper<ImmutableBytesWritable, KeyValue> {
+    static final class DeleteMapper extends RdfTableMapper<ImmutableBytesWritable, KeyValue> {
 
         final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
-        Table table;
-        RDFFactory rdfFactory;
-        ValueIO.Reader valueReader;
         long total = 0, deleted = 0;
         Resource subj;
         IRI pred;
@@ -84,10 +86,8 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            table = HalyardTableUtils.getTable(conf, conf.get(SOURCE), false, 0);
-            rdfFactory = RDFFactory.create(table);
+            openKeyspace(conf, conf.get(SOURCE), conf.get(SNAPSHOT_PATH));
             ValueFactory vf = rdfFactory.getIdValueFactory();
-            valueReader = rdfFactory.createTableReader(vf, table);
             String s = conf.get(SUBJECT);
             if (s!= null) {
                 subj = NTriplesUtil.parseResource(s, vf);
@@ -139,10 +139,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 
         @Override
         protected void cleanup(Context output) throws IOException {
-        	if (table != null) {
-        		table.close();
-        		table = null;
-        	}
+        	closeKeyspace();
         }
     }
 
@@ -150,19 +147,26 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         super(
             "bulkdelete",
             "Halyard Bulk Delete is a MapReduce application that effectively deletes large set of triples or whole named graphs, based on specified statement pattern and/or named graph(s).",
-            "Example: halyard bulkdelete -t my_data -f bulkdelete_temp1 -s <http://whatever/mysubj> -g <http://whatever/mygraph1> -g <http://whatever/mygraph2>"
+            "Example: halyard bulkdelete -t my_data -w bulkdelete_temp1 -s <http://whatever/mysubj> -g <http://whatever/mygraph1> -g <http://whatever/mygraph2>"
         );
-        addOption("t", "target-dataset", "dataset_table", "HBase table with Halyard RDF store", true, true);
-        addOption("f", "temp-folder", "temporary_folder", "Temporary folder for HBase files", true, true);
+        addOption("t", "target-dataset", "dataset_table", "HBase table with Halyard RDF store to update", true, true);
+        addOption("w", "work-dir", "shared_folder", "Temporary folder for HBase files", true, true);
         addOption("s", "subject", "subject", "Optional subject to delete", false, true);
         addOption("p", "predicate", "predicate", "Optional predicate to delete", false, true);
         addOption("o", "object", "object", "Optional object to delete", false, true);
         addOption("g", "named-graph", "named_graph", "Optional named graph(s) to delete, "+DEFAULT_GRAPH_KEYWORD+" represents triples outside of any named graph", false, false);
+        addOption("n", "snapshot-name", "snapshot_name", "Snapshot to read from. If specified then data is read from the snapshot instead of the table specified by -t and the results are written to the table. Requires -u.", false, true);
+        addOption("u", "restore-dir", "restore_folder", "The snapshot restore folder on HDFS. Requires -n.", false, true);
     }
 
     @Override
     public int run(CommandLine cmd) throws Exception {
-        String source = cmd.getOptionValue('t');
+    	if ((cmd.hasOption('n') && !cmd.hasOption('u')) || (!cmd.hasOption('n') && cmd.hasOption('u'))) {
+    		throw new MissingOptionException("Both -n and -u must be specified to read from a snapshot");
+    	}
+        String target = cmd.getOptionValue('t');
+    	boolean useSnapshot = cmd.hasOption('n') && cmd.hasOption('u');
+        String source = useSnapshot ? cmd.getOptionValue('n') : target;
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
             NTriplesUtil.class,
             Rio.class,
@@ -175,6 +179,13 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardDelete " + source);
         job.getConfiguration().set(SOURCE, source);
+        if (cmd.hasOption('u')) {
+			FileSystem fs = CommonFSUtils.getRootDirFileSystem(getConf());
+        	if (fs.exists(new Path(cmd.getOptionValue('u')))) {
+        		throw new IOException("Snapshot restore directory already exists");
+        	}
+            job.getConfiguration().set(SNAPSHOT_PATH, cmd.getOptionValue('u'));
+        }
         if (cmd.hasOption('s')) {
             job.getConfiguration().set(SUBJECT, cmd.getOptionValue('s'));
         }
@@ -191,37 +202,48 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         TableMapReduceUtil.initCredentials(job);
 
         RDFFactory rdfFactory;
-        try (Table table = HalyardTableUtils.getTable(getConf(), source, false, 0)) {
-            rdfFactory = RDFFactory.create(table);
-        }
+        Keyspace keyspace = HalyardTableUtils.getKeyspace(getConf(), source, cmd.getOptionValue('u'));
+        try {
+        	try (KeyspaceConnection kc = keyspace.getConnection()) {
+        		rdfFactory = RDFFactory.create(kc);
+        	}
+		} finally {
+			keyspace.close();
+		}
         Scan scan = StatementIndex.scanAll(rdfFactory);
-
-        TableMapReduceUtil.initTableMapperJob(source,
+        keyspace.initMapperJob(
             scan,
             DeleteMapper.class,
             ImmutableBytesWritable.class,
             LongWritable.class,
             job);
-
         job.setMapOutputKeyClass(ImmutableBytesWritable.class);
         job.setMapOutputValueClass(KeyValue.class);
         job.setSpeculativeExecution(false);
         job.setMapSpeculativeExecution(false);
         job.setReduceSpeculativeExecution(false);
-		Connection conn = HalyardTableUtils.getConnection(getConf());
-		try (Table hTable = HalyardTableUtils.getTable(conn, source, false, 0)) {
-			RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());
-			HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), regionLocator);
-            FileOutputFormat.setOutputPath(job, new Path(cmd.getOptionValue('f')));
-            TableMapReduceUtil.addDependencyJars(job);
+        TableName hTableName;
+		try (Connection conn = HalyardTableUtils.getConnection(getConf())) {
+			try (Table hTable = HalyardTableUtils.getTable(conn, target, false, 0)) {
+				hTableName = hTable.getName();
+				RegionLocator regionLocator = conn.getRegionLocator(hTableName);
+				HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), regionLocator);
+			}
+		}
+		Path workDir = new Path(cmd.getOptionValue('w'));
+        FileOutputFormat.setOutputPath(job, workDir);
+        TableMapReduceUtil.addDependencyJars(job);
+        try {
             if (job.waitForCompletion(true)) {
-				BulkLoadHFiles.create(getConf()).bulkLoad(hTable.getName(), new Path(cmd.getOptionValue('f')));
+				BulkLoadHFiles.create(getConf()).bulkLoad(hTableName, workDir);
                 LOG.info("Bulk Delete completed.");
                 return 0;
             } else {
         		LOG.error("Bulk Delete failed to complete.");
                 return -1;
             }
+        } finally {
+        	keyspace.destroy();
         }
     }
 }

@@ -51,12 +51,8 @@ public class HalyardBulkExportTest extends AbstractHalyardToolTest {
 			}
 		}
 
-        File root = File.createTempFile("test_bulkExport", "");
-        root.delete();
-        root.mkdirs();
-
+        File root = createTempDir("test_bulkExport");
         File q = new File(root, "test_bulkExport.sparql");
-        q.deleteOnExit();
         try (PrintStream qs = new PrintStream(q)) {
             qs.println("select * where {?s ?p ?o}");
         }
@@ -88,12 +84,9 @@ public class HalyardBulkExportTest extends AbstractHalyardToolTest {
 			}
 		}
 
-        File root = File.createTempFile("test_parallelBulkExport", "");
-        root.delete();
-        root.mkdirs();
+        File root = createTempDir("test_parallelBulkExport");
 
         File q = new File(root, "test_parallelBulkExport.sparql");
-        q.deleteOnExit();
         try (PrintStream qs = new PrintStream(q)) {
             qs.println("select * where {?s ?p ?o. FILTER (<http://merck.github.io/Halyard/ns#forkAndFilterBy> (2, ?p))}");
         }

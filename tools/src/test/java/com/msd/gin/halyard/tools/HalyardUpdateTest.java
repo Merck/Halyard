@@ -57,9 +57,7 @@ public class HalyardUpdateTest extends AbstractHalyardToolTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        File rf = File.createTempFile("HalyardUpdateTest", "");
-        rf.delete();
-        rf.mkdirs();
+        File rf = createTempDir("HalyardUpdateTest");
         ROOT = rf.toURI().toURL().toString();
         if (!ROOT.endsWith("/")) {
             ROOT = ROOT + "/";

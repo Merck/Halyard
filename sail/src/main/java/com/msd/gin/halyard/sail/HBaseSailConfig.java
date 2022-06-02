@@ -51,27 +51,29 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
         BACK_COMPATIBILITY_MAP.put(HALYARD.EVALUATION_TIMEOUT_PROPERTY, factory.createIRI(OLD_NAMESPACE, "evaluationtimeout"));
     }
 
-    private String tablespace = null;
+    private String tableName = null;
     private int splitBits = 0;
     private boolean create = true;
+	private String snapshotName = null;
+	private String snapshotRestorePath = null;
     private boolean push = true;
     private int evaluationTimeout = 180; //3 min
     private String elasticIndexURL = "";
 
     /**
      * Sets HBase table name
-     * @param tablespace String HBase table name
+     * @param tableName String HBase table name
      */
-    public void setTablespace(String tablespace) {
-        this.tablespace = tablespace;
+    public void setTableName(String tableName) {
+        this.tableName = tableName;
     }
 
     /**
      * Gets HBase table name
      * @return String table name
      */
-    public String getTablespace() {
-        return tablespace;
+    public String getTableName() {
+        return tableName;
     }
 
     /**
@@ -106,10 +108,27 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
         this.create = create;
     }
 
-    /**
-     * Gets flag to use {@link com.msd.gin.halyard.strategy.HalyardEvaluationStrategy} instead of {@link org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy}
-     * @return boolean flag to use HalyardEvaluationStrategy instead of StrictEvaluationStrategy
-     */
+	public String getSnapshotName() {
+		return snapshotName;
+	}
+
+	public void setSnapshotName(String snapshotName) {
+		this.snapshotName = snapshotName;
+	}
+
+	public String getSnapshotRestorePath() {
+		return snapshotRestorePath;
+	}
+
+	public void setSnapshotRestorePath(String snapshotRestorePath) {
+		this.snapshotRestorePath = snapshotRestorePath;
+	}
+
+	/**
+	 * Gets flag to use {@link com.msd.gin.halyard.strategy.HalyardEvaluationStrategy} instead of {@link org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy}
+	 * 
+	 * @return boolean flag to use HalyardEvaluationStrategy instead of StrictEvaluationStrategy
+	 */
     public boolean isPush() {
         return push;
     }
@@ -170,9 +189,17 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
     public Resource export(Model graph) {
         Resource implNode = super.export(graph);
         ValueFactory vf = SimpleValueFactory.getInstance();
-        if (tablespace != null) graph.add(implNode, HALYARD.TABLE_NAME_PROPERTY, vf.createLiteral(tablespace));
+		if (tableName != null) {
+			graph.add(implNode, HALYARD.TABLE_NAME_PROPERTY, vf.createLiteral(tableName));
+		}
         graph.add(implNode, HALYARD.SPLITBITS_PROPERTY, vf.createLiteral(splitBits));
         graph.add(implNode, HALYARD.CREATE_TABLE_PROPERTY, vf.createLiteral(create));
+		if (snapshotName != null) {
+			graph.add(implNode, HALYARD.SNAPSHOT_NAME_PROPERTY, vf.createLiteral(snapshotName));
+		}
+		if (snapshotRestorePath != null) {
+			graph.add(implNode, HALYARD.SNAPSHOT_RESTORE_PATH_PROPERTY, vf.createLiteral(snapshotRestorePath));
+		}
         graph.add(implNode, HALYARD.PUSH_STRATEGY_PROPERTY, vf.createLiteral(push));
         graph.add(implNode, HALYARD.EVALUATION_TIMEOUT_PROPERTY, vf.createLiteral(evaluationTimeout));
         graph.add(implNode, HALYARD.ELASTIC_INDEX_URL_PROPERTY, vf.createLiteral(elasticIndexURL));
@@ -188,10 +215,10 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
     @Override
     public void parse(Model graph, Resource implNode) throws SailConfigException {
         super.parse(graph, implNode);
-        Optional<Literal> tablespaceValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.TABLE_NAME_PROPERTY);
-        if (tablespaceValue.isPresent() && tablespaceValue.get().stringValue().length() > 0) {
-            setTablespace(tablespaceValue.get().stringValue());
-        } else {
+        Optional<Literal> tableNameValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.TABLE_NAME_PROPERTY);
+        if (tableNameValue.isPresent() && tableNameValue.get().stringValue().length() > 0) {
+            setTableName(tableNameValue.get().stringValue());
+		} else {
             Optional<Resource> delegate = Models.subject(graph.filter(null, SailConfigSchema.DELEGATE, implNode));
             Optional<Resource> sailImpl = Models.subject(graph.filter(null, SailRepositorySchema.SAILIMPL, delegate.isPresent() ? delegate.get(): implNode));
             if (sailImpl.isPresent()) {
@@ -199,12 +226,12 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
                 if (repoImpl.isPresent()) {
                     Optional<Literal> idValue = Models.objectLiteral(graph.filter(repoImpl.get(), RepositoryConfigSchema.REPOSITORYID, null));
                     if (idValue.isPresent()) {
-                        setTablespace(idValue.get().stringValue());
+                        setTableName(idValue.get().stringValue());
                     }
                 }
             }
+		}
 
-        }
         Optional<Literal> splitBitsValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.SPLITBITS_PROPERTY);
         if (splitBitsValue.isPresent()) try {
             setSplitBits(splitBitsValue.get().intValue());
@@ -217,6 +244,14 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
         } catch (IllegalArgumentException e) {
             throw new SailConfigException(e);
         }
+	Optional<Literal> snapshotNameValue = Models.objectLiteral(graph.filter(implNode, HALYARD.SNAPSHOT_NAME_PROPERTY, null));
+	if (snapshotNameValue.isPresent()) {
+		setSnapshotName(snapshotNameValue.get().getLabel());
+	}
+	Optional<Literal> snapshotRestorePathValue = Models.objectLiteral(graph.filter(implNode, HALYARD.SNAPSHOT_RESTORE_PATH_PROPERTY, null));
+	if (snapshotRestorePathValue.isPresent()) {
+		setSnapshotRestorePath(snapshotRestorePathValue.get().getLabel());
+	}
         Optional<Literal> pushValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.PUSH_STRATEGY_PROPERTY);
         if (pushValue.isPresent()) try {
             setPush(pushValue.get().booleanValue());

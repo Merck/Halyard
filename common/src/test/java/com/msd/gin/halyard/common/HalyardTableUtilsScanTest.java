@@ -25,6 +25,7 @@ import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -151,14 +152,16 @@ public class HalyardTableUtilsScanTest {
     }
 
     private static RDFFactory rdfFactory;
+    private static Connection conn;
 	private static Table table;
     private static Set<Statement> allStatements;
 
     @BeforeClass
     public static void setup() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-        table = HalyardTableUtils.getTable(conf, "testScan", true, 0);
-		rdfFactory = RDFFactory.create(table);
+		conn = HalyardTableUtils.getConnection(conf);
+        table = HalyardTableUtils.getTable(conn, "testScan", true, 0);
+		rdfFactory = RDFFactory.create(new TableKeyspace.TableKeyspaceConnection(table));
 
         SimpleValueFactory vf = SimpleValueFactory.getInstance();
         allStatements = new HashSet<>();
@@ -177,6 +180,7 @@ public class HalyardTableUtilsScanTest {
     @AfterClass
     public static void teardown() throws Exception {
         table.close();
+        conn.close();
     }
 
     private final String s, p, o, c;

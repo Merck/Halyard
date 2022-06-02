@@ -2,11 +2,11 @@ package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.Identifier;
+import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
@@ -27,7 +27,7 @@ public final class ObjectTupleFunction extends AbstractReificationTupleFunction 
 	}
 
 	@Override
-	protected Value getValue(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
-		return HalyardTableUtils.getObject(table, id, vf, rdfFactory);
+	protected Value getValue(KeyspaceConnection ks, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+		return HalyardTableUtils.getObject(ks, id, vf, rdfFactory);
 	}
 }

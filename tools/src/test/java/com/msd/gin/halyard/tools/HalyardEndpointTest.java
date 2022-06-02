@@ -53,9 +53,7 @@ public class HalyardEndpointTest {
      */
     @BeforeClass
     public static void setup() throws Exception {
-        File rf = File.createTempFile("HalyardEndpointTest", "");
-        rf.delete();
-        rf.mkdirs();
+        File rf = AbstractHalyardToolTest.createTempDir("HalyardEndpointTest");
         ROOT = rf.getPath();
         if (!ROOT.endsWith("/")) {
             ROOT = ROOT + "/";

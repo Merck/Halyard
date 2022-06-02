@@ -85,6 +85,26 @@
 					</tr>
 					<tr>
 						<th>
+							HBase Snapshot Name
+						</th>
+						<td>
+							<input type="text" id="snapshotName" name="HBase Snapshot Name" size="48"
+								value="" />
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<th>
+							HBase Snapshot restore path
+						</th>
+						<td>
+							<input type="text" id="snapshotRestorePath" name="HBase Snapshot restore path" size="48"
+								value="" />
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<th>
 							Use Halyard Push Evaluation Strategy
 						</th>
 						<td>

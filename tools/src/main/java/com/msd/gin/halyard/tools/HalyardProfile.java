@@ -19,6 +19,7 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 
+import java.io.IOException;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.Collections;
@@ -66,7 +67,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
     public int run(CommandLine cmd) throws Exception {
 		SailRepository repo = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('e'), null, new HBaseSail.SailConnectionFactory() {
 			@Override
-			public SailConnection createConnection(HBaseSail sail) {
+			public SailConnection createConnection(HBaseSail sail) throws IOException {
 				return new HBaseSailConnection(sail) {
 					private final NumberFormat cardinalityFormatter = DecimalFormat.getNumberInstance();
 

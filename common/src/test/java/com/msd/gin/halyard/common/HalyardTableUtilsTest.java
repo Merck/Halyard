@@ -58,7 +58,7 @@ public class HalyardTableUtilsTest {
 		conf.setInt(Config.KEY_SIZE_OBJECT, OBJECT_KEY_SIZE);
 		conn = HalyardTableUtils.getConnection(conf);
 		table = HalyardTableUtils.getTable(conn, "testUtils", true, -1);
-		rdfFactory = RDFFactory.create(table);
+		rdfFactory = RDFFactory.create(new TableKeyspace.TableKeyspaceConnection(table));
     }
 
     @AfterClass
@@ -76,7 +76,7 @@ public class HalyardTableUtilsTest {
     @Test
     public void testGetTheSameTableAgain() throws Exception {
         table.close();
-        table = HalyardTableUtils.getTable(HBaseServerTestInstance.getInstanceConfig(), "testUtils", true, 1);
+        table = HalyardTableUtils.getTable(conn, "testUtils", false, -1);
     }
 
     @Test

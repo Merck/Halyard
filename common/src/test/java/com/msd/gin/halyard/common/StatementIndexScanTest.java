@@ -10,6 +10,7 @@ import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -38,7 +39,8 @@ public class StatementIndexScanTest {
     private static final String CTX = "http://whatever/ctx";
 
     private static final ValueFactory vf = SimpleValueFactory.getInstance();
-	private static Table table;
+    private static Connection hConn;
+	private static KeyspaceConnection keyspaceConn;
 	private static RDFFactory rdfFactory;
 	private static ValueIO.Reader reader;
     private static Set<Statement> allStatements;
@@ -51,9 +53,11 @@ public class StatementIndexScanTest {
     @BeforeClass
     public static void setup() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-        table = HalyardTableUtils.getTable(conf, "testStatementIndex", true, 0);
-		rdfFactory = RDFFactory.create(table);
-		reader = rdfFactory.createTableReader(vf, table);
+		hConn = HalyardTableUtils.getConnection(conf);
+        Table table = HalyardTableUtils.getTable(hConn, "testStatementIndex", true, 0);
+        keyspaceConn = new TableKeyspace.TableKeyspaceConnection(table);
+		rdfFactory = RDFFactory.create(keyspaceConn);
+		reader = rdfFactory.createTableReader(vf, keyspaceConn);
 
         stringLiterals = new HashSet<>();
         nonstringLiterals = new HashSet<>();
@@ -96,14 +100,14 @@ public class StatementIndexScanTest {
 
     @AfterClass
     public static void teardown() throws Exception {
-        table.close();
+        keyspaceConn.close();
     }
 
     @Test
     public void testScanAll() throws Exception {
         Set<Statement> actual = new HashSet<>();
         Scan scan = StatementIndex.scanAll(rdfFactory);
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
@@ -118,7 +122,7 @@ public class StatementIndexScanTest {
     public void testScanLiterals() throws Exception {
         Set<Literal> actual = new HashSet<>();
         Scan scan = StatementIndex.scanLiterals(rdfFactory);
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
@@ -134,7 +138,7 @@ public class StatementIndexScanTest {
     public void testScanLiteralsContext() throws Exception {
         Set<Literal> actual = new HashSet<>();
         Scan scan = StatementIndex.scanLiterals(vf.createIRI(CTX), rdfFactory);
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
@@ -154,7 +158,7 @@ public class StatementIndexScanTest {
 
         Set<Literal> actual = new HashSet<>();
         Scan scan = rdfFactory.getSPOIndex().scanWithConstraint(rdfSubj, rdfPred, new ObjectConstraint(XSD.STRING));
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(rdfSubj, rdfPred, null, null, r, reader, rdfFactory)) {
@@ -176,7 +180,7 @@ public class StatementIndexScanTest {
 
         Set<Literal> actual = new HashSet<>();
         Scan scan = rdfFactory.getCSPOIndex().scanWithConstraint(rdfCtx, rdfSubj, rdfPred, new ObjectConstraint(HALYARD.NON_STRING));
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(rdfSubj, rdfPred, null, rdfCtx, r, reader, rdfFactory)) {
@@ -196,7 +200,7 @@ public class StatementIndexScanTest {
 
         Set<Triple> actual = new HashSet<>();
         Scan scan = rdfFactory.getSPOIndex().scanWithConstraint(rdfSubj, rdfPred, new ValueConstraint(ValueType.TRIPLE));
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(rdfSubj, rdfPred, null, null, r, reader, rdfFactory)) {
@@ -214,7 +218,7 @@ public class StatementIndexScanTest {
 
         Set<Literal> actual = new HashSet<>();
         Scan scan = rdfFactory.getPOSIndex().scanWithConstraint(rdfPred, new ObjectConstraint(XSD.STRING));
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(null, rdfPred, null, null, r, reader, rdfFactory)) {
@@ -234,7 +238,7 @@ public class StatementIndexScanTest {
 
         Set<Literal> actual = new HashSet<>();
         Scan scan = rdfFactory.getCPOSIndex().scanWithConstraint(rdfCtx, rdfPred, new ObjectConstraint(HALYARD.NON_STRING));
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(null, rdfPred, null, rdfCtx, r, reader, rdfFactory)) {
@@ -252,7 +256,7 @@ public class StatementIndexScanTest {
 
         Set<Triple> actual = new HashSet<>();
         Scan scan = rdfFactory.getPOSIndex().scanWithConstraint(rdfPred, new ValueConstraint(ValueType.TRIPLE));
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(null, rdfPred, null, null, r, reader, rdfFactory)) {
@@ -268,7 +272,7 @@ public class StatementIndexScanTest {
     public void testScanStringLiterals_OSP() throws Exception {
         Set<Literal> actual = new HashSet<>();
         Scan scan = rdfFactory.getOSPIndex().scanWithConstraint(new ObjectConstraint(XSD.STRING));
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
@@ -287,7 +291,7 @@ public class StatementIndexScanTest {
 
         Set<Literal> actual = new HashSet<>();
         Scan scan = rdfFactory.getCOSPIndex().scanWithConstraint(rdfCtx, new ObjectConstraint(HALYARD.NON_STRING));
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, rdfCtx, r, reader, rdfFactory)) {
@@ -303,7 +307,7 @@ public class StatementIndexScanTest {
     public void testScanTriples_OSP() throws Exception {
         Set<Triple> actual = new HashSet<>();
         Scan scan = rdfFactory.getOSPIndex().scanWithConstraint(new ValueConstraint(ValueType.TRIPLE));
-        try (ResultScanner rs = table.getScanner(scan)) {
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
                 for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
@@ -318,21 +322,21 @@ public class StatementIndexScanTest {
     @Test
     public void testGetSubject() throws Exception {
         Resource subj = vf.createIRI(SUBJ);
-    	Resource actual = HalyardTableUtils.getSubject(table, rdfFactory.id(subj), vf, rdfFactory);
+    	Resource actual = HalyardTableUtils.getSubject(keyspaceConn, rdfFactory.id(subj), vf, rdfFactory);
     	assertEquals(subj, actual);
     }
 
     @Test
     public void testGetPredicate() throws Exception {
     	IRI pred = RDF.VALUE;
-    	IRI actual = HalyardTableUtils.getPredicate(table, rdfFactory.id(pred), vf, rdfFactory);
+    	IRI actual = HalyardTableUtils.getPredicate(keyspaceConn, rdfFactory.id(pred), vf, rdfFactory);
     	assertEquals(pred, actual);
     }
 
     @Test
     public void testGetObject() throws Exception {
     	Value obj = foobarLiteral;
-    	Value actual = HalyardTableUtils.getObject(table, rdfFactory.id(obj), vf, rdfFactory);
+    	Value actual = HalyardTableUtils.getObject(keyspaceConn, rdfFactory.id(obj), vf, rdfFactory);
     	assertEquals(obj, actual);
     }
 

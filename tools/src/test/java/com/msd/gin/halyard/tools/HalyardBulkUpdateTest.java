@@ -66,11 +66,8 @@ public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
 			}
 		}
         sail.shutDown();
-        File queries = File.createTempFile("test_update_queries", "");
-        queries.delete();
-        queries.mkdir();
+        File queries = createTempDir("test_update_queries");
         File q = new File(queries, "test_update_query.sparql");
-        q.deleteOnExit();
         try (PrintStream qs = new PrintStream(q)) {
             qs.println("PREFIX halyard: <http://merck.github.io/Halyard/ns#>\n"
                 + "delete {?s <http://whatever/pred> ?o}\n"
@@ -79,8 +76,7 @@ public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
                 + "insert {?s <http://whatever/another> ?o}\n"
                 + "where {?s <http://whatever/reverse> ?o . FILTER (halyard:forkAndFilterBy(3, ?s, ?o))}");
         }
-        File htableDir = File.createTempFile("test_htable", "");
-        htableDir.delete();
+        File htableDir = getTempHTableDir("test_htable");
 
         assertEquals(0, run(conf, new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", TABLE}));
 
@@ -182,13 +178,9 @@ public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
         sail.shutDown();
 
         //prepare the update queries
-        File queries = File.createTempFile("test_time_update_queries", "");
-        queries.delete();
-        queries.mkdir();
+        File queries = createTempDir("test_time_update_queries");
         File q1 = new File(queries, "test_time_update_query_delete.sparql");
         File q2 = new File(queries, "test_time_update_query_insert.sparql");
-        q1.deleteOnExit();
-        q2.deleteOnExit();
         try (PrintStream qs = new PrintStream(q1)) {
             qs.println( "PREFIX : <http://whatever/> " +
                         "PREFIX halyard: <http://merck.github.io/Halyard/ns#> " +
@@ -230,8 +222,7 @@ public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
                         "  }" +
                         "}");
         }
-        File htableDir = File.createTempFile("test_htable", "");
-        htableDir.delete();
+        File htableDir = getTempHTableDir("test_htable");
 
         //execute BulkUpdate
         assertEquals(0, run(conf, new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", "timebulkupdatetesttable"}));

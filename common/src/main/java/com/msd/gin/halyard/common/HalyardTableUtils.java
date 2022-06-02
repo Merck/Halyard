@@ -35,6 +35,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
@@ -89,26 +90,6 @@ public final class HalyardTableUtils {
 
     private HalyardTableUtils() {}
 
-    /**
-	 * Helper method which locates or creates and returns the specified Table used for triple/ quad storage. The table may be pre-split into regions (rather than HBase's default of
-	 * starting with 1). For a discussion of pre-splits take a look at <a href= "https://hortonworks.com/blog/apache-hbase-region-splitting-and-merging/">this article</a>
-	 * 
-	 * @param config Hadoop Configuration of the cluster running HBase
-	 * @param tableName String table name
-	 * @param create boolean option to create the table if does not exist
-	 * @param splitBits int number of bits used for calculation of Table region pre-splits (applies for new tables only). Must be between 0 and 16. Higher values generate more
-	 * splits.
-	 * @throws IOException throws IOException in case of any HBase IO problems
-	 * @return the org.apache.hadoop.hbase.client.Table
-	 */
-	public static Table getTable(Configuration config, String tableName, boolean create, int splitBits) throws IOException {
-		return getTable(config, tableName, create, splitBits, true);
-	}
-	public static Table getTable(Configuration config, String tableName, boolean create, int splitBits, boolean quads)
-			throws IOException {
-		return getTable(getConnection(config), tableName, create, splitBits, quads);
-	}
-
 	/**
 	 * Helper method which locates or creates and returns the specified Table used for triple/ quad storage. The table may be pre-split into regions (rather than HBase's default of
 	 * starting with 1). For a discussion of pre-splits take a look at <a href= "https://hortonworks.com/blog/apache-hbase-region-splitting-and-merging/">this article</a>
@@ -122,34 +103,18 @@ public final class HalyardTableUtils {
 	 * @return the org.apache.hadoop.hbase.client.Table
 	 */
 	public static Table getTable(Connection conn, String tableName, boolean create, int splitBits) throws IOException {
-		return getTable(conn, tableName, create, splitBits, true);
-	}
-	public static Table getTable(Connection conn, String tableName, boolean create, int splitBits, boolean quads) throws IOException {
 		TableName htableName = TableName.valueOf(tableName);
         if (create && !tableExists(conn, htableName)) {
-    		RDFFactory rdfFactory = RDFFactory.create(conn.getConfiguration());
-            return createTable(conn, htableName, splitBits < 0 ? null : calculateSplits(splitBits, quads, rdfFactory), DEFAULT_MAX_VERSIONS);
+            return createTable(conn, htableName, splitBits);
         } else {
         	return conn.getTable(htableName);
         }
     }
 
-    /**
-     * Helper method which locates or creates and returns the specified HTable used for triple/ quad storage
-     * @param config Hadoop Configuration of the cluster running HBase
-     * @param tableName String table name
-     * @param splits array of keys used to pre-split new table, may be null
-	 * @return the org.apache.hadoop.hbase.client.Table
-     * @throws IOException throws IOException in case of any HBase IO problems
-     */
-	public static Table createTableIfNotExists(Configuration config, String tableName, byte[][] splits)
+	public static void createTableIfNotExists(Connection conn, TableName htableName, int splitBits)
 			throws IOException {
-		TableName htableName = TableName.valueOf(tableName);
-		Connection conn = getConnection(config);
 		if (!tableExists(conn, htableName)) {
-			return createTable(conn, htableName, splits, DEFAULT_MAX_VERSIONS);
-		} else {
-			return conn.getTable(htableName);
+			createTable(conn, htableName, splitBits).close();;
 		}
 	}
 
@@ -157,6 +122,11 @@ public final class HalyardTableUtils {
 		try (Admin admin = conn.getAdmin()) {
 			return admin.tableExists(htableName);
 		}
+	}
+
+	public static Table createTable(Connection conn, TableName htableName, int splitBits) throws IOException {
+		RDFFactory rdfFactory = RDFFactory.create(conn.getConfiguration());
+        return createTable(conn, htableName, splitBits < 0 ? null : calculateSplits(splitBits, true, rdfFactory), DEFAULT_MAX_VERSIONS);
 	}
 
 	public static Table createTable(Connection conn, TableName htableName, byte[][] splits, int maxVersions) throws IOException {
@@ -207,6 +177,34 @@ public final class HalyardTableUtils {
 			admin.disableTable(table);
 			admin.deleteTable(table);
 		}
+    }
+
+    public static Keyspace getKeyspace(Configuration conf, String sourceName, String restorePathName) throws IOException {
+    	Connection conn;
+    	TableName tableName;
+    	Path restorePath;
+        if (restorePathName != null) {
+        	conn = null;
+        	tableName = null;
+        	restorePath = new Path(restorePathName);
+        } else {
+        	conn = getConnection(conf);
+        	tableName = TableName.valueOf(sourceName);
+        	restorePath = null;
+        }
+        return getKeyspace(conn, tableName, conf, sourceName, restorePath);
+    }
+
+    public static Keyspace getKeyspace(Connection conn, TableName tableName, Configuration conf, String snapshotName, Path restorePath) throws IOException {
+    	Keyspace keyspace;
+    	if (conn != null && tableName != null) {
+            keyspace = new TableKeyspace(conn, tableName);
+    	} else if (snapshotName != null && restorePath != null) {
+            keyspace = new SnapshotKeyspace(conf, snapshotName, restorePath);
+        } else {
+        	throw new IllegalArgumentException("Inconsistent arguments");
+        }
+        return keyspace;
     }
 
 	/**
@@ -551,10 +549,10 @@ public final class HalyardTableUtils {
         }
     }
 
-	public static Resource getSubject(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
-		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, table);
+	public static Resource getSubject(KeyspaceConnection kc, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
 		Scan scan = scanSingle(rdfFactory.getSPOIndex(), id);
-		try (ResultScanner scanner = table.getScanner(scan)) {
+		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
 				if(cells != null && cells.length > 0) {
@@ -566,10 +564,10 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static IRI getPredicate(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
-		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, table);
+	public static IRI getPredicate(KeyspaceConnection kc, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
 		Scan scan = scanSingle(rdfFactory.getPOSIndex(), id);
-		try (ResultScanner scanner = table.getScanner(scan)) {
+		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
 				if(cells != null && cells.length > 0) {
@@ -581,10 +579,10 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static Value getObject(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
-		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, table);
+	public static Value getObject(KeyspaceConnection kc, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
 		Scan scan = scanSingle(rdfFactory.getOSPIndex(), id);
-		try (ResultScanner scanner = table.getScanner(scan)) {
+		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
 				if(cells != null && cells.length > 0) {

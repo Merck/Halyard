@@ -49,9 +49,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
 
     @Test
     public void testBulkLoad() throws Exception {
-        File root = File.createTempFile("test_triples", "");
-        root.delete();
-        root.mkdirs();
+        File root = createTempDir("test_triples");
         File file1 = new File(root, "test_triples.jsonld");
         try (PrintStream ps = new PrintStream(file1)) {
             ps.println("{\"@graph\": [");
@@ -86,12 +84,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         try (PrintStream ps = new PrintStream(file4)) {
             ps.println("this is an invalid NT file content");
         }
-        file1.deleteOnExit();
-        file2.deleteOnExit();
-        file3.deleteOnExit();
-        file4.deleteOnExit();
-        File htableDir = File.createTempFile("test_htable", "");
-        htableDir.delete();
+        File htableDir = getTempHTableDir("test_htable");
 
         //load with override of the graph context, however with no default graph context
         assertEquals(0, run(new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o", "-m", "1000"}));
@@ -104,8 +97,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         rep.shutDown();
 
         htableDir.delete();
-        htableDir = File.createTempFile("test_htable", "");
-        htableDir.delete();
+        htableDir = getTempHTableDir("test_htable");
 
         //default load
         assertEquals(0, run(new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-g", "{0}"}));
@@ -117,8 +109,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         rep.shutDown();
 
         htableDir.delete();
-        htableDir = File.createTempFile("test_htable", "");
-        htableDir.delete();
+        htableDir = getTempHTableDir("test_htable");
 
         //load with default graph context containing full URI pattern
         assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkLoad(), new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-g", "{0}"}));
@@ -132,8 +123,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         rep.shutDown();
 
         htableDir.delete();
-        htableDir = File.createTempFile("test_htable", "");
-        htableDir.delete();
+        htableDir = getTempHTableDir("test_htable");
 
         //load with graph context override containing URI path pattern
         assertEquals(0, run(new String[]{"-b", "-1", "-i", "-d", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o", "-g", "http://what{1}"}));
@@ -161,8 +151,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
             ps.println("<http://whatever> <http://whatever> <http://valid2> .");
         }
         file.deleteOnExit();
-        File htableDir = File.createTempFile("test_htable", "");
-        htableDir.delete();
+        File htableDir = getTempHTableDir("test_htable");
 
         //load with override of the graph context, however with no default graph context
         assertEquals(0, run(new String[]{"-b", "-1", "-i", "-s", file.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable2"}));

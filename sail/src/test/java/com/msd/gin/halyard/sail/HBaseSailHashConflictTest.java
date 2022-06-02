@@ -29,6 +29,7 @@ import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -85,31 +86,28 @@ public class HBaseSailHashConflictTest {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
 		RDFFactory rdfFactory = RDFFactory.create(conf);
 
-		try (Table table = HalyardTableUtils.getTable(conf, "testConflictingHash", true, 0)) {
-            long timestamp = System.currentTimeMillis();
-			List<? extends Cell> triple = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp, rdfFactory);
-			List<? extends Cell> conflicts[] = new List[] {
-					HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null, false, timestamp, rdfFactory), HalyardTableUtils.toKeyValues(SUBJ, CONF, OBJ, null, false, timestamp, rdfFactory),
-					HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null, false, timestamp, rdfFactory), HalyardTableUtils.toKeyValues(CONF, PRED, OBJ, null, false, timestamp, rdfFactory),
-					HalyardTableUtils.toKeyValues(CONF, PRED, CONF, null, false, timestamp, rdfFactory), HalyardTableUtils.toKeyValues(CONF, CONF, OBJ, null, false, timestamp, rdfFactory),
-					HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null, false, timestamp, rdfFactory),
-            };
-			List<Put> puts = new ArrayList<>();
-			for (int i = 0; i < triple.size(); i++) {
-				Cell kv = triple.get(i);
-				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
-                for (int j=0; j<conflicts.length; j++) {
-					Cell conflictCell = conflicts[j].get(i);
-					Cell xkv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(),
-                            kv.getFamilyArray(), kv.getFamilyOffset(), kv.getFamilyLength(),
-							conflictCell.getQualifierArray(), conflictCell.getQualifierOffset(), conflictCell.getQualifierLength(),
-                            kv.getTimestamp(), KeyValue.Type.Put,
-							conflictCell.getValueArray(), conflictCell.getValueOffset(), conflictCell.getValueLength());
-					puts.add(new Put(xkv.getRowArray(), xkv.getRowOffset(), xkv.getRowLength(), xkv.getTimestamp()).add(xkv));
-                }
-            }
-			table.put(puts);
-        }
+		try (Connection conn = HalyardTableUtils.getConnection(HBaseServerTestInstance.getInstanceConfig())) {
+			try (Table table = HalyardTableUtils.getTable(conn, "testConflictingHash", true, 0)) {
+				long timestamp = System.currentTimeMillis();
+				List<? extends Cell> triple = HalyardTableUtils.toKeyValues(SUBJ, PRED, OBJ, null, false, timestamp, rdfFactory);
+				List<? extends Cell> conflicts[] = new List[] { HalyardTableUtils.toKeyValues(SUBJ, PRED, CONF, null, false, timestamp, rdfFactory), HalyardTableUtils.toKeyValues(SUBJ, CONF, OBJ, null, false, timestamp, rdfFactory),
+						HalyardTableUtils.toKeyValues(SUBJ, CONF, CONF, null, false, timestamp, rdfFactory), HalyardTableUtils.toKeyValues(CONF, PRED, OBJ, null, false, timestamp, rdfFactory),
+						HalyardTableUtils.toKeyValues(CONF, PRED, CONF, null, false, timestamp, rdfFactory), HalyardTableUtils.toKeyValues(CONF, CONF, OBJ, null, false, timestamp, rdfFactory),
+						HalyardTableUtils.toKeyValues(CONF, CONF, CONF, null, false, timestamp, rdfFactory), };
+				List<Put> puts = new ArrayList<>();
+				for (int i = 0; i < triple.size(); i++) {
+					Cell kv = triple.get(i);
+					puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
+					for (int j = 0; j < conflicts.length; j++) {
+						Cell conflictCell = conflicts[j].get(i);
+						Cell xkv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getFamilyArray(), kv.getFamilyOffset(), kv.getFamilyLength(), conflictCell.getQualifierArray(), conflictCell.getQualifierOffset(),
+								conflictCell.getQualifierLength(), kv.getTimestamp(), KeyValue.Type.Put, conflictCell.getValueArray(), conflictCell.getValueOffset(), conflictCell.getValueLength());
+						puts.add(new Put(xkv.getRowArray(), xkv.getRowOffset(), xkv.getRowLength(), xkv.getTimestamp()).add(xkv));
+					}
+				}
+				table.put(puts);
+			}
+		}
 
 		sail = new HBaseSail(conf, "testConflictingHash", false, 0, true, 0, null, null);
 		sail.initialize();

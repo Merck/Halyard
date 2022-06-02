@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.vocab.VOID_EXT;
@@ -28,9 +29,14 @@ import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SD;
@@ -46,6 +52,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
 import org.eclipse.rdf4j.rio.helpers.ParseErrorLogger;
+import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Test;
@@ -56,15 +63,15 @@ import static org.junit.Assert.*;
  * @author Adam Sotona (MSD)
  */
 public class HalyardStatsTest extends AbstractHalyardToolTest {
+	private final ValueFactory vf = SimpleValueFactory.getInstance();
 
 	@Override
 	protected AbstractHalyardTool createTool() {
 		return new HalyardStats();
 	}
 
-    @Test
-    public void testStatsTarget() throws Exception {
-        final HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "statsTable", true, -1, true, 0, null, null);
+	private static Sail createData(String tableName) throws Exception {
+        final HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), tableName, true, -1, true, 0, null, null);
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
 			try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testData.trig")) {
@@ -78,10 +85,15 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
 				}).parse(ref, "");
 			}
 		}
+		return sail;
+	}
 
-        File root = File.createTempFile("test_stats", "");
-        root.delete();
-        root.mkdirs();
+	@Test
+    public void testStatsTarget() throws Exception {
+		Sail sail = createData("statsTable");
+		sail.shutDown();
+
+        File root = createTempDir("test_stats");
 
         assertEquals(0, run(new String[]{"-s", "statsTable", "-t", root.toURI().toURL().toString() + "stats{0}.trig", "-r", "100", "-g", "http://whatever/myStats"}));
 
@@ -89,8 +101,8 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
         assertTrue(stats.isFile());
         try (InputStream statsStream = new FileInputStream(stats)) {
             try (InputStream refStream = HalyardStatsTest.class.getResourceAsStream("testStatsTarget.trig")) {
-                Model statsM = Rio.parse(statsStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger());
-                Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger(), SimpleValueFactory.getInstance().createIRI("http://whatever/myStats"));
+                Model statsM = Rio.parse(statsStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), vf, new ParseErrorLogger());
+                Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), vf, new ParseErrorLogger(), vf.createIRI("http://whatever/myStats"));
                 assertEqualModels(refM, statsM);
             }
         }
@@ -149,22 +161,7 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
 
     @Test
     public void testStatsUpdate() throws Exception {
-        final HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "statsTable2", true, -1, true, 0, null, null);
-        sail.initialize();
-
-        //load test data
-		try (SailConnection conn = sail.getConnection()) {
-			try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testData.trig")) {
-				RDFParser p = Rio.createParser(RDFFormat.TRIG);
-				p.setPreserveBNodeIDs(true);
-				p.setRDFHandler(new AbstractRDFHandler() {
-					@Override
-					public void handleStatement(Statement st) throws RDFHandlerException {
-						conn.addStatement(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
-					}
-				}).parse(ref, "");
-			}
-		}
+        Sail sail = createData("statsTable2");
 
 		// update stats
 		assertEquals(0, run(new String[] { "-s", "statsTable2", "-r", "100" }));
@@ -178,7 +175,7 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
 				}
 			}
 			try (InputStream refStream = HalyardStatsTest.class.getResourceAsStream("testStatsTarget.trig")) {
-				Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger());
+				Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), vf, new ParseErrorLogger());
 				assertEqualModels(refM, statsM);
 			}
 
@@ -207,7 +204,7 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
 				}
 			}
 			try (InputStream refStream = HalyardStatsTest.class.getResourceAsStream("testStatsMoreTarget.trig")) {
-				Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger());
+				Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), vf, new ParseErrorLogger());
 				assertEqualModels(refM, statsM);
 			}
 
@@ -216,24 +213,10 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
 
     @Test
     public void testStatsTargetPartial() throws Exception {
-        final HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "statsTable3", true, -1, true, 0, null, null);
-        sail.initialize();
-		try (SailConnection conn = sail.getConnection()) {
-			try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testData.trig")) {
-				RDFParser p = Rio.createParser(RDFFormat.TRIG);
-				p.setPreserveBNodeIDs(true);
-				p.setRDFHandler(new AbstractRDFHandler() {
-					@Override
-					public void handleStatement(Statement st) throws RDFHandlerException {
-						conn.addStatement(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
-					}
-				}).parse(ref, "");
-			}
-		}
+        Sail sail = createData("statsTable3");
+		sail.shutDown();
 
-        File root = File.createTempFile("test_stats", "");
-        root.delete();
-        root.mkdirs();
+        File root = createTempDir("test_stats");
 
         assertEquals(0, run(new String[]{"-s", "statsTable3", "-t", root.toURI().toURL().toString() + "stats{0}.trig", "-r", "100", "-g", "http://whatever/myStats", "-c", "http://whatever/graph0"}));
 
@@ -241,8 +224,37 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
         assertTrue(stats.isFile());
         try (InputStream statsStream = new FileInputStream(stats)) {
             try (InputStream refStream = HalyardStatsTest.class.getResourceAsStream("testStatsTargetPartial.trig")) {
-                Model statsM = Rio.parse(statsStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger());
-                Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), SimpleValueFactory.getInstance(), new ParseErrorLogger(), SimpleValueFactory.getInstance().createIRI("http://whatever/myStats"));
+                Model statsM = Rio.parse(statsStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), vf, new ParseErrorLogger());
+                Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), vf, new ParseErrorLogger(), vf.createIRI("http://whatever/myStats"));
+                assertEqualModels(refM, statsM);
+            }
+        }
+    }
+
+	@Test
+    public void testStatsTarget_snapshot() throws Exception {
+		String table = "statsTable4";
+		Sail sail = createData(table);
+		sail.shutDown();
+
+		String snapshot = table + "Snapshot";
+		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+    	try (Connection conn = HalyardTableUtils.getConnection(conf)) {
+        	try (Admin admin = conn.getAdmin()) {
+        		admin.snapshot(snapshot, TableName.valueOf(table));
+        	}
+    	}
+
+        File root = createTempDir("test_stats_snapshot");
+        File restoredSnapshot = getTempSnapshotDir("restored_snapshot");
+        assertEquals(0, run(new String[]{"-s", snapshot, "-t", root.toURI().toURL().toString() + "stats{0}_snapshot.trig", "-r", "100", "-g", "http://whatever/myStats", "-u", restoredSnapshot.toURI().toURL().toString()}));
+
+        File stats = new File(root, "stats0_snapshot.trig");
+        assertTrue(stats.isFile());
+        try (InputStream statsStream = new FileInputStream(stats)) {
+            try (InputStream refStream = HalyardStatsTest.class.getResourceAsStream("testStatsTarget.trig")) {
+                Model statsM = Rio.parse(statsStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), vf, new ParseErrorLogger());
+                Model refM = Rio.parse(refStream, "", RDFFormat.TRIG, new ParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true), vf, new ParseErrorLogger(), vf.createIRI("http://whatever/myStats"));
                 assertEqualModels(refM, statsM);
             }
         }

@@ -55,6 +55,10 @@ public final class HALYARD implements Vocabulary {
 
     public final static IRI CREATE_TABLE_PROPERTY = SVF.createIRI(NAMESPACE, "createTable");
 
+    public final static IRI SNAPSHOT_NAME_PROPERTY = SVF.createIRI(NAMESPACE, "snapshotName");
+
+    public final static IRI SNAPSHOT_RESTORE_PATH_PROPERTY = SVF.createIRI(NAMESPACE, "snapshotRestorePath");
+
     public final static IRI PUSH_STRATEGY_PROPERTY = SVF.createIRI(NAMESPACE, "pushStrategy");
 
     public final static IRI EVALUATION_TIMEOUT_PROPERTY = SVF.createIRI(NAMESPACE, "evaluationTimeout");
