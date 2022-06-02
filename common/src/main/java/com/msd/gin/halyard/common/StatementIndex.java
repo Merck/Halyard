@@ -25,6 +25,7 @@ import org.eclipse.rdf4j.model.ValueFactory;
 public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 extends SPOC<?>,T4 extends SPOC<?>> {
 	public enum Name {SPO, POS, OSP, CSPO, CPOS, COSP};
 	private static final byte WELL_KNOWN_IRI_MARKER = (byte) ('#' | 0x80);  // marker must be negative (msb set) so it is distinguishable from a length (>=0)
+	private static final int VAR_CARDINALITY = 10;
 
 	public static StatementIndex<?,?,?,?> toIndex(byte prefix, RDFFactory rdfFactory) {
 		switch(prefix) {
@@ -41,9 +42,12 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	public static final Scan scanAll(RDFFactory rdfFactory) {
 		StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
 		StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = rdfFactory.getCOSPIndex();
+		int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
 		return HalyardTableUtils.scan(
 			spo.concat(false,  spo.role1.startKey(), spo.role2.startKey(), spo.get3StartKey(), spo.get4StartKey()),
-			cosp.concat(true, cosp.role1.stopKey(), cosp.role2.stopKey(), cosp.get3StopKey(), cosp.role4.endStopKey())
+			cosp.concat(true, cosp.role1.stopKey(), cosp.role2.stopKey(), cosp.get3StopKey(), cosp.role4.endStopKey()),
+			cardinality,
+			true
 		);
 	}
 
@@ -51,9 +55,12 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> index = rdfFactory.getOSPIndex();
 		int typeSaltSize = rdfFactory.typeSaltSize;
 		if (typeSaltSize == 1) {
+			int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
 			return index.scan(
 				rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role1.startKey()), index.role2.startKey(), index.get3StartKey(), index.get4StartKey(),
-				rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role1.stopKey()), index.role2.stopKey(), index.get3StopKey(), index.role4.endStopKey()
+				rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role1.stopKey()), index.role2.stopKey(), index.get3StopKey(), index.role4.endStopKey(),
+				cardinality,
+				true
 			);
 		} else {
 			return index.scanWithConstraint(new ValueConstraint(ValueType.LITERAL));
@@ -66,9 +73,12 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		int typeSaltSize = rdfFactory.typeSaltSize;
 		if (typeSaltSize == 1) {
 			ByteSequence ctxb = new ByteArray(ctx.getKeyHash(index));
+			int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
 			return index.scan(
 				ctxb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role2.startKey()), index.get3StartKey(), index.get4StartKey(),
-				ctxb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role2.stopKey()), index.get3StopKey(), index.role4.endStopKey()
+				ctxb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role2.stopKey()), index.get3StopKey(), index.role4.endStopKey(),
+				cardinality,
+				true
 			);
 		} else {
 			return index.scanWithConstraint(ctx, new ValueConstraint(ValueType.LITERAL));
@@ -360,25 +370,31 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return rdfFactory.id(idBytes);
 	}
 
-	private Scan scan(ByteSequence k1Start, ByteSequence k2Start, ByteSequence k3Start, ByteSequence k4Start, ByteSequence k1Stop, ByteSequence k2Stop, ByteSequence k3Stop, ByteSequence k4Stop) {
-		return HalyardTableUtils.scan(concat(false, k1Start, k2Start, k3Start, k4Start), concat(true, k1Stop, k2Stop, k3Stop, k4Stop));
+	private Scan scan(ByteSequence k1Start, ByteSequence k2Start, ByteSequence k3Start, ByteSequence k4Start, ByteSequence k1Stop, ByteSequence k2Stop, ByteSequence k3Stop, ByteSequence k4Stop, int cardinality, boolean indiscriminate) {
+		return HalyardTableUtils.scan(concat(false, k1Start, k2Start, k3Start, k4Start), concat(true, k1Stop, k2Stop, k3Stop, k4Stop), cardinality, indiscriminate);
 	}
 
 	Scan scan(Identifier id) {
 		ByteSequence kb = new ByteArray(role1.keyHash(this, id));
 		byte[] cq = role1.qualifierHash(id);
+		int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
 		return scan(
 			kb, role2.startKey(), get3StartKey(), get4StartKey(),
-			kb, role2.stopKey(), get3StopKey(), role4.endStopKey()
+			kb, role2.stopKey(), get3StopKey(), role4.endStopKey(),
+			cardinality,
+			false
 		).setFilter(new ColumnPrefixFilter(cq));
 	}
 	public Scan scan() {
 		return scanWithConstraint(null);
 	}
 	public Scan scanWithConstraint(ValueConstraint constraint) {
+		int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
 		Scan scan = scan(
 			role1.startKey(), role2.startKey(), get3StartKey(), get4StartKey(),
-			role1.stopKey(),  role2.stopKey(),  get3StopKey(),  role4.endStopKey()
+			role1.stopKey(),  role2.stopKey(),  get3StopKey(),  role4.endStopKey(),
+			cardinality,
+			true
 		);
 		if (constraint != null) {
 			List<Filter> filters = new ArrayList<>();
@@ -396,9 +412,12 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	}
 	public Scan scanWithConstraint(RDFIdentifier<T1> k, ValueConstraint constraint) {
 		ByteSequence kb = new ByteArray(k.getKeyHash(this));
+		int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
 		Scan scan = scan(
 			kb, role2.startKey(), get3StartKey(), get4StartKey(),
-			kb, role2.stopKey(),  get3StopKey(),  role4.endStopKey()
+			kb, role2.stopKey(),  get3StopKey(),  role4.endStopKey(),
+			cardinality,
+			false
 		);
 		Filter qf = new ColumnPrefixFilter(qualifier(k, null, null, null));
 		if (constraint != null) {
@@ -421,16 +440,21 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	public Scan scanWithConstraint(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2, ValueConstraint constraint) {
 		ByteSequence k1b = new ByteArray(k1.getKeyHash(this));
 		ByteSequence k2b, stop2;
+		int cardinality;
 		if (k2 != null) {
 			k2b = new ByteArray(k2.getKeyHash(this));
 			stop2 = k2b;
+			cardinality = VAR_CARDINALITY*VAR_CARDINALITY;
 		} else {
 			k2b = role2.startKey();
 			stop2 = role2.stopKey();
+			cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
 		}
 		Scan scan = scan(
 			k1b, k2b, get3StartKey(), get4StartKey(),
-			k1b, stop2, get3StopKey(), role4.endStopKey()
+			k1b, stop2, get3StopKey(), role4.endStopKey(),
+			cardinality,
+			false
 		);
 		Filter qf = new ColumnPrefixFilter(qualifier(k1, k2, null, null));
 		if (constraint != null) {
@@ -454,16 +478,21 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		ByteSequence k1b = new ByteArray(k1.getKeyHash(this));
 		ByteSequence k2b = new ByteArray(k2.getKeyHash(this));
 		ByteSequence k3b, stop3;
+		int cardinality;
 		if (k3 != null) {
 			k3b = new ByteArray(get3KeyHash(this, k3));
 			stop3 = k3b;
+			cardinality = VAR_CARDINALITY;
 		} else {
 			k3b = get3StartKey();
 			stop3 = get3StopKey();
+			cardinality = VAR_CARDINALITY*VAR_CARDINALITY;
 		}
 		Scan scan = scan(
 			k1b, k2b, k3b, get4StartKey(),
-			k1b, k2b, stop3, role4.endStopKey()
+			k1b, k2b, stop3, role4.endStopKey(),
+			cardinality,
+			false
 		);
 		Filter qf = new ColumnPrefixFilter(qualifier(k1, k2, k3, null));
 		if (constraint != null) {
@@ -485,9 +514,12 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		byte[] k2b = k2.getKeyHash(this);
 		byte[] k3b = get3KeyHash(this, k3);
 		byte[] k4b = k4.getEndKeyHash(this);
+		int cardinality = 1;
 		return scan(
 			new ByteArray(k1b), new ByteArray(k2b), new ByteArray(k3b), new ByteArray(k4b),
-			new ByteArray(k1b), new ByteArray(k2b), new ByteArray(k3b), new ByteArray(k4b)
+			new ByteArray(k1b), new ByteArray(k2b), new ByteArray(k3b), new ByteArray(k4b),
+			cardinality,
+			false
 		).setFilter(new ColumnPrefixFilter(qualifier(k1, k2, k3, k4)));
 	}
 

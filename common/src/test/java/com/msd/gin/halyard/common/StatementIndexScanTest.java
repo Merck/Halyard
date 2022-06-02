@@ -15,10 +15,12 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
+import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Triple;
+import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.OWL;
@@ -44,6 +46,7 @@ public class StatementIndexScanTest {
     private static Set<Literal> stringLiterals;
     private static Set<Literal> nonstringLiterals;
     private static Set<Triple> allTriples;
+    private static final Literal foobarLiteral = vf.createLiteral("foobar", vf.createIRI("http://whatever/datatype"));
 
     @BeforeClass
     public static void setup() throws Exception {
@@ -61,6 +64,7 @@ public class StatementIndexScanTest {
 			nonstringLiterals.add(vf.createLiteral((long) Math.random()));
         }
         nonstringLiterals.add(vf.createLiteral(new Date()));
+        nonstringLiterals.add(foobarLiteral);
         allLiterals = new HashSet<>();
         allLiterals.addAll(stringLiterals);
         allLiterals.addAll(nonstringLiterals);
@@ -309,6 +313,27 @@ public class StatementIndexScanTest {
             }
         }
         assertSets(allTriples, actual);
+    }
+
+    @Test
+    public void testGetSubject() throws Exception {
+        Resource subj = vf.createIRI(SUBJ);
+    	Resource actual = HalyardTableUtils.getSubject(table, rdfFactory.id(subj), vf, rdfFactory);
+    	assertEquals(subj, actual);
+    }
+
+    @Test
+    public void testGetPredicate() throws Exception {
+    	IRI pred = RDF.VALUE;
+    	IRI actual = HalyardTableUtils.getPredicate(table, rdfFactory.id(pred), vf, rdfFactory);
+    	assertEquals(pred, actual);
+    }
+
+    @Test
+    public void testGetObject() throws Exception {
+    	Value obj = foobarLiteral;
+    	Value actual = HalyardTableUtils.getObject(table, rdfFactory.id(obj), vf, rdfFactory);
+    	assertEquals(obj, actual);
     }
 
     private static <E> void assertSets(Set<E> expected, Set<E> actual) {

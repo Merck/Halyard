@@ -553,7 +553,7 @@ public final class HalyardTableUtils {
 
 	public static Resource getSubject(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, table);
-		Scan scan = scan(rdfFactory.getSPOIndex(), id);
+		Scan scan = scanSingle(rdfFactory.getSPOIndex(), id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
@@ -568,7 +568,7 @@ public final class HalyardTableUtils {
 
 	public static IRI getPredicate(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, table);
-		Scan scan = scan(rdfFactory.getPOSIndex(), id);
+		Scan scan = scanSingle(rdfFactory.getPOSIndex(), id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
@@ -583,7 +583,7 @@ public final class HalyardTableUtils {
 
 	public static Value getObject(Table table, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, table);
-		Scan scan = scan(rdfFactory.getOSPIndex(), id);
+		Scan scan = scanSingle(rdfFactory.getOSPIndex(), id);
 		try (ResultScanner scanner = table.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
@@ -596,10 +596,11 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	private static Scan scan(StatementIndex<?,?,?,?> index, Identifier id) {
+	private static Scan scanSingle(StatementIndex<?,?,?,?> index, Identifier id) {
 		Scan scanAll = index.scan(id);
-		return scan(scanAll.getStartRow(), scanAll.getStopRow())
-			.setFilter(new FilterList(scanAll.getFilter(), new FirstKeyOnlyFilter())).setOneRowLimit();
+		return scan(scanAll.getStartRow(), scanAll.getStopRow(), 1, false)
+			.setFilter(new FilterList(scanAll.getFilter(), new FirstKeyOnlyFilter()))
+			.setOneRowLimit();
 	}
 
 	/**
@@ -662,14 +663,19 @@ public final class HalyardTableUtils {
      * Helper method constructing a custom HBase Scan from given arguments
      * @param startRow start row key byte array (inclusive)
      * @param stopRow stop row key byte array (exclusive)
+     * @param rowBatchSize number of rows to fetch per RPC
+     * @param indiscriminate if the scan is indiscriminate (e.g. full table scan)
      * @return HBase Scan instance
      */
-	static Scan scan(byte[] startRow, byte[] stopRow) {
+	static Scan scan(byte[] startRow, byte[] stopRow, int rowBatchSize, boolean indiscriminate) {
         Scan scan = new Scan();
         scan.addFamily(CF_NAME);
 		scan.readVersions(READ_VERSIONS);
         scan.setAllowPartialResults(true);
         scan.setBatch(10);
+        scan.setCaching(rowBatchSize);
+        // dont cause the block cache to be flushed when doing an indiscriminate scan
+        scan.setCacheBlocks(!indiscriminate);
         if(startRow != null) {
 			scan.withStartRow(startRow);
         }
