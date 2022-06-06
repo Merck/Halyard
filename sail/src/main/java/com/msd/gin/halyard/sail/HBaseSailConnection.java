@@ -471,7 +471,7 @@ public class HBaseSailConnection implements SailConnection {
 		}
         try {
 			for (Resource ctx : contexts) {
-				for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, false, timestamp, sail.getRDFFactory())) { // serialize the key value pairs relating to the statement in HBase
+				for (KeyValue kv : HalyardTableUtils.addKeyValues(subj, pred, obj, ctx, timestamp, sail.getRDFFactory())) { // serialize the key value pairs relating to the statement in HBase
 					put(kv);
 				}
 			}
@@ -520,7 +520,7 @@ public class HBaseSailConnection implements SailConnection {
 		checkWritable();
 		try {
 			for (Resource ctx : contexts) {
-				for (KeyValue kv : HalyardTableUtils.toKeyValues(subj, pred, obj, ctx, true, timestamp, sail.getRDFFactory())) { // calculate the kv's corresponding to the quad (or triple)
+				for (KeyValue kv : HalyardTableUtils.deleteKeyValues(subj, pred, obj, ctx, timestamp, sail.getRDFFactory())) { // calculate the kv's corresponding to the quad (or triple)
 					delete(kv);
 				}
 			}

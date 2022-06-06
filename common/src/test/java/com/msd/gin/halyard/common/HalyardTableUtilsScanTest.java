@@ -170,7 +170,7 @@ public class HalyardTableUtilsScanTest {
         long timestamp = System.currentTimeMillis();
 		List<Put> puts = new ArrayList<>();
         for (Statement st : allStatements) {
-            for (Cell kv : HalyardTableUtils.toKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext(), false, timestamp, rdfFactory)) {
+            for (Cell kv : HalyardTableUtils.addKeyValues(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext(), timestamp, rdfFactory)) {
 				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
             }
         }

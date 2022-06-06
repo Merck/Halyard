@@ -321,6 +321,13 @@ public final class HalyardTableUtils {
 		}
 	}
 
+	public static List<? extends KeyValue> addKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, RDFFactory rdfFactory) {
+		return toKeyValues(subj, pred, obj, context, false, timestamp, rdfFactory);
+	}
+	public static List<? extends KeyValue> deleteKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, RDFFactory rdfFactory) {
+		return toKeyValues(subj, pred, obj, context, true, timestamp, rdfFactory);
+	}
+
 	/**
      * Conversion method from Subj, Pred, Obj and optional Context into an array of HBase keys
      * @param subj subject Resource
@@ -336,11 +343,11 @@ public final class HalyardTableUtils {
 		List<KeyValue> kvs =  new ArrayList<KeyValue>(context == null ? PREFIXES : 2 * PREFIXES);
         KeyValue.Type type = delete ? KeyValue.Type.DeleteColumn : KeyValue.Type.Put;
 		timestamp = toHalyardTimestamp(timestamp, !delete);
-		appendKeyValues(subj, pred, obj, context, type, timestamp, kvs, rdfFactory);
+		appendKeyValues(subj, pred, obj, context, type, timestamp, true, kvs, rdfFactory);
 		return kvs;
 	}
 
-    private static void appendKeyValues(Resource subj, IRI pred, Value obj, Resource context, KeyValue.Type type, long timestamp, List<KeyValue> kvs, RDFFactory rdfFactory) {
+    private static void appendKeyValues(Resource subj, IRI pred, Value obj, Resource context, KeyValue.Type type, long timestamp, boolean includeInDefaultGraph, List<KeyValue> kvs, RDFFactory rdfFactory) {
     	if(subj == null || pred == null || obj == null) {
     		throw new NullPointerException();
     	}
@@ -361,9 +368,11 @@ public final class HalyardTableUtils {
         StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = rdfFactory.getCOSPIndex();
 
         // generate HBase key value pairs from: row, family, qualifier, value. Permutations of SPO (and if needed CSPO) are all stored.
-		kvs.add(new KeyValue(spo.row(sb, pb, ob, cb), CF_NAME, spo.qualifier(sb, pb, ob, cb), timestamp, type, spo.value(sb, pb, ob, cb)));
-		kvs.add(new KeyValue(pos.row(pb, ob, sb, cb), CF_NAME, pos.qualifier(pb, ob, sb, cb), timestamp, type, pos.value(pb, ob, sb, cb)));
-		kvs.add(new KeyValue(osp.row(ob, sb, pb, cb), CF_NAME, osp.qualifier(ob, sb, pb, cb), timestamp, type, osp.value(ob, sb, pb, cb)));
+        if (includeInDefaultGraph) {
+			kvs.add(new KeyValue(spo.row(sb, pb, ob, cb), CF_NAME, spo.qualifier(sb, pb, ob, cb), timestamp, type, spo.value(sb, pb, ob, cb)));
+			kvs.add(new KeyValue(pos.row(pb, ob, sb, cb), CF_NAME, pos.qualifier(pb, ob, sb, cb), timestamp, type, pos.value(pb, ob, sb, cb)));
+			kvs.add(new KeyValue(osp.row(ob, sb, pb, cb), CF_NAME, osp.qualifier(ob, sb, pb, cb), timestamp, type, osp.value(ob, sb, pb, cb)));
+        }
         if (context != null) {
         	kvs.add(new KeyValue(cspo.row(cb, sb, pb, ob), CF_NAME, cspo.qualifier(cb, sb, pb, ob), timestamp, type, cspo.value(cb, sb, pb, ob)));
         	kvs.add(new KeyValue(cpos.row(cb, pb, ob, sb), CF_NAME, cpos.qualifier(cb, pb, ob, sb), timestamp, type, cpos.value(cb, pb, ob, sb)));
@@ -372,12 +381,12 @@ public final class HalyardTableUtils {
 
 		if (subj.isTriple()) {
 			Triple t = (Triple) subj;
-			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, kvs, rdfFactory);
+			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, false, kvs, rdfFactory);
 		}
 
 		if (obj.isTriple()) {
 			Triple t = (Triple) obj;
-			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, kvs, rdfFactory);
+			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, false, kvs, rdfFactory);
 		}
     }
 

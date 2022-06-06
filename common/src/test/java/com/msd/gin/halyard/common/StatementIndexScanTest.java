@@ -87,7 +87,7 @@ public class StatementIndexScanTest {
         long timestamp = System.currentTimeMillis();
 		List<Put> puts = new ArrayList<>();
 		for (Statement stmt : allStatements) {
-            for (Cell kv : HalyardTableUtils.toKeyValues(stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), stmt.getContext(), false, timestamp, rdfFactory)) {
+            for (Cell kv : HalyardTableUtils.addKeyValues(stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), stmt.getContext(), timestamp, rdfFactory)) {
 				puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
             }
 		}

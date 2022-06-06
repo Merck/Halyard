@@ -31,6 +31,7 @@ import org.apache.hadoop.hbase.client.Table;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -88,7 +89,7 @@ public class HalyardTableUtilsTest {
         IRI pred = vf.createIRI("http://testBigLiteral/pred/");
         Value obj = vf.createLiteral(RandomStringUtils.random(100000));
 		List<Put> puts = new ArrayList<>();
-        for (Cell kv : HalyardTableUtils.toKeyValues(subj, pred, obj, null, false, System.currentTimeMillis(), rdfFactory)) {
+        for (Cell kv : HalyardTableUtils.addKeyValues(subj, pred, obj, null, System.currentTimeMillis(), rdfFactory)) {
 			puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
 		table.put(puts);
@@ -115,8 +116,8 @@ public class HalyardTableUtilsTest {
         Value obj1 = vf.createLiteral("literal1");
         Value obj2 = vf.createLiteral("literal2");
         long timestamp = System.currentTimeMillis();
-        List<? extends Cell> kv1 = HalyardTableUtils.toKeyValues(subj, pred1, obj1, null, false, timestamp, rdfFactory);
-        List<? extends Cell> kv2 = HalyardTableUtils.toKeyValues(subj, pred2, obj2, null, false, timestamp, rdfFactory);
+        List<? extends Cell> kv1 = HalyardTableUtils.addKeyValues(subj, pred1, obj1, null, timestamp, rdfFactory);
+        List<? extends Cell> kv2 = HalyardTableUtils.addKeyValues(subj, pred2, obj2, null, timestamp, rdfFactory);
 		List<Put> puts = new ArrayList<>();
         for (int i=0; i<3; i++) {
         	Cell cell1 = kv1.get(i);
@@ -149,7 +150,7 @@ public class HalyardTableUtilsTest {
         IRI pred = vf.createIRI("http://whatever/pred/");
         Value expl = vf.createLiteral("explicit");
 		List<Put> puts = new ArrayList<>();
-        for (Cell kv : HalyardTableUtils.toKeyValues(subj, pred, expl, null, false, System.currentTimeMillis(), rdfFactory)) {
+        for (Cell kv : HalyardTableUtils.addKeyValues(subj, pred, expl, null, System.currentTimeMillis(), rdfFactory)) {
 			puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
 		table.put(puts);
@@ -186,8 +187,20 @@ public class HalyardTableUtilsTest {
     @Test
     public void testToKeyValuesDelete() throws Exception {
         IRI res = SimpleValueFactory.getInstance().createIRI("http://testiri");
-        List<? extends Cell> kvs = HalyardTableUtils.toKeyValues(res, res, res, res, true, 0, rdfFactory);
+        List<? extends Cell> kvs = HalyardTableUtils.deleteKeyValues(res, res, res, res, 0, rdfFactory);
         assertEquals(6, kvs.size());
+        for (Cell kv : kvs) {
+            assertEquals(Cell.Type.DeleteColumn, kv.getType());
+        }
+    }
+
+    @Test
+    public void testToKeyValuesTripleDelete() throws Exception {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        IRI res = vf.createIRI("http://testiri");
+        Triple t = vf.createTriple(res, res, res);
+        List<? extends Cell> kvs = HalyardTableUtils.deleteKeyValues(t, res, t, res, 0, rdfFactory);
+        assertEquals(12, kvs.size());
         for (Cell kv : kvs) {
             assertEquals(Cell.Type.DeleteColumn, kv.getType());
         }

@@ -211,7 +211,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
         @Override
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
-            for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, timestamp, rdfFactory)) {
+            for (KeyValue keyValue: HalyardTableUtils.addKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), timestamp, rdfFactory)) {
                 rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                 context.write(rowKey, keyValue);
             }

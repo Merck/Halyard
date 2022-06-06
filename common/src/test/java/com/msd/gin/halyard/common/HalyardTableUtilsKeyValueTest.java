@@ -84,7 +84,7 @@ public class HalyardTableUtilsKeyValueTest {
 		long ts = 0;
 		Resource ctx = c != null ? c.val : null;
 		Statement expected = vf.createStatement(s.val, p.val, o.val, ctx);
-		List<? extends Cell> kvs = HalyardTableUtils.toKeyValues(s.val, p.val, o.val, ctx, false, ts, rdfFactory);
+		List<? extends Cell> kvs = HalyardTableUtils.addKeyValues(s.val, p.val, o.val, ctx, ts, rdfFactory);
 		for(Cell kv : kvs) {
 			testParseStatement("spoc", expected, s, p, o, c != null ? c : null, kv, ts);
 			testParseStatement("_poc", expected, null, p, o, c != null ? c : null, kv, ts);
