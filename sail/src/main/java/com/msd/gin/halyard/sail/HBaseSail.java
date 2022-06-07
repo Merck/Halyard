@@ -237,7 +237,7 @@ public class HBaseSail implements Sail {
 				}
 			}
 
-			keyspace = HalyardTableUtils.getKeyspace(hConnection, tableName, config, snapshotName, snapshotRestorePath);
+			keyspace = HalyardTableUtils.getKeyspace(config, hConnection, tableName, snapshotName, snapshotRestorePath);
 			try (KeyspaceConnection keyspaceConn = keyspace.getConnection()) {
 				rdfFactory = RDFFactory.create(keyspaceConn);
 			}

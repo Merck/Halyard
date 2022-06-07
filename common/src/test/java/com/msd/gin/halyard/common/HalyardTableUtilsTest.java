@@ -199,7 +199,7 @@ public class HalyardTableUtilsTest {
         ValueFactory vf = SimpleValueFactory.getInstance();
         IRI res = vf.createIRI("http://testiri");
         Triple t = vf.createTriple(res, res, res);
-        List<? extends Cell> kvs = HalyardTableUtils.deleteKeyValues(t, res, t, res, 0, rdfFactory);
+        List<? extends Cell> kvs = HalyardTableUtils.toKeyValues(t, res, t, res, true, true, 0, rdfFactory);
         assertEquals(12, kvs.size());
         for (Cell kv : kvs) {
             assertEquals(Cell.Type.DeleteColumn, kv.getType());

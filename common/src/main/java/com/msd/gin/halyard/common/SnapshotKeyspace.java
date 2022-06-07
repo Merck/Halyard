@@ -1,11 +1,13 @@
 package com.msd.gin.halyard.common;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -37,11 +39,6 @@ final class SnapshotKeyspace implements Keyspace {
 	}
 
 	@Override
-	public TableName getTableName() {
-		return null;
-	}
-
-	@Override
 	public KeyspaceConnection getConnection() {
 		return new SnapshotKeyspaceConnection();
 	}
@@ -51,6 +48,18 @@ final class SnapshotKeyspace implements Keyspace {
 		TableMapReduceUtil.initTableSnapshotMapperJob(
 			snapshotName,
 			scan,
+			mapper,
+			outputKeyClass,
+			outputValueClass,
+			job,
+			true,
+			restoreDir);
+	}
+
+	@Override
+	public void initMapperJob(List<Scan> scans, Class<? extends TableMapper<?,?>> mapper, Class<?> outputKeyClass, Class<?> outputValueClass, Job job) throws IOException {
+        TableMapReduceUtil.initMultiTableSnapshotMapperJob(
+            Collections.singletonMap(snapshotName, (Collection<Scan>) scans),
 			mapper,
 			outputKeyClass,
 			outputValueClass,

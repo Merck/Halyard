@@ -166,12 +166,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 
 								@Override
 								protected void delete(KeyValue kv) throws IOException {
-								    kv = new KeyValue(kv.getRowArray(), kv.getRowOffset(), (int) kv.getRowLength(),
-								            kv.getFamilyArray(), kv.getFamilyOffset(), (int) kv.getFamilyLength(),
-								            kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength(),
-								            kv.getTimestamp(), KeyValue.Type.DeleteColumn, kv.getValueArray(), kv.getValueOffset(),
-								            kv.getValueLength());
-								    rowKey.set(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength());
+									rowKey.set(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength());
 									try {
 										context.write(rowKey, kv);
 									} catch (InterruptedException ex) {
@@ -208,20 +203,17 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 	                        LOG.info("Execution of: {}", query);
 	                        context.setStatus(name);
 	                        upd.execute();
-	                        context.setStatus(name + " - " + addedKvs.get() + " added " + removedKvs.get() + " removed");
-	                        context.getCounter(Counters.ADDED_KVS).increment(addedKvs.get());
-	                        context.getCounter(Counters.REMOVED_KVS).increment(removedKvs.get());
-	                        LOG.info("Query finished with {} KeyValues added and {} removed", addedKvs.get(), removedKvs.get());
                         }
                     } finally {
                         rep.shutDown();
                     }
-                } catch (RepositoryException | MalformedQueryException | QueryEvaluationException | RDFHandlerException ex) {
-                    LOG.error("Error running update", ex);
-                    throw new IOException(ex);
                 } finally {
                     FunctionRegistry.getInstance().remove(fn);
                 }
+                context.setStatus(name + " - " + addedKvs.get() + " added " + removedKvs.get() + " removed");
+                context.getCounter(Counters.ADDED_KVS).increment(addedKvs.get());
+                context.getCounter(Counters.REMOVED_KVS).increment(removedKvs.get());
+                LOG.info("Query finished with {} KeyValues added and {} removed", addedKvs.get(), removedKvs.get());
             }
         }
     }

@@ -42,10 +42,12 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.RDFS;
 import org.eclipse.rdf4j.model.vocabulary.SD;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.BooleanQuery;
@@ -62,6 +64,7 @@ import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -718,6 +721,30 @@ public class HBaseSailTest {
     }
 
 	@Test
+	public void testAddDeleteTriple() throws Exception {
+		String table = "whatevertable";
+		HBaseSail sail = new HBaseSail(hconn, useTable(table), true, 0, usePushStrategy, 0, null, null);
+		sail.initialize();
+		ValueFactory vf = sail.getValueFactory();
+		Triple t = vf.createTriple(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createLiteral("whatever"));
+		Triple t1 = vf.createTriple(vf.createIRI("http://whatever/subj1"), vf.createIRI("http://whatever/pred1"), t);
+		Triple t2 = vf.createTriple(vf.createIRI("http://whatever/subj2"), vf.createIRI("http://whatever/pred2"), t);
+		try (SailConnection conn = sail.getConnection()) {
+			conn.addStatement(t1, RDFS.COMMENT, vf.createLiteral(1));
+			conn.addStatement(t2, RDFS.COMMENT, vf.createLiteral(2));
+			assertCount(conn, 2);
+			assertTripleCount(conn, 3);
+			conn.removeStatements(t2, RDFS.COMMENT, vf.createLiteral(2));
+			assertCount(conn, 1);
+			assertTripleCount(conn, 2);
+			conn.removeStatements(t1, RDFS.COMMENT, vf.createLiteral(1));
+			assertCount(conn, 0);
+			assertTripleCount(conn, 0);
+		}
+		sail.shutDown();
+	}
+
+	@Test
     public void testSnapshot() throws Exception {
 		String table = "whatevertable";
 		HBaseSail sail = new HBaseSail(hconn, useTable(table), true, 0, usePushStrategy, 0, null, null);
@@ -749,5 +776,27 @@ public class HBaseSailTest {
 		try (Admin admin = hconn.getAdmin()) {
 			admin.deleteSnapshot(snapshot);
 		}
+	}
+
+	private static void assertCount(SailConnection conn, int expected) throws Exception {
+		int count = 0;
+		try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, true)) {
+			while (iter.hasNext()) {
+				iter.next();
+				count++;
+			}
+		}
+		Assert.assertEquals(expected, count);
+	}
+
+	private static void assertTripleCount(SailConnection conn, int expected) throws Exception {
+		int count = 0;
+		try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, true, HALYARD.TRIPLE_GRAPH_CONTEXT)) {
+			while (iter.hasNext()) {
+				iter.next();
+				count++;
+			}
+		}
+		Assert.assertEquals(expected, count);
 	}
 }

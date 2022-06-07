@@ -19,8 +19,11 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.TableName;
@@ -30,8 +33,8 @@ import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Assert;
@@ -52,15 +55,16 @@ public class HalyardBulkDeleteTest extends AbstractHalyardToolTest {
 	}
 
 	private static void createData() throws Exception {
-        ValueFactory vf = SimpleValueFactory.getInstance();
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(conf, TABLE, true, -1, true, 0, null, null);
         sail.initialize();
+        ValueFactory vf = sail.getValueFactory();
         IRI pred = vf.createIRI("http://whatever/pred");
+        Triple t = vf.createTriple(vf.createIRI("http://triple/whatever"), pred, vf.createLiteral("triple"));
 		try (SailConnection conn = sail.getConnection()) {
 			for (int i = 0; i < 5; i++) {
 				for (int j = 0; j < 5; j++) {
-					Resource subj = vf.createIRI("http://whatever/subj" + i);
+					Resource subj = (i == 0) ? vf.createTriple(vf.createBNode(), pred, t) : vf.createIRI("http://whatever/subj" + i);
 					Resource obj = vf.createIRI("http://whatever/obj" + j);
 					Resource ctx = (i == 0) ? null : vf.createIRI("http://whatever/ctx" + i);
 					conn.addStatement(subj, pred, obj, ctx);
@@ -68,6 +72,8 @@ public class HalyardBulkDeleteTest extends AbstractHalyardToolTest {
 			}
         }
         sail.shutDown();
+        assertCount(25);
+        assertTripleCount(6);
 	}
 
 	@Test
@@ -76,14 +82,17 @@ public class HalyardBulkDeleteTest extends AbstractHalyardToolTest {
         File htableDir = getTempHTableDir("test_htable");
         assertEquals(0, run(new String[]{ "-t", TABLE, "-o", "<http://whatever/obj0>", "-g", HalyardBulkDelete.DEFAULT_GRAPH_KEYWORD, "-g", "<http://whatever/ctx1>", "-w", htableDir.toURI().toURL().toString()}));
         assertCount(23);
+        assertTripleCount(5);
 
         htableDir = getTempHTableDir("test_htable");
         assertEquals(0, run(new String[]{ "-t", TABLE, "-s", "<http://whatever/subj2>", "-w", htableDir.toURI().toURL().toString()}));
         assertCount(18);
+        assertTripleCount(5);
 
         htableDir = getTempHTableDir("test_htable");
         assertEquals(0, run(new String[]{ "-t", TABLE, "-p", "<http://whatever/pred>", "-w", htableDir.toURI().toURL().toString()}));
         assertCount(0);
+        assertTripleCount(0);
     }
 
 	@Test
@@ -101,16 +110,19 @@ public class HalyardBulkDeleteTest extends AbstractHalyardToolTest {
         File restoredSnapshot = getTempSnapshotDir("restored_snapshot");
         assertEquals(0, run(new String[]{ "-n", snapshot, "-t", TABLE, "-o", "<http://whatever/obj0>", "-g", HalyardBulkDelete.DEFAULT_GRAPH_KEYWORD, "-g", "<http://whatever/ctx1>", "-w", htableDir.toURI().toURL().toString(), "-u", restoredSnapshot.toURI().toURL().toString()}));
         assertCount(23);
+        assertTripleCount(5);
 
         htableDir = getTempHTableDir("test_htable_snapshot");
         restoredSnapshot = getTempSnapshotDir("restored_snapshot");
         assertEquals(0, run(new String[]{ "-n", snapshot, "-t", TABLE, "-s", "<http://whatever/subj2>", "-w", htableDir.toURI().toURL().toString(), "-u", restoredSnapshot.toURI().toURL().toString()}));
         assertCount(18);
+        assertTripleCount(5);
 
         htableDir = getTempHTableDir("test_htable_snapshot");
         restoredSnapshot = getTempSnapshotDir("restored_snapshot");
         assertEquals(0, run(new String[]{ "-n", snapshot, "-t", TABLE, "-p", "<http://whatever/pred>", "-w", htableDir.toURI().toURL().toString(), "-u", restoredSnapshot.toURI().toURL().toString()}));
         assertCount(0);
+        assertTripleCount(0);
     }
 
     private static void assertCount(int expected) throws Exception {
@@ -118,14 +130,33 @@ public class HalyardBulkDeleteTest extends AbstractHalyardToolTest {
         sail.initialize();
         try {
 			try (SailConnection conn = sail.getConnection()) {
-				int count = 0;
+				List<Statement> stmts = new ArrayList<>();
 				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, true)) {
 					while (iter.hasNext()) {
-						iter.next();
-						count++;
+						Statement stmt = iter.next();
+						stmts.add(stmt);
 					}
 				}
-				Assert.assertEquals(expected, count);
+				Assert.assertEquals(stmts.toString(), expected, stmts.size());
+			}
+        } finally {
+            sail.shutDown();
+        }
+    }
+
+    private static void assertTripleCount(int expected) throws Exception {
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
+        sail.initialize();
+        try {
+			try (SailConnection conn = sail.getConnection()) {
+				List<Statement> stmts = new ArrayList<>();
+				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, true, HALYARD.TRIPLE_GRAPH_CONTEXT)) {
+					while (iter.hasNext()) {
+						Statement stmt = iter.next();
+						stmts.add(stmt);
+					}
+				}
+				Assert.assertEquals(stmts.toString(), expected, stmts.size());
 			}
         } finally {
             sail.shutDown();

@@ -45,7 +45,7 @@ public class HBaseSailAddRemoveTest {
     private static final Value OBJ = SimpleValueFactory.getInstance().createLiteral("whatever literal");
     private static final IRI CONTEXT = SimpleValueFactory.getInstance().createIRI("http://whatever/cont/");
 
-    private static HBaseSail explicitSail;
+    private static HBaseSail sail;
 
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
@@ -63,13 +63,13 @@ public class HBaseSailAddRemoveTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        explicitSail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "testAddRemove", true, 0, true, 0, null, null);
-        explicitSail.initialize();
+        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "testAddRemove", true, 0, true, 0, null, null);
+        sail.initialize();
     }
 
     @AfterClass
     public static void teardown() throws Exception {
-        explicitSail.shutDown();
+        sail.shutDown();
     }
 
     private final Resource subj;
@@ -84,9 +84,9 @@ public class HBaseSailAddRemoveTest {
 
     @Test
     public void testAddAndRemoveExplicitStatements() throws Exception {
-		try (SailConnection conn = explicitSail.getConnection()) {
-			conn.addStatement(null, SUBJ, PRED, OBJ);
-			conn.addStatement(null, SUBJ, PRED, OBJ, CONTEXT);
+		try (SailConnection conn = sail.getConnection()) {
+			conn.addStatement(SUBJ, PRED, OBJ);
+			conn.addStatement(SUBJ, PRED, OBJ, CONTEXT);
 			CloseableIteration<? extends Statement, SailException> iter;
 			iter = conn.getStatements(null, null, null, true);
 			assertTrue(iter.hasNext());
@@ -117,4 +117,9 @@ public class HBaseSailAddRemoveTest {
 			iter.close();
 		}
     }
+
+	@Test
+	public void testAddRemoveTriple() {
+
+	}
 }

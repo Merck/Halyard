@@ -59,6 +59,7 @@ import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
@@ -128,6 +129,7 @@ public class HBaseSailConnection implements SailConnection {
 
     @Override
     public void close() throws SailException {
+    	flush();
 		if (mutator != null) {
 			try {
 				mutator.close();
@@ -464,14 +466,15 @@ public class HBaseSailConnection implements SailConnection {
     }
 
     private void checkWritable() {
-		if (keyspaceConn == null)
+		if (keyspaceConn == null) {
 			throw new IllegalStateException("Connection is closed");
+		}
 		if (!sail.isWritable()) {
 			throw new SailException(sail.tableName + " is read only");
 		}
     }
 
-	protected void addStatementInternal(Resource subj, IRI pred, Value obj, Resource[] contexts, long timestamp) throws SailException {
+	private void addStatementInternal(Resource subj, IRI pred, Value obj, Resource[] contexts, long timestamp) throws SailException {
     	checkWritable();
 		if (contexts == null || contexts.length == 0) {
 			// if all contexts then insert into the default context
@@ -479,14 +482,18 @@ public class HBaseSailConnection implements SailConnection {
 		}
         try {
 			for (Resource ctx : contexts) {
-				for (KeyValue kv : HalyardTableUtils.addKeyValues(subj, pred, obj, ctx, timestamp, sail.getRDFFactory())) { // serialize the key value pairs relating to the statement in HBase
-					put(kv);
-				}
+				addStatement(subj, pred, obj, ctx, timestamp);
 			}
         } catch (IOException e) {
             throw new SailException(e);
         }
     }
+
+	private void addStatement(Resource subj, IRI pred, Value obj, Resource ctx, long timestamp) throws IOException {
+		for (KeyValue kv : HalyardTableUtils.addKeyValues(subj, pred, obj, ctx, timestamp, sail.getRDFFactory())) {
+			put(kv);
+		}
+	}
 
 	protected void put(KeyValue kv) throws IOException {
 		getBufferedMutator().mutate(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
@@ -507,7 +514,7 @@ public class HBaseSailConnection implements SailConnection {
 			try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
 				while (iter.hasNext()) {
 					Statement st = iter.next();
-					removeStatementInternal(op, st.getSubject(), st.getPredicate(), st.getObject(), new Resource[] { st.getContext() }, timestamp);
+					removeStatementInternal(st.getSubject(), st.getPredicate(), st.getObject(), new Resource[] { st.getContext() }, timestamp);
 				}
 			}
 		}
@@ -515,32 +522,55 @@ public class HBaseSailConnection implements SailConnection {
 
     @Override
     public void removeStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
-		if (subj == null || pred == null || obj == null || contexts == null || contexts.length == 0) {
-			removeStatements(op, subj, pred, obj, contexts);
-		} else {
+		if (subj != null && pred != null && obj != null && contexts != null && contexts.length > 0) {
 			long timestamp = getTimestamp(op, true);
-			removeStatementInternal(op, subj, pred, obj, contexts, timestamp);
+			removeStatementInternal(subj, pred, obj, contexts, timestamp);
+		} else {
+			removeStatements(op, subj, pred, obj, contexts);
 		}
     }
 
-	protected void removeStatementInternal(UpdateContext op, Resource subj, IRI pred, Value obj, Resource[] contexts, long timestamp) throws SailException {
-		assert contexts != null && contexts.length > 0;
+	private void removeStatementInternal(Resource subj, IRI pred, Value obj, Resource[] contexts, long timestamp) throws SailException {
 		checkWritable();
 		try {
 			for (Resource ctx : contexts) {
-				for (KeyValue kv : HalyardTableUtils.deleteKeyValues(subj, pred, obj, ctx, timestamp, sail.getRDFFactory())) { // calculate the kv's corresponding to the quad (or triple)
-					delete(kv);
-				}
+				deleteStatement(subj, pred, obj, ctx, timestamp);
+			}
+			if (subj.isTriple()) {
+				removeTriple((Triple) subj, timestamp);
+			}
+			if (obj.isTriple()) {
+				removeTriple((Triple) obj, timestamp);
 			}
 		} catch (IOException e) {
 			throw new SailException(e);
 		}
 	}
 
+	protected void removeTriple(Triple t, Long timestamp) throws IOException {
+		flush();
+		if (!HalyardTableUtils.isTripleReferenced(keyspaceConn, t, sail.getRDFFactory())) {
+			// orphaned so safe to remove
+			deleteStatement(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, timestamp);
+			if (t.getSubject().isTriple()) {
+				removeTriple((Triple) t.getSubject(), timestamp);
+			}
+			if (t.getObject().isTriple()) {
+				removeTriple((Triple) t.getObject(), timestamp);
+			}
+		}
+	}
+
+	private void deleteStatement(Resource subj, IRI pred, Value obj, Resource ctx, long timestamp) throws IOException {
+		for (KeyValue kv : HalyardTableUtils.deleteKeyValues(subj, pred, obj, ctx, timestamp, sail.getRDFFactory())) {
+			delete(kv);
+		}
+	}
+
 	protected void delete(KeyValue kv) throws IOException {
 		getBufferedMutator().mutate(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).add(kv));
 		pendingUpdates = true;
-    }
+	}
 
     @Override
     public boolean pendingRemovals() {
@@ -560,8 +590,7 @@ public class HBaseSailConnection implements SailConnection {
         removeStatements(null, null, null, contexts); //remove all statements in the contexts.
     }
 
-    private void clearAllStatements() throws SailException {
-    	checkWritable();
+	private void clearAllStatements() throws SailException {
         try {
 			Get getConfig = new Get(HalyardTableUtils.CONFIG_ROW_KEY);
 			Result config = keyspaceConn.get(getConfig);

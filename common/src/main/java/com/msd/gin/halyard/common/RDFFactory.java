@@ -17,9 +17,8 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.filter.FilterList;
-import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
@@ -432,15 +431,20 @@ public class RDFFactory {
 			RDFIdentifier<SPOC.S> skey = createSubjectId(id(sid));
 			RDFIdentifier<SPOC.P> pkey = createPredicateId(id(pid));
 			RDFIdentifier<SPOC.O> okey = createObjectId(id(oid));
-			Scan scan = cspo.scan(ckey, skey, pkey, okey);
-			Get get = new Get(scan.getStartRow())
-				.setFilter(new FilterList(scan.getFilter(), new FirstKeyOnlyFilter()));
-			get.addFamily(HalyardTableUtils.CF_NAME);
+			Scan scan = HalyardTableUtils.scanSingle(cspo.scan(ckey, skey, pkey, okey));
 			try {
-				get.readVersions(HalyardTableUtils.READ_VERSIONS);
-				Result result = conn.get(get);
-				assert result.rawCells().length == 1;
-				Statement stmt = HalyardTableUtils.parseStatement(null, null, null, ckey, result.rawCells()[0], valueReader, RDFFactory.this);
+				Result result;
+				try (ResultScanner scanner = conn.getScanner(scan)) {
+					result = scanner.next();
+				}
+				if (result == null) {
+					throw new IOException("Triple not found");
+				}
+				Cell[] cells = result.rawCells();
+				if (cells == null || cells.length == 0) {
+					throw new IOException("Triple not found");
+				}
+				Statement stmt = HalyardTableUtils.parseStatement(null, null, null, ckey, cells[0], valueReader, RDFFactory.this);
 				return valueReader.getValueFactory().createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
 			} catch (IOException ioe) {
 				throw new RuntimeException(ioe);

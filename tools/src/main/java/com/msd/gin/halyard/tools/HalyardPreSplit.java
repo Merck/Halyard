@@ -97,7 +97,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
             if (counter++ == next) {
                 next = counter + random.nextInt(decimationFactor);
-                for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, 0, rdfFactory)) {
+                for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, true, 0, rdfFactory)) {
                     rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                     keyValueLength.set(keyValue.getLength());
                     context.write(rowKey, keyValueLength);

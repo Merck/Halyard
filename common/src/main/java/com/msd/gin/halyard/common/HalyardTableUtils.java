@@ -180,25 +180,26 @@ public final class HalyardTableUtils {
     }
 
     public static Keyspace getKeyspace(Configuration conf, String sourceName, String restorePathName) throws IOException {
-    	Connection conn;
     	TableName tableName;
     	Path restorePath;
         if (restorePathName != null) {
-        	conn = null;
         	tableName = null;
         	restorePath = new Path(restorePathName);
         } else {
-        	conn = getConnection(conf);
         	tableName = TableName.valueOf(sourceName);
         	restorePath = null;
         }
-        return getKeyspace(conn, tableName, conf, sourceName, restorePath);
+        return getKeyspace(conf, null, tableName, sourceName, restorePath);
     }
 
-    public static Keyspace getKeyspace(Connection conn, TableName tableName, Configuration conf, String snapshotName, Path restorePath) throws IOException {
+    public static Keyspace getKeyspace(Configuration conf, Connection conn, TableName tableName, String snapshotName, Path restorePath) throws IOException {
     	Keyspace keyspace;
-    	if (conn != null && tableName != null) {
-            keyspace = new TableKeyspace(conn, tableName);
+    	if (tableName != null) {
+    		if (conn != null) {
+    			keyspace = new TableKeyspace(conn, tableName);
+    		} else {
+    			keyspace = new TableKeyspace(conf, tableName);
+    		}
     	} else if (snapshotName != null && restorePath != null) {
             keyspace = new SnapshotKeyspace(conf, snapshotName, restorePath);
         } else {
@@ -322,10 +323,10 @@ public final class HalyardTableUtils {
 	}
 
 	public static List<? extends KeyValue> addKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, RDFFactory rdfFactory) {
-		return toKeyValues(subj, pred, obj, context, false, timestamp, rdfFactory);
+		return toKeyValues(subj, pred, obj, context, false, true, timestamp, rdfFactory);
 	}
 	public static List<? extends KeyValue> deleteKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, RDFFactory rdfFactory) {
-		return toKeyValues(subj, pred, obj, context, true, timestamp, rdfFactory);
+		return toKeyValues(subj, pred, obj, context, true, false, timestamp, rdfFactory);
 	}
 
 	/**
@@ -334,20 +335,21 @@ public final class HalyardTableUtils {
      * @param pred predicate IRI
      * @param obj object Value
      * @param context optional context Resource
-     * @param delete boolean switch whether to get KeyValues for deletion instead of for insertion
+     * @param delete boolean switch to produce KeyValues for deletion instead of for insertion
+     * @param includeTriples boolean switch to include KeyValues for triples 
      * @param timestamp long timestamp value for time-ordering purposes
      * @param rdfFactory RDFFactory
      * @return List of KeyValues
      */
-	public static List<? extends KeyValue> toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, long timestamp, RDFFactory rdfFactory) {
+	public static List<? extends KeyValue> toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, boolean includeTriples, long timestamp, RDFFactory rdfFactory) {
 		List<KeyValue> kvs =  new ArrayList<KeyValue>(context == null ? PREFIXES : 2 * PREFIXES);
         KeyValue.Type type = delete ? KeyValue.Type.DeleteColumn : KeyValue.Type.Put;
 		timestamp = toHalyardTimestamp(timestamp, !delete);
-		appendKeyValues(subj, pred, obj, context, type, timestamp, true, kvs, rdfFactory);
+		appendKeyValues(subj, pred, obj, context, type, timestamp, true, includeTriples, kvs, rdfFactory);
 		return kvs;
 	}
 
-    private static void appendKeyValues(Resource subj, IRI pred, Value obj, Resource context, KeyValue.Type type, long timestamp, boolean includeInDefaultGraph, List<KeyValue> kvs, RDFFactory rdfFactory) {
+    private static void appendKeyValues(Resource subj, IRI pred, Value obj, Resource context, KeyValue.Type type, long timestamp, boolean includeInDefaultGraph, boolean includeTriples, List<KeyValue> kvs, RDFFactory rdfFactory) {
     	if(subj == null || pred == null || obj == null) {
     		throw new NullPointerException();
     	}
@@ -379,15 +381,17 @@ public final class HalyardTableUtils {
         	kvs.add(new KeyValue(cosp.row(cb, ob, sb, pb), CF_NAME, cosp.qualifier(cb, ob, sb, pb), timestamp, type, cosp.value(cb, ob, sb, pb)));
         }
 
-		if (subj.isTriple()) {
-			Triple t = (Triple) subj;
-			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, false, kvs, rdfFactory);
-		}
-
-		if (obj.isTriple()) {
-			Triple t = (Triple) obj;
-			appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, false, kvs, rdfFactory);
-		}
+        if (includeTriples) {
+			if (subj.isTriple()) {
+				Triple t = (Triple) subj;
+				appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, false, true, kvs, rdfFactory);
+			}
+	
+			if (obj.isTriple()) {
+				Triple t = (Triple) obj;
+				appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, false, true, kvs, rdfFactory);
+			}
+        }
     }
 
 	/**
@@ -558,9 +562,66 @@ public final class HalyardTableUtils {
         }
     }
 
+	public static boolean isTripleReferenced(KeyspaceConnection kc, Triple t, RDFFactory rdfFactory) throws IOException {
+		return HalyardTableUtils.hasSubject(kc, t, rdfFactory)
+			|| HalyardTableUtils.hasObject(kc, t, rdfFactory)
+			|| HalyardTableUtils.hasSubject(kc, t, HALYARD.TRIPLE_GRAPH_CONTEXT, rdfFactory)
+			|| HalyardTableUtils.hasObject(kc, t, HALYARD.TRIPLE_GRAPH_CONTEXT, rdfFactory);
+	}
+
+	public static boolean hasSubject(KeyspaceConnection kc, Resource subj, RDFFactory rdfFactory) throws IOException {
+		Scan scan = scanSingle(rdfFactory.getSPOIndex().scan(rdfFactory.createSubject(subj)));
+		try (ResultScanner scanner = kc.getScanner(scan)) {
+			for (Result result : scanner) {
+				Cell[] cells = result.rawCells();
+				if(cells != null && cells.length > 0) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	public static boolean hasSubject(KeyspaceConnection kc, Resource subj, Resource ctx, RDFFactory rdfFactory) throws IOException {
+		Scan scan = scanSingle(rdfFactory.getCSPOIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createSubject(subj)));
+		try (ResultScanner scanner = kc.getScanner(scan)) {
+			for (Result result : scanner) {
+				Cell[] cells = result.rawCells();
+				if(cells != null && cells.length > 0) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	public static boolean hasObject(KeyspaceConnection kc, Value obj, RDFFactory rdfFactory) throws IOException {
+		Scan scan = scanSingle(rdfFactory.getOSPIndex().scan(rdfFactory.createObject(obj)));
+		try (ResultScanner scanner = kc.getScanner(scan)) {
+			for (Result result : scanner) {
+				Cell[] cells = result.rawCells();
+				if(cells != null && cells.length > 0) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	public static boolean hasObject(KeyspaceConnection kc, Value obj, Resource ctx, RDFFactory rdfFactory) throws IOException {
+		Scan scan = scanSingle(rdfFactory.getCOSPIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createObject(obj)));
+		try (ResultScanner scanner = kc.getScanner(scan)) {
+			for (Result result : scanner) {
+				Cell[] cells = result.rawCells();
+				if(cells != null && cells.length > 0) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	public static Resource getSubject(KeyspaceConnection kc, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
-		Scan scan = scanSingle(rdfFactory.getSPOIndex(), id);
+		Scan scan = scanSingle(rdfFactory.getSPOIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
@@ -575,7 +636,7 @@ public final class HalyardTableUtils {
 
 	public static IRI getPredicate(KeyspaceConnection kc, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
-		Scan scan = scanSingle(rdfFactory.getPOSIndex(), id);
+		Scan scan = scanSingle(rdfFactory.getPOSIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
@@ -590,7 +651,7 @@ public final class HalyardTableUtils {
 
 	public static Value getObject(KeyspaceConnection kc, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
-		Scan scan = scanSingle(rdfFactory.getOSPIndex(), id);
+		Scan scan = scanSingle(rdfFactory.getOSPIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
 				Cell[] cells = result.rawCells();
@@ -603,8 +664,7 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	private static Scan scanSingle(StatementIndex<?,?,?,?> index, Identifier id) {
-		Scan scanAll = index.scan(id);
+	static Scan scanSingle(Scan scanAll) {
 		return scan(scanAll.getStartRow(), scanAll.getStopRow(), 1, false)
 			.setFilter(new FilterList(scanAll.getFilter(), new FirstKeyOnlyFilter()))
 			.setOneRowLimit();

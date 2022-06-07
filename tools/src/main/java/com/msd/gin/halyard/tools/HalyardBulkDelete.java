@@ -21,12 +21,16 @@ import static com.msd.gin.halyard.tools.HalyardBulkLoad.*;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.Keyspace;
 import com.msd.gin.halyard.common.KeyspaceConnection;
+import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.StatementIndex;
+import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.cli.CommandLine;
@@ -55,6 +59,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
@@ -78,25 +83,28 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 
     enum Counters {
 		REMOVED_KVS,
+		REMOVED_TRIPLED_KVS,
 		TOTAL_KVS
 	}
 
     static final class DeleteMapper extends RdfTableMapper<ImmutableBytesWritable, KeyValue> {
 
         final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
-        long totalKvs = 0, deletedKvs = 0;
+        long totalKvs = 0L, deletedKvs = 0L, deletedTripledKvs = 0L;
+        ValueFactory vf;
         long htimestamp;
+        boolean tripleCleanupOnly;
         Resource subj;
         IRI pred;
         Value obj;
-        List<Resource> ctx;
+        List<Resource> ctxs;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             openKeyspace(conf, conf.get(SOURCE), conf.get(SNAPSHOT_PATH));
+            vf = rdfFactory.getIdValueFactory();
             htimestamp = HalyardTableUtils.toHalyardTimestamp(conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis()), false);
-            ValueFactory vf = rdfFactory.getIdValueFactory();
             String s = conf.get(SUBJECT);
             if (s != null) {
                 subj = NTriplesUtil.parseResource(s, vf);
@@ -111,12 +119,12 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
             }
             String cs[] = conf.getStrings(CONTEXTS);
             if (cs != null) {
-                ctx = new ArrayList<>();
+                ctxs = new ArrayList<>();
                 for (String c : cs) {
                     if (DEFAULT_GRAPH_KEYWORD.equals(c)) {
-                        ctx.add(null);
+                        ctxs.add(null);
                     } else {
-                        ctx.add(NTriplesUtil.parseResource(c, vf));
+                        ctxs.add(NTriplesUtil.parseResource(c, vf));
                     }
                 }
             }
@@ -126,19 +134,14 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             for (Cell c : value.rawCells()) {
                 Statement st = HalyardTableUtils.parseStatement(null, null, null, null, c, valueReader, rdfFactory);
-                if ((subj == null || subj.equals(st.getSubject())) && (pred == null || pred.equals(st.getPredicate())) && (obj == null || obj.equals(st.getObject())) && (ctx == null || ctx.contains(st.getContext()))) {
-                    KeyValue kv = new KeyValue(c.getRowArray(), c.getRowOffset(), (int) c.getRowLength(),
-                        c.getFamilyArray(), c.getFamilyOffset(), (int) c.getFamilyLength(),
-                        c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength(),
-                        htimestamp, KeyValue.Type.DeleteColumn, c.getValueArray(), c.getValueOffset(),
-                        c.getValueLength());
-                    rowKey.set(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength());
-                    output.write(rowKey, kv);
-                    deletedKvs++;
+                if ((ctxs == null || ctxs.contains(st.getContext())) && (subj == null || subj.equals(st.getSubject())) && (pred == null || pred.equals(st.getPredicate())) && (obj == null || obj.equals(st.getObject()))) {
+                    deleteCell(c, st, output);
+                } else if (HALYARD.TRIPLE_GRAPH_CONTEXT.equals(st.getContext())) {
+                    cleanupTriple(c, st, output);
                 } else {
                     output.progress();
                 }
-                if (totalKvs++ % 10000l == 0) {
+                if (totalKvs++ % 10000L == 0) {
                     String msg = MessageFormat.format("{0} / {1} cells deleted", deletedKvs, totalKvs);
                     output.setStatus(msg);
                     LOG.info(msg);
@@ -146,9 +149,32 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
             }
         }
 
+        private void deleteCell(Cell c, Statement st, Context output) throws IOException, InterruptedException {
+        	KeyValue kv = new KeyValue(c.getRowArray(), c.getRowOffset(), (int) c.getRowLength(),
+                c.getFamilyArray(), c.getFamilyOffset(), (int) c.getFamilyLength(),
+                c.getQualifierArray(), c.getQualifierOffset(), c.getQualifierLength(),
+                htimestamp, KeyValue.Type.DeleteColumn, c.getValueArray(), c.getValueOffset(),
+                c.getValueLength());
+            rowKey.set(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength());
+            output.write(rowKey, kv);
+            deletedKvs++;
+            if (st.getSubject().isTriple() || st.getObject().isTriple()) {
+                deletedTripledKvs++;
+            }
+        }
+
+        private void cleanupTriple(Cell c, Statement st, Context output) throws IOException, InterruptedException {
+        	Triple t = vf.createTriple(st.getSubject(), st.getPredicate(), st.getObject());
+    		if (!HalyardTableUtils.isTripleReferenced(keyspaceConn, t, rdfFactory)) {
+    			// orphaned so safe to remove
+    			deleteCell(c, st, output);
+    		}
+        }
+
         @Override
         protected void cleanup(Context output) throws IOException {
         	output.getCounter(Counters.REMOVED_KVS).increment(deletedKvs);
+        	output.getCounter(Counters.REMOVED_TRIPLED_KVS).increment(deletedTripledKvs);
         	output.getCounter(Counters.TOTAL_KVS).increment(totalKvs);
         	closeKeyspace();
         }
@@ -210,9 +236,6 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
             HBaseConfiguration.class,
             AuthenticationProtos.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        Job job = Job.getInstance(getConf(), "HalyardDelete " + source);
-        job.setJarByClass(HalyardBulkDelete.class);
-        TableMapReduceUtil.initCredentials(job);
 
         RDFFactory rdfFactory;
         Keyspace keyspace = HalyardTableUtils.getKeyspace(getConf(), source, cmd.getOptionValue('u'));
@@ -223,40 +246,64 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 		} finally {
 			keyspace.close();
 		}
-        Scan scan = StatementIndex.scanAll(rdfFactory);
-        keyspace.initMapperJob(
-            scan,
-            DeleteMapper.class,
-            ImmutableBytesWritable.class,
-            LongWritable.class,
-            job);
-        job.setMapOutputKeyClass(ImmutableBytesWritable.class);
-        job.setMapOutputValueClass(KeyValue.class);
-        job.setSpeculativeExecution(false);
-        job.setMapSpeculativeExecution(false);
-        job.setReduceSpeculativeExecution(false);
-        TableName hTableName;
-		try (Connection conn = HalyardTableUtils.getConnection(getConf())) {
-			try (Table hTable = HalyardTableUtils.getTable(conn, target, false, 0)) {
-				hTableName = hTable.getName();
-				RegionLocator regionLocator = conn.getRegionLocator(hTableName);
-				HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), regionLocator);
-			}
-		}
-		Path workDir = new Path(cmd.getOptionValue('w'));
-        FileOutputFormat.setOutputPath(job, workDir);
-        TableMapReduceUtil.addDependencyJars(job);
+        List<Scan> scans = Collections.singletonList(StatementIndex.scanAll(rdfFactory));
         try {
-            if (job.waitForCompletion(true)) {
-				BulkLoadHFiles.create(getConf()).bulkLoad(hTableName, workDir);
-                LOG.info("Bulk Delete completed.");
-                return 0;
-            } else {
-        		LOG.error("Bulk Delete failed to complete.");
-                return -1;
+            for (int i=0; !scans.isEmpty(); i++) {
+                Job job = Job.getInstance(getConf(), "HalyardDelete " + source);
+                job.setJarByClass(HalyardBulkDelete.class);
+                TableMapReduceUtil.initCredentials(job);
+                keyspace.initMapperJob(
+                    scans,
+                    DeleteMapper.class,
+                    ImmutableBytesWritable.class,
+                    LongWritable.class,
+                    job);
+                job.setMapOutputKeyClass(ImmutableBytesWritable.class);
+                job.setMapOutputValueClass(KeyValue.class);
+                job.setSpeculativeExecution(false);
+                job.setMapSpeculativeExecution(false);
+                job.setReduceSpeculativeExecution(false);
+                TableName hTableName;
+        		try (Connection conn = HalyardTableUtils.getConnection(getConf())) {
+        			try (Table hTable = HalyardTableUtils.getTable(conn, target, false, 0)) {
+        				hTableName = hTable.getName();
+        				RegionLocator regionLocator = conn.getRegionLocator(hTableName);
+        				HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), regionLocator);
+        			}
+        		}
+        		Path workDir = new Path(cmd.getOptionValue('w'), "pass"+(i+1));
+                FileOutputFormat.setOutputPath(job, workDir);
+                TableMapReduceUtil.addDependencyJars(job);
+	            if (job.waitForCompletion(true)) {
+					BulkLoadHFiles.create(getConf()).bulkLoad(hTableName, workDir);
+	                LOG.info("Bulk Delete completed.");
+	                if (job.getCounters().findCounter(Counters.REMOVED_TRIPLED_KVS).getValue() > 0) {
+	                	// maybe more triples to delete
+		                RDFContext rdfGraphCtx = rdfFactory.createContext(HALYARD.TRIPLE_GRAPH_CONTEXT);
+		                scans = Arrays.asList(
+		    	            rdfFactory.getCSPOIndex().scan(rdfGraphCtx),
+		    	            rdfFactory.getCPOSIndex().scan(rdfGraphCtx),
+		    	            rdfFactory.getCOSPIndex().scan(rdfGraphCtx)
+		                );
+		                if (useSnapshot) {
+		                	// switch to reading from table
+		                	getConf().set(SOURCE, target);
+		                	getConf().unset(SNAPSHOT_PATH);
+		                	keyspace.destroy();
+		                	keyspace = HalyardTableUtils.getKeyspace(getConf(), target, null);
+		                }
+	                } else {
+	                	scans = Collections.emptyList();
+	                }
+	            } else {
+	        		LOG.error("Bulk Delete failed to complete.");
+	                return -1;
+	            }
             }
         } finally {
         	keyspace.destroy();
         }
+        LOG.info("Bulk Delete completed.");
+        return 0;
     }
 }

@@ -40,7 +40,6 @@ import java.nio.ByteBuffer;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -55,7 +54,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
@@ -614,28 +612,12 @@ public final class HalyardStats extends AbstractHalyardTool {
         } else {
             scans = Collections.singletonList(StatementIndex.scanAll(rdfFactory));
         }
-        TableName sourceTableName = keyspace.getTableName();
-        if (sourceTableName != null) {
-	        byte[] sourceTableNameBytes = sourceTableName.toBytes();
-	        for (Scan scan : scans) {
-	            scan.setAttribute(Scan.SCAN_ATTRIBUTES_TABLE_NAME, sourceTableNameBytes);
-	        }
-	        TableMapReduceUtil.initTableMapperJob(
-                scans,
-                StatsMapper.class,
-                ImmutableBytesWritable.class,
-                LongWritable.class,
-                job);
-        } else {
-	        TableMapReduceUtil.initMultiTableSnapshotMapperJob(
-                Collections.singletonMap(source, (Collection<Scan>) scans),
-                StatsMapper.class,
-                ImmutableBytesWritable.class,
-                LongWritable.class,
-                job,
-                true,
-                new Path(cmd.getOptionValue('u')));
-        }
+        keyspace.initMapperJob(
+	        scans,
+	        StatsMapper.class,
+	        ImmutableBytesWritable.class,
+	        LongWritable.class,
+	        job);
         job.setPartitionerClass(StatsPartitioner.class);
         job.setReducerClass(StatsReducer.class);
         job.setOutputFormatClass(NullOutputFormat.class);

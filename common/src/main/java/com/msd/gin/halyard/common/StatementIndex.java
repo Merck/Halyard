@@ -44,7 +44,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = rdfFactory.getCOSPIndex();
 		int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
 		return HalyardTableUtils.scan(
-			spo.concat(false,  spo.role1.startKey(), spo.role2.startKey(), spo.get3StartKey(), spo.get4StartKey()),
+			spo.concat(false, spo.role1.startKey(), spo.role2.startKey(), spo.get3StartKey(), spo.get4StartKey()),
 			cosp.concat(true, cosp.role1.stopKey(), cosp.role2.stopKey(), cosp.get3StopKey(), cosp.role4.endStopKey()),
 			cardinality,
 			true
