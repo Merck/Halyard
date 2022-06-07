@@ -81,7 +81,6 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         private RDFFactory rdfFactory;
         private long counter = 0, next = 0;
         private int decimationFactor;
-        private long timestamp;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -92,14 +91,13 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
             for (byte b = 1; b < StatementIndex.Name.values().length; b++) {
                 context.write(new ImmutableBytesWritable(new byte[] {b}), new LongWritable(1));
             }
-            timestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
         @Override
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
             if (counter++ == next) {
                 next = counter + random.nextInt(decimationFactor);
-                for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, timestamp, rdfFactory)) {
+                for (KeyValue keyValue: HalyardTableUtils.toKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), false, 0, rdfFactory)) {
                     rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                     keyValueLength.set(keyValue.getLength());
                     context.write(rowKey, keyValueLength);
@@ -130,7 +128,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
                 size = 0;
             }
             for (LongWritable val : values) {
-                    size += val.get();
+                size += val.get();
             }
         }
 
@@ -203,7 +201,6 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
         getConf().setInt(DECIMATION_FACTOR_PROPERTY, Integer.parseInt(cmd.getOptionValue('d', String.valueOf(DEFAULT_DECIMATION_FACTOR))));
         getConf().setLong(SPLIT_LIMIT_PROPERTY, Long.parseLong(cmd.getOptionValue('l', String.valueOf(DEFAULT_SPLIT_LIMIT))));
         Job job = Job.getInstance(getConf(), "HalyardPreSplit -> " + target);

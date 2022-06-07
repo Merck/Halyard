@@ -432,6 +432,12 @@ public class HBaseSailConnection implements SailConnection {
 		return (op instanceof Timestamped) ? ((Timestamped) op).getTimestamp() : getDefaultTimestamp(isDelete);
     }
 
+	/**
+	 * Timestamp to use if none specified by the UpdateContext, e.g. via halyard:timestamp.
+	 * 
+	 * @param isDelete flag to indicate timestamp is for a delete operation
+	 * @return millisecond timestamp
+	 */
 	protected long getDefaultTimestamp(boolean isDelete) {
 		long ts = System.currentTimeMillis();
 		if (ts > lastTimestamp) {
@@ -460,7 +466,9 @@ public class HBaseSailConnection implements SailConnection {
     private void checkWritable() {
 		if (keyspaceConn == null)
 			throw new IllegalStateException("Connection is closed");
-        if (!sail.isWritable()) throw new SailException(sail.tableName + " is read only");
+		if (!sail.isWritable()) {
+			throw new SailException(sail.tableName + " is read only");
+		}
     }
 
 	protected void addStatementInternal(Resource subj, IRI pred, Value obj, Resource[] contexts, long timestamp) throws SailException {

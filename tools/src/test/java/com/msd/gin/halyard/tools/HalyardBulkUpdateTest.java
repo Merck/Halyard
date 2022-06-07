@@ -78,12 +78,12 @@ public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
         }
         File htableDir = getTempHTableDir("test_htable");
 
-        assertEquals(0, run(conf, new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", TABLE}));
+        assertEquals(0, run(new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", TABLE}));
 
         q.delete();
         queries.delete();
 
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
+        sail = new HBaseSail(conf, TABLE, false, 0, true, 0, null, null);
         sail.initialize();
         try {
 			try (SailConnection conn = sail.getConnection()) {
@@ -225,7 +225,7 @@ public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
         File htableDir = getTempHTableDir("test_htable");
 
         //execute BulkUpdate
-        assertEquals(0, run(conf, new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", "timebulkupdatetesttable"}));
+        assertEquals(0, run(new String[]{ "-q", queries.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-s", "timebulkupdatetesttable"}));
 
         q1.delete();
         q2.delete();
@@ -233,7 +233,7 @@ public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
 
         //read transformed data into model
         LinkedHashModel resultModel = new LinkedHashModelFactory().createEmptyModel();
-        sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "timebulkupdatetesttable", false, 0, true, 0, null, null);
+        sail = new HBaseSail(conf, "timebulkupdatetesttable", false, 0, true, 0, null, null);
         sail.initialize();
         try {
 			try (SailConnection conn = sail.getConnection()) {

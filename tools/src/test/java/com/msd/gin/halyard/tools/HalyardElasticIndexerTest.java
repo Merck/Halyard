@@ -240,8 +240,7 @@ public class HalyardElasticIndexerTest extends AbstractHalyardToolTest {
             String indexUrl = "http://localhost:" + serverPort + INDEX_PATH;
             String[] cmdLineArgs = namedGraphOnly ? new String[]{"-s", "elasticTable", "-t", indexUrl, "-c", "-g", "<http://whatever/graph#1>"}
             : new String[]{"-s", "elasticTable", "-t", indexUrl, "-c"};
-            Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-            int rc = run(conf, cmdLineArgs);
+            int rc = run(cmdLineArgs);
             assertEquals(0, rc);
         } finally {
             server.stop(0);

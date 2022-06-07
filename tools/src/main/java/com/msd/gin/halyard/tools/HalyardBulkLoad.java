@@ -122,12 +122,17 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     /**
      * Property defining exact timestamp of all loaded triples (System.currentTimeMillis() is the default value)
      */
-    public static final String DEFAULT_TIMESTAMP_PROPERTY = "halyard.bulk.timestamp";
+    public static final String TIMESTAMP_PROPERTY = "halyard.bulk.timestamp";
 
     /**
      * Multiplier limiting maximum single file size in relation to the maximum split size, before it is processed in parallel (10x maximum split size)
      */
     private static final long MAX_SINGLE_FILE_MULTIPLIER = 10;
+
+    enum Counters {
+		ADDED_KVS,
+		ADDED_STATEMENTS
+	}
 
     static void setParsers() {
         //this is a workaround to avoid autodetection of .xml files as TriX format and hook on .trix file extension only
@@ -201,12 +206,14 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
         private RDFFactory rdfFactory;
         private long timestamp;
+        private long addedKvs;
+        private long addedStmts;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             rdfFactory = RDFFactory.create(conf);
-            timestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
+            timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
         @Override
@@ -214,7 +221,15 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
             for (KeyValue keyValue: HalyardTableUtils.addKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), timestamp, rdfFactory)) {
                 rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                 context.write(rowKey, keyValue);
+                addedKvs++;
             }
+            addedStmts++;
+        }
+
+        @Override
+        protected void cleanup(Context output) throws IOException {
+        	output.getCounter(Counters.ADDED_KVS).increment(addedKvs);
+        	output.getCounter(Counters.ADDED_STATEMENTS).increment(addedStmts);
         }
     }
 
@@ -553,16 +568,20 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         getConf().setBoolean(VERIFY_DATATYPE_VALUES_PROPERTY, cmd.hasOption('d'));
         getConf().setBoolean(TRUNCATE_PROPERTY, cmd.hasOption('r'));
         getConf().setInt(SPLIT_BITS_PROPERTY, Integer.parseInt(cmd.getOptionValue('b', "3")));
-        if (cmd.hasOption('g')) getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
+        if (cmd.hasOption('g')) {
+        	getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
+        }
         getConf().setBoolean(OVERRIDE_CONTEXT_PROPERTY, cmd.hasOption('o'));
-        getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, Long.parseLong(cmd.getOptionValue('e', String.valueOf(System.currentTimeMillis()))));
-        if (cmd.hasOption('m')) getConf().setLong("mapreduce.input.fileinputformat.split.maxsize", Long.parseLong(cmd.getOptionValue('m')));
+        getConf().setLong(TIMESTAMP_PROPERTY, cmd.hasOption('e') ? Long.parseLong(cmd.getOptionValue('e')) : System.currentTimeMillis());
+        if (cmd.hasOption('m')) {
+        	getConf().setLong("mapreduce.input.fileinputformat.split.maxsize", Long.parseLong(cmd.getOptionValue('m')));
+        }
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
-                NTriplesUtil.class,
-                Rio.class,
-                AbstractRDFHandler.class,
-                RDFFormat.class,
-                RDFParser.class);
+            NTriplesUtil.class,
+            Rio.class,
+            AbstractRDFHandler.class,
+            RDFFormat.class,
+            RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardBulkLoad -> " + workdir + " -> " + target);
         job.setJarByClass(HalyardBulkLoad.class);

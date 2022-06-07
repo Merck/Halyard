@@ -96,6 +96,11 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
     private static final String TABLE_NAME_PROPERTY = "halyard.table.name";
     private static final String STAGE_PROPERTY = "halyard.update.stage";
 
+    enum Counters {
+		ADDED_KVS,
+		REMOVED_KVS
+	}
+
     /**
      * Mapper class performing SPARQL Graph query evaluation and producing Halyard KeyValue pairs for HBase BulkLoad Reducers
      */
@@ -103,7 +108,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 
         private String tableName;
         private String elasticIndexURL;
-        private long defaultTimestamp;
+        private long timestamp;
         private int stage;
 
         @Override
@@ -111,7 +116,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             tableName = conf.get(TABLE_NAME_PROPERTY);
             elasticIndexURL = conf.get(ELASTIC_INDEX_URL);
-            defaultTimestamp = conf.getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis());
+            timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
             stage = conf.getInt(STAGE_PROPERTY, 0);
             final QueryInputFormat.QueryInputSplit qis = (QueryInputFormat.QueryInputSplit)context.getInputSplit();
             final String query = qis.getQuery();
@@ -129,8 +134,8 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                     singleUpdate.map(ue, d);
                 }
                 context.setStatus("Execution of: " + name + " stage #" + stage);
-                final AtomicLong added = new AtomicLong();
-                final AtomicLong removed = new AtomicLong();
+                final AtomicLong addedKvs = new AtomicLong();
+                final AtomicLong removedKvs = new AtomicLong();
                 Function fn = new ParallelSplitFunction(qis.getRepeatIndex());
                 FunctionRegistry.getInstance().add(fn);
                 try {
@@ -153,9 +158,9 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 									} catch (InterruptedException ex) {
 										throw new IOException(ex);
 									}
-									if (added.incrementAndGet() % 1000l == 0) {
-										context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-										LOG.info("{} KeyValues added and {} removed", added.get(), removed.get());
+									if (addedKvs.incrementAndGet() % 1000l == 0) {
+										context.setStatus(name + " - " + addedKvs.get() + " added " + removedKvs.get() + " removed");
+										LOG.info("{} KeyValues added and {} removed", addedKvs.get(), removedKvs.get());
 									}
 								}
 
@@ -172,15 +177,15 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 									} catch (InterruptedException ex) {
 										throw new IOException(ex);
 									}
-									if (removed.incrementAndGet() % 1000l == 0) {
-										context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-										LOG.info("{} KeyValues added and {} removed", added.get(), removed.get());
+									if (removedKvs.incrementAndGet() % 1000l == 0) {
+										context.setStatus(name + " - " + addedKvs.get() + " added " + removedKvs.get() + " removed");
+										LOG.info("{} KeyValues added and {} removed", addedKvs.get(), removedKvs.get());
 									}
 								}
 
 								@Override
 								protected long getDefaultTimestamp(boolean delete) {
-									return defaultTimestamp;
+									return timestamp;
 								}
 
 								@Override
@@ -203,8 +208,10 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 	                        LOG.info("Execution of: {}", query);
 	                        context.setStatus(name);
 	                        upd.execute();
-	                        context.setStatus(name + " - " + added.get() + " added " + removed.get() + " removed");
-	                        LOG.info("Query finished with {} KeyValues added and {} removed", added.get(), removed.get());
+	                        context.setStatus(name + " - " + addedKvs.get() + " added " + removedKvs.get() + " removed");
+	                        context.getCounter(Counters.ADDED_KVS).increment(addedKvs.get());
+	                        context.getCounter(Counters.REMOVED_KVS).increment(removedKvs.get());
+	                        LOG.info("Query finished with {} KeyValues added and {} removed", addedKvs.get(), removedKvs.get());
                         }
                     } finally {
                         rep.shutDown();
@@ -229,7 +236,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "update-operations", "sparql_update_operations", "folder or path pattern with SPARQL update operations", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
-        addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (default is actual time of the operation)", false, true);
+        addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all updated records (default is actual time of the operation)", false, true);
         addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
     }
 
@@ -238,8 +245,9 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         String source = cmd.getOptionValue('s');
         String queryFiles = cmd.getOptionValue('q');
         String workdir = cmd.getOptionValue('w');
-        getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, Long.parseLong(cmd.getOptionValue('e', String.valueOf(System.currentTimeMillis()))));
-        if (cmd.hasOption('i')) getConf().set(ELASTIC_INDEX_URL, cmd.getOptionValue('i'));
+        if (cmd.hasOption('i')) {
+        	getConf().set(ELASTIC_INDEX_URL, cmd.getOptionValue('i'));
+        }
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                NTriplesUtil.class,
                Rio.class,
@@ -251,7 +259,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                AuthenticationProtos.class);
         HBaseConfiguration.addHbaseResources(getConf());
         getConf().setStrings(TABLE_NAME_PROPERTY, source);
-        getConf().setLong(DEFAULT_TIMESTAMP_PROPERTY, getConf().getLong(DEFAULT_TIMESTAMP_PROPERTY, System.currentTimeMillis()));
+        getConf().setLong(TIMESTAMP_PROPERTY, cmd.hasOption('e') ? Long.parseLong(cmd.getOptionValue('e')) : System.currentTimeMillis());
         int stages = 1;
         for (int stage = 0; stage < stages; stage++) {
             Job job = Job.getInstance(getConf(), "HalyardBulkUpdate -> " + workdir + " -> " + source + " stage #" + stage);
