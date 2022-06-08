@@ -9,6 +9,9 @@ public final class RDFContext extends RDFValue<Resource,SPOC.C> {
 		if(ctx == null) {
 			return null;
 		}
+		if (ctx.isTriple()) {
+    		throw new UnsupportedOperationException("Context cannot be a triple value");
+		}
 		return new RDFContext(role, ctx, rdfFactory);
 	}
 

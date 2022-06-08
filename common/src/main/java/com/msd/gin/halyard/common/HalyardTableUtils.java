@@ -322,7 +322,7 @@ public final class HalyardTableUtils {
 		}
 	}
 
-	public static List<? extends KeyValue> addKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, RDFFactory rdfFactory) {
+	public static List<? extends KeyValue> insertKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, RDFFactory rdfFactory) {
 		return toKeyValues(subj, pred, obj, context, false, true, timestamp, rdfFactory);
 	}
 	public static List<? extends KeyValue> deleteKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, RDFFactory rdfFactory) {
@@ -353,14 +353,11 @@ public final class HalyardTableUtils {
     	if(subj == null || pred == null || obj == null) {
     		throw new NullPointerException();
     	}
-    	if(context != null && context.isTriple()) {
-    		throw new UnsupportedOperationException("Context cannot be a triple value");
-    	}
 
-    	RDFSubject sb = rdfFactory.createSubject(subj); // subject bytes
-		RDFPredicate pb = rdfFactory.createPredicate(pred); // predicate bytes
-		RDFObject ob = rdfFactory.createObject(obj); // object bytes
-		RDFContext cb = rdfFactory.createContext(context); // context (graph) bytes
+    	RDFSubject sb = rdfFactory.createSubject(subj);
+		RDFPredicate pb = rdfFactory.createPredicate(pred);
+		RDFObject ob = rdfFactory.createObject(obj);
+		RDFContext cb = rdfFactory.createContext(context);
 
         StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
         StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = rdfFactory.getPOSIndex();

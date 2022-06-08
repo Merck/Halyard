@@ -18,6 +18,8 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.util.LFUCache;
+import com.msd.gin.halyard.util.LRUCache;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.Closeable;
@@ -27,9 +29,10 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.cli.CommandLine;
@@ -131,7 +134,8 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
     enum Counters {
 		ADDED_KVS,
-		ADDED_STATEMENTS
+		ADDED_STATEMENTS,
+		PARSE_QUEUE_FULL
 	}
 
     static void setParsers() {
@@ -204,7 +208,12 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     public static final class RDFMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, KeyValue> {
 
         private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
+        // formats like Turtle tend to favour recently used identifiers
+        private final LRUCache<Value,IRI> canonicalIdentifierCache = new LRUCache<>(100);
+        // predicates tend to have a more global distribution
+        private final LFUCache<Value,IRI> canonicalPredicateCache = new LFUCache<>(500, 0.2f);
         private RDFFactory rdfFactory;
+        private ValueFactory idValueFactory;
         private long timestamp;
         private long addedKvs;
         private long addedStmts;
@@ -213,14 +222,33 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             rdfFactory = RDFFactory.create(conf);
+            idValueFactory = rdfFactory.getIdValueFactory();
             timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
+        private IRI getIdentifiableIRI(Map<Value,IRI> cache, Value iri) {
+            return cache.computeIfAbsent(iri, v -> idValueFactory.createIRI(v.stringValue()));
+        }
+
         @Override
-        protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
-            for (KeyValue keyValue: HalyardTableUtils.addKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), timestamp, rdfFactory)) {
+        protected void map(LongWritable key, Statement stmt, final Context output) throws IOException, InterruptedException {
+            Resource subj = stmt.getSubject();
+            if (subj.isIRI()) {
+                // subject may appear multiple times so cache hash and serialized form
+            	subj = getIdentifiableIRI(canonicalIdentifierCache, subj);
+            }
+            IRI pred = stmt.getPredicate();
+            // predicate may appear multiple times so cache hash and serialized form
+            pred = getIdentifiableIRI(canonicalPredicateCache, pred);
+            Value obj = stmt.getObject();
+            if (obj.isIRI()) {
+                // object may appear multiple times so cache hash and serialized form
+            	obj = getIdentifiableIRI(canonicalIdentifierCache, obj);
+            }
+            Resource ctx = stmt.getContext();
+            for (KeyValue keyValue: HalyardTableUtils.insertKeyValues(subj, pred, obj, ctx, timestamp, rdfFactory)) {
                 rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
-                context.write(rowKey, keyValue);
+                output.write(rowKey, keyValue);
                 addedKvs++;
             }
             addedStmts++;
@@ -355,7 +383,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         private final Path paths[];
         private final long[] sizes, offsets;
         private final long size;
-        private final BlockingQueue<Statement> queue = new ArrayBlockingQueue<>(8);
+        private final BlockingQueue<Statement> queue = new LinkedBlockingQueue<>(500);
         private final boolean skipInvalid, verifyDataTypeValues;
         private final String defaultRdfContextPattern;
         private final boolean overrideRdfContext;
@@ -477,10 +505,15 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
         @Override
         public void handleStatement(Statement st) throws RDFHandlerException {
-            if (count == 1 || Math.floorMod(st.hashCode(), count) == offset) try {
-                queue.put(st);
-            } catch (InterruptedException e) {
-                throw new RDFHandlerException(e);
+            if (count == 1 || Math.floorMod(st.hashCode(), count) == offset) {
+            	if (!queue.offer(st)) {
+            		context.getCounter(Counters.PARSE_QUEUE_FULL).increment(1);
+	            	try {
+		                queue.put(st);
+		            } catch (InterruptedException e) {
+		                throw new RDFHandlerException(e);
+		            }
+            	}
             }
         }
 

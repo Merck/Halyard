@@ -490,7 +490,7 @@ public class HBaseSailConnection implements SailConnection {
     }
 
 	private void addStatement(Resource subj, IRI pred, Value obj, Resource ctx, long timestamp) throws IOException {
-		for (KeyValue kv : HalyardTableUtils.addKeyValues(subj, pred, obj, ctx, timestamp, sail.getRDFFactory())) {
+		for (KeyValue kv : HalyardTableUtils.insertKeyValues(subj, pred, obj, ctx, timestamp, sail.getRDFFactory())) {
 			put(kv);
 		}
 	}

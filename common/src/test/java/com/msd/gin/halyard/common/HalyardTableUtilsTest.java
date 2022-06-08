@@ -50,6 +50,7 @@ public class HalyardTableUtilsTest {
 	private static final int OBJECT_KEY_SIZE = 5;
 	private static Connection conn;
 	private static Table table;
+	private static KeyspaceConnection keyspaceConn;
 	private static RDFFactory rdfFactory;
 
     @BeforeClass
@@ -59,7 +60,8 @@ public class HalyardTableUtilsTest {
 		conf.setInt(Config.KEY_SIZE_OBJECT, OBJECT_KEY_SIZE);
 		conn = HalyardTableUtils.getConnection(conf);
 		table = HalyardTableUtils.getTable(conn, "testUtils", true, -1);
-		rdfFactory = RDFFactory.create(new TableKeyspace.TableKeyspaceConnection(table));
+		keyspaceConn = new TableKeyspace.TableKeyspaceConnection(table);
+		rdfFactory = RDFFactory.create(keyspaceConn);
     }
 
     @AfterClass
@@ -89,7 +91,7 @@ public class HalyardTableUtilsTest {
         IRI pred = vf.createIRI("http://testBigLiteral/pred/");
         Value obj = vf.createLiteral(RandomStringUtils.random(100000));
 		List<Put> puts = new ArrayList<>();
-        for (Cell kv : HalyardTableUtils.addKeyValues(subj, pred, obj, null, System.currentTimeMillis(), rdfFactory)) {
+        for (Cell kv : HalyardTableUtils.insertKeyValues(subj, pred, obj, null, System.currentTimeMillis(), rdfFactory)) {
 			puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
 		table.put(puts);
@@ -106,6 +108,20 @@ public class HalyardTableUtilsTest {
     }
 
     @Test
+    public void testNestedTriples() throws Exception {
+        ValueFactory vf = SimpleValueFactory.getInstance();
+        IRI res = vf.createIRI("http://testiri");
+        Triple t1 = vf.createTriple(res, res, res);
+        Triple t2 = vf.createTriple(t1, res, t1);
+        List<? extends Cell> kvs = HalyardTableUtils.insertKeyValues(t2, res, t2, res, 0, rdfFactory);
+        for (Cell kv : kvs) {
+			table.put(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
+        }
+        assertTrue(HalyardTableUtils.isTripleReferenced(keyspaceConn, t1, rdfFactory));
+        assertTrue(HalyardTableUtils.isTripleReferenced(keyspaceConn, t2, rdfFactory));
+    }
+
+    @Test
     public void testConflictingHash() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
         ValueIO.Reader reader = rdfFactory.createReader(vf);
@@ -116,8 +132,8 @@ public class HalyardTableUtilsTest {
         Value obj1 = vf.createLiteral("literal1");
         Value obj2 = vf.createLiteral("literal2");
         long timestamp = System.currentTimeMillis();
-        List<? extends Cell> kv1 = HalyardTableUtils.addKeyValues(subj, pred1, obj1, null, timestamp, rdfFactory);
-        List<? extends Cell> kv2 = HalyardTableUtils.addKeyValues(subj, pred2, obj2, null, timestamp, rdfFactory);
+        List<? extends Cell> kv1 = HalyardTableUtils.insertKeyValues(subj, pred1, obj1, null, timestamp, rdfFactory);
+        List<? extends Cell> kv2 = HalyardTableUtils.insertKeyValues(subj, pred2, obj2, null, timestamp, rdfFactory);
 		List<Put> puts = new ArrayList<>();
         for (int i=0; i<3; i++) {
         	Cell cell1 = kv1.get(i);
@@ -150,7 +166,7 @@ public class HalyardTableUtilsTest {
         IRI pred = vf.createIRI("http://whatever/pred/");
         Value expl = vf.createLiteral("explicit");
 		List<Put> puts = new ArrayList<>();
-        for (Cell kv : HalyardTableUtils.addKeyValues(subj, pred, expl, null, System.currentTimeMillis(), rdfFactory)) {
+        for (Cell kv : HalyardTableUtils.insertKeyValues(subj, pred, expl, null, System.currentTimeMillis(), rdfFactory)) {
 			puts.add(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
         }
 		table.put(puts);
@@ -185,9 +201,9 @@ public class HalyardTableUtilsTest {
     }
 
     @Test
-    public void testToKeyValuesDelete() throws Exception {
+    public void testToKeyValues() throws Exception {
         IRI res = SimpleValueFactory.getInstance().createIRI("http://testiri");
-        List<? extends Cell> kvs = HalyardTableUtils.deleteKeyValues(res, res, res, res, 0, rdfFactory);
+        List<? extends Cell> kvs = HalyardTableUtils.toKeyValues(res, res, res, res, true, true, 0, rdfFactory);
         assertEquals(6, kvs.size());
         for (Cell kv : kvs) {
             assertEquals(Cell.Type.DeleteColumn, kv.getType());
@@ -195,11 +211,12 @@ public class HalyardTableUtilsTest {
     }
 
     @Test
-    public void testToKeyValuesTripleDelete() throws Exception {
+    public void testToKeyValuesTriple() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
         IRI res = vf.createIRI("http://testiri");
         Triple t = vf.createTriple(res, res, res);
         List<? extends Cell> kvs = HalyardTableUtils.toKeyValues(t, res, t, res, true, true, 0, rdfFactory);
+        // 6 for the statement, 3 for the subject triple, 3 for the object triple - no dedupping
         assertEquals(12, kvs.size());
         for (Cell kv : kvs) {
             assertEquals(Cell.Type.DeleteColumn, kv.getType());

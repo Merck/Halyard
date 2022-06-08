@@ -89,11 +89,11 @@ public class HBaseSailHashConflictTest {
 		try (Connection conn = HalyardTableUtils.getConnection(HBaseServerTestInstance.getInstanceConfig())) {
 			try (Table table = HalyardTableUtils.getTable(conn, "testConflictingHash", true, 0)) {
 				long timestamp = System.currentTimeMillis();
-				List<? extends Cell> triple = HalyardTableUtils.addKeyValues(SUBJ, PRED, OBJ, null, timestamp, rdfFactory);
-				List<? extends Cell> conflicts[] = new List[] { HalyardTableUtils.addKeyValues(SUBJ, PRED, CONF, null, timestamp, rdfFactory), HalyardTableUtils.addKeyValues(SUBJ, CONF, OBJ, null, timestamp, rdfFactory),
-						HalyardTableUtils.addKeyValues(SUBJ, CONF, CONF, null, timestamp, rdfFactory), HalyardTableUtils.addKeyValues(CONF, PRED, OBJ, null, timestamp, rdfFactory),
-						HalyardTableUtils.addKeyValues(CONF, PRED, CONF, null, timestamp, rdfFactory), HalyardTableUtils.addKeyValues(CONF, CONF, OBJ, null, timestamp, rdfFactory),
-						HalyardTableUtils.addKeyValues(CONF, CONF, CONF, null, timestamp, rdfFactory), };
+				List<? extends Cell> triple = HalyardTableUtils.insertKeyValues(SUBJ, PRED, OBJ, null, timestamp, rdfFactory);
+				List<? extends Cell> conflicts[] = new List[] { HalyardTableUtils.insertKeyValues(SUBJ, PRED, CONF, null, timestamp, rdfFactory), HalyardTableUtils.insertKeyValues(SUBJ, CONF, OBJ, null, timestamp, rdfFactory),
+						HalyardTableUtils.insertKeyValues(SUBJ, CONF, CONF, null, timestamp, rdfFactory), HalyardTableUtils.insertKeyValues(CONF, PRED, OBJ, null, timestamp, rdfFactory),
+						HalyardTableUtils.insertKeyValues(CONF, PRED, CONF, null, timestamp, rdfFactory), HalyardTableUtils.insertKeyValues(CONF, CONF, OBJ, null, timestamp, rdfFactory),
+						HalyardTableUtils.insertKeyValues(CONF, CONF, CONF, null, timestamp, rdfFactory), };
 				List<Put> puts = new ArrayList<>();
 				for (int i = 0; i < triple.size(); i++) {
 					Cell kv = triple.get(i);
