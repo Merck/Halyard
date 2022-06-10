@@ -3,6 +3,7 @@ package com.msd.gin.halyard.common;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -61,7 +62,7 @@ public class StatementIndexScanTest {
 
         stringLiterals = new HashSet<>();
         nonstringLiterals = new HashSet<>();
-        for (int i=0; i<5; i++) {
+        for (int i=0; i<10; i++) {
 			stringLiterals.add(vf.createLiteral(String.valueOf(Math.random())));
 			stringLiterals.add(vf.createLiteral(String.valueOf(Math.random()), "en"));
 			nonstringLiterals.add(vf.createLiteral(Math.random()));
@@ -148,6 +149,23 @@ public class StatementIndexScanTest {
             }
         }
         assertSets(allLiterals, actual);
+    }
+
+    @Test
+    public void testAllTermScan() throws Exception {
+    	for (Statement stmt : allStatements) {
+    		Scan scan = StatementIndex.scan(
+    			rdfFactory.createSubject(stmt.getSubject()),
+    			rdfFactory.createPredicate(stmt.getPredicate()),
+    			rdfFactory.createObject(stmt.getObject()),
+    			rdfFactory.createContext(stmt.getContext()),
+    			rdfFactory);
+            try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
+                Result r = rs.next();
+                List<Statement> stmts = HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory);
+                assertEquals(Collections.singletonList(stmt), stmts);
+            }
+    	}
     }
 
     @Test

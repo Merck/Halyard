@@ -266,7 +266,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 				bnodeBatcher.handleStatement(st);
 			} else {
 				// group by subject for more efficient turtle encoding
-				int idx = (Math.abs(st.getSubject().hashCode()) % batchers.length);
+				int idx = Math.floorMod(st.getSubject().hashCode(), batchers.length);
 				batchers[idx].handleStatement(st);
 			}
 		}

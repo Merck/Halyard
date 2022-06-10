@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import javax.annotation.Nullable;
 
@@ -83,6 +84,45 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		} else {
 			return index.scanWithConstraint(ctx, new ValueConstraint(ValueType.LITERAL));
 		}
+	}
+
+	/**
+	 * Performs a scan using any suitable index.
+	 */
+	public static final Scan scan(RDFIdentifier<? extends SPOC.S> s, RDFIdentifier<? extends SPOC.P> p, RDFIdentifier<? extends SPOC.O> o, RDFIdentifier<? extends SPOC.C> c, RDFFactory rdfFactory) {
+		Scan scan;
+		if (c == null) {
+			int h = Math.floorMod(Objects.hash(s, p, o), 3);
+			switch (h) {
+				case 0:
+					scan = rdfFactory.getSPOIndex().scan(s, p, o);
+					break;
+				case 1:
+					scan = rdfFactory.getPOSIndex().scan(p, o, s);
+					break;
+				case 2:
+					scan = rdfFactory.getOSPIndex().scan(o, s, p);
+					break;
+				default:
+					throw new AssertionError();
+			}
+		} else {
+			int h = Math.floorMod(Objects.hash(s, p, o, c), 3);
+			switch (h) {
+				case 0:
+					scan = rdfFactory.getCSPOIndex().scan(c, s, p, o);
+					break;
+				case 1:
+					scan = rdfFactory.getCPOSIndex().scan(c, p, o, s);
+					break;
+				case 2:
+					scan = rdfFactory.getCOSPIndex().scan(c, o, s, p);
+					break;
+				default:
+					throw new AssertionError();
+			}
+		}
+		return scan;
 	}
 
 	/**
@@ -209,7 +249,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	private int get3KeyHashSize() {
 		return isQuadIndex ? role3.keyHashSize() : role3.endKeyHashSize();
 	}
-	private <T extends SPOC<?>> byte[] get3KeyHash(StatementIndex<?,?,T,?> index, RDFIdentifier<T> k) {
+	private <T extends SPOC<?>> byte[] get3KeyHash(StatementIndex<?,?,T,?> index, RDFIdentifier<? extends T> k) {
 		return isQuadIndex ? k.getKeyHash(index) : k.getEndKeyHash(index);
 	}
 	private int get3QualifierHashSize() {
@@ -226,7 +266,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return isQuadIndex ? role4.endStartKey() : ByteSequence.EMPTY;
 	}
 
-	byte[] row(RDFIdentifier<T1> v1, RDFIdentifier<T2> v2, RDFIdentifier<T3> v3, @Nullable RDFIdentifier<T4> v4) {
+	byte[] row(RDFIdentifier<? extends T1> v1, RDFIdentifier<? extends T2> v2, RDFIdentifier<? extends T3> v3, @Nullable RDFIdentifier<? extends T4> v4) {
 		boolean hasQuad = (v4 != null);
 		if (isQuadIndex && !hasQuad) {
 			throw new NullPointerException("Missing identifier from quad.");
@@ -243,7 +283,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return r;
 	}
 
-	byte[] qualifier(RDFIdentifier<T1> v1, @Nullable RDFIdentifier<T2> v2, @Nullable RDFIdentifier<T3> v3, @Nullable RDFIdentifier<T4> v4) {
+	byte[] qualifier(RDFIdentifier<? extends T1> v1, @Nullable RDFIdentifier<? extends T2> v2, @Nullable RDFIdentifier<? extends T3> v3, @Nullable RDFIdentifier<? extends T4> v4) {
 		byte[] cq = new byte[role1.qualifierHashSize() + (v2 != null ? role2.qualifierHashSize() : 0) + (v3 != null ? get3QualifierHashSize() : 0) + (v4 != null ? role4.endQualifierHashSize() : 0)];
 		ByteBuffer bb = ByteBuffer.wrap(cq);
 		v1.writeQualifierHashTo(bb);
@@ -407,10 +447,10 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		}
 		return scan;
 	}
-	public Scan scan(RDFIdentifier<T1> k) {
+	public Scan scan(RDFIdentifier<? extends T1> k) {
 		return scanWithConstraint(k, null);
 	}
-	public Scan scanWithConstraint(RDFIdentifier<T1> k, ValueConstraint constraint) {
+	public Scan scanWithConstraint(RDFIdentifier<? extends T1> k, ValueConstraint constraint) {
 		ByteSequence kb = new ByteArray(k.getKeyHash(this));
 		int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
 		Scan scan = scan(
@@ -434,10 +474,10 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		}
 		return scan;
 	}
-	public Scan scan(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2) {
+	public Scan scan(RDFIdentifier<? extends T1> k1, RDFIdentifier<? extends T2> k2) {
 		return scanWithConstraint(k1, k2, null);
 	}
-	public Scan scanWithConstraint(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2, ValueConstraint constraint) {
+	public Scan scanWithConstraint(RDFIdentifier<? extends T1> k1, RDFIdentifier<? extends T2> k2, ValueConstraint constraint) {
 		ByteSequence k1b = new ByteArray(k1.getKeyHash(this));
 		ByteSequence k2b, stop2;
 		int cardinality;
@@ -471,10 +511,10 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		}
 		return scan;
 	}
-	public Scan scan(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2, RDFIdentifier<T3> k3) {
+	public Scan scan(RDFIdentifier<? extends T1> k1, RDFIdentifier<? extends T2> k2, RDFIdentifier<? extends T3> k3) {
 		return scanWithConstraint(k1, k2, k3, null);
 	}
-	public Scan scanWithConstraint(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2, RDFIdentifier<T3> k3, ValueConstraint constraint) {
+	public Scan scanWithConstraint(RDFIdentifier<? extends T1> k1, RDFIdentifier<? extends T2> k2, RDFIdentifier<? extends T3> k3, ValueConstraint constraint) {
 		ByteSequence k1b = new ByteArray(k1.getKeyHash(this));
 		ByteSequence k2b = new ByteArray(k2.getKeyHash(this));
 		ByteSequence k3b, stop3;
@@ -509,7 +549,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		}
 		return scan;
 	}
-	public Scan scan(RDFIdentifier<T1> k1, RDFIdentifier<T2> k2, RDFIdentifier<T3> k3, RDFIdentifier<T4> k4) {
+	public Scan scan(RDFIdentifier<? extends T1> k1, RDFIdentifier<? extends T2> k2, RDFIdentifier<? extends T3> k3, RDFIdentifier<? extends T4> k4) {
 		byte[] k1b = k1.getKeyHash(this);
 		byte[] k2b = k2.getKeyHash(this);
 		byte[] k3b = get3KeyHash(this, k3);

@@ -451,7 +451,7 @@ public final class HalyardTableUtils {
 					if (obj == null) {
 						return rdfFactory.getSPOIndex().scan(subj, pred);
                     } else {
-						return rdfFactory.getSPOIndex().scan(subj, pred, obj);
+						return StatementIndex.scan(subj, pred, obj, null, rdfFactory);
                     }
                 }
             }
@@ -481,7 +481,7 @@ public final class HalyardTableUtils {
 					if (obj == null) {
 						return rdfFactory.getCSPOIndex().scan(ctx, subj, pred);
                     } else {
-						return rdfFactory.getCSPOIndex().scan(ctx, subj, pred, obj);
+						return StatementIndex.scan(subj, pred, obj, ctx, rdfFactory);
                     }
                 }
             }

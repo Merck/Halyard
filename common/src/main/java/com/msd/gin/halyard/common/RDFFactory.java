@@ -431,7 +431,7 @@ public class RDFFactory {
 			RDFIdentifier<SPOC.S> skey = createSubjectId(id(sid));
 			RDFIdentifier<SPOC.P> pkey = createPredicateId(id(pid));
 			RDFIdentifier<SPOC.O> okey = createObjectId(id(oid));
-			Scan scan = HalyardTableUtils.scanSingle(cspo.scan(ckey, skey, pkey, okey));
+			Scan scan = HalyardTableUtils.scanSingle(StatementIndex.scan(skey, pkey, okey, ckey, RDFFactory.this));
 			try {
 				Result result;
 				try (ResultScanner scanner = conn.getScanner(scan)) {
