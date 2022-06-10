@@ -30,8 +30,7 @@ public abstract class RDFValue<V extends Value, T extends SPOC<V>> extends RDFId
 			if (val instanceof SerializableValue) {
 				ser = ((SerializableValue) val).getSerializedForm();
 			} else {
-				byte[] b = rdfFactory.idTripleWriter.toBytes(val);
-				ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
+				ser = rdfFactory.getSerializedForm(val);
 			}
 		}
 		return ser.duplicate();

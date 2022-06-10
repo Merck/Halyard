@@ -33,8 +33,7 @@ public final class IdentifiableLiteral extends LiteralWrapper implements Identif
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = rdfFactory.idTripleWriter.toBytes(literal);
-			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
+			ser = rdfFactory.getSerializedForm(literal);
 		}
 		return ser.duplicate();
 	}

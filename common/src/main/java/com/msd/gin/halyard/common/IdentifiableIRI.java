@@ -84,8 +84,7 @@ public final class IdentifiableIRI implements IRI, Identifiable, SerializableVal
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = rdfFactory.idTripleWriter.toBytes(this);
-			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
+			ser = rdfFactory.getSerializedForm(this);
 		}
 		return ser.duplicate();
 	}

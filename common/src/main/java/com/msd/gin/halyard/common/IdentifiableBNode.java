@@ -33,8 +33,7 @@ public final class IdentifiableBNode extends BNodeWrapper implements Identifiabl
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = rdfFactory.idTripleWriter.toBytes(bnode);
-			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
+			ser = rdfFactory.getSerializedForm(bnode);
 		}
 		return ser.duplicate();
 	}

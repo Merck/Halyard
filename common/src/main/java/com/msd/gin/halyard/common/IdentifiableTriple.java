@@ -33,8 +33,7 @@ public final class IdentifiableTriple extends TripleWrapper implements Identifia
 	@Override
 	public ByteBuffer getSerializedForm() {
 		if (ser == null) {
-			byte[] b = rdfFactory.idTripleWriter.toBytes(triple);
-			ser = ByteBuffer.wrap(b).asReadOnlyBuffer();
+			ser = rdfFactory.getSerializedForm(triple);
 		}
 		return ser.duplicate();
 	}

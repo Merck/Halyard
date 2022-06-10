@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.msd.gin.halyard.common.Config;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFFactory;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
@@ -505,6 +507,57 @@ public class HBaseSailTest {
 		}
         rep.shutDown();
     }
+
+	@Test
+	public void testEvaluateSelectService_differentHashes() throws Exception {
+		ValueFactory vf = SimpleValueFactory.getInstance();
+		Configuration conf = hconn.getConfiguration();
+		conf.set(Config.ID_HASH, "Murmur3-128");
+		conf.setInt(Config.ID_SIZE, 6);
+		conf.setInt(Config.ID_TYPE_INDEX, 0);
+		HBaseSail sail = new HBaseSail(hconn, useTable("whateverservice"), true, 0, usePushStrategy, 0, null, null);
+		SailRepository rep = new SailRepository(sail);
+		rep.init();
+		Random r = new Random(333);
+		IRI pred = vf.createIRI("http://whatever/pred");
+		IRI meta = vf.createIRI("http://whatever/meta");
+		try (RepositoryConnection conn = rep.getConnection()) {
+			for (int i = 0; i < 1000; i++) {
+				IRI subj = vf.createIRI("http://whatever/subj#" + r.nextLong());
+				IRI graph = vf.createIRI("http://whatever/grp#" + r.nextLong());
+				conn.add(subj, pred, graph, meta);
+				for (int j = 0; j < 10; j++) {
+					IRI s = vf.createIRI("http://whatever/s#" + r.nextLong());
+					IRI p = vf.createIRI("http://whatever/p#" + r.nextLong());
+					IRI o = vf.createIRI("http://whatever/o#" + r.nextLong());
+					conn.add(s, p, o, graph);
+				}
+			}
+		}
+		rep.shutDown();
+
+		conf.set(Config.ID_HASH, "SHA-1");
+		conf.setInt(Config.ID_SIZE, 8);
+		conf.setInt(Config.ID_TYPE_INDEX, 1);
+		sail = new HBaseSail(hconn, useTable("whateverparent"), true, 0, usePushStrategy, 0, null, null);
+		rep = new SailRepository(sail);
+		rep.init();
+		try (RepositoryConnection conn = rep.getConnection()) {
+			conn.add(meta, RDF.TYPE, SD.NAMED_GRAPH_CLASS);
+			conn.add(meta, RDFS.LABEL, vf.createLiteral("Meta"));
+			TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL,
+					"select * where {" + "  SERVICE <" + HALYARD.NAMESPACE + "whateverservice> {" + "    graph ?meta { ?subj <http://whatever/pred> ?graph } " + "    }" + " ?meta ?mp ?mo  }");
+			int count = 0;
+			try (TupleQueryResult res = q.evaluate()) {
+				while (res.hasNext()) {
+					count++;
+					res.next();
+				}
+			}
+			assertEquals(2000, count);
+		}
+		rep.shutDown();
+	}
 
 	@Test
 	public void testEvaluateServiceSameTable() throws Exception {
