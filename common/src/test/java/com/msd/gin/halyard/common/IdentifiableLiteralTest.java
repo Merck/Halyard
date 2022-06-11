@@ -6,26 +6,25 @@ import org.eclipse.rdf4j.model.LiteralTest;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 
 public class IdentifiableLiteralTest extends LiteralTest {
-    private static final RDFFactory rdfFactory = RDFFactory.create();
 
 	@Override
 	protected IRI datatype(String dt) {
-		return new IdentifiableIRI(dt, rdfFactory);
+		return new IdentifiableIRI(dt);
 	}
 
 	@Override
 	protected Literal literal(String label) {
-		return new IdentifiableLiteral(SimpleValueFactory.getInstance().createLiteral(label), rdfFactory);
+		return new IdentifiableLiteral(SimpleValueFactory.getInstance().createLiteral(label));
 	}
 
 	@Override
 	protected Literal literal(String label, String lang) {
-		return new IdentifiableLiteral(SimpleValueFactory.getInstance().createLiteral(label, lang), rdfFactory);
+		return new IdentifiableLiteral(SimpleValueFactory.getInstance().createLiteral(label, lang));
 	}
 
 	@Override
 	protected Literal literal(String label, IRI dt) {
-		return new IdentifiableLiteral(SimpleValueFactory.getInstance().createLiteral(label, dt), rdfFactory);
+		return new IdentifiableLiteral(SimpleValueFactory.getInstance().createLiteral(label, dt));
 	}
 
 }

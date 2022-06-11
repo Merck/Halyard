@@ -7,19 +7,18 @@ import org.eclipse.rdf4j.model.StatementTest;
 import org.eclipse.rdf4j.model.Value;
 
 public class TimestampedStatementTest extends StatementTest {
-    private static final RDFFactory rdfFactory = RDFFactory.create();
 
 	@Override
 	protected IRI iri(String iri) {
-		return new IdentifiableIRI(iri, rdfFactory);
+		return new IdentifiableIRI(iri);
 	}
 
 	@Override
 	protected Statement statement(Resource s, IRI p, Value o, Resource c) {
 		if (c != null) {
-			return rdfFactory.getTimestampedValueFactory().createStatement(s, p, o, c);
+			return TimestampedValueFactory.INSTANCE.createStatement(s, p, o, c);
 		} else {
-			return rdfFactory.getTimestampedValueFactory().createStatement(s, p, o);
+			return TimestampedValueFactory.INSTANCE.createStatement(s, p, o);
 		}
 	}
 

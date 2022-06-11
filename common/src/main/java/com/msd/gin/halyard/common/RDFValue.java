@@ -28,7 +28,7 @@ public abstract class RDFValue<V extends Value, T extends SPOC<V>> extends RDFId
 	public final ByteBuffer getSerializedForm() {
 		if (ser == null) {
 			if (val instanceof SerializableValue) {
-				ser = ((SerializableValue) val).getSerializedForm();
+				ser = ((SerializableValue) val).getSerializedForm(rdfFactory);
 			} else {
 				ser = rdfFactory.getSerializedForm(val);
 			}
@@ -37,8 +37,8 @@ public abstract class RDFValue<V extends Value, T extends SPOC<V>> extends RDFId
 	}
 
 	@Override
-	protected final Identifier calculateId() {
-		return rdfFactory.id(val);
+	protected final ValueIdentifier calculateId() {
+		return rdfFactory.id(val, getSerializedForm());
 	}
 
 	@Override

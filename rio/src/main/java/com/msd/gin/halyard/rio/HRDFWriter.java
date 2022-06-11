@@ -55,7 +55,7 @@ public final class HRDFWriter extends AbstractRDFWriter {
 
 
 	private final DataOutputStream out;
-	private static final ValueIO valueIO = ValueIO.create();
+	private static final ValueIO valueIO = ValueIO.getDefault();
 	private static final ValueIO.Writer valueWriter = valueIO.createWriter(new StreamTripleWriter());
 
 	public HRDFWriter(OutputStream out) {

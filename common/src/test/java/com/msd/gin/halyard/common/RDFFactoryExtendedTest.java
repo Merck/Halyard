@@ -25,6 +25,9 @@ import org.junit.runners.Parameterized;
 
 import static org.junit.Assert.*;
 
+/**
+ * Test different RDFFactory configurations.
+ */
 @RunWith(Parameterized.class)
 public class RDFFactoryExtendedTest {
 
@@ -76,7 +79,7 @@ public class RDFFactoryExtendedTest {
 			assertFalse(bb.hasRemaining());
 			bb.flip();
 			salts.add(bb);
-			Identifier id = rdfFactory.id(idBytes);
+			ValueIdentifier id = rdfFactory.id(idBytes);
 			assertTrue(id.isIRI());
 		}
 		assertEquals(rdfFactory.typeSaltSize, salts.size());
@@ -92,7 +95,7 @@ public class RDFFactoryExtendedTest {
 			assertFalse(bb.hasRemaining());
 			bb.flip();
 			salts.add(bb);
-			Identifier id = rdfFactory.id(idBytes);
+			ValueIdentifier id = rdfFactory.id(idBytes);
 			assertTrue(id.isLiteral());
 			assertTrue(id.isString());
 		}
@@ -112,7 +115,7 @@ public class RDFFactoryExtendedTest {
     public void testIdIsUnique() {
         ValueFactory vf = SimpleValueFactory.getInstance();
         List<Value> values = RDFFactoryTest.createData(vf).stream().map(arr -> (Value)arr[0]).collect(Collectors.toList());
-        Set<Identifier> ids = new HashSet<>(values.size());
+        Set<ValueIdentifier> ids = new HashSet<>(values.size());
         for (Value v : values) {
         	ids.add(rdfFactory.id(v));
         }
@@ -120,15 +123,10 @@ public class RDFFactoryExtendedTest {
     }
 
 	@Test
-	public void testWellKnownId() {
-		Identifier id = rdfFactory.wellKnownId(RDF.TYPE);
-		assertNotNull(id);
-		IRI typeIri = rdfFactory.getWellKnownIRI(id);
-		assertEquals(RDF.TYPE, typeIri);
-	}
-
-	@Test
 	public void testWellKnownIRI() {
 		assertTrue(rdfFactory.isWellKnownIRI(RDF.TYPE));
+		ValueIdentifier id = rdfFactory.id(RDF.TYPE);
+		IRI typeIri = rdfFactory.getWellKnownIRI(id);
+		assertEquals(RDF.TYPE, typeIri);
 	}
 }

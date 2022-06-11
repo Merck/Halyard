@@ -1,6 +1,5 @@
 package com.msd.gin.halyard.strategy;
 
-import com.msd.gin.halyard.common.ObjectConstraint;
 import com.msd.gin.halyard.common.ValueConstraint;
 import com.msd.gin.halyard.optimizers.ExtendedEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
@@ -66,7 +65,7 @@ class MemoryStoreWithConstraintsStrategy extends MemoryStore {
 		}
 
 		@Override
-		public TripleSource getTripleSource(ValueConstraint subjConstraint, ObjectConstraint objConstraint) {
+		public TripleSource getTripleSource(ValueConstraint subjConstraint, ValueConstraint objConstraint) {
 			return new TripleSource() {
 		        @Override
 		        public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {

@@ -330,11 +330,20 @@ public class ValueIO {
 		return v;
 	}
 
-	public static ValueIO create() {
-		boolean loadVocabularies = Config.getBoolean("halyard.vocabularies", true);
-		boolean loadLanguages = Config.getBoolean("halyard.languages", true);
-		int stringCompressionThreshold = Config.getInteger("halyard.string.compressionThreshold", 200);
-		return new ValueIO(loadVocabularies, loadLanguages, stringCompressionThreshold);
+	private static volatile ValueIO defaultValueIO;
+
+	public static ValueIO getDefault() {
+		if (defaultValueIO == null) {
+			synchronized (ValueIO.class) {
+				if (defaultValueIO == null) {
+					boolean loadVocabularies = Config.getBoolean("halyard.vocabularies", true);
+					boolean loadLanguages = Config.getBoolean("halyard.languages", true);
+					int stringCompressionThreshold = Config.getInteger("halyard.string.compressionThreshold", 200);
+					defaultValueIO = new ValueIO(loadVocabularies, loadLanguages, stringCompressionThreshold);
+				}
+			}
+		}
+		return defaultValueIO;
 	}
 
 	private final BiMap<Short, String> wellKnownNamespaces = HashBiMap.create(256);
@@ -815,8 +824,16 @@ public class ValueIO {
 		}
 	}
 
+	public Writer createStreamWriter() {
+		return createWriter(new StreamTripleWriter());
+	}
+
 	public Writer createWriter(TripleWriter tw) {
 		return new Writer(tw);
+	}
+
+	public Reader createStreamReader(ValueFactory vf) {
+		return createReader(vf, new StreamTripleReader());
 	}
 
 	public Reader createReader(ValueFactory vf, TripleReader tf) {

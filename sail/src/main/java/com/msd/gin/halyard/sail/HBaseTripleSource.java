@@ -18,12 +18,13 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.KeyspaceConnection;
-import com.msd.gin.halyard.common.ObjectConstraint;
+import com.msd.gin.halyard.common.LiteralConstraint;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
+import com.msd.gin.halyard.common.TimestampedValueFactory;
 import com.msd.gin.halyard.common.ValueConstraint;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
@@ -100,12 +101,12 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 	}
 
 	public TripleSource getTimestampedTripleSource() {
-		ValueIO.Reader tsValueReader = rdfFactory.createTableReader(rdfFactory.getTimestampedValueFactory(), table);
+		ValueIO.Reader tsValueReader = rdfFactory.createTableReader(TimestampedValueFactory.INSTANCE, table);
 		return new HBaseTripleSource(table, tsValueReader, rdfFactory, timeoutSecs, settings, ticker);
 	}
 
 	@Override
-	public TripleSource getTripleSource(ValueConstraint subjConstraint, ObjectConstraint objConstraints) {
+	public TripleSource getTripleSource(ValueConstraint subjConstraint, ValueConstraint objConstraints) {
 		return new HBaseTripleSource(table, valueReader, rdfFactory, timeoutSecs, settings, ticker) {
 			protected Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, RDFFactory rdfFactory) {
 				return HalyardTableUtils.scanWithConstraints(subj, subjConstraint, pred, obj, objConstraints, ctx, rdfFactory);

@@ -2,6 +2,7 @@ package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.Timestamped;
+import com.msd.gin.halyard.common.TimestampedValueFactory;
 import com.msd.gin.halyard.sail.HBaseTripleSource;
 
 import java.util.List;
@@ -39,7 +40,7 @@ public class TimestampTupleFunctionTest {
 
 					@Override
 					public ValueFactory getValueFactory() {
-						return rdfFactory.getTimestampedValueFactory();
+						return TimestampedValueFactory.INSTANCE;
 					}
 				};
 			}

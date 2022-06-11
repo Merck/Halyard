@@ -2,9 +2,6 @@ package com.msd.gin.halyard.common;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.msd.gin.halyard.common.Hashes.HashFunction;
-import com.msd.gin.halyard.common.ValueIO.StreamTripleReader;
-import com.msd.gin.halyard.common.ValueIO.StreamTripleWriter;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.ByteArrayInputStream;
@@ -20,6 +17,7 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
@@ -36,14 +34,11 @@ public class RDFFactory {
 	public final ValueIO.Writer idTripleWriter;
 	public final ValueIO.Writer streamWriter;
 	public final ValueIO.Reader streamReader;
-	private final BiMap<Identifier, IRI> wellKnownIriIds = HashBiMap.create(256);
-	private final ThreadLocal<HashFunction> idHash;
-	private final Identifier.Format idFormat;
+	private final BiMap<ValueIdentifier, IRI> wellKnownIriIds = HashBiMap.create(256);
+	private final ValueIdentifier.Format idFormat;
 	final int typeSaltSize;
 
 	private final ValueIO valueIO;
-	private final ValueFactory idValueFactory;
-	private final ValueFactory tsValueFactory;
 
 	final RDFRole<SPOC.S> subject;
 	final RDFRole<SPOC.P> predicate;
@@ -113,30 +108,13 @@ public class RDFFactory {
 		);
 		String confIdAlgo = Config.getString(config, Config.ID_HASH, "SHA-1");
 		int confIdSize = Config.getInteger(config, Config.ID_SIZE, 0);
-
-		idHash = new ThreadLocal<HashFunction>() {
-			@Override
-			protected HashFunction initialValue() {
-				return Hashes.getHash(confIdAlgo, confIdSize);
-			}
-		};
-		HashFunction hashInstance = idHash.get();
-		int idSize = hashInstance.size();
-		LOGGER.info("Identifier hash: {} {}-bit ({} bytes)", hashInstance.getName(), idSize*Byte.SIZE, idSize);
+		int idSize = Hashes.getHash(confIdAlgo, confIdSize).size();
+		LOGGER.info("Identifier hash: {} {}-bit ({} bytes)", confIdAlgo, idSize*Byte.SIZE, idSize);
 
 		int typeIndex = lessThan(lessThanOrEqual(Config.getInteger(config, Config.ID_TYPE_INDEX, 0), Short.BYTES), idSize);
-		Identifier.TypeNibble typeNibble = Config.getBoolean(config, Config.ID_TYPE_NIBBLE, true) ? Identifier.TypeNibble.LITTLE_NIBBLE : Identifier.TypeNibble.BIG_NIBBLE;
-		switch (typeNibble) {
-			case BIG_NIBBLE:
-				typeSaltSize = 1 << (8*typeIndex);
-				break;
-			case LITTLE_NIBBLE:
-				typeSaltSize = 1 << (4*(typeIndex+1));
-				break;
-			default:
-				throw new AssertionError();
-		}
-		idFormat = new Identifier.Format(confIdAlgo, idSize, typeIndex, typeNibble);
+		ValueIdentifier.TypeNibble typeNibble = Config.getBoolean(config, Config.ID_TYPE_NIBBLE, true) ? ValueIdentifier.TypeNibble.LITTLE_NIBBLE : ValueIdentifier.TypeNibble.BIG_NIBBLE;
+		idFormat = new ValueIdentifier.Format(confIdAlgo, idSize, typeIndex, typeNibble);
+		typeSaltSize = idFormat.getSaltSize();
 
 		int subjectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 5), MIN_KEY_SIZE), idSize);
 		int subjectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_SUBJECT, 3), MIN_KEY_SIZE), idSize);
@@ -147,15 +125,13 @@ public class RDFFactory {
 		int contextKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 3), MIN_KEY_SIZE), idSize);
 		int contextEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_CONTEXT, 0), 0), idSize);
 
-		idValueFactory = new IdValueFactory(this);
-		tsValueFactory = new TimestampedValueFactory(this);
 		idTripleWriter = valueIO.createWriter(new IdTripleWriter());
-		streamWriter = valueIO.createWriter(new StreamTripleWriter());
-		streamReader = valueIO.createReader(idValueFactory, new StreamTripleReader());
+		streamWriter = valueIO.createStreamWriter();
+		streamReader = valueIO.createStreamReader(IdValueFactory.INSTANCE);
 
 		for (IRI iri : valueIO.wellKnownIris.values()) {
-			IdentifiableIRI idIri = new IdentifiableIRI(iri.stringValue(), this);
-			Identifier id = idIri.getId();
+			IdentifiableIRI idIri = new IdentifiableIRI(iri.stringValue());
+			ValueIdentifier id = idIri.getId(this);
 			if (wellKnownIriIds.putIfAbsent(id, idIri) != null) {
 				throw new AssertionError(String.format("Hash collision between %s and %s",
 						wellKnownIriIds.get(id), idIri));
@@ -219,27 +195,16 @@ public class RDFFactory {
 		);
 	}
 
-	public ValueFactory getIdValueFactory() {
-		return idValueFactory;
-	}
-
-	public ValueFactory getTimestampedValueFactory() {
-		return tsValueFactory;
-	}
-
 	public Collection<Namespace> getWellKnownNamespaces() {
 		return valueIO.getWellKnownNamespaces();
 	}
-	Identifier wellKnownId(IRI iri) {
-		return wellKnownIriIds.inverse().get(iri);
-	}
 
-	IRI getWellKnownIRI(Identifier id) {
+	IRI getWellKnownIRI(ValueIdentifier id) {
 		return wellKnownIriIds.get(id);
 	}
 
 	boolean isWellKnownIRI(Value v) {
-		return wellKnownIriIds.containsValue(v);
+		return v.isIRI() && wellKnownIriIds.containsValue(v);
 	}
 
 	public int getIdSize() {
@@ -259,7 +224,7 @@ public class RDFFactory {
 				seq.writeTo(bb);
 				// overwrite type bits
 				idFormat.writeType(type, datatype, arr, offset);
-				if (idFormat.typeNibble == Identifier.TypeNibble.LITTLE_NIBBLE) {
+				if (idFormat.typeNibble == ValueIdentifier.TypeNibble.LITTLE_NIBBLE) {
 					arr[offset+idFormat.typeIndex] = (byte) ((arr[offset+idFormat.typeIndex] & 0x0F) | ((saltBits&0x0F) << 4));
 					saltBits >>= 4;
 				}
@@ -317,44 +282,39 @@ public class RDFFactory {
 		return cosp;
 	}
 
-	public Identifier id(Value v) {
-		Identifier id;
-		if (v instanceof Identifiable) {
-			Identifiable idv = (Identifiable) v;
-			id = idv.getId();
-			// if Value comes from a different table, e.g. federated query
-			if (!id.getFormat().equals(idFormat)) {
-				id = makeId(v);
-				idv.setId(id);
+	public ValueIdentifier id(Value v) {
+		ValueIdentifier id = v.isIRI() ? wellKnownIriIds.inverse().get(v) : null;
+		if (v instanceof IdentifiableValue) {
+			IdentifiableValue idv = (IdentifiableValue) v;
+			if (id != null) {
+				idv.setId(this, id);
+			} else {
+				id = idv.getId(this);
 			}
-			return id;
+		} else if (id == null) {
+			ByteBuffer ser = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
+			ser = idTripleWriter.writeTo(v, ser);
+			ser.flip();
+			id = id(v, ser);
 		}
-
-		id = wellKnownIriIds.inverse().get(v);
-		if (id != null) {
-			return id;
-		}
-
-		return makeId(v);
+		return id;
 	}
 
-	private Identifier makeId(Value v) {
-		ByteBuffer ser = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
-		ser = idTripleWriter.writeTo(v, ser);
-		ser.flip();
-		return id(v, ser);
-	}
-
-	Identifier id(Value v, ByteBuffer ser) {
-		byte[] hash = idHash.get().apply(ser);
-		return Identifier.create(v, hash, idFormat);
-	}
-
-	public Identifier id(byte[] idBytes) {
+	public ValueIdentifier id(byte[] idBytes) {
 		if (idBytes.length != idFormat.size) {
 			throw new IllegalArgumentException("Byte array has incorrect length");
 		}
-		return new Identifier(idBytes, idFormat);
+		return new ValueIdentifier(idBytes, idFormat);
+	}
+
+	ValueIdentifier id(Value v, ByteBuffer ser) {
+		ValueType type = ValueType.valueOf(v);
+		return idFormat.id(type, v.isLiteral() ? ((Literal)v).getDatatype() : null, ser);
+	}
+
+	ByteBuffer getSerializedForm(Value v) {
+		byte[] b = idTripleWriter.toBytes(v);
+		return ByteBuffer.wrap(b).asReadOnlyBuffer();
 	}
 
 	public byte[] statementId(Resource subj, IRI pred, Value obj) {
@@ -374,20 +334,15 @@ public class RDFFactory {
 		return buf;
 	}
 
-	ByteBuffer getSerializedForm(Value v) {
-		byte[] b = idTripleWriter.toBytes(v);
-		return ByteBuffer.wrap(b).asReadOnlyBuffer();
-	}
-
-	public RDFIdentifier<SPOC.S> createSubjectId(Identifier id) {
+	public RDFIdentifier<SPOC.S> createSubjectId(ValueIdentifier id) {
 		return new RDFIdentifier<>(subject, id);
 	}
 
-	public RDFIdentifier<SPOC.P> createPredicateId(Identifier id) {
+	public RDFIdentifier<SPOC.P> createPredicateId(ValueIdentifier id) {
 		return new RDFIdentifier<>(predicate, id);
 	}
 
-	public RDFIdentifier<SPOC.O> createObjectId(Identifier id) {
+	public RDFIdentifier<SPOC.O> createObjectId(ValueIdentifier id) {
 		return new RDFIdentifier<>(object, id);
 	}
 

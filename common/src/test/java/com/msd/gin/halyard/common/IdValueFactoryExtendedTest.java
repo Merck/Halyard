@@ -15,6 +15,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
@@ -25,13 +26,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import static org.junit.Assert.assertEquals;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class IdValueFactoryExtendedTest {
-    private static final RDFFactory rdfFactory = RDFFactory.create();
 	private static final Date NOW = new Date();
 
 	private static List<Value> createData(ValueFactory vf) {
@@ -79,7 +79,7 @@ public class IdValueFactoryExtendedTest {
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> data() {
 		List<Value> expected = createData(SimpleValueFactory.getInstance());
-		List<Value> actual = createData(rdfFactory.getIdValueFactory());
+		List<Value> actual = createData(IdValueFactory.INSTANCE);
 		List<Object[]> testValues = new ArrayList<>();
 		for (int i=0; i<expected.size(); i++) {
 			testValues.add(new Object[] {expected.get(i), actual.get(i)});
@@ -88,9 +88,9 @@ public class IdValueFactoryExtendedTest {
 	}
 
 	private Value expected;
-	private Value actual;
+	private IdentifiableValue actual;
 
-	public IdValueFactoryExtendedTest(Value expected, Value actual) {
+	public IdValueFactoryExtendedTest(Value expected, IdentifiableValue actual) {
 		this.expected = expected;
 		this.actual = actual;
 	}
@@ -132,5 +132,31 @@ public class IdValueFactoryExtendedTest {
 
 		// should have better compression than the standard classes
 		assertThat("Serialized size", out.toByteArray().length, lessThan(expectedOut.toByteArray().length));
+	}
+
+	@Test
+	public void testId() {
+		Configuration conf1 = new Configuration(false);
+		conf1.setInt(Config.ID_SIZE, 8);
+		RDFFactory rdfFactory1 = RDFFactory.create(conf1);
+		assertEquals(rdfFactory1.id(expected), actual.getId(rdfFactory1));
+
+		Configuration conf2 = new Configuration(false);
+		conf2.setInt(Config.ID_SIZE, 10);
+		RDFFactory rdfFactory2 = RDFFactory.create(conf2);
+		assertEquals(rdfFactory2.id(expected), actual.getId(rdfFactory2));
+	}
+
+	@Test
+	public void testSerializedForm() {
+		Configuration conf1 = new Configuration(false);
+		conf1.setInt(Config.ID_SIZE, 8);
+		RDFFactory rdfFactory1 = RDFFactory.create(conf1);
+		assertEquals(rdfFactory1.getSerializedForm(expected), ((SerializableValue)actual).getSerializedForm(rdfFactory1));
+
+		Configuration conf2 = new Configuration(false);
+		conf2.setInt(Config.ID_SIZE, 10);
+		RDFFactory rdfFactory2 = RDFFactory.create(conf2);
+		assertEquals(rdfFactory2.getSerializedForm(expected), ((SerializableValue)actual).getSerializedForm(rdfFactory2));
 	}
 }

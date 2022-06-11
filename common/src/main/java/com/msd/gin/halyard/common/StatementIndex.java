@@ -379,20 +379,20 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
     		}
 			return pattern.val;
     	} else if(len == WELL_KNOWN_IRI_MARKER) {
-			Identifier id = parseId(role, key, cq, keySize);
+			ValueIdentifier id = parseId(role, key, cq, keySize);
 			IRI iri = rdfFactory.getWellKnownIRI(id);
 			if (iri == null) {
 				throw new IllegalStateException(String.format("Unknown IRI hash: %s", id));
 			}
 			return iri;
 		} else if(len > 0) {
-			Identifier id = parseId(role, key, cq, keySize);
+			ValueIdentifier id = parseId(role, key, cq, keySize);
 			int limit = cv.limit();
 			cv.limit(cv.position() + len);
 			Value value = reader.readValue(cv);
 			cv.limit(limit);
-			if (value instanceof Identifiable) {
-				((Identifiable)value).setId(id);
+			if (value instanceof IdentifiableValue) {
+				((IdentifiableValue)value).setId(rdfFactory, id);
 			}
 			return value;
 		} else if(len == 0) {
@@ -402,7 +402,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		}
     }
 
-	private Identifier parseId(RDFRole<?> role, ByteBuffer key, ByteBuffer cn, int keySize) {
+	private ValueIdentifier parseId(RDFRole<?> role, ByteBuffer key, ByteBuffer cn, int keySize) {
 		byte[] idBytes = new byte[rdfFactory.getIdSize()];
 		role.unrotate(key.array(), key.arrayOffset() + key.position(), keySize, this, idBytes);
 		key.position(key.position()+keySize);
@@ -414,7 +414,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return HalyardTableUtils.scan(concat(false, k1Start, k2Start, k3Start, k4Start), concat(true, k1Stop, k2Stop, k3Stop, k4Stop), cardinality, indiscriminate);
 	}
 
-	Scan scan(Identifier id) {
+	Scan scan(ValueIdentifier id) {
 		ByteSequence kb = new ByteArray(role1.keyHash(this, id));
 		byte[] cq = role1.qualifierHash(id);
 		int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
@@ -566,8 +566,8 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	private void appendLiteralFilters(ByteSequence prefix, ByteSequence stopPrefix, ByteSequence startKey, ByteSequence stopKey, ByteSequence trailingStartKeys, ByteSequence trailingStopKeys, ValueConstraint constraint, List<Filter> filters) {
 		ValueType type = constraint.getValueType();
 		IRI dt = null;
-		if ((constraint instanceof ObjectConstraint)) {
-			ObjectConstraint objConstraint = (ObjectConstraint) constraint;
+		if ((constraint instanceof LiteralConstraint)) {
+			LiteralConstraint objConstraint = (LiteralConstraint) constraint;
 			dt = objConstraint.getDatatype();
 		}
 		int typeSaltSize = rdfFactory.typeSaltSize;

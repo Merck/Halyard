@@ -4,6 +4,7 @@ import static junit.framework.TestCase.assertTrue;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.GEO;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQueryResult;
@@ -48,6 +49,18 @@ public class ConstrainedValueStrategyTest {
     }
 
     @Test
+    public void testFilterDatatypeNotEqual() {
+        ValueFactory vf = con.getValueFactory();
+        con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));
+        con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral("foo"));
+    	String q ="SELECT ?s { ?s ?p ?o filter(datatype(?o)!=xsd:int) }";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+        BindingSet bs = res.next();
+        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
+    }
+
+    @Test
     public void testFilterLangs() {
         ValueFactory vf = con.getValueFactory();
         con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));
@@ -58,6 +71,19 @@ public class ConstrainedValueStrategyTest {
         assertTrue(res.hasNext());
         BindingSet bs = res.next();
         assertEquals("c", ((IRI)bs.getValue("s")).getLocalName());
+    }
+
+    @Test
+    public void testFilterLangsNotEqual() {
+        ValueFactory vf = con.getValueFactory();
+        con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));
+        con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral("bar", "fr"));
+        con.add(vf.createIRI("http://whatever/c"), vf.createIRI("http://whatever/val"), vf.createLiteral("bar", "en"));
+    	String q ="SELECT ?s { ?s ?p ?o filter(lang(?o)>'en') }";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+        BindingSet bs = res.next();
+        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
     }
 
     @Test
@@ -82,6 +108,18 @@ public class ConstrainedValueStrategyTest {
         assertTrue(res.hasNext());
         BindingSet bs = res.next();
         assertTrue(bs.getValue("s").isBNode());
+    }
+
+    @Test
+    public void testFilterIsLiteral() {
+        ValueFactory vf = con.getValueFactory();
+        con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createBNode());
+        con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral("foo", GEO.WKT_LITERAL));
+    	String q ="SELECT ?s { ?s ?p ?o filter(isLiteral(?o)) }";
+        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
+        assertTrue(res.hasNext());
+        BindingSet bs = res.next();
+        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
     }
 
     @Test

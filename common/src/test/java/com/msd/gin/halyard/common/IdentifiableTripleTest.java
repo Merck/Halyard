@@ -8,16 +8,15 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 
 public class IdentifiableTripleTest extends TripleTest {
-    private static final RDFFactory rdfFactory = RDFFactory.create();
 
 	@Override
 	protected Triple triple(Resource s, IRI p, Value o) {
-		return new IdentifiableTriple(SimpleValueFactory.getInstance().createTriple(s, p, o), rdfFactory);
+		return new IdentifiableTriple(SimpleValueFactory.getInstance().createTriple(s, p, o));
 	}
 
 	@Override
 	protected IRI iri(String iri) {
-		return new IdentifiableIRI(iri, rdfFactory);
+		return new IdentifiableIRI(iri);
 	}
 
 }

@@ -76,9 +76,9 @@ public class ConstrainedStatementPattern extends StatementPattern {
 	@Override
 	public int hashCode() {
 		int result = super.hashCode();
-		result ^= Objects.hashCode(objectType);
-		result ^= Objects.hashCode(literalConstraintFunction);
-		result ^= Objects.hashCode(literalConstraintValue);
+		result = 89 * result + Objects.hashCode(objectType);
+		result = 89 * result + Objects.hashCode(literalConstraintFunction);
+		result = 89 * result + Objects.hashCode(literalConstraintValue);
 		return result;
 	}
 

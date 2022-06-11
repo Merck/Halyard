@@ -1,14 +1,15 @@
 package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 public class RDFIdentifier<T extends SPOC<?>> {
 	private final RDFRole<? extends SPOC<?>> role;
-	private Identifier id;
+	private ValueIdentifier id;
 
-	RDFIdentifier(RDFRole<? extends SPOC<?>> role, Identifier id) {
+	RDFIdentifier(RDFRole<? extends SPOC<?>> role, ValueIdentifier id) {
 		this(role);
-		this.id = id;
+		this.id = Objects.requireNonNull(id);
 	}
 
 	protected RDFIdentifier(RDFRole<? extends SPOC<?>> role) {
@@ -19,11 +20,11 @@ public class RDFIdentifier<T extends SPOC<?>> {
 		return role;
 	}
 
-	protected Identifier calculateId() {
-		throw new UnsupportedOperationException("ID must be provided");
+	protected ValueIdentifier calculateId() {
+		throw new AssertionError("ID must be provided");
 	}
 
-	private Identifier getId() {
+	private ValueIdentifier getId() {
 		if (id == null) {
 			id = calculateId();
 		}

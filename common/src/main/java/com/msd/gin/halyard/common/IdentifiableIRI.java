@@ -7,24 +7,23 @@ import java.util.Objects;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.util.URIUtil;
 
-public final class IdentifiableIRI implements IRI, Identifiable, SerializableValue {
+public final class IdentifiableIRI implements IRI, IdentifiableValue, SerializableValue {
 	private static final long serialVersionUID = 8055405742401584331L;
 	private final String iri;
-	private final RDFFactory rdfFactory;
 	private int localNameIdx = -1;
-	private Identifier id;
+	private RDFFactory rdfFactory;
+	private ValueIdentifier id;
 	private ByteBuffer ser;
 
-	IdentifiableIRI(String iri, RDFFactory valueIO) {
+	IdentifiableIRI(String iri) {
 		if (iri.indexOf(':') == -1) {
 			throw new IllegalArgumentException(String.format("Not a valid (absolute) IRI: %s", iri));
 		}
 		this.iri = Objects.requireNonNull(iri);
-		this.rdfFactory = Objects.requireNonNull(valueIO);
 	}
 
-	IdentifiableIRI(String namespace, String localName, RDFFactory valueIO) {
-		this(Objects.requireNonNull(namespace, "Namespace is null") + Objects.requireNonNull(localName, "Local name is null"), valueIO);
+	IdentifiableIRI(String namespace, String localName) {
+		this(Objects.requireNonNull(namespace, "Namespace is null") + Objects.requireNonNull(localName, "Local name is null"));
 		localNameIdx = namespace.length();
 	}
 
@@ -50,22 +49,6 @@ public final class IdentifiableIRI implements IRI, Identifiable, SerializableVal
 	}
 
 	@Override
-	public final String toString() {
-		return iri;
-	}
-
-	@Override
-	public Identifier getId() {
-		if (id == null) {
-			id = rdfFactory.wellKnownId(this);
-			if (id == null) {
-				id = rdfFactory.id(this, getSerializedForm());
-			}
-		}
-		return id;
-	}
-
-	@Override
 	public boolean equals(Object o) {
 		return this == o || o instanceof IRI
 				&& iri.equals(((IRI) o).stringValue());
@@ -77,12 +60,36 @@ public final class IdentifiableIRI implements IRI, Identifiable, SerializableVal
 	}
 
 	@Override
-	public void setId(Identifier id) {
+	public final String toString() {
+		return iri;
+	}
+
+	private void validateCache(RDFFactory rdfFactory) {
+		if (this.rdfFactory != rdfFactory) {
+			this.id = null;
+			this.ser = null;
+			this.rdfFactory = rdfFactory;
+		}
+	}
+
+	@Override
+	public ValueIdentifier getId(RDFFactory rdfFactory) {
+		validateCache(rdfFactory);
+		if (id == null) {
+			id = rdfFactory.id(this, getSerializedForm(rdfFactory));
+		}
+		return id;
+	}
+
+	@Override
+	public void setId(RDFFactory rdfFactory, ValueIdentifier id) {
+		validateCache(rdfFactory);
 		this.id = id;
 	}
 
 	@Override
-	public ByteBuffer getSerializedForm() {
+	public ByteBuffer getSerializedForm(RDFFactory rdfFactory) {
+		validateCache(rdfFactory);
 		if (ser == null) {
 			ser = rdfFactory.getSerializedForm(this);
 		}
@@ -90,9 +97,7 @@ public final class IdentifiableIRI implements IRI, Identifiable, SerializableVal
 	}
 
 	private Object writeReplace() throws ObjectStreamException {
-		ByteBuffer serBuf = getSerializedForm();
-		byte[] b = new byte[serBuf.remaining()];
-		serBuf.get(b);
-		return new SerializedValue(b, rdfFactory.streamReader);
+		byte[] b = ValueIO.getDefault().createStreamWriter().toBytes(this);
+		return new SerializedValue(b);
 	}
 }

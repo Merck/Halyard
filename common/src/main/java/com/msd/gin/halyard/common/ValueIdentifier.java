@@ -1,16 +1,18 @@
 package com.msd.gin.halyard.common;
 
+import com.msd.gin.halyard.common.Hashes.HashFunction;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
 import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.model.Literal;
-import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.XSD;
 
-public final class Identifier implements ByteSequence, Serializable {
+public final class ValueIdentifier implements ByteSequence, Serializable {
 	private static final long serialVersionUID = 1293499350691875714L;
 
 	enum TypeNibble {
@@ -69,12 +71,54 @@ public final class Identifier implements ByteSequence, Serializable {
 		final int size;
 		final int typeIndex;
 		final TypeNibble typeNibble;
+		transient ThreadLocal<HashFunction> hashFuncProvider;
 
+		/**
+		 * Identifier format.
+		 * @param algorithm algorithm used to generate the ID.
+		 * @param size byte size of the ID
+		 * @param typeIndex byte index to store type information
+		 * @param typeNibble byte nibble to store type information
+		 */
 		Format(String algorithm, int size, int typeIndex, TypeNibble typeNibble) {
 			this.size = size;
 			this.algorithm = algorithm;
 			this.typeIndex = typeIndex;
 			this.typeNibble = typeNibble;
+			initHashProvider();
+		}
+
+		private void initHashProvider() {
+			hashFuncProvider = new ThreadLocal<HashFunction>() {
+				@Override
+				protected HashFunction initialValue() {
+					return Hashes.getHash(algorithm, size);
+				}
+			};
+		}
+
+		int getSaltSize() {
+			int typeSaltSize;
+			switch (typeNibble) {
+				case BIG_NIBBLE:
+					typeSaltSize = 1 << (8*typeIndex);
+					break;
+				case LITTLE_NIBBLE:
+					typeSaltSize = 1 << (4*(typeIndex+1));
+					break;
+				default:
+					throw new AssertionError();
+			}
+			return typeSaltSize;
+		}
+
+		/**
+		 * Thread-safe.
+		 */
+		ValueIdentifier id(ValueType type, IRI datatype, ByteBuffer ser) {
+			byte[] hash = hashFuncProvider.get().apply(ser);
+			writeType(type, datatype, hash, 0);
+			return new ValueIdentifier(hash, this);
 		}
 
 		@Override
@@ -132,12 +176,11 @@ public final class Identifier implements ByteSequence, Serializable {
 			arr[offset+typeIndex] = typeByte;
 			return arr;
 		}
-	}
 
-	static Identifier create(Value v, byte[] hash, Format format) {
-		ValueType type = ValueType.valueOf(v);
-		format.writeType(type, v.isLiteral() ? ((Literal)v).getDatatype() : null, hash, 0);
-		return new Identifier(hash, format);
+		private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+			in.defaultReadObject();
+			initHashProvider();
+		}
 	}
 
 	static boolean isString(IRI dt) {
@@ -146,16 +189,10 @@ public final class Identifier implements ByteSequence, Serializable {
 
 	private final byte[] idBytes;
 	private final Format format;
-	private final int hashcode;
 
-	Identifier(byte[] idBytes, Format format) {
+	ValueIdentifier(byte[] idBytes, Format format) {
 		this.idBytes = idBytes;
 		this.format = format;
-		int h = idBytes[0] & 0xFF;
-		for (int i=1; i<Math.min(idBytes.length, 4); i++) {
-			h = (h << 8) | (idBytes[i] & 0xFF);
-		}
-		this.hashcode = h;
 	}
 
 	public Format getFormat() {
@@ -214,10 +251,10 @@ public final class Identifier implements ByteSequence, Serializable {
 		if (this == o) {
 			return true;
 		}
-		if (!(o instanceof Identifier)) {
+		if (!(o instanceof ValueIdentifier)) {
 			return false;
 		}
-		Identifier that = (Identifier) o;
+		ValueIdentifier that = (ValueIdentifier) o;
 		if (this.idBytes.length != that.idBytes.length) {
 			return false;
 		}
@@ -231,7 +268,11 @@ public final class Identifier implements ByteSequence, Serializable {
 
 	@Override
 	public int hashCode() {
-		return hashcode;
+		int h = idBytes[0] & 0xFF;
+		for (int i=1; i<Math.min(idBytes.length, 4); i++) {
+			h = (h << 8) | (idBytes[i] & 0xFF);
+		}
+		return h;
 	}
 
 	@Override

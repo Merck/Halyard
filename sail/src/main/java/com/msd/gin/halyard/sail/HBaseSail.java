@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.Keyspace;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
@@ -244,7 +245,7 @@ public class HBaseSail implements Sail {
 		} catch (IOException e) {
 			throw new SailException(e);
 		}
-		this.valueFactory = rdfFactory.getIdValueFactory();
+		this.valueFactory = IdValueFactory.INSTANCE;
 
 		if (includeNamespaces) {
 			addNamespaces();

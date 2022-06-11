@@ -19,6 +19,7 @@ package com.msd.gin.halyard.tools;
 import static com.msd.gin.halyard.tools.HalyardBulkLoad.*;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.Keyspace;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFContext;
@@ -103,7 +104,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             openKeyspace(conf, conf.get(SOURCE), conf.get(SNAPSHOT_PATH));
-            vf = rdfFactory.getIdValueFactory();
+            vf = IdValueFactory.INSTANCE;
             htimestamp = HalyardTableUtils.toHalyardTimestamp(conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis()), false);
             String s = conf.get(SUBJECT);
             if (s != null) {

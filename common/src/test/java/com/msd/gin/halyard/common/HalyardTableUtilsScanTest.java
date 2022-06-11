@@ -257,7 +257,7 @@ public class HalyardTableUtilsScanTest {
         RDFPredicate pred = rdfFactory.createPredicate(p == null ? null : vf.createIRI(p));
         RDFObject obj = rdfFactory.createObject(o == null ? null : vf.createLiteral(o));
         RDFContext ctx = rdfFactory.createContext(c == null ? null : vf.createIRI(c));
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scanWithConstraints(subj, new ValueConstraint(ValueType.IRI), pred, obj, new ObjectConstraint(XSD.STRING), ctx, rdfFactory))) {
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scanWithConstraints(subj, new ValueConstraint(ValueType.IRI), pred, obj, new LiteralConstraint(XSD.STRING), ctx, rdfFactory))) {
             Set<Statement> res = new HashSet<>();
             Result r;
             while ((r = rs.next()) != null) {
@@ -302,7 +302,7 @@ public class HalyardTableUtilsScanTest {
         RDFPredicate pred = rdfFactory.createPredicate(p == null ? null : vf.createIRI(p));
         RDFObject obj = rdfFactory.createObject(o == null ? null : vf.createLiteral(o));
         RDFContext ctx = rdfFactory.createContext(c == null ? null : vf.createIRI(c));
-        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scanWithConstraints(subj, null, pred, obj, new ObjectConstraint(XSD.STRING), ctx, rdfFactory))) {
+        try (ResultScanner rs = table.getScanner(HalyardTableUtils.scanWithConstraints(subj, null, pred, obj, new LiteralConstraint(XSD.STRING), ctx, rdfFactory))) {
             Set<Statement> res = new HashSet<>();
             Result r;
             while ((r = rs.next()) != null) {

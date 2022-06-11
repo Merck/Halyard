@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.Keyspace;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFContext;
@@ -161,7 +162,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         	CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(cpos);
             update = conf.get(TARGET) == null;
             threshold = conf.getLong(THRESHOLD, 1000);
-            ValueFactory vf = rdfFactory.getIdValueFactory();
+            ValueFactory vf = IdValueFactory.INSTANCE;
             statsContext = vf.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String gc = conf.get(GRAPH_CONTEXT);
             if (gc != null) {
@@ -409,7 +410,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             openKeyspace(conf, conf.get(SOURCE), conf.get(SNAPSHOT_PATH));
-            vf = rdfFactory.getIdValueFactory();
+            vf = IdValueFactory.INSTANCE;
             statsGraphContext = vf.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String targetUrl = conf.get(TARGET);
             if (targetUrl == null) {
@@ -598,7 +599,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         List<Scan> scans;
         if (graphContext != null) { //restricting stats to scan given graph context only
             scans = new ArrayList<>(4);
-            ValueFactory vf = rdfFactory.getIdValueFactory();
+            ValueFactory vf = IdValueFactory.INSTANCE;
             RDFContext rdfGraphCtx = rdfFactory.createContext(vf.createIRI(graphContext));
             scans.add(rdfFactory.getCSPOIndex().scan(rdfGraphCtx));
             scans.add(rdfFactory.getCPOSIndex().scan(rdfGraphCtx));

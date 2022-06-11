@@ -485,7 +485,7 @@ public final class HalyardTableUtils {
         }
     }
 
-	public static Scan scanWithConstraints(RDFSubject subj, ValueConstraint subjConstraint, RDFPredicate pred, RDFObject obj, ObjectConstraint objConstraint, RDFContext ctx, RDFFactory rdfFactory) {
+	public static Scan scanWithConstraints(RDFSubject subj, ValueConstraint subjConstraint, RDFPredicate pred, RDFObject obj, ValueConstraint objConstraint, RDFContext ctx, RDFFactory rdfFactory) {
 		if (subj == null && subjConstraint != null && (pred == null || objConstraint == null)) {
 			return scanWithSubjectConstraint(subjConstraint, pred, obj, ctx, rdfFactory);
 		} else if (obj == null && objConstraint != null) {
@@ -527,7 +527,7 @@ public final class HalyardTableUtils {
         }
     }
 
-	private static Scan scanWithObjectConstraint(RDFSubject subj, RDFPredicate pred, @Nonnull ObjectConstraint objConstraint, RDFContext ctx, RDFFactory rdfFactory) {
+	private static Scan scanWithObjectConstraint(RDFSubject subj, RDFPredicate pred, @Nonnull ValueConstraint objConstraint, RDFContext ctx, RDFFactory rdfFactory) {
 		if (ctx == null) {
 			if (subj == null) {
 				if (pred == null) {
@@ -616,7 +616,7 @@ public final class HalyardTableUtils {
 		return false;
 	}
 
-	public static Resource getSubject(KeyspaceConnection kc, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+	public static Resource getSubject(KeyspaceConnection kc, ValueIdentifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
 		Scan scan = scanSingle(rdfFactory.getSPOIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {
@@ -631,7 +631,7 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static IRI getPredicate(KeyspaceConnection kc, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+	public static IRI getPredicate(KeyspaceConnection kc, ValueIdentifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
 		Scan scan = scanSingle(rdfFactory.getPOSIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {
@@ -646,7 +646,7 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static Value getObject(KeyspaceConnection kc, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+	public static Value getObject(KeyspaceConnection kc, ValueIdentifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
 		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
 		Scan scan = scanSingle(rdfFactory.getOSPIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {

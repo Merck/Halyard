@@ -1,7 +1,7 @@
 package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.Identifier;
+import com.msd.gin.halyard.common.ValueIdentifier;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 
@@ -27,7 +27,7 @@ public final class ObjectTupleFunction extends AbstractReificationTupleFunction 
 	}
 
 	@Override
-	protected Value getValue(KeyspaceConnection ks, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
+	protected Value getValue(KeyspaceConnection ks, ValueIdentifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
 		return HalyardTableUtils.getObject(ks, id, vf, rdfFactory);
 	}
 }

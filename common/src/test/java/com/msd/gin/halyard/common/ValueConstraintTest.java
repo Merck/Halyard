@@ -31,7 +31,7 @@ public class ValueConstraintTest {
 	@Test
 	public void testAllLiterals() {
 		ValueFactory vf = SimpleValueFactory.getInstance();
-		ObjectConstraint vc = new ObjectConstraint(ValueType.LITERAL);
+		ValueConstraint vc = new ValueConstraint(ValueType.LITERAL);
 		assertTrue(vc.test(vf.createLiteral(1)));
 		assertTrue(vc.test(vf.createLiteral("foobar")));
 		assertTrue(vc.test(vf.createLiteral("foo", "en")));
@@ -40,7 +40,7 @@ public class ValueConstraintTest {
 	@Test
 	public void testStringLiteral() {
 		ValueFactory vf = SimpleValueFactory.getInstance();
-		ObjectConstraint vc = new ObjectConstraint(XSD.STRING);
+		LiteralConstraint vc = new LiteralConstraint(XSD.STRING);
 		assertFalse(vc.test(vf.createLiteral(1)));
 		assertTrue(vc.test(vf.createLiteral("foobar")));
 		assertFalse(vc.test(vf.createLiteral("foo", "en")));
@@ -49,7 +49,7 @@ public class ValueConstraintTest {
 	@Test
 	public void testLangLiteral() {
 		ValueFactory vf = SimpleValueFactory.getInstance();
-		ObjectConstraint vc = new ObjectConstraint("en");
+		LiteralConstraint vc = new LiteralConstraint("en");
 		assertFalse(vc.test(vf.createLiteral(1)));
 		assertFalse(vc.test(vf.createLiteral("foobar")));
 		assertTrue(vc.test(vf.createLiteral("foo", "en")));
@@ -58,7 +58,7 @@ public class ValueConstraintTest {
 	@Test
 	public void testOtherLiteral() {
 		ValueFactory vf = SimpleValueFactory.getInstance();
-		ObjectConstraint vc = new ObjectConstraint(HALYARD.NON_STRING);
+		LiteralConstraint vc = new LiteralConstraint(HALYARD.NON_STRING);
 		assertTrue(vc.test(vf.createLiteral(1)));
 		assertTrue(vc.test(vf.createLiteral(new Date())));
 		assertFalse(vc.test(vf.createLiteral("foobar")));
@@ -68,10 +68,18 @@ public class ValueConstraintTest {
 	@Test
 	public void testAnyNumeric() {
 		ValueFactory vf = SimpleValueFactory.getInstance();
-		ObjectConstraint vc = new ObjectConstraint(HALYARD.ANY_NUMERIC);
+		LiteralConstraint vc = new LiteralConstraint(HALYARD.ANY_NUMERIC);
 		assertTrue(vc.test(vf.createLiteral(1)));
 		assertTrue(vc.test(vf.createLiteral(1.8)));
 		assertFalse(vc.test(vf.createLiteral("foobar")));
 		assertFalse(vc.test(vf.createLiteral("foo", "en")));
+	}
+
+	@Test
+	public void testEquals() {
+		ValueConstraint vc = new ValueConstraint(ValueType.LITERAL);
+		LiteralConstraint lc = new LiteralConstraint(XSD.STRING);
+		assertNotEquals(vc, lc);
+		assertNotEquals(lc, vc);
 	}
 }

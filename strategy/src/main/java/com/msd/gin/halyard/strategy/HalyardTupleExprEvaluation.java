@@ -21,7 +21,7 @@ import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPush
 
 import com.msd.gin.halyard.algebra.ConstrainedStatementPattern;
 import com.msd.gin.halyard.algebra.StarJoin;
-import com.msd.gin.halyard.common.ObjectConstraint;
+import com.msd.gin.halyard.common.LiteralConstraint;
 import com.msd.gin.halyard.common.ValueConstraint;
 import com.msd.gin.halyard.common.ValueType;
 import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
@@ -243,7 +243,7 @@ final class HalyardTupleExprEvaluation {
     		if (csp.getSubjectType() != null) {
     			subjConstraint = new ValueConstraint(csp.getSubjectType());
     		}
-    		ObjectConstraint objConstraint = null;
+    		ValueConstraint objConstraint = null;
     		if (csp.getObjectType() != null) {
 				if (csp.getObjectType() == ValueType.LITERAL) {
 					UnaryValueOperator constraintFunc = csp.getLiteralConstraintFunction();
@@ -264,7 +264,7 @@ final class HalyardTupleExprEvaluation {
 									return;
 								}
 								IRI dt = (IRI) v;
-				    			objConstraint = new ObjectConstraint(dt);
+				    			objConstraint = new LiteralConstraint(dt);
 							} else if (constraintFunc instanceof Lang) {
 								if (!v.isLiteral()) {
 									parent.empty();
@@ -273,19 +273,19 @@ final class HalyardTupleExprEvaluation {
 								Literal lang = (Literal) v;
 								String label = lang.getLabel();
 								if (!label.isEmpty()) {
-					    			objConstraint = new ObjectConstraint(lang.getLabel());
+					    			objConstraint = new LiteralConstraint(lang.getLabel());
 								} else {
-					    			objConstraint = new ObjectConstraint(ValueType.LITERAL);
+					    			objConstraint = new ValueConstraint(ValueType.LITERAL);
 								}
 							} else if ((constraintFunc instanceof IsNumeric) && BooleanLiteral.TRUE.equals(v)) {
-				    			objConstraint = new ObjectConstraint(HALYARD.ANY_NUMERIC);
+				    			objConstraint = new LiteralConstraint(HALYARD.ANY_NUMERIC);
 							}
 						}
 	    			} else {
-		    			objConstraint = new ObjectConstraint(ValueType.LITERAL);
+		    			objConstraint = new ValueConstraint(ValueType.LITERAL);
 	    			}
 	    		} else {
-	    			objConstraint = new ObjectConstraint(csp.getObjectType());
+	    			objConstraint = new ValueConstraint(csp.getObjectType());
 	    		}
     		}
 			ts = ((ConstrainedTripleSourceFactory)tripleSource).getTripleSource(subjConstraint, objConstraint);

@@ -87,7 +87,7 @@ public class RDFFactoryTest {
 	public static Collection<Object[]> data() {
 		List<Object[]> testValues = new ArrayList<>();
 		testValues.addAll(createData(SimpleValueFactory.getInstance()));
-		testValues.addAll(createData(rdfFactory.getIdValueFactory()));
+		testValues.addAll(createData(IdValueFactory.INSTANCE));
 		return testValues;
 	}
 
@@ -111,7 +111,7 @@ public class RDFFactoryTest {
 
 	private void testToAndFromBytes(int bufferSize) {
         ValueIO.Writer writer = rdfFactory.createWriter();
-        ValueIO.Reader reader = rdfFactory.createReader(rdfFactory.getIdValueFactory());
+        ValueIO.Reader reader = rdfFactory.createReader(IdValueFactory.INSTANCE);
 
         ByteBuffer buf = ByteBuffer.allocate(bufferSize);
 		buf = writer.writeTo(expectedValue, buf);
@@ -143,9 +143,9 @@ public class RDFFactoryTest {
 
 	@Test
 	public void testRDFValue() {
-		Identifier id = rdfFactory.id(expectedValue);
-		if (expectedValue instanceof Identifiable) {
-			assertEquals(id, ((Identifiable)expectedValue).getId());
+		ValueIdentifier id = rdfFactory.id(expectedValue);
+		if (expectedValue instanceof IdentifiableValue) {
+			assertEquals(id, ((IdentifiableValue)expectedValue).getId(rdfFactory));
 		}
 
 		assertEquals("isIRI", expectedValue.isIRI(), id.isIRI());
@@ -179,7 +179,7 @@ public class RDFFactoryTest {
 		}
 	}
 
-	private static void assertRDFValueHashes(Identifier id, RDFValue<?,?> v) {
+	private static void assertRDFValueHashes(ValueIdentifier id, RDFValue<?,?> v) {
         StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
         StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = rdfFactory.getPOSIndex();
         StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = rdfFactory.getOSPIndex();

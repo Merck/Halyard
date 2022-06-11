@@ -1,7 +1,7 @@
 package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.Hashes;
-import com.msd.gin.halyard.common.Identifier;
+import com.msd.gin.halyard.common.ValueIdentifier;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
@@ -26,7 +26,7 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 
 	protected abstract int statementPosition();
 
-	protected abstract Value getValue(KeyspaceConnection ks, Identifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException;
+	protected abstract Value getValue(KeyspaceConnection ks, ValueIdentifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException;
 
 	@Override
 	public final CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> evaluate(ValueFactory vf,
@@ -40,7 +40,7 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 		RDFFactory rdfFactory = (RDFFactory) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE);
 
 		IRI idIri = (IRI) args[0];
-		Identifier id;
+		ValueIdentifier id;
 		if (HALYARD.STATEMENT_ID_NS.getName().equals(idIri.getNamespace())) {
 			int idSize = rdfFactory.getIdSize();
 			byte[] stmtId = Hashes.decode(idIri.getLocalName());

@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.util.LFUCache;
 import com.msd.gin.halyard.util.LRUCache;
@@ -222,7 +223,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             rdfFactory = RDFFactory.create(conf);
-            idValueFactory = rdfFactory.getIdValueFactory();
+            idValueFactory = IdValueFactory.INSTANCE;
             timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 

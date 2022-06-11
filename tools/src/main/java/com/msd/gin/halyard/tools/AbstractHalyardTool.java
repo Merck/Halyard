@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.Keyspace;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
@@ -179,7 +180,7 @@ public abstract class AbstractHalyardTool implements Tool {
             keyspace = HalyardTableUtils.getKeyspace(conf, source, restorePath);
             keyspaceConn = keyspace.getConnection();
             rdfFactory = RDFFactory.create(keyspaceConn);
-            valueReader = rdfFactory.createTableReader(rdfFactory.getIdValueFactory(), keyspaceConn);
+            valueReader = rdfFactory.createTableReader(IdValueFactory.INSTANCE, keyspaceConn);
         }
 
         protected void closeKeyspace() throws IOException {
@@ -205,7 +206,7 @@ public abstract class AbstractHalyardTool implements Tool {
             keyspace = HalyardTableUtils.getKeyspace(conf, source, restorePath);
             keyspaceConn = keyspace.getConnection();
             rdfFactory = RDFFactory.create(keyspaceConn);
-            valueReader = rdfFactory.createTableReader(rdfFactory.getIdValueFactory(), keyspaceConn);
+            valueReader = rdfFactory.createTableReader(IdValueFactory.INSTANCE, keyspaceConn);
         }
 
         protected void closeKeyspace() throws IOException {

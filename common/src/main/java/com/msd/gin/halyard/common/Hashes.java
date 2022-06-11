@@ -22,6 +22,12 @@ public final class Hashes {
         }
     }
 
+	/**
+	 * Returns a hash function.
+	 * @param algorithm the hash algorithm
+	 * @param size the byte size of the hash (may cause 0-padding if larger than that supported by the algorithm, 0 to use the default size for the algorithm)
+	 * @return HashFunction
+	 */
 	public static HashFunction getHash(String algorithm, int size) {
 		switch (algorithm) {
 			case "FarmHash-64":
@@ -92,8 +98,8 @@ public final class Hashes {
 
 
 	public static abstract class HashFunction implements Function<ByteBuffer,byte[]> {
-		final String name;
-		final int size;
+		private final String name;
+		private final int size;
 
 		static int hashSize(int size, int defaultSize) {
 			return (size > 0) ? size : defaultSize;

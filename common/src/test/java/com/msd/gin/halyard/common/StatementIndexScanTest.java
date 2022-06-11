@@ -175,7 +175,7 @@ public class StatementIndexScanTest {
         RDFPredicate rdfPred = rdfFactory.createPredicate(RDF.VALUE);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = rdfFactory.getSPOIndex().scanWithConstraint(rdfSubj, rdfPred, new ObjectConstraint(XSD.STRING));
+        Scan scan = rdfFactory.getSPOIndex().scanWithConstraint(rdfSubj, rdfPred, new LiteralConstraint(XSD.STRING));
         try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
@@ -197,7 +197,7 @@ public class StatementIndexScanTest {
         RDFContext rdfCtx = rdfFactory.createContext(ctx);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = rdfFactory.getCSPOIndex().scanWithConstraint(rdfCtx, rdfSubj, rdfPred, new ObjectConstraint(HALYARD.NON_STRING));
+        Scan scan = rdfFactory.getCSPOIndex().scanWithConstraint(rdfCtx, rdfSubj, rdfPred, new LiteralConstraint(HALYARD.NON_STRING));
         try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
@@ -235,7 +235,7 @@ public class StatementIndexScanTest {
         RDFPredicate rdfPred = rdfFactory.createPredicate(RDF.VALUE);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = rdfFactory.getPOSIndex().scanWithConstraint(rdfPred, new ObjectConstraint(XSD.STRING));
+        Scan scan = rdfFactory.getPOSIndex().scanWithConstraint(rdfPred, new LiteralConstraint(XSD.STRING));
         try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
@@ -255,7 +255,7 @@ public class StatementIndexScanTest {
         RDFContext rdfCtx = rdfFactory.createContext(ctx);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = rdfFactory.getCPOSIndex().scanWithConstraint(rdfCtx, rdfPred, new ObjectConstraint(HALYARD.NON_STRING));
+        Scan scan = rdfFactory.getCPOSIndex().scanWithConstraint(rdfCtx, rdfPred, new LiteralConstraint(HALYARD.NON_STRING));
         try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
@@ -289,7 +289,7 @@ public class StatementIndexScanTest {
     @Test
     public void testScanStringLiterals_OSP() throws Exception {
         Set<Literal> actual = new HashSet<>();
-        Scan scan = rdfFactory.getOSPIndex().scanWithConstraint(new ObjectConstraint(XSD.STRING));
+        Scan scan = rdfFactory.getOSPIndex().scanWithConstraint(new LiteralConstraint(XSD.STRING));
         try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
@@ -308,7 +308,7 @@ public class StatementIndexScanTest {
         RDFContext rdfCtx = rdfFactory.createContext(ctx);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = rdfFactory.getCOSPIndex().scanWithConstraint(rdfCtx, new ObjectConstraint(HALYARD.NON_STRING));
+        Scan scan = rdfFactory.getCOSPIndex().scanWithConstraint(rdfCtx, new LiteralConstraint(HALYARD.NON_STRING));
         try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {

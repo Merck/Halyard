@@ -36,7 +36,7 @@ public final class HRDFParser extends AbstractRDFParser {
 
     }
 
-	private static final ValueIO valueIO = ValueIO.create();
+	private static final ValueIO valueIO = ValueIO.getDefault();
 
     @Override
 	public RDFFormat getRDFFormat() {

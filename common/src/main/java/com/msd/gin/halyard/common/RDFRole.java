@@ -62,29 +62,29 @@ public final class RDFRole<T extends SPOC<?>> {
 		return sizeLength;
 	}
 
-	byte[] keyHash(StatementIndex<?,?,?,?> index, Identifier id) {
+	byte[] keyHash(StatementIndex<?,?,?,?> index, ValueIdentifier id) {
 		int len = keyHashSize();
 		// rotate key so ordering is different for different prefixes
 		// this gives better load distribution when traversing between prefixes
 		return id.rotate(len, toShift(index), new byte[len]);
 	}
 
-	byte[] endKeyHash(StatementIndex<?,?,?,?> index, Identifier id) {
+	byte[] endKeyHash(StatementIndex<?,?,?,?> index, ValueIdentifier id) {
 		int len = endKeyHashSize();
 		return len > 0 ? id.rotate(len, toShift(index), new byte[len]) : new byte[0];
 	}
 
-	byte[] qualifierHash(Identifier id) {
+	byte[] qualifierHash(ValueIdentifier id) {
 		byte[] b = new byte[qualifierHashSize()];
 		writeQualifierHashTo(id, ByteBuffer.wrap(b));
 		return b;
 	}
 
-	ByteBuffer writeQualifierHashTo(Identifier id, ByteBuffer bb) {
+	ByteBuffer writeQualifierHashTo(ValueIdentifier id, ByteBuffer bb) {
 		return id.writeSliceTo(keyHashSize(), qualifierHashSize(), bb);
 	}
 
-	ByteBuffer writeEndQualifierHashTo(Identifier id, ByteBuffer bb) {
+	ByteBuffer writeEndQualifierHashTo(ValueIdentifier id, ByteBuffer bb) {
 		return id.writeSliceTo(endKeyHashSize(), endQualifierHashSize(), bb);
 	}
 

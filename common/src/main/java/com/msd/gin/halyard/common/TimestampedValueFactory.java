@@ -4,14 +4,12 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.ContextStatement;
 import org.eclipse.rdf4j.model.impl.SimpleStatement;
 
 public class TimestampedValueFactory extends IdValueFactory {
-
-	TimestampedValueFactory(RDFFactory rdfFactory) {
-		super(rdfFactory);
-	}
+	public static final ValueFactory INSTANCE = new TimestampedValueFactory();
 
 	@Override
 	public Statement createStatement(Resource subject, IRI predicate, Value object) {

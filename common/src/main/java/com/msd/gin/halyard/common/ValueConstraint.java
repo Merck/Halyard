@@ -39,7 +39,7 @@ public class ValueConstraint implements Predicate<Value> {
 		if (this == other) {
 			return true;
 		}
-		if (!(other instanceof ValueConstraint)) {
+		if (this.getClass() != other.getClass()) {
 			return false;
 		}
 		ValueConstraint that = (ValueConstraint) other;

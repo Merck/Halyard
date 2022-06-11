@@ -24,7 +24,7 @@ import static org.junit.Assert.*;
 @RunWith(Parameterized.class)
 public class HalyardTableUtilsKeyValueTest {
     private static final RDFFactory rdfFactory = RDFFactory.create();
-	private static final ValueFactory vf = rdfFactory.getTimestampedValueFactory();
+	private static final ValueFactory vf = TimestampedValueFactory.INSTANCE;
 
     private static final IRI SUBJ1 = vf.createIRI("http://whatever/subj1");
     private static final IRI SUBJ2 = RDF.NIL;
@@ -99,16 +99,16 @@ public class HalyardTableUtilsKeyValueTest {
 		assertEquals(msg, expected, actual);
 		assertEquals(ts, ((Timestamped)actual).getTimestamp());
 		if(s == null) {
-			assertEquals(rdfFactory.id(expected.getSubject()), ((Identifiable)actual.getSubject()).getId());
+			assertEquals(rdfFactory.id(expected.getSubject()), ((IdentifiableValue)actual.getSubject()).getId(rdfFactory));
 		}
 		if(p == null) {
-			assertEquals(rdfFactory.id(expected.getPredicate()), ((Identifiable)actual.getPredicate()).getId());
+			assertEquals(rdfFactory.id(expected.getPredicate()), ((IdentifiableValue)actual.getPredicate()).getId(rdfFactory));
 		}
 		if(o == null) {
-			assertEquals(rdfFactory.id(expected.getObject()), ((Identifiable)actual.getObject()).getId());
+			assertEquals(rdfFactory.id(expected.getObject()), ((IdentifiableValue)actual.getObject()).getId(rdfFactory));
 		}
 		if (c == null && (expected.getContext() != null || actual.getContext() != null)) {
-			assertEquals(rdfFactory.id(expected.getContext()), ((Identifiable)actual.getContext()).getId());
+			assertEquals(rdfFactory.id(expected.getContext()), ((IdentifiableValue)actual.getContext()).getId(rdfFactory));
 		}
 	}
 }
