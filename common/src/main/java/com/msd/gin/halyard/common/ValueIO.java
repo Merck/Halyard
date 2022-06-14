@@ -186,11 +186,11 @@ public class ValueIO {
 		}
 	}
 
-	private static ByteBuffer writeUncompressedString(String s) {
+	public static ByteBuffer writeUncompressedString(String s) {
 		return StandardCharsets.UTF_8.encode(s);
 	}
 
-	private static String readUncompressedString(ByteBuffer b) {
+	public static String readUncompressedString(ByteBuffer b) {
 		return StandardCharsets.UTF_8.decode(b).toString();
 	}
 

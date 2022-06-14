@@ -76,8 +76,10 @@ public final class WIKIDATA implements Vocabulary {
     public static final Namespace EUNIS_NS = new IntegerNamespace("eunis", "http://eunis.eea.europa.eu/species/");
     public static final Namespace BABELNET_NS = new SimpleNamespace("babel", "http://babelnet.org/rdf/");
     public static final Namespace OS_NS = new IntegerNamespace("os", "http://data.ordnancesurvey.co.uk/id/");
+    public static final Namespace ENSEMBL_NS = new SimpleNamespace("ensembl", "http://rdf.ebi.ac.uk/resource/ensembl/");
     public static final Namespace PUBCHEM_CID_NS = new PrefixedIntegerNamespace("pubchem_cid", "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/", "CID");
     public static final Namespace PUBCHEM_SID_NS = new PrefixedIntegerNamespace("pubchem_sid", "http://rdf.ncbi.nlm.nih.gov/pubchem/substance/", "SID");
+    public static final Namespace PUBMED_NS = new IntegerNamespace("pm", "https://pubmed.ncbi.nlm.nih.gov/");
     public static final Namespace MUSICBRAINZ_AREA_NS = new UUIDNamespace("mb_area", "http://musicbrainz.org/area/");
     public static final Namespace MUSICBRAINZ_ARTIST_NS = new UUIDNamespace("mb_artist", "http://musicbrainz.org/artist/");
     public static final Namespace MUSICBRAINZ_EVENT_NS = new UUIDNamespace("mb_event", "http://musicbrainz.org/event/");
@@ -87,6 +89,7 @@ public final class WIKIDATA implements Vocabulary {
     public static final Namespace MUSICBRAINZ_RELEASE_GROUP_NS = new UUIDNamespace("mb_release_group", "http://musicbrainz.org/release-group/");
     public static final Namespace MUSICBRAINZ_RELEASE_NS = new UUIDNamespace("mb_release", "http://musicbrainz.org/release/");
     public static final Namespace MUSICBRAINZ_SERIES_NS = new UUIDNamespace("mb_series", "http://musicbrainz.org/series/");
+    public static final Namespace WORMS_NS = new IntegerNamespace("worms", "urn:lsid:marinespecies.org:taxname:");
 
     public static final Namespace EN_WIKIPEDIA_NS = new SimpleNamespace("wiki_en", "https://en.wikipedia.org/wiki/");
     public static final Namespace CEB_WIKIPEDIA_NS = new SimpleNamespace("wiki_ceb", "https://ceb.wikipedia.org/wiki/");
@@ -95,7 +98,19 @@ public final class WIKIDATA implements Vocabulary {
     public static final Namespace DE_WIKIPEDIA_NS = new SimpleNamespace("wiki_de", "https://de.wikipedia.org/wiki/");
     public static final Namespace ES_WIKIPEDIA_NS = new SimpleNamespace("wiki_es", "https://es.wikipedia.org/wiki/");
     public static final Namespace IT_WIKIPEDIA_NS = new SimpleNamespace("wiki_it", "https://it.wikipedia.org/wiki/");
+    public static final Namespace PT_WIKIPEDIA_NS = new SimpleNamespace("wiki_pt", "https://pt.wikipedia.org/wiki/");
+    public static final Namespace NL_WIKIPEDIA_NS = new SimpleNamespace("wiki_nl", "https://nl.wikipedia.org/wiki/");
+    public static final Namespace PL_WIKIPEDIA_NS = new SimpleNamespace("wiki_pl", "https://pl.wikipedia.org/wiki/");
+    public static final Namespace UK_WIKIPEDIA_NS = new SimpleNamespace("wiki_uk", "https://uk.wikipedia.org/wiki/");
+    public static final Namespace TR_WIKIPEDIA_NS = new SimpleNamespace("wiki_tr", "https://tr.wikipedia.org/wiki/");
+    public static final Namespace KO_WIKIPEDIA_NS = new SimpleNamespace("wiki_ko", "https://ko.wikipedia.org/wiki/");
+    public static final Namespace RU_WIKIPEDIA_NS = new SimpleNamespace("wiki_ru", "https://ru.wikipedia.org/wiki/");
+    public static final Namespace AR_WIKIPEDIA_NS = new SimpleNamespace("wiki_ar", "https://ar.wikipedia.org/wiki/");
+    public static final Namespace ARZ_WIKIPEDIA_NS = new SimpleNamespace("wiki_arz", "https://arz.wikipedia.org/wiki/");
+    public static final Namespace AZ_WIKIPEDIA_NS = new SimpleNamespace("wiki_az", "https://az.wikipedia.org/wiki/");
+    public static final Namespace ZH_WIKIPEDIA_NS = new SimpleNamespace("wiki_zh", "https://zh.wikipedia.org/wiki/");
     public static final Namespace WIKIMEDIA_NS = new SimpleNamespace("wikimedia", "https://commons.wikimedia.org/wiki/");
+    public static final Namespace WIKIMEDIA_FP_NS = new SimpleNamespace("wikimedia_fp", "http://commons.wikimedia.org/wiki/Special:FilePath/");
 
     // popular items
     public static final IRI HUMAN = SVF.createIRI(WD_NAMESPACE, "Q5");
@@ -124,6 +139,17 @@ public final class WIKIDATA implements Vocabulary {
     public static final IRI DE_WIKIPEDIA = SVF.createIRI("https://de.wikipedia.org/");
     public static final IRI ES_WIKIPEDIA = SVF.createIRI("https://es.wikipedia.org/");
     public static final IRI IT_WIKIPEDIA = SVF.createIRI("https://it.wikipedia.org/");
+    public static final IRI PT_WIKIPEDIA = SVF.createIRI("https://pt.wikipedia.org/");
+    public static final IRI NL_WIKIPEDIA = SVF.createIRI("https://nl.wikipedia.org/");
+    public static final IRI PL_WIKIPEDIA = SVF.createIRI("https://pl.wikipedia.org/");
+    public static final IRI UK_WIKIPEDIA = SVF.createIRI("https://uk.wikipedia.org/");
+    public static final IRI TR_WIKIPEDIA = SVF.createIRI("https://tr.wikipedia.org/");
+    public static final IRI KO_WIKIPEDIA = SVF.createIRI("https://ko.wikipedia.org/");
+    public static final IRI RU_WIKIPEDIA = SVF.createIRI("https://ru.wikipedia.org/");
+    public static final IRI AR_WIKIPEDIA = SVF.createIRI("https://ar.wikipedia.org/");
+    public static final IRI ARZ_WIKIPEDIA = SVF.createIRI("https://arz.wikipedia.org/");
+    public static final IRI AZ_WIKIPEDIA = SVF.createIRI("https://az.wikipedia.org/");
+    public static final IRI ZH_WIKIPEDIA = SVF.createIRI("https://zh.wikipedia.org/");
     public static final IRI WIKIMEDIA = SVF.createIRI("https://commons.wikimedia.org/");
 
     public static final class Properties {
@@ -170,10 +196,12 @@ public final class WIKIDATA implements Vocabulary {
         public static final String STREET_NUMBER = "P670";
         public static final String ORTHOLOG = "P684";
         public static final String PUBMED_ID = "P698";
+        public static final String ENSEMBL_ID = "P704";
         public static final String FAMILY_NAME = "P734";
         public static final String GIVEN_NAME = "P735";
         public static final String RETRIEVED = "P813";
         public static final String ARXIV_ID = "P818";
+        public static final String WORMS_ID = "P850";
         public static final String REFERENCE_URL = "P854";
         public static final String OFFICIAL_WEBSITE = "P856";
         public static final String MAIN_SUBJECT = "P921";
