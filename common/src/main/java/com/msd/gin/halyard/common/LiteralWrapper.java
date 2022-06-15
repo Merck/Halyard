@@ -11,6 +11,7 @@ import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.base.CoreDatatype;
 
 public abstract class LiteralWrapper implements Literal {
 	private static final long serialVersionUID = -3751940963092784186L;
@@ -28,6 +29,11 @@ public abstract class LiteralWrapper implements Literal {
 	@Override
 	public final Optional<String> getLanguage() {
 		return literal.getLanguage();
+	}
+
+	@Override
+	public final CoreDatatype getCoreDatatype() {
+		return literal.getCoreDatatype();
 	}
 
 	@Override

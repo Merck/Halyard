@@ -57,7 +57,7 @@ public class HalyardBulkDeleteTest extends AbstractHalyardToolTest {
 	private static void createData() throws Exception {
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(conf, TABLE, true, -1, true, 0, null, null);
-        sail.initialize();
+        sail.init();
         ValueFactory vf = sail.getValueFactory();
         IRI pred = vf.createIRI("http://whatever/pred");
         Triple t = vf.createTriple(vf.createIRI("http://triple/whatever"), pred, vf.createLiteral("triple"));
@@ -127,7 +127,7 @@ public class HalyardBulkDeleteTest extends AbstractHalyardToolTest {
 
     private static void assertCount(int expected) throws Exception {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
-        sail.initialize();
+        sail.init();
         try {
 			try (SailConnection conn = sail.getConnection()) {
 				List<Statement> stmts = new ArrayList<>();
@@ -146,7 +146,7 @@ public class HalyardBulkDeleteTest extends AbstractHalyardToolTest {
 
     private static void assertTripleCount(int expected) throws Exception {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, false, 0, true, 0, null, null);
-        sail.initialize();
+        sail.init();
         try {
 			try (SailConnection conn = sail.getConnection()) {
 				List<Statement> stmts = new ArrayList<>();

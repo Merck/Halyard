@@ -16,16 +16,6 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.msd.gin.halyard.common.KeyspaceConnection;
-import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.ValueIO;
-import com.msd.gin.halyard.sail.search.SearchDocument;
-import com.msd.gin.halyard.sail.search.SearchClient;
-import com.msd.gin.halyard.vocab.HALYARD;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -44,14 +34,24 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.sail.SailException;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.common.KeyspaceConnection;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.StatementIndices;
+import com.msd.gin.halyard.common.ValueIO;
+import com.msd.gin.halyard.sail.search.SearchClient;
+import com.msd.gin.halyard.sail.search.SearchDocument;
+import com.msd.gin.halyard.vocab.HALYARD;
+
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 
 public class HBaseSearchTripleSource extends HBaseTripleSource {
 	private final SearchClient searchClient;
 
-	public HBaseSearchTripleSource(KeyspaceConnection table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, SearchClient searchClient, HBaseSail.Ticker ticker) {
-		super(table, vf, rdfFactory, timeoutSecs, settings, ticker);
+	public HBaseSearchTripleSource(KeyspaceConnection table, ValueFactory vf, StatementIndices stmtIndices, long timeoutSecs, HBaseSail.ScanSettings settings, SearchClient searchClient, HBaseSail.Ticker ticker) {
+		super(table, vf, stmtIndices, timeoutSecs, settings, ticker);
 		this.searchClient = searchClient;
 	}
 

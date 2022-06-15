@@ -5,7 +5,7 @@
 
 **Fork of [Halyard](https://github.com/Merck/Halyard) with support for RDF-star, XPath 3 functions, SPIN functions (and many other improvements/fixes).**
 
-**NB: this fork is not data compatible with the original.**
+**NB: this fork is not compatible with the original.**
 
 Halyard is an extremely horizontally scalable triple store with support for named graphs, designed for integration of extremely large semantic data models and for storage and SPARQL 1.1 querying of complete Linked Data universe snapshots. Halyard implementation is based on Eclipse RDF4J framework and Apache HBase database, and it is completely written in Java.
 
@@ -17,9 +17,14 @@ Halyard is an extremely horizontally scalable triple store with support for name
 
 Halyard is expected to run on an Apache Hadoop cluster node with configured Apache HBase client. Apache Hadoop and Apache HBase components are not bundled with Halyard. The runtime requirements are:
 
- * Apache Hadoop version 2.10 or 3.1.1 or higher
- * Apache HBase version 2.3 or higher
- * Java 8 Runtime
+ * Apache Hadoop version 3.3 or higher
+ * Apache HBase version 2.5 or higher
+ * Java 11 Runtime
+
+(For convenience, here is a [Java 11 build of HBase 2.5 against Hadoop 3.3](https://github.com/pulquero/hbase/releases/tag/rel%2F2.5.0%2B3.3.3)).
+
+To run the webapps on Tomcat, create `bin/setenv.sh` with the line
+`export CLASSPATH="$CATALINA_HOME/lib/*:/mnt/hbase-2.5.0/conf:/mnt/hbase-2.5.0/lib/shaded-clients/*:/mnt/hbase-2.5.0/lib/client-facing-thirdparty/*"`.
 
 See [Documentation](https://pulquero.github.io/Halyard) for usage examples, architecture information, and more.
 

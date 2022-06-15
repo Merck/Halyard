@@ -17,7 +17,7 @@
 package com.msd.gin.halyard.strategy;
 
 import org.eclipse.rdf4j.query.Dataset;
-import org.eclipse.rdf4j.query.parser.sparql.manifest.SPARQL11QueryComplianceTest;
+import org.eclipse.rdf4j.testsuite.query.parser.sparql.manifest.SPARQL11QueryComplianceTest;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.dataset.DatasetRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepository;

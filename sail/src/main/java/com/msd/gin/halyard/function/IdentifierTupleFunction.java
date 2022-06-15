@@ -2,6 +2,7 @@ package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 import com.msd.gin.halyard.vocab.HALYARD;
 
@@ -33,7 +34,8 @@ public class IdentifierTupleFunction implements TupleFunction {
 			Value... args)
 		throws ValueExprEvaluationException
 	{
-		RDFFactory rdfFactory = (RDFFactory) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE);
+		StatementIndices indices = (StatementIndices) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_INDICES_ATTRIBUTE);
+		RDFFactory rdfFactory = indices.getRDFFactory();
 
 		Namespace ns;
 		String id;

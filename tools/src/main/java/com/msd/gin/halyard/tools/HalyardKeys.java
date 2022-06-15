@@ -5,6 +5,7 @@ import com.msd.gin.halyard.common.Keyspace;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.StatementIndex;
+import com.msd.gin.halyard.common.StatementIndices;
 
 import java.io.IOException;
 import java.net.URI;
@@ -213,7 +214,8 @@ public final class HalyardKeys extends AbstractHalyardTool {
 		} finally {
 			keyspace.close();
 		}
-        Scan scan = StatementIndex.scanAll(rdfFactory);
+        StatementIndices indices = new StatementIndices(getConf(), rdfFactory);
+        Scan scan = indices.scanAll();
         scan.setAllowPartialResults(false);
         scan.setBatch(-1);
         keyspace.initMapperJob(

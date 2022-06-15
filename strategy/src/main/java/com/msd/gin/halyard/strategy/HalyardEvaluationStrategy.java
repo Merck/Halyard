@@ -37,6 +37,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizerPipeline;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryValueEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
@@ -226,6 +227,11 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
     public boolean isTrue(ValueExpr expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         return valueEval.isTrue(expr, bindings);
     }
+
+	@Override
+	public boolean isTrue(QueryValueEvaluationStep expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
+		return valueEval.isTrue(expr, bindings);
+	}
 
     @Override
     public String toString() {

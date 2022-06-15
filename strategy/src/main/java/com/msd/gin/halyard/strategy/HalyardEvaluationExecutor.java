@@ -438,13 +438,19 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
         }
 
         final class BindingSetPipeIteration extends LookAheadIteration<BindingSet, QueryEvaluationException> {
+        	final long jitteredTimeout;
 
-            @Override
+        	BindingSetPipeIteration() {
+        		// add some jitter to avoid threads timing out at the same time (-5%, +5%)
+        		jitteredTimeout = pollTimeoutMillis + (hashCode() % (pollTimeoutMillis/20));
+        	}
+
+        	 @Override
             protected BindingSet getNextElement() throws QueryEvaluationException {
     			BindingSet bs = null;
     			try {
                     for (int retries = 0; bs == null && !isClosed(); retries++) {
-    					bs = queue.poll(pollTimeoutMillis, TimeUnit.MILLISECONDS);
+    					bs = queue.poll(jitteredTimeout, TimeUnit.MILLISECONDS);
     					Throwable thr = exception;
     					if (thr != null) {
 	    					if (thr instanceof RuntimeException) {
@@ -482,16 +488,19 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
         }
 
         final class QueueingBindingSetPipe extends BindingSetPipe {
+        	private final long jitteredTimeout;
         	volatile boolean isClosed = false;
 
             QueueingBindingSetPipe() {
             	super(null);
+        		// add some jitter to avoid threads timing out at the same time (-5%, +5%)
+        		jitteredTimeout = pollTimeoutMillis + (hashCode() % (pollTimeoutMillis/20));
             }
 
             private boolean addToQueue(BindingSet bs) throws InterruptedException {
             	boolean added = false;
             	for (int retries = 0; !added && !isClosed(); retries++) {
-            		added = queue.offer(bs, pollTimeoutMillis, TimeUnit.MILLISECONDS);
+            		added = queue.offer(bs, jitteredTimeout, TimeUnit.MILLISECONDS);
 
 					if (!added) {
 						if(checkThreads(retries)) {

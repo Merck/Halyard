@@ -57,7 +57,7 @@ public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
         ValueFactory vf = SimpleValueFactory.getInstance();
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(conf, TABLE, true, -1, true, 0, null, null);
-        sail.initialize();
+        sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 			for (int i = 0; i < 5; i++) {
 				for (int j = 0; j < 5; j++) {
@@ -84,7 +84,7 @@ public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
         queries.delete();
 
         sail = new HBaseSail(conf, TABLE, false, 0, true, 0, null, null);
-        sail.initialize();
+        sail.init();
         try {
 			try (SailConnection conn = sail.getConnection()) {
 				int count;
@@ -151,7 +151,7 @@ public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
         //fill the change graph with change events
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(conf, "timebulkupdatetesttable", true, -1, true, 0, null, null);
-        sail.initialize();
+        sail.init();
         int i=0;
         IRI timestamp = vf.createIRI("http://whatever/timestamp");
         IRI deleteGraph = vf.createIRI("http://whatever/deleteGraph");
@@ -234,7 +234,7 @@ public class HalyardBulkUpdateTest extends AbstractHalyardToolTest {
         //read transformed data into model
         LinkedHashModel resultModel = new LinkedHashModelFactory().createEmptyModel();
         sail = new HBaseSail(conf, "timebulkupdatetesttable", false, 0, true, 0, null, null);
-        sail.initialize();
+        sail.init();
         try {
 			try (SailConnection conn = sail.getConnection()) {
 				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, true, targetGraph)) {

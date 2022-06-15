@@ -1,11 +1,15 @@
 package com.msd.gin.halyard.sail.spin;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HBaseSail;
 
 import java.util.Arrays;
 import java.util.Collection;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
@@ -17,7 +21,6 @@ import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
-import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.junit.After;
 import org.junit.Before;
@@ -38,6 +41,8 @@ public class HBaseSailSplTest {
 		return Arrays.asList(new Object[] { true }, new Object[] { false });
 	}
 
+	private final String tableName;
+
 	private boolean usePushStrategy;
 
 	private Repository repo;
@@ -46,21 +51,25 @@ public class HBaseSailSplTest {
 
 	public HBaseSailSplTest(boolean usePushStrategy) {
 		this.usePushStrategy = usePushStrategy;
+		this.tableName = "splTestTable-" + (usePushStrategy ? "push" : "pull");
 	}
 
 	@Before
 	public void setup() throws Exception {
-		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "spifTestTable", true, 10, usePushStrategy, 0, null, null);
+		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+		HBaseSail sail = new HBaseSail(conf, tableName, true, 10, usePushStrategy, 0, null, null);
 		repo = new SailRepository(sail);
 		repo.init();
 		conn = repo.getConnection();
 	}
 
 	@After
-	public void tearDown() throws RepositoryException {
-		conn.clear();
+	public void tearDown() throws Exception {
 		conn.close();
 		repo.shutDown();
+		try (Connection hconn = HalyardTableUtils.getConnection(HBaseServerTestInstance.getInstanceConfig())) {
+			HalyardTableUtils.deleteTable(hconn, TableName.valueOf(tableName));
+		}
 	}
 
 	@Test

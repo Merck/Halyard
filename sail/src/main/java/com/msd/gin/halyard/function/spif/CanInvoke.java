@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.rdf4j.RDF4JException;
+import org.eclipse.rdf4j.common.exception.RDF4JException;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.EmptyIteration;
 import org.eclipse.rdf4j.common.iteration.Iterations;
@@ -177,7 +177,7 @@ public class CanInvoke extends AbstractSpinFunction implements Function {
 
 					EvaluationStatistics stats = new ExtendedEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY);
 					EvaluationStrategy strategy = new ExtendedEvaluationStrategy(getTripleSource(), dataset,
-							serviceResolver, tupleFunctionRegistry, 0L, stats);
+							serviceResolver, tupleFunctionRegistry, functionRegistry, 0L, stats);
 					strategy.optimize(tupleExpr, stats, bindings);
 					return strategy.evaluate(tupleExpr, bindings);
 				}

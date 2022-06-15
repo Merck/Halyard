@@ -1,6 +1,7 @@
 package com.msd.gin.halyard.function;
 
 import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.common.TimestampedValueFactory;
 import com.msd.gin.halyard.sail.HBaseTripleSource;
@@ -24,10 +25,10 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class TimestampTupleFunctionTest {
-	private static final RDFFactory rdfFactory = RDFFactory.create();
+	private static final StatementIndices stmtIndices = StatementIndices.create();
 
 	private TripleSource getStubTripleSource(long ts) {
-		return new HBaseTripleSource(null, SimpleValueFactory.getInstance(), rdfFactory, 0) {
+		return new HBaseTripleSource(null, SimpleValueFactory.getInstance(), stmtIndices, 0) {
 			@Override
 			public TripleSource getTimestampedTripleSource() {
 				return new TripleSource() {

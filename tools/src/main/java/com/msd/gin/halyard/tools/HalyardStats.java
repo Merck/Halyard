@@ -25,6 +25,7 @@ import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.SPOC;
 import com.msd.gin.halyard.common.StatementIndex;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -142,12 +143,12 @@ public final class HalyardStats extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             openKeyspace(conf, conf.get(SOURCE_NAME_PROPERTY), conf.get(SNAPSHOT_PATH_PROPERTY));
-            spo = rdfFactory.getSPOIndex();
-            pos = rdfFactory.getPOSIndex();
-            osp = rdfFactory.getOSPIndex();
-            cspo = rdfFactory.getCSPOIndex();
-            cpos = rdfFactory.getCPOSIndex();
-            cosp = rdfFactory.getCOSPIndex();
+            spo = stmtIndices.getSPOIndex();
+            pos = stmtIndices.getPOSIndex();
+            osp = stmtIndices.getOSPIndex();
+            cspo = stmtIndices.getCSPOIndex();
+            cpos = stmtIndices.getCPOSIndex();
+            cosp = stmtIndices.getCOSPIndex();
             subjectKeySize = rdfFactory.getSubjectRole().keyHashSize();
             predicateKeySize = rdfFactory.getPredicateRole().keyHashSize();
             objectKeySize = rdfFactory.getObjectRole().keyHashSize();
@@ -157,7 +158,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             lastObjFragment = new byte[objectKeySize];
             lastCtxFragment = new byte[contextKeySize];
             lastClassFragment = new byte[objectKeySize];
-            spo = rdfFactory.getSPOIndex();
+            spo = stmtIndices.getSPOIndex();
         	RDF_TYPE_PREDICATE = rdfFactory.createPredicate(RDF.TYPE);
         	POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(pos);
         	CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(cpos);
@@ -194,8 +195,8 @@ public final class HalyardStats extends AbstractHalyardTool {
 
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
-            StatementIndex<?,?,?,?> index = StatementIndex.toIndex(key.get()[key.getOffset()], rdfFactory);
-			List<Statement> stmts = HalyardTableUtils.parseStatements(null, null, null, null, value, valueReader, rdfFactory);
+            StatementIndex<?,?,?,?> index = stmtIndices.toIndex(key.get()[key.getOffset()]);
+			List<Statement> stmts = HalyardTableUtils.parseStatements(null, null, null, null, value, valueReader, stmtIndices);
             int hashShift;
             if (!index.isQuadIndex()) {
             	// triple region
@@ -212,7 +213,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                         if (sail == null) {
                             Configuration conf = output.getConfiguration();
                             sail = new HBaseSail(conf, conf.get(SOURCE_NAME_PROPERTY), false, 0, true, 0, null, null);
-                            sail.initialize();
+                            sail.init();
 							conn = sail.getConnection();
                         }
 						for (Statement st : stmts) {
@@ -423,7 +424,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             String targetUrl = conf.get(TARGET);
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE_NAME_PROPERTY), false, 0, true, 0, null, null);
-                sail.initialize();
+                sail.init();
 				conn = sail.getConnection();
 				conn.setNamespace(SD.PREFIX, SD.NAMESPACE);
 				conn.setNamespace(VOID.PREFIX, VOID.NAMESPACE);
@@ -604,22 +605,23 @@ public final class HalyardStats extends AbstractHalyardTool {
 		} finally {
 			keyspace.close();
 		}
+        StatementIndices indices = new StatementIndices(getConf(), rdfFactory);
         List<Scan> scans;
         if (namedGraph != null) {  //restricting stats to scan given graph context only
             scans = new ArrayList<>(4);
             ValueFactory vf = IdValueFactory.INSTANCE;
             RDFContext rdfGraphCtx = rdfFactory.createContext(vf.createIRI(namedGraph));
-            scans.add(rdfFactory.getCSPOIndex().scan(rdfGraphCtx));
-            scans.add(rdfFactory.getCPOSIndex().scan(rdfGraphCtx));
-            scans.add(rdfFactory.getCOSPIndex().scan(rdfGraphCtx));
+            scans.add(indices.getCSPOIndex().scan(rdfGraphCtx));
+            scans.add(indices.getCPOSIndex().scan(rdfGraphCtx));
+            scans.add(indices.getCOSPIndex().scan(rdfGraphCtx));
             if (target == null) {
                 // add stats context to the scanned row ranges (when in update mode) to delete the related stats during MapReduce
-				scans.add(rdfFactory.getCSPOIndex().scan(
+				scans.add(indices.getCSPOIndex().scan(
 					rdfFactory.createContext(statsGraph == null ? HALYARD.STATS_GRAPH_CONTEXT : vf.createIRI(statsGraph))
 				));
             }
         } else {
-            scans = Collections.singletonList(StatementIndex.scanAll(rdfFactory));
+            scans = Collections.singletonList(indices.scanAll());
         }
         keyspace.initMapperJob(
 	        scans,

@@ -24,6 +24,7 @@ import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.vocab.HALYARD;
 
@@ -132,10 +133,10 @@ public final class HalyardSummary extends AbstractHalyardTool {
                 Set<IRI> res = new HashSet<>();
                 RDFSubject s = rdfFactory.createSubject((Resource)instance);
                 RDFPredicate p = rdfFactory.createPredicate(RDF.TYPE);
-                Scan scan = HalyardTableUtils.scan(s, p, null, null, rdfFactory);
+                Scan scan = HalyardTableUtils.scan(s, p, null, null, stmtIndices);
                 try (ResultScanner scanner = keyspaceConn.getScanner(scan)) {
                     for (Result r : scanner) {
-                        for (Statement st : HalyardTableUtils.parseStatements(s, p, null, null, r, valueReader, rdfFactory)) {
+                        for (Statement st : HalyardTableUtils.parseStatements(s, p, null, null, r, valueReader, stmtIndices)) {
 	                        if (st.getSubject().equals(instance) && st.getPredicate().equals(RDF.TYPE) && (st.getObject() instanceof IRI)) {
 	                            res.add((IRI)st.getObject());
 	                        }
@@ -254,7 +255,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             if (random.nextInt(decimationFactor) == 0) {
-                statementChange(output, HalyardTableUtils.parseStatement(null, null, null, null, value.rawCells()[0], valueReader, rdfFactory));
+                statementChange(output, HalyardTableUtils.parseStatement(null, null, null, null, value.rawCells()[0], valueReader, stmtIndices));
             }
             if (++counter % 10000 == 0) {
                 output.setStatus(MessageFormat.format("{0} cc:{1} pc:{2} pd:{3} pr:{4} pdr:{5}", counter, ccCounter, pcCounter, pdCounter, prCounter, pdrCounter));
@@ -306,7 +307,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             this.namedGraph = ng == null ? null : SVF.createIRI(ng);
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
             sail = new HBaseSail(conf, conf.get(SOURCE_NAME_PROPERTY), false, 0, true, 0, null, null);
-            sail.initialize();
+            sail.init();
 			conn = sail.getConnection();
             setupOutput();
             write(CARDINALITY, RDF.TYPE, RDF.PROPERTY);
@@ -518,7 +519,8 @@ public final class HalyardSummary extends AbstractHalyardTool {
 		} finally {
 			keyspace.close();
 		}
-        Scan scan = rdfFactory.getPOSIndex().scan();
+        StatementIndices indices = new StatementIndices(getConf(), rdfFactory);
+        Scan scan = indices.getPOSIndex().scan();
         keyspace.initMapperJob(
             scan,
             SummaryMapper.class,

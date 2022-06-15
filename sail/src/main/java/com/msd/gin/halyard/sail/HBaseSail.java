@@ -22,6 +22,7 @@ import com.msd.gin.halyard.common.Keyspace;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.SSLSettings;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.function.DynamicFunctionRegistry;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.StatementPatternCardinalityCalculator;
@@ -64,8 +65,8 @@ import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
-import org.eclipse.rdf4j.IsolationLevel;
-import org.eclipse.rdf4j.IsolationLevels;
+import org.eclipse.rdf4j.common.transaction.IsolationLevel;
+import org.eclipse.rdf4j.common.transaction.IsolationLevels;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
@@ -227,6 +228,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
     final Ticker ticker;
 	private FederatedServiceResolver federatedServiceResolver;
 	private RDFFactory rdfFactory;
+	private StatementIndices stmtIndices;
 	private ValueFactory valueFactory;
 	private FunctionRegistry functionRegistry = new DynamicFunctionRegistry();
 	private TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
@@ -445,7 +447,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	}
 
 	@Override
-	public void initialize() throws SailException {
+	public void init() throws SailException {
 		try {
 			if (tableName != null) {
 				if (!hConnectionIsShared) {
@@ -467,14 +469,15 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		} catch (IOException e) {
 			throw new SailException(e);
 		}
-		this.valueFactory = IdValueFactory.INSTANCE;
+		stmtIndices = new StatementIndices(config, rdfFactory);
+		valueFactory = IdValueFactory.INSTANCE;
 
 		if (includeNamespaces) {
 			addNamespaces();
 		}
 
 		StatementPatternCardinalityCalculator.Factory spcalcFactory = () -> new HalyardStatsBasedStatementPatternCardinalityCalculator(
-				new HBaseTripleSource(keyspace.getConnection(), valueFactory, rdfFactory, evaluationTimeoutSecs), rdfFactory);
+				new HBaseTripleSource(keyspace.getConnection(), valueFactory, stmtIndices, evaluationTimeoutSecs), rdfFactory);
 		HalyardEvaluationStatistics.ServiceStatsProvider srvStatsProvider = service -> {
 			HalyardEvaluationStatistics fedStats = null;
 			FederatedService fedServ = federatedServiceResolver.getService(service);
@@ -547,7 +550,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	}
 
 	private boolean isInitialized() {
-		return (keyspace != null) && (rdfFactory != null);
+		return (keyspace != null) && (rdfFactory != null) && (stmtIndices != null);
 	}
 
 	private void addNamespaces() {
@@ -607,6 +610,13 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 			throw new IllegalStateException("Sail is not initialized");
 		}
 		return rdfFactory;
+	}
+
+	public StatementIndices getStatementIndices() {
+		if (stmtIndices == null) {
+			throw new IllegalStateException("Sail is not initialized");
+		}
+		return stmtIndices;
 	}
 
     @Override

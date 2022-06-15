@@ -4,8 +4,8 @@ import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 
 import org.apache.hadoop.hbase.client.Connection;
-import org.eclipse.rdf4j.sail.RDFStoreTest;
 import org.eclipse.rdf4j.sail.Sail;
+import org.eclipse.rdf4j.testsuite.sail.RDFStoreTest;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;

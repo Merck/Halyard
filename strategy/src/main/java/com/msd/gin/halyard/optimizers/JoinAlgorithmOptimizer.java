@@ -1,6 +1,6 @@
 package com.msd.gin.halyard.optimizers;
 
-import com.msd.gin.halyard.algebra.HashJoin;
+import com.msd.gin.halyard.algebra.Algorithms;
 
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
@@ -60,7 +60,7 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 			double hashCost = leftCard*HASH_LOOKUP_COST + rightCard*HASH_BUILD_COST;
 			boolean useHash = rightCard <= hashJoinLimit && costRatio*hashCost < nestedCost;
 			if (useHash) {
-				join.setAlgorithm(HashJoin.INSTANCE);
+				join.setAlgorithm(Algorithms.HASH_JOIN);
 				join.setCostEstimate(hashCost);
 			}
 		}
@@ -74,6 +74,6 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 	private static boolean isSupported(TupleExpr expr) {
 		return (expr instanceof StatementPattern)
 				|| (expr instanceof BindingSetAssignment)
-				|| ((expr instanceof BinaryTupleOperator) && HashJoin.NAME.equals(((BinaryTupleOperator)expr).getAlgorithmName()));
+				|| ((expr instanceof BinaryTupleOperator) && Algorithms.HASH_JOIN.equals(((BinaryTupleOperator)expr).getAlgorithmName()));
 	}
 }

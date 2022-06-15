@@ -7,6 +7,8 @@
  *******************************************************************************/
 package com.msd.gin.halyard.strategy;
 
+import java.util.List;
+
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.BooleanLiteral;
@@ -14,11 +16,16 @@ import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.Compare;
+import org.eclipse.rdf4j.query.algebra.FunctionCall;
 import org.eclipse.rdf4j.query.algebra.MathExpr;
+import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
+import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
+import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
+import org.eclipse.rdf4j.query.algebra.evaluation.function.datetime.Now;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.TupleFunctionEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtil;
@@ -31,12 +38,14 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.XMLDatatypeMathUtil;
  * @author Jeen Broekstra
  */
 public class ExtendedEvaluationStrategy extends TupleFunctionEvaluationStrategy {
+	private final FunctionRegistry funcRegistry;
 	private boolean isStrict = false;
 
 	public ExtendedEvaluationStrategy(TripleSource tripleSource, Dataset dataset,
-			FederatedServiceResolver serviceResolver, TupleFunctionRegistry tupleFuncRegistry,
+			FederatedServiceResolver serviceResolver, TupleFunctionRegistry tupleFuncRegistry, FunctionRegistry funcRegistry,
 			long iterationCacheSyncThreshold, EvaluationStatistics evaluationStatistics) {
 		super(tripleSource, dataset, serviceResolver, tupleFuncRegistry, iterationCacheSyncThreshold, evaluationStatistics);
+		this.funcRegistry = funcRegistry;
 	}
 
 	public void setStrict(boolean f) {
@@ -70,4 +79,32 @@ public class ExtendedEvaluationStrategy extends TupleFunctionEvaluationStrategy 
 		throw new ValueExprEvaluationException("Both arguments must be literals");
 	}
 
+	/**
+	 * Evaluates a function.
+	 */
+	@Override
+	public Value evaluate(FunctionCall node, BindingSet bindings)
+			throws QueryEvaluationException {
+		Function function = funcRegistry
+				.get(node.getURI())
+				.orElseThrow(() -> new QueryEvaluationException("Unknown function '" + node.getURI() + "'"));
+
+		// the NOW function is a special case as it needs to keep a shared
+		// return
+		// value for the duration of the query.
+		if (function instanceof Now) {
+			return evaluate((Now) function, bindings);
+		}
+
+		List<ValueExpr> args = node.getArgs();
+
+		Value[] argValues = new Value[args.size()];
+
+		for (int i = 0; i < args.size(); i++) {
+			argValues[i] = evaluate(args.get(i), bindings);
+		}
+
+		return function.evaluate(tripleSource, argValues);
+
+	}
 }

@@ -19,6 +19,7 @@ package com.msd.gin.halyard.tools;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.util.LFUCache;
 import com.msd.gin.halyard.util.LRUCache;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -211,7 +212,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     public static final class RDFMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, KeyValue> {
 
         private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
-        private RDFFactory rdfFactory;
+        private StatementIndices stmtIndices;
         private long timestamp;
         private long addedKvs;
         private long addedStmts;
@@ -219,13 +220,14 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            rdfFactory = RDFFactory.create(conf);
+            RDFFactory rdfFactory = RDFFactory.create(conf);
+            stmtIndices = new StatementIndices(conf, rdfFactory);
             timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
         }
 
         @Override
         protected void map(LongWritable key, Statement stmt, final Context output) throws IOException, InterruptedException {
-            for (KeyValue keyValue: HalyardTableUtils.insertKeyValues(stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), stmt.getContext(), timestamp, rdfFactory)) {
+            for (KeyValue keyValue: HalyardTableUtils.insertKeyValues(stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), stmt.getContext(), timestamp, stmtIndices)) {
                 rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                 output.write(rowKey, keyValue);
                 addedKvs++;

@@ -19,12 +19,15 @@ package com.msd.gin.halyard.sail;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.algebra.Algebra;
+import com.msd.gin.halyard.common.Config;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.sail.HBaseSail.SailConnectionFactory;
+import com.msd.gin.halyard.sail.connection.SailConnectionQueryPreparer;
 import com.msd.gin.halyard.sail.search.SearchClient;
 import com.msd.gin.halyard.sail.search.SearchInterpreter;
 import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
@@ -50,8 +53,8 @@ import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
-import org.eclipse.rdf4j.IsolationLevel;
-import org.eclipse.rdf4j.IsolationLevels;
+import org.eclipse.rdf4j.common.transaction.IsolationLevel;
+import org.eclipse.rdf4j.common.transaction.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.EmptyIteration;
@@ -83,7 +86,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
-import org.eclipse.rdf4j.sail.SailConnectionQueryPreparer;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.eclipse.rdf4j.sail.UpdateContext;
@@ -97,16 +99,17 @@ public class HBaseSailConnection extends AbstractSailConnection {
 
 	public static final String SOURCE_STRING_BINDING = "__source__";
 	public static final String QUERY_CONTEXT_KEYSPACE_ATTRIBUTE = KeyspaceConnection.class.getName();
-	public static final String QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE = RDFFactory.class.getName();
+	public static final String QUERY_CONTEXT_INDICES_ATTRIBUTE = StatementIndices.class.getName();
 	public static final String QUERY_CONTEXT_SEARCH_ATTRIBUTE = SearchClient.class.getName();
+	private static final int MAX_QUERY_CACHE_SIZE = Config.getInteger("hayard.evaluation.maxQueryCacheSize", 100);
 
-	private final Cache<PreparedQueryKey, TupleExpr> queryCache = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(5000).expireAfterWrite(1L, TimeUnit.HOURS).build();
+	private final Cache<PreparedQueryKey, TupleExpr> queryCache = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(MAX_QUERY_CACHE_SIZE).expireAfterWrite(1L, TimeUnit.HOURS).build();
 
     private final HBaseSail sail;
 	private final SearchClient searchClient;
 	private KeyspaceConnection keyspaceConn;
 	private BufferedMutator mutator;
-	private boolean pendingUpdates;
+	private int pendingUpdateCount;
 	private long lastTimestamp = Long.MIN_VALUE;
 	private boolean lastUpdateWasDelete;
 
@@ -162,14 +165,14 @@ public class HBaseSailConnection extends AbstractSailConnection {
     }
 
 	private RDFStarTripleSource createTripleSource() {
-		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeoutSecs, sail.getScanSettings(), searchClient, sail.ticker);
+		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getStatementIndices(), sail.evaluationTimeoutSecs, sail.getScanSettings(), searchClient, sail.ticker);
 	}
 
 	private QueryContext createQueryContext(TripleSource source, boolean includeInferred, String sourceString) {
 		SailConnectionQueryPreparer queryPreparer = new SailConnectionQueryPreparer(this, includeInferred, source);
 		QueryContext queryContext = new QueryContext(queryPreparer);
 		queryContext.setAttribute(QUERY_CONTEXT_KEYSPACE_ATTRIBUTE, keyspaceConn);
-		queryContext.setAttribute(QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE, sail.getRDFFactory());
+		queryContext.setAttribute(QUERY_CONTEXT_INDICES_ATTRIBUTE, sail.getStatementIndices());
 		queryContext.setAttribute(HalyardEvaluationStrategy.QUERY_CONTEXT_SOURCE_STRING_ATTRIBUTE, sourceString);
 		queryContext.setAttribute(QUERY_CONTEXT_SEARCH_ATTRIBUTE, searchClient);
 		return queryContext;
@@ -181,7 +184,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		if (sail.pushStrategy) {
 			strategy = new HalyardEvaluationStrategy(source, queryContext, sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), dataset, sail.getFederatedServiceResolver(), stats);
 		} else {
-			strategy = new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), sail.getTupleFunctionRegistry(), 0L, stats);
+			strategy = new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), 0L, stats);
 			strategy.setOptimizerPipeline(new ExtendedQueryOptimizerPipeline(strategy, source.getValueFactory(), stats));
 		}
 		return strategy;
@@ -327,8 +330,8 @@ public class HBaseSailConnection extends AbstractSailConnection {
 					final ResultScanner rs;
 
 					StatementScanner(RDFFactory rdfFactory) throws IOException {
-						super(rdfFactory.createTableReader(sail.getValueFactory(), keyspaceConn), rdfFactory);
-						rs = keyspaceConn.getScanner(rdfFactory.getCSPOIndex().scan());
+						super(sail.getStatementIndices().createTableReader(sail.getValueFactory(), keyspaceConn), sail.getStatementIndices());
+						rs = keyspaceConn.getScanner(sail.getStatementIndices().getCSPOIndex().scan());
 					}
 
 					@Override
@@ -431,10 +434,10 @@ public class HBaseSailConnection extends AbstractSailConnection {
 
     @Override
     public void flush() throws SailException {
-		if (pendingUpdates) {
+		if (pendingUpdateCount > 0) {
 			try {
 				mutator.flush();
-				pendingUpdates = false;
+				pendingUpdateCount = 0;
 			} catch (IOException e) {
 				throw new SailException(e);
 			}
@@ -514,28 +517,34 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		}
         try {
 			for (Resource ctx : contexts) {
-				addStatement(subj, pred, obj, ctx, timestamp);
+				insertStatement(subj, pred, obj, ctx, timestamp);
 			}
         } catch (IOException e) {
             throw new SailException(e);
         }
     }
 
-	private void addStatement(Resource subj, IRI pred, Value obj, Resource ctx, long timestamp) throws IOException {
-		for (KeyValue kv : HalyardTableUtils.insertKeyValues(subj, pred, obj, ctx, timestamp, sail.getRDFFactory())) {
+	private void insertStatement(Resource subj, IRI pred, Value obj, Resource ctx, long timestamp) throws IOException {
+		for (KeyValue kv : HalyardTableUtils.insertKeyValues(subj, pred, obj, ctx, timestamp, sail.getStatementIndices())) {
+			put(kv);
+		}
+	}
+
+	private void insertSystemStatement(Resource subj, IRI pred, Value obj, Resource ctx, long timestamp) throws IOException {
+		for (KeyValue kv : HalyardTableUtils.insertSystemKeyValues(subj, pred, obj, ctx, timestamp, sail.getStatementIndices())) {
 			put(kv);
 		}
 	}
 
 	protected void put(KeyValue kv) throws IOException {
 		getBufferedMutator().mutate(new Put(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength(), kv.getTimestamp()).add(kv));
-		pendingUpdates = true;
-    }
-
-    @Override
-    public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
+		pendingUpdateCount++;
+	}
+	
+	@Override
+	public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
 		removeStatements(null, subj, pred, obj, contexts);
-    }
+	}
 
 	private void removeStatements(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
 		checkWritable();
@@ -552,15 +561,15 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		}
 	}
 
-    @Override
-    public void removeStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
+	@Override
+	public void removeStatement(UpdateContext op, Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
 		if (subj != null && pred != null && obj != null && contexts != null && contexts.length > 0) {
 			long timestamp = getTimestamp(op, true);
 			removeStatementInternal(subj, pred, obj, contexts, timestamp);
 		} else {
 			removeStatements(op, subj, pred, obj, contexts);
 		}
-    }
+	}
 
 	private void removeStatementInternal(Resource subj, IRI pred, Value obj, Resource[] contexts, long timestamp) throws SailException {
 		checkWritable();
@@ -581,7 +590,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 
 	protected void removeTriple(Triple t, Long timestamp) throws IOException {
 		flush();
-		if (!HalyardTableUtils.isTripleReferenced(keyspaceConn, t, sail.getRDFFactory())) {
+		if (!HalyardTableUtils.isTripleReferenced(keyspaceConn, t, sail.getStatementIndices())) {
 			// orphaned so safe to remove
 			deleteStatement(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, timestamp);
 			if (t.getSubject().isTriple()) {
@@ -594,14 +603,30 @@ public class HBaseSailConnection extends AbstractSailConnection {
 	}
 
 	private void deleteStatement(Resource subj, IRI pred, Value obj, Resource ctx, long timestamp) throws IOException {
-		for (KeyValue kv : HalyardTableUtils.deleteKeyValues(subj, pred, obj, ctx, timestamp, sail.getRDFFactory())) {
+		for (KeyValue kv : HalyardTableUtils.deleteKeyValues(subj, pred, obj, ctx, timestamp, sail.getStatementIndices())) {
+			delete(kv);
+		}
+	}
+
+	private void deleteSystemStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws IOException {
+		long timestamp = getDefaultTimestamp(true);
+		try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
+			while (iter.hasNext()) {
+				Statement st = iter.next();
+				deleteSystemStatement(st.getSubject(), st.getPredicate(), st.getObject(), st.getContext(), timestamp);
+			}
+		}
+	}
+
+	private void deleteSystemStatement(Resource subj, IRI pred, Value obj, Resource ctx, long timestamp) throws IOException {
+		for (KeyValue kv : HalyardTableUtils.deleteSystemKeyValues(subj, pred, obj, ctx, timestamp, sail.getStatementIndices())) {
 			delete(kv);
 		}
 	}
 
 	protected void delete(KeyValue kv) throws IOException {
 		getBufferedMutator().mutate(new Delete(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength()).add(kv));
-		pendingUpdates = true;
+		pendingUpdateCount++;
 	}
 
     @Override
@@ -659,31 +684,35 @@ public class HBaseSailConnection extends AbstractSailConnection {
 
     @Override
     public void setNamespace(String prefix, String name) throws SailException {
+		checkWritable();
         ValueFactory vf = sail.getValueFactory();
         try {
-            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
-			addStatement(vf.createIRI(name), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
-        } catch (SailException e) {
-			LOG.warn("Namespace prefix could not be presisted due to an exception", e);
+			deleteSystemStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
+			long timestamp = getDefaultTimestamp(false);
+			insertSystemStatement(vf.createIRI(name), HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), HALYARD.SYSTEM_GRAPH_CONTEXT, timestamp);
+        } catch (IOException e) {
+			throw new SailException("Namespace prefix could not be presisted due to an exception", e);
         }
     }
 
     @Override
     public void removeNamespace(String prefix) throws SailException {
+		checkWritable();
         ValueFactory vf = sail.getValueFactory();
         try {
-            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
-        } catch (SailException e) {
-			LOG.warn("Namespace prefix could not be removed due to an exception", e);
+			deleteSystemStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, vf.createLiteral(prefix), new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
+        } catch (IOException e) {
+        	throw new SailException("Namespace prefix could not be removed due to an exception", e);
         }
     }
 
     @Override
     public void clearNamespaces() throws SailException {
+		checkWritable();
         try {
-            removeStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null, new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
-        } catch (SailException e) {
-			LOG.warn("Namespaces could not be cleared due to an exception", e);
+			deleteSystemStatements(null, HALYARD.NAMESPACE_PREFIX_PROPERTY, null, new Resource[] { HALYARD.SYSTEM_GRAPH_CONTEXT });
+        } catch (IOException e) {
+        	throw new SailException("Namespaces could not be cleared due to an exception", e);
         }
     }
 

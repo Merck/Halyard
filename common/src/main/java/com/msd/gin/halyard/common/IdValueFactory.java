@@ -19,6 +19,7 @@ import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.base.AbstractValueFactory;
+import org.eclipse.rdf4j.model.base.CoreDatatype;
 
 @ThreadSafe
 public class IdValueFactory implements ValueFactory {
@@ -65,6 +66,16 @@ public class IdValueFactory implements ValueFactory {
 	@Override
 	public Literal createLiteral(String value, IRI datatype) {
 		return new IdentifiableLiteral(DELEGATE.createLiteral(value, datatype));
+	}
+
+	@Override
+	public Literal createLiteral(String label, CoreDatatype datatype) {
+		return new IdentifiableLiteral(DELEGATE.createLiteral(label, datatype));
+	}
+
+	@Override
+	public Literal createLiteral(String label, IRI datatype, CoreDatatype coreDatatype) {
+		return new IdentifiableLiteral(DELEGATE.createLiteral(label, datatype, coreDatatype));
 	}
 
 	@Override

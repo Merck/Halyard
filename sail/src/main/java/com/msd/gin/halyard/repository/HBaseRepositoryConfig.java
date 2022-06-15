@@ -25,6 +25,11 @@ public class HBaseRepositoryConfig extends AbstractRepositoryImplConfig {
 		super(HBaseRepositoryFactory.REPOSITORY_TYPE);
 	}
 
+	public HBaseRepositoryConfig(HBaseSailConfig cfg) {
+		super(HBaseRepositoryFactory.REPOSITORY_TYPE);
+		setSailImplConfig(cfg);
+	}
+
 	public HBaseSailConfig getSailImplConfig() {
 		return sailImplConfig;
 	}

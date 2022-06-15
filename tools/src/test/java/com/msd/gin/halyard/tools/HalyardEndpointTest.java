@@ -60,7 +60,7 @@ public class HalyardEndpointTest {
         }
         ValueFactory vf = SimpleValueFactory.getInstance();
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), TABLE, true, 0, true, 0, null, null);
-        sail.initialize();
+        sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 			for (int i = 0; i < 10; i++) {
 				for (int j = 0; j < 10; j++) {

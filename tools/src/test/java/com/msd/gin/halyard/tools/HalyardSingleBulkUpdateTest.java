@@ -30,7 +30,7 @@ public class HalyardSingleBulkUpdateTest extends AbstractHalyardToolTest {
         ValueFactory vf = SimpleValueFactory.getInstance();
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(conf, TABLE, true, -1, true, 0, null, null);
-        sail.initialize();
+        sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 			for (int i = 0; i < 5; i++) {
 				for (int j = 0; j < 5; j++) {
@@ -51,7 +51,7 @@ public class HalyardSingleBulkUpdateTest extends AbstractHalyardToolTest {
         assertEquals(0, run(new String[]{ "-q", query, "-w", htableDir.toURI().toURL().toString(), "-s", TABLE}));
 
         sail = new HBaseSail(conf, TABLE, false, 0, true, 0, null, null);
-        sail.initialize();
+        sail.init();
         try {
 			try (SailConnection conn = sail.getConnection()) {
 				int count;

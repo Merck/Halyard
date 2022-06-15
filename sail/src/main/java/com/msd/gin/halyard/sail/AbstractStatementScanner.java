@@ -1,13 +1,5 @@
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.RDFContext;
-import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.RDFObject;
-import com.msd.gin.halyard.common.RDFPredicate;
-import com.msd.gin.halyard.common.RDFSubject;
-import com.msd.gin.halyard.common.ValueIO;
-
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -17,9 +9,17 @@ import org.eclipse.rdf4j.common.iteration.AbstractCloseableIteration;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.ValueFactory;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.RDFContext;
+import com.msd.gin.halyard.common.RDFObject;
+import com.msd.gin.halyard.common.RDFPredicate;
+import com.msd.gin.halyard.common.RDFSubject;
+import com.msd.gin.halyard.common.StatementIndices;
+import com.msd.gin.halyard.common.ValueIO;
+
 public abstract class AbstractStatementScanner extends AbstractCloseableIteration<Statement, IOException> {
 	private final ValueIO.Reader reader;
-	protected final RDFFactory rdfFactory;
+	protected final StatementIndices indices;
 	protected final ValueFactory vf;
 	protected RDFSubject subj;
 	protected RDFPredicate pred;
@@ -28,9 +28,9 @@ public abstract class AbstractStatementScanner extends AbstractCloseableIteratio
 	private Statement next = null;
 	private Iterator<Statement> iter = null;
 
-	protected AbstractStatementScanner(ValueIO.Reader reader, RDFFactory rdfFactory) {
+	protected AbstractStatementScanner(ValueIO.Reader reader, StatementIndices indices) {
 		this.reader = reader;
-		this.rdfFactory = rdfFactory;
+		this.indices = indices;
 		this.vf = reader.getValueFactory();
 	}
 
@@ -45,7 +45,7 @@ public abstract class AbstractStatementScanner extends AbstractCloseableIteratio
 					if (res == null) {
 						return false; // no more Results
 					}
-					iter = HalyardTableUtils.parseStatements(subj, pred, obj, ctx, res, reader, rdfFactory).iterator();
+					iter = HalyardTableUtils.parseStatements(subj, pred, obj, ctx, res, reader, indices).iterator();
 				}
 				if (iter.hasNext()) {
 					Statement s = iter.next();

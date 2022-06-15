@@ -65,7 +65,7 @@ public class HalyardElasticIndexerTest extends AbstractHalyardToolTest {
     public void testElasticIndexer() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
         HBaseSail sail = new HBaseSail(conf, "elasticTable", true, 0, true, 0, null, null);
-        sail.initialize();
+        sail.init();
         ValueFactory vf = SimpleValueFactory.getInstance();
 		try (SailConnection conn = sail.getConnection()) {
 			for (int i = 0; i < 100; i++) {

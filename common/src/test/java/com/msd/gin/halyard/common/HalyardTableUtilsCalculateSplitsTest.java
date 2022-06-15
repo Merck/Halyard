@@ -36,7 +36,7 @@ import static org.junit.Assert.*;
  */
 @RunWith(Parameterized.class)
 public class HalyardTableUtilsCalculateSplitsTest {
-    private static final RDFFactory rdfFactory = RDFFactory.create();
+    private static final StatementIndices stmtIndices = StatementIndices.create();
 
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
@@ -66,7 +66,7 @@ public class HalyardTableUtilsCalculateSplitsTest {
 
     @Test
     public void testCalculateSplits() {
-		byte bb[][] = HalyardTableUtils.calculateSplits(splits, quads, predicateFractions, rdfFactory);
+		byte bb[][] = HalyardTableUtils.calculateSplits(splits, quads, predicateFractions, stmtIndices);
         if (expected == null) {
             assertNull(bb);
         } else {

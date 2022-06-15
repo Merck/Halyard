@@ -161,7 +161,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         assertEquals(0, run(new String[]{"-b", "-1", "-i", "-s", file.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable2"}));
 
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable2", false, 0, true, 30, null, null);
-        sail.initialize();
+        sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 			assertEquals(3, conn.size());
 		}
@@ -181,7 +181,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         assertEquals(0, run(new String[]{"-s", file.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable3"}));
 
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable3", false, 0, true, 30, null, null);
-        sail.initialize();
+        sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 			CloseableIteration<? extends Statement,? extends SailException> iter = conn.getStatements(null, null, null, false);
 			assertTrue(iter.hasNext());

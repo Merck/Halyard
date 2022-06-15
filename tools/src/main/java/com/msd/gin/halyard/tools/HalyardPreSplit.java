@@ -21,6 +21,7 @@ import static com.msd.gin.halyard.tools.HalyardBulkLoad.*;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.StatementIndex;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.tools.HalyardBulkLoad.RioFileInputFormat;
 
 import java.io.IOException;
@@ -83,7 +84,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
         private final LongWritable keyValueLength = new LongWritable();
         private final Random random = new Random(0);
-        private RDFFactory rdfFactory;
+        private StatementIndices stmtIndices;
         private long counter = 0, next = 0;
         private int maxIncrement;
         private long stmtCount = 0L;
@@ -91,7 +92,8 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
-            rdfFactory = RDFFactory.create(conf);
+            RDFFactory rdfFactory = RDFFactory.create(conf);
+            stmtIndices = new StatementIndices(conf, rdfFactory);
             int decimationFactor = conf.getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
             maxIncrement = 2*decimationFactor - 1;
             // prefix splits
@@ -104,7 +106,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
             if (counter++ == next) {
                 next = counter + random.nextInt(maxIncrement);
-                for (KeyValue keyValue: HalyardTableUtils.insertKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), 0, rdfFactory)) {
+                for (KeyValue keyValue: HalyardTableUtils.insertKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), 0, stmtIndices)) {
                     rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                     keyValueLength.set(keyValue.getLength());
                     context.write(rowKey, keyValueLength);

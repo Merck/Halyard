@@ -80,7 +80,7 @@ public class HalyardSummaryTest extends AbstractHalyardToolTest {
             literals[i] = svf.createLiteral("0", literalTypes[r.nextInt(literalTypes.length)]);
         }
 		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "summaryTable", true, -1, true, 0, null, null);
-		sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
             for (IRI instance : instances) {
                 Collection<IRI> clsC = new ArrayList<>();

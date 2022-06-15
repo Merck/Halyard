@@ -21,6 +21,7 @@ import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.Keyspace;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.common.ValueIO;
 
 import java.io.IOException;
@@ -263,13 +264,15 @@ public abstract class AbstractHalyardTool implements Tool {
         protected Keyspace keyspace;
         protected KeyspaceConnection keyspaceConn;
         protected RDFFactory rdfFactory;
+        protected StatementIndices stmtIndices;
         protected ValueIO.Reader valueReader;
 
         protected final void openKeyspace(Configuration conf, String source, String restorePath) throws IOException {
             keyspace = HalyardTableUtils.getKeyspace(conf, source, restorePath);
             keyspaceConn = keyspace.getConnection();
             rdfFactory = RDFFactory.create(keyspaceConn);
-            valueReader = rdfFactory.createTableReader(IdValueFactory.INSTANCE, keyspaceConn);
+            stmtIndices = new StatementIndices(conf, rdfFactory);
+            valueReader = stmtIndices.createTableReader(IdValueFactory.INSTANCE, keyspaceConn);
         }
 
         protected void closeKeyspace() throws IOException {
@@ -289,13 +292,15 @@ public abstract class AbstractHalyardTool implements Tool {
         protected Keyspace keyspace;
         protected KeyspaceConnection keyspaceConn;
         protected RDFFactory rdfFactory;
+        protected StatementIndices stmtIndices;
         protected ValueIO.Reader valueReader;
 
         protected final void openKeyspace(Configuration conf, String source, String restorePath) throws IOException {
             keyspace = HalyardTableUtils.getKeyspace(conf, source, restorePath);
             keyspaceConn = keyspace.getConnection();
             rdfFactory = RDFFactory.create(keyspaceConn);
-            valueReader = rdfFactory.createTableReader(IdValueFactory.INSTANCE, keyspaceConn);
+            stmtIndices = new StatementIndices(conf, rdfFactory);
+            valueReader = stmtIndices.createTableReader(IdValueFactory.INSTANCE, keyspaceConn);
         }
 
         protected void closeKeyspace() throws IOException {

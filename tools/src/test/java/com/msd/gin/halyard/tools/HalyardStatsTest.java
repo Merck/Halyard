@@ -72,7 +72,7 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
 
 	private static Sail createData(String tableName) throws Exception {
         final HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), tableName, true, -1, true, 0, null, null);
-        sail.initialize();
+        sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 			try (InputStream ref = HalyardStatsTest.class.getResourceAsStream("testData.trig")) {
 				RDFParser p = Rio.createParser(RDFFormat.TRIG);

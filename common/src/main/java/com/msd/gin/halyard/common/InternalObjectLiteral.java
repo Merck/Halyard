@@ -9,6 +9,7 @@ import java.util.Optional;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.base.CoreDatatype;
 
 public class InternalObjectLiteral<T> implements ObjectLiteral<T> {
 	private static final long serialVersionUID = -124780683447095687L;
@@ -41,6 +42,11 @@ public class InternalObjectLiteral<T> implements ObjectLiteral<T> {
 	@Override
 	public IRI getDatatype() {
 		return HALYARD.JAVA_TYPE;
+	}
+
+	@Override
+	public CoreDatatype getCoreDatatype() {
+		return CoreDatatype.NONE;
 	}
 
 	@Override

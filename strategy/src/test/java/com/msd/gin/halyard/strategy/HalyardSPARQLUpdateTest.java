@@ -16,7 +16,7 @@
  */
 package com.msd.gin.halyard.strategy;
 
-import org.eclipse.rdf4j.query.parser.sparql.SPARQLUpdateTest;
+import org.eclipse.rdf4j.testsuite.query.parser.sparql.SPARQLUpdateTest;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 

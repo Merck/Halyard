@@ -3,6 +3,7 @@ package com.msd.gin.halyard.sail.search;
 import com.google.common.collect.Lists;
 import com.msd.gin.halyard.common.ObjectLiteral;
 import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 import com.msd.gin.halyard.vocab.HALYARD;
 
@@ -49,7 +50,8 @@ public class SearchTupleFunction implements TupleFunction {
 		int fuzziness = ((Literal) args[argPos++]).intValue();
 		int phraseSlop = ((Literal) args[argPos++]).intValue();
 		List<SearchInterpreter.SearchParams.MatchParams> matches = ((ObjectLiteral<List<SearchInterpreter.SearchParams.MatchParams>>) args[argPos++]).objectValue();
-		RDFFactory rdfFactory = (RDFFactory) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE);
+		StatementIndices indices = (StatementIndices) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_INDICES_ATTRIBUTE);
+		RDFFactory rdfFactory = indices.getRDFFactory();
 		SearchClient searchClient = (SearchClient) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_SEARCH_ATTRIBUTE);
 		try {
 			SearchResponse<SearchDocument> searchResults = searchClient.search(query, limit, fuzziness, phraseSlop);

@@ -24,7 +24,7 @@ import com.msd.gin.halyard.common.Keyspace;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.StatementIndex;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
@@ -136,7 +136,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
             for (Cell c : value.rawCells()) {
-                Statement st = HalyardTableUtils.parseStatement(null, null, null, null, c, valueReader, rdfFactory);
+                Statement st = HalyardTableUtils.parseStatement(null, null, null, null, c, valueReader, stmtIndices);
                 if ((ctxs == null || ctxs.contains(st.getContext())) && (subj == null || subj.equals(st.getSubject())) && (pred == null || pred.equals(st.getPredicate())) && (obj == null || obj.equals(st.getObject()))) {
                     deleteCell(c, st, output);
                 } else if (HALYARD.TRIPLE_GRAPH_CONTEXT.equals(st.getContext())) {
@@ -168,7 +168,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 
         private void cleanupTriple(Cell c, Statement st, Context output) throws IOException, InterruptedException {
         	Triple t = vf.createTriple(st.getSubject(), st.getPredicate(), st.getObject());
-    		if (!HalyardTableUtils.isTripleReferenced(keyspaceConn, t, rdfFactory)) {
+    		if (!HalyardTableUtils.isTripleReferenced(keyspaceConn, t, stmtIndices)) {
     			// orphaned so safe to remove
     			deleteCell(c, st, output);
     		}
@@ -250,18 +250,19 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 			keyspace.close();
 		}
         String[] namedGraphs = cmd.getOptionValues('g');
+        StatementIndices indices = new StatementIndices(getConf(), rdfFactory);
         List<Scan> scans;
         if (namedGraphs != null && namedGraphs.length > 0) {
         	scans = new ArrayList<>(1 + namedGraphs.length);
-        	scans.add(StatementIndex.scanDefaultIndices(rdfFactory));
+        	scans.add(indices.scanDefaultIndices());
         	for (String graph : namedGraphs) {
         		if (!DEFAULT_GRAPH_KEYWORD.equals(graph)) {
         			Resource ctx = IdValueFactory.INSTANCE.createIRI(graph);
-            		scans.addAll(StatementIndex.scanContextIndices(ctx, rdfFactory));
+            		scans.addAll(indices.scanContextIndices(ctx));
         		}
         	}
         } else {
-        	scans = Collections.singletonList(StatementIndex.scanAll(rdfFactory));
+        	scans = Collections.singletonList(indices.scanAll());
         }
         try {
             for (int i=0; !scans.isEmpty(); i++) {
@@ -295,9 +296,9 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 	                	// maybe more triples to delete
 		                RDFContext rdfGraphCtx = rdfFactory.createContext(HALYARD.TRIPLE_GRAPH_CONTEXT);
 		                scans = Arrays.asList(
-		    	            rdfFactory.getCSPOIndex().scan(rdfGraphCtx),
-		    	            rdfFactory.getCPOSIndex().scan(rdfGraphCtx),
-		    	            rdfFactory.getCOSPIndex().scan(rdfGraphCtx)
+		    	            indices.getCSPOIndex().scan(rdfGraphCtx),
+		    	            indices.getCPOSIndex().scan(rdfGraphCtx),
+		    	            indices.getCOSPIndex().scan(rdfGraphCtx)
 		                );
 		                if (useSnapshot) {
 		                	// switch to reading from table

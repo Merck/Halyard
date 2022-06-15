@@ -18,7 +18,6 @@ import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
 
 public class ExtendedEvaluationStatistics extends EvaluationStatistics {
 
@@ -90,8 +89,6 @@ public class ExtendedEvaluationStatistics extends EvaluationStatistics {
         		meetStarJoin((StarJoin) node);
         	} else if (node instanceof TupleFunctionCall) {
         		meetTupleFunctionCall((TupleFunctionCall) node);
-			} else if (node instanceof ExternalSet) {
-                meetExternalSet((ExternalSet) node);
             } else {
                 node.visitChildren(this);
             }

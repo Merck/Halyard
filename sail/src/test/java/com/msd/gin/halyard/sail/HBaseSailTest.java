@@ -39,8 +39,8 @@ import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.TableDescriptor;
 import org.apache.hadoop.hbase.client.TableDescriptorBuilder;
-import org.eclipse.rdf4j.IsolationLevel;
-import org.eclipse.rdf4j.IsolationLevels;
+import org.eclipse.rdf4j.common.transaction.IsolationLevel;
+import org.eclipse.rdf4j.common.transaction.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Namespace;
@@ -133,14 +133,14 @@ public class HBaseSailTest {
     @Test
     public void testInitializeAndShutDown() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertable"), true, 0, usePushStrategy, 10, null, null);
-        sail.initialize();
+		sail.init();
         sail.shutDown();
     }
 
     @Test
     public void testInitializeAndShutDownWithNoSharedConnection() throws Exception {
 		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), useTable("whatevertable"), true, 0, usePushStrategy, 10, null, null);
-        sail.initialize();
+		sail.init();
         sail.shutDown();
     }
 
@@ -150,14 +150,14 @@ public class HBaseSailTest {
 		esSettings.username = "elastic";
 		esSettings.password = "f00bar";
 		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), useTable("whatevertable"), true, 0, usePushStrategy, 10, esSettings);
-		sail.initialize();
+		sail.init();
 		sail.shutDown();
 	}
 
 	@Test
     public void testIsWritable() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertableRW"), true, 0, usePushStrategy, 10, null, null);
-		sail.initialize();
+		sail.init();
 		TableDescriptor desc;
 		try {
 			desc = hconn.getTable(sail.tableName).getDescriptor();
@@ -172,7 +172,7 @@ public class HBaseSailTest {
 		}
 
 		sail = new HBaseSail(hconn, desc.getTableName().getNameAsString(), true, 0, usePushStrategy, 10, null, null);
-		sail.initialize();
+		sail.init();
 		try {
 			assertFalse(sail.isWritable());
 		} finally {
@@ -183,7 +183,7 @@ public class HBaseSailTest {
     @Test(expected = SailException.class)
     public void testWriteToReadOnly() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertableRO"), true, 0, usePushStrategy, 10, null, null);
-        sail.initialize();
+		sail.init();
         try {
 			TableDescriptor desc = hconn.getTable(sail.tableName).getDescriptor();
             try (Admin ha = hconn.getAdmin()) {
@@ -202,7 +202,7 @@ public class HBaseSailTest {
     @Test
     public void testGetConnection() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertable"), true, 0, usePushStrategy, 10, null, null);
-		sail.initialize();
+		sail.init();
 		try {
 			try (SailConnection conn = sail.getConnection()) {
 				assertTrue(conn.isOpen());
@@ -215,7 +215,7 @@ public class HBaseSailTest {
     @Test
     public void testGetValueFactory() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertable"), true, 0, usePushStrategy, 10, null, null);
-		sail.initialize();
+		sail.init();
 		try {
 			assertNotNull(sail.getValueFactory());
 		} finally {
@@ -242,7 +242,7 @@ public class HBaseSailTest {
         ValueFactory vf = SimpleValueFactory.getInstance();
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertablectx"), true, 0, usePushStrategy,
 				10, null, null);
-        sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
             conn.addStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, vf.createIRI("http://whatever/ctx"), HALYARD.STATS_GRAPH_CONTEXT);
             try (CloseableIteration<? extends Resource, SailException> ctxIt = conn.getContextIDs()) {
@@ -259,7 +259,7 @@ public class HBaseSailTest {
         ValueFactory vf = SimpleValueFactory.getInstance();
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertablesize"), true, 0, usePushStrategy,
 				180, null, null);
-        sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
             assertEquals(0, conn.size());
             assertEquals(0, conn.size(HALYARD.STATS_ROOT_NODE));
@@ -286,7 +286,7 @@ public class HBaseSailTest {
     @Test(expected = UnknownSailTransactionStateException.class)
     public void testBegin() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertable"), true, 0, usePushStrategy, 10, null, null);
-		sail.initialize();
+		sail.init();
 		try {
 			try (SailConnection conn = sail.getConnection()) {
 				conn.begin(IsolationLevels.READ_COMMITTED);
@@ -299,7 +299,7 @@ public class HBaseSailTest {
     @Test
     public void testRollback() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertable"), true, 0, usePushStrategy, 10, null, null);
-		sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 			conn.rollback();
 		} finally {
@@ -310,7 +310,7 @@ public class HBaseSailTest {
     @Test
     public void testIsActive() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertable"), true, 0, usePushStrategy, 10, null, null);
-		sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 			assertTrue(conn.isActive());
 		} finally {
@@ -322,7 +322,7 @@ public class HBaseSailTest {
     public void testNamespaces() throws Exception {
 		String tableName = useTable("whatevertable");
 		HBaseSail sail = new HBaseSail(hconn, tableName, true, 0, usePushStrategy, 10, null, null);
-        sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
         	assertEquals(0, countNamespaces(conn));
         	conn.setNamespace("prefix", "http://whatever/namespace/");
@@ -332,7 +332,7 @@ public class HBaseSailTest {
 			sail.shutDown();
         }
 		sail = new HBaseSail(hconn, tableName, false, 0, usePushStrategy, 10, null, null);
-        sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
         	assertEquals(1, countNamespaces(conn));
 	        conn.removeNamespace("prefix");
@@ -342,7 +342,7 @@ public class HBaseSailTest {
 			sail.shutDown();
         }
 		sail = new HBaseSail(hconn, tableName, false, 0, usePushStrategy, 10, null, null);
-        sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
         	assertEquals(0, countNamespaces(conn));
 	        conn.setNamespace("prefix", "http://whatever/namespace/");
@@ -353,7 +353,7 @@ public class HBaseSailTest {
 			sail.shutDown();
         }
 		sail = new HBaseSail(hconn, tableName, false, 0, usePushStrategy, 10, null, null);
-        sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
         	assertEquals(1, countNamespaces(conn));
         	assertEquals("http://whatever/namespace2/", conn.getNamespace("prefix"));
@@ -363,7 +363,7 @@ public class HBaseSailTest {
 			sail.shutDown();
         }
 		sail = new HBaseSail(hconn, tableName, false, 0, usePushStrategy, 10, null, null);
-        sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
         	assertEquals(0, countNamespaces(conn));
 		} finally {
@@ -391,7 +391,7 @@ public class HBaseSailTest {
         IRI context = vf.createIRI("http://whatever/context/");
         CloseableIteration<? extends Statement, SailException> iter;
 		HBaseSail sail = new HBaseSail(hconn, tableName, true, 0, usePushStrategy, 10, null, null);
-        sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 	        conn.addStatement(subj, pred, obj, context);
 	        conn.addStatement(subj, pred, obj);
@@ -414,7 +414,7 @@ public class HBaseSailTest {
         }
 		// check sail can be re-initialized after clear()
 		sail = new HBaseSail(hconn, tableName, false, 0, usePushStrategy, 10, null, null);
-		sail.initialize();
+		sail.init();
 		sail.shutDown();
     }
 
@@ -651,7 +651,7 @@ public class HBaseSailTest {
     public void testStatementsIteratorRemove1() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertable"), true, 0, usePushStrategy, 10, null, null);
         try {
-            sail.initialize();
+			sail.init();
 			try (SailConnection conn = sail.getConnection()) {
 				conn.getStatements(null, null, null, true).remove();
 			}
@@ -664,7 +664,7 @@ public class HBaseSailTest {
     public void testStatementsIteratorRemove2() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertable"), true, 0, usePushStrategy, 10, null, null);
         try {
-            sail.initialize();
+			sail.init();
             ValueFactory vf = SimpleValueFactory.getInstance();
 			try (SailConnection conn = sail.getConnection()) {
 				conn.getStatements(vf.createIRI("http://whatever/subj/"), vf.createIRI("http://whatever/pred/"),
@@ -680,7 +680,7 @@ public class HBaseSailTest {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertable"), true, 0, usePushStrategy, 10, null, null);
 		try {
 			sail.setDataDir(null);
-			sail.initialize();
+			sail.init();
 			try (SailConnection conn = sail.getConnection()) {
 				conn.prepare();
 				conn.begin();
@@ -697,7 +697,7 @@ public class HBaseSailTest {
     @Test(expected = SailException.class)
     public void testTimeoutGetStatements() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertable"), true, 0, usePushStrategy, 1, null, null);
-        sail.initialize();
+		sail.init();
         try {
 			try (SailConnection conn = sail.getConnection()) {
 				try (CloseableIteration<? extends Statement, SailException> it = conn.getStatements(null, null, null,
@@ -714,7 +714,7 @@ public class HBaseSailTest {
     @Test
     public void testCardinalityCalculator() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("cardinalitytable"), true, 0, usePushStrategy, 10, null, null);
-        sail.initialize();
+		sail.init();
 		RDFFactory rdfFactory = sail.getRDFFactory();
         SimpleValueFactory f = SimpleValueFactory.getInstance();
         TupleExpr q1 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s a ?o}", "http://whatever/").getTupleExpr();
@@ -797,7 +797,7 @@ public class HBaseSailTest {
 	public void testAddDeleteTriple() throws Exception {
 		String table = "whatevertable";
 		HBaseSail sail = new HBaseSail(hconn, useTable(table), true, 0, usePushStrategy, 10, null, null);
-		sail.initialize();
+		sail.init();
 		ValueFactory vf = sail.getValueFactory();
 		Triple t = vf.createTriple(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createLiteral("whatever"));
 		Triple t1 = vf.createTriple(vf.createIRI("http://whatever/subj1"), vf.createIRI("http://whatever/pred1"), t);
@@ -821,7 +821,7 @@ public class HBaseSailTest {
     public void testSnapshot() throws Exception {
 		String table = "whatevertable";
 		HBaseSail sail = new HBaseSail(hconn, useTable(table), true, 0, usePushStrategy, 10, null, null);
-		sail.initialize();
+		sail.init();
 		ValueFactory vf = sail.getValueFactory();
 		try (SailConnection conn = sail.getConnection()) {
 			conn.addStatement(vf.createIRI("http://whatever/subj"), vf.createIRI("http://whatever/pred"), vf.createLiteral("whatever"));
@@ -838,7 +838,7 @@ public class HBaseSailTest {
 		restorePath.deleteOnExit();
 
 		sail = new HBaseSail(hconn.getConfiguration(), snapshot, restorePath.toURI().toURL().toString(), usePushStrategy, 10, (HBaseSail.ElasticSettings) null);
-		sail.initialize();
+		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 			try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, false)) {
 				assertTrue(iter.hasNext());

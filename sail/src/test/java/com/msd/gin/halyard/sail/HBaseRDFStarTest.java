@@ -2,7 +2,7 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 
-import org.eclipse.rdf4j.repository.RDFStarSupportTest;
+import org.eclipse.rdf4j.testsuite.repository.RDFStarSupportTest;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.sail.Sail;

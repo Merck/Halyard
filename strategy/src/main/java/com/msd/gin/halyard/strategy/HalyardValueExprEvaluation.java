@@ -71,12 +71,14 @@ import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExprTripleRef;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryValueEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.datetime.Now;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtil;
+import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtility;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.XMLDatatypeMathUtil;
 
 /**
@@ -104,19 +106,21 @@ class HalyardValueExprEvaluation {
     /**
      * Determines the "effective boolean value" of the {@link Value} returned by evaluating the expression.
      * See {@link QueryEvaluationUtil#getEffectiveBooleanValue(Value)} for the definition of "effective boolean value.
-     * @param expr
+     * @param expr expression to evaluate
      * @param bindings the set of named value bindings
-     * @return
+     * @return the boolean value that the expression evaluates to
+     * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    boolean isTrue(ValueExpr expr, BindingSet bindings) throws QueryEvaluationException {
-        try {
-            Value value = evaluate(expr, bindings);
-            return QueryEvaluationUtil.getEffectiveBooleanValue(value);
-        } catch (ValueExprEvaluationException e) {
-            return false;
-        }
+    boolean isTrue(ValueExpr expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
+        Value value = evaluate(expr, bindings);
+        return QueryEvaluationUtility.getEffectiveBooleanValue(value).orElse(false);
     }
+
+	boolean isTrue(QueryValueEvaluationStep expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
+		Value value = expr.evaluate(bindings);
+		return QueryEvaluationUtility.getEffectiveBooleanValue(value).orElse(false);
+	}
 
     /**
      * Determines which evaluate method to call based on the type of {@link ValueExpr}

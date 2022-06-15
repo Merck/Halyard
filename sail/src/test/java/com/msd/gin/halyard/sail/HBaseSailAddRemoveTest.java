@@ -64,7 +64,7 @@ public class HBaseSailAddRemoveTest {
     @BeforeClass
     public static void setup() throws Exception {
 		sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "testAddRemove", true, 0, true, 10, null, null);
-        sail.initialize();
+		sail.init();
     }
 
     @AfterClass

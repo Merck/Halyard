@@ -61,64 +61,6 @@ public class HalyardStrategyExtendedTest {
         repo.shutDown();
     }
 
-    @Test
-    public void testIntersect() throws Exception {
-        ValueFactory vf = con.getValueFactory();
-        con.add(vf.createIRI("http://whatever/subj1"), vf.createIRI("http://whatever/pred1"), vf.createIRI("http://whatever/val1"));
-        con.add(vf.createIRI("http://whatever/subj1"), vf.createIRI("http://whatever/pred2"), vf.createIRI("http://whatever/val1"));
-        con.add(vf.createIRI("http://whatever/subj2"), vf.createIRI("http://whatever/pred1"), vf.createIRI("http://whatever/val1"));
-        con.add(vf.createIRI("http://whatever/subj2"), vf.createIRI("http://whatever/pred2"), vf.createIRI("http://whatever/val2"));
-        String serql = "SELECT val FROM {subj} <http://whatever/pred1> {val} INTERSECT SELECT val FROM {subj} <http://whatever/pred2> {val}";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SERQL, serql).evaluate();
-        assertTrue(res.hasNext());
-        assertEquals(vf.createIRI("http://whatever/val1"), res.next().getBinding("val").getValue());
-        if (res.hasNext()) {
-            assertEquals(vf.createIRI("http://whatever/val1"), res.next().getBinding("val").getValue());
-        }
-    }
-
-    @Test
-    public void testLikeAndNamespace() throws Exception {
-        ValueFactory vf = con.getValueFactory();
-        con.add(vf.createIRI("urn:test/subjx"), vf.createIRI("urn:test/pred"), vf.createLiteral("valuex"));
-        con.add(vf.createIRI("urn:test/xsubj"), vf.createIRI("urn:test/pred"), vf.createLiteral("xvalue"));
-        String serql = "SELECT * FROM {s} test:pred {o} WHERE s LIKE \"urn:test/subj*\" USING NAMESPACE test = <urn:test/>";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SERQL, serql).evaluate();
-        assertTrue(res.hasNext());
-        res.next();
-        assertFalse(res.hasNext());
-        serql = "SELECT * FROM {s} test:pred {o} WHERE o LIKE \"value*\" USING NAMESPACE test = <urn:test/>";
-        res = con.prepareTupleQuery(QueryLanguage.SERQL, serql).evaluate();
-        assertTrue(res.hasNext());
-        res.next();
-        assertFalse(res.hasNext());
-    }
-
-    @Test
-    public void testSubqueries() throws Exception {
-        ValueFactory vf = con.getValueFactory();
-        con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));
-        con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral(2));
-        con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/attrib"), vf.createLiteral("muhehe"));
-        String serql = "SELECT higher FROM {node} <http://whatever/val> {higher} WHERE higher > ANY (SELECT value FROM {} <http://whatever/val> {value})";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SERQL, serql).evaluate();
-        assertTrue(res.hasNext());
-        assertEquals(2, ((Literal) res.next().getValue("higher")).intValue());
-        serql = "SELECT lower FROM {node} <http://whatever/val> {lower} WHERE lower < ANY (SELECT value FROM {} <http://whatever/val> {value})";
-        res = con.prepareTupleQuery(QueryLanguage.SERQL, serql).evaluate();
-        assertTrue(res.hasNext());
-        assertEquals(1, ((Literal) res.next().getValue("lower")).intValue());
-        con.add(vf.createBNode("http://whatever/c"), vf.createIRI("http://whatever/val"), vf.createLiteral(3));
-        serql = "SELECT highest FROM {node} <http://whatever/val> {highest} WHERE highest >= ALL (SELECT value FROM {} <http://whatever/val> {value})";
-        res = con.prepareTupleQuery(QueryLanguage.SERQL, serql).evaluate();
-        assertTrue(res.hasNext());
-        assertEquals(3, ((Literal) res.next().getValue("highest")).intValue());
-        serql = "SELECT val FROM {node} <http://whatever/val> {val} WHERE val IN (SELECT value FROM {} <http://whatever/val> {value}; <http://whatever/attrib> {\"muhehe\"})";
-        res = con.prepareTupleQuery(QueryLanguage.SERQL, serql).evaluate();
-        assertTrue(res.hasNext());
-        assertEquals(2, ((Literal) res.next().getValue("val")).intValue());
-    }
-
     @Test(expected = QueryEvaluationException.class)
     public void testService() throws Exception {
         String sparql = "SELECT * WHERE {SERVICE <http://whatever/> { ?s ?p ?o . }}";

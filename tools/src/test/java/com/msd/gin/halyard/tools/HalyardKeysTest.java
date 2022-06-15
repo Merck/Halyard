@@ -51,7 +51,7 @@ public class HalyardKeysTest extends AbstractHalyardToolTest {
     	conf.setInt(Config.END_KEY_SIZE_OBJECT, 1);
     	conf.setInt(Config.KEY_SIZE_CONTEXT, 1);
         final HBaseSail sail = new HBaseSail(conf, TABLE_NAME, true, -1, true, 0, null, null);
-        sail.initialize();
+        sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 			try (InputStream ref = HalyardKeysTest.class.getResourceAsStream("testData.trig")) {
 				RDFParser p = Rio.createParser(RDFFormat.TRIG);

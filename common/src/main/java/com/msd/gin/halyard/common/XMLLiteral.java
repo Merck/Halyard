@@ -25,6 +25,7 @@ import javax.xml.transform.stream.StreamSource;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.base.CoreDatatype;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.jvnet.fastinfoset.FastInfosetException;
 import org.jvnet.fastinfoset.FastInfosetResult;
@@ -97,6 +98,11 @@ public class XMLLiteral implements ObjectLiteral<Document> {
 	@Override
 	public IRI getDatatype() {
 		return RDF.XMLLITERAL;
+	}
+
+	@Override
+	public CoreDatatype getCoreDatatype() {
+		return CoreDatatype.RDF.XMLLITERAL;
 	}
 
 	public Document objectValue() {

@@ -43,7 +43,7 @@ public class HalyardBulkExportTest extends AbstractHalyardToolTest {
     @Test
     public void testBulkExport() throws Exception {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkExportTable", true, 0, true, 0, null, null);
-        sail.initialize();
+        sail.init();
         ValueFactory vf = SimpleValueFactory.getInstance();
 		try (SailConnection conn = sail.getConnection()) {
 			for (int i = 0; i < 1000; i++) {
@@ -76,7 +76,7 @@ public class HalyardBulkExportTest extends AbstractHalyardToolTest {
     @Test
     public void testParallelBulkExport() throws Exception {
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkExportTable2", true, 0, true, 0, null, null);
-        sail.initialize();
+        sail.init();
         ValueFactory vf = SimpleValueFactory.getInstance();
 		try (SailConnection conn = sail.getConnection()) {
 			for (int i = 0; i < 1000; i++) {

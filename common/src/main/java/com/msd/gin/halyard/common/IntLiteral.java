@@ -8,6 +8,7 @@ import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.base.CoreDatatype;
 import org.eclipse.rdf4j.model.datatypes.XMLDatatypeUtil;
 
 public final class IntLiteral implements Literal {
@@ -41,6 +42,11 @@ public final class IntLiteral implements Literal {
 	@Override
 	public IRI getDatatype() {
 		return datatype;
+	}
+
+	@Override
+	public CoreDatatype getCoreDatatype() {
+		return CoreDatatype.from(datatype);
 	}
 
 	@Override

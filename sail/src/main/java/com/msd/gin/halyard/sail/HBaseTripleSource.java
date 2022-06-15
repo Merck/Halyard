@@ -23,6 +23,7 @@ import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.RDFPredicate;
 import com.msd.gin.halyard.common.RDFSubject;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.common.TimestampedValueFactory;
 import com.msd.gin.halyard.common.ValueConstraint;
 import com.msd.gin.halyard.common.ValueIO;
@@ -67,23 +68,25 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseTripleSource.class);
 
 	protected final KeyspaceConnection keyspaceConn;
+	protected final StatementIndices stmtIndices;
 	protected final RDFFactory rdfFactory;
 	private final ValueIO.Reader valueReader;
 	private final long timeoutSecs;
 	private final HBaseSail.ScanSettings settings;
 	private final HBaseSail.Ticker ticker;
 
-	public HBaseTripleSource(KeyspaceConnection table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs) {
-		this(table, vf, rdfFactory, timeoutSecs, null, null);
+	public HBaseTripleSource(KeyspaceConnection table, ValueFactory vf, StatementIndices stmtIndices, long timeoutSecs) {
+		this(table, vf, stmtIndices, timeoutSecs, null, null);
 	}
 
-	HBaseTripleSource(KeyspaceConnection table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
-		this(table, rdfFactory.createTableReader(vf, table), rdfFactory, timeoutSecs, settings, ticker);
+	HBaseTripleSource(KeyspaceConnection table, ValueFactory vf, StatementIndices stmtIndices, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
+		this(table, stmtIndices.createTableReader(vf, table), stmtIndices, timeoutSecs, settings, ticker);
 	}
 
-	private HBaseTripleSource(KeyspaceConnection table, ValueIO.Reader valueReader, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
+	private HBaseTripleSource(KeyspaceConnection table, ValueIO.Reader valueReader, StatementIndices stmtIndices, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
 		this.keyspaceConn = table;
-		this.rdfFactory = rdfFactory;
+		this.stmtIndices = stmtIndices;
+		this.rdfFactory = stmtIndices.getRDFFactory();
 		this.valueReader = valueReader;
 		this.timeoutSecs = timeoutSecs;
 		this.settings = settings;
@@ -101,15 +104,16 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 	}
 
 	public TripleSource getTimestampedTripleSource() {
-		ValueIO.Reader tsValueReader = rdfFactory.createTableReader(TimestampedValueFactory.INSTANCE, keyspaceConn);
-		return new HBaseTripleSource(keyspaceConn, tsValueReader, rdfFactory, timeoutSecs, settings, ticker);
+		ValueIO.Reader tsValueReader = stmtIndices.createTableReader(TimestampedValueFactory.INSTANCE, keyspaceConn);
+		return new HBaseTripleSource(keyspaceConn, tsValueReader, stmtIndices, timeoutSecs, settings, ticker);
 	}
 
 	@Override
 	public TripleSource getTripleSource(ValueConstraint subjConstraint, ValueConstraint objConstraints) {
-		return new HBaseTripleSource(keyspaceConn, valueReader, rdfFactory, timeoutSecs, settings, ticker) {
-			protected Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, RDFFactory rdfFactory) {
-				return HalyardTableUtils.scanWithConstraints(subj, subjConstraint, pred, obj, objConstraints, ctx, rdfFactory);
+		return new HBaseTripleSource(keyspaceConn, valueReader, stmtIndices, timeoutSecs, settings, ticker) {
+			@Override
+			protected Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, StatementIndices indices) {
+				return HalyardTableUtils.scanWithConstraints(subj, subjConstraint, pred, obj, objConstraints, ctx, indices);
 			}
 		};
 	}
@@ -149,8 +153,8 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 		return new StatementScanner(subj, pred, obj, contexts, reader);
 	}
 
-	protected Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, RDFFactory rdfFactory) {
-		return HalyardTableUtils.scan(subj, pred, obj, ctx, rdfFactory);
+	protected Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, StatementIndices indices) {
+		return HalyardTableUtils.scan(subj, pred, obj, ctx, indices);
 	}
 
 	@Override
@@ -175,7 +179,7 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 		private ResultScanner rs = null;
 
 		public StatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contextsList, ValueIO.Reader reader) {
-			super(reader, HBaseTripleSource.this.rdfFactory);
+			super(reader, HBaseTripleSource.this.stmtIndices);
 			this.subj = rdfFactory.createSubject(subj);
 			this.pred = rdfFactory.createPredicate(pred);
 			this.obj = rdfFactory.createObject(obj);
@@ -191,7 +195,7 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 
 						// build a ResultScanner from an HBase Scan that finds potential matches
 						ctx = rdfFactory.createContext(contexts.next());
-						Scan scan = scan(subj, pred, obj, ctx, rdfFactory);
+						Scan scan = scan(subj, pred, obj, ctx, stmtIndices);
 						if (settings != null) {
 							scan.setTimeRange(settings.minTimestamp, settings.maxTimestamp);
 							scan.readVersions(settings.maxVersions);

@@ -7,9 +7,11 @@
  *******************************************************************************/
 package com.msd.gin.halyard.sail.spin;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
 
+import org.eclipse.rdf4j.common.transaction.IsolationLevels;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
@@ -33,6 +35,8 @@ import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParseException;
+import org.eclipse.rdf4j.rio.RDFWriter;
+import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.sail.SailConnectionListener;
 import org.eclipse.rdf4j.sail.inferencer.InferencerConnection;
 import org.eclipse.rdf4j.sail.inferencer.fc.SchemaCachingRDFSInferencer;
@@ -55,15 +59,9 @@ public class SpinInferencing {
 	}
 
 	public static void insertSchema(RepositoryConnection target) throws RDFParseException, RepositoryException, IOException {
-		String[] schemas = { "/schema/owl-basic.ttl", "/schema/sp.ttl", "/schema/spin.ttl", "/schema/spl.spin.ttl", "/schema/spif.ttl" };
-		Repository repo = new SailRepository(new SchemaCachingRDFSInferencer(new MemoryStore()));
-		try (RepositoryConnection conn = repo.getConnection()) {
-			for (String path : schemas) {
-				URL url = SpinInferencing.class.getResource(path);
-				conn.add(url, RDFFormat.TURTLE);
-			}
-			target.add(conn.getStatements(null, null, null, true));
-		}
+		// see main() below
+		URL url = SpinInferencing.class.getResource("/schema/spin-full-rdfs.ttl");
+		target.add(url, RDFFormat.TURTLE);
 	}
 
 	public static int executeRule(Resource subj, Resource rule, QueryPreparer queryPreparer, SpinParser parser,
@@ -176,5 +174,24 @@ public class SpinInferencing {
 		public int getStatementCount() {
 			return stmtCount;
 		}
+	}
+
+	public static void main(String[] args) throws Exception {
+		String[] schemas = { "/schema/owl-basic.ttl", "/schema/sp.ttl", "/schema/spin.ttl", "/schema/spl.spin.ttl", "/schema/spif.ttl" };
+		Repository repo = new SailRepository(new SchemaCachingRDFSInferencer(new MemoryStore()));
+		try (RepositoryConnection conn = repo.getConnection()) {
+			conn.setIsolationLevel(IsolationLevels.NONE);
+			conn.begin();
+			for (String path : schemas) {
+				URL url = SpinInferencing.class.getResource(path);
+				conn.add(url, RDFFormat.TURTLE);
+			}
+			conn.commit();
+			try (FileOutputStream out = new FileOutputStream("spin-full-rdfs.ttl")) {
+				RDFWriter writer = Rio.createWriter(RDFFormat.TURTLE, out);
+				conn.exportStatements(null, null, null, true, writer);
+			}
+		}
+		repo.shutDown();
 	}
 }

@@ -88,7 +88,6 @@ public final class HalyardTableUtils {
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
 	private static final long REGION_MAX_FILESIZE = 10000000000l;  // 10GB
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
-    private static final int MAX_CLIENT_SCANNER_CACHE_SIZE = 10000;
 
     private HalyardTableUtils() {}
 
@@ -127,8 +126,10 @@ public final class HalyardTableUtils {
 	}
 
 	public static Table createTable(Connection conn, TableName htableName, int splitBits) throws IOException {
-		RDFFactory rdfFactory = RDFFactory.create(conn.getConfiguration());
-        return createTable(conn, htableName, splitBits < 0 ? null : calculateSplits(splitBits, true, rdfFactory), DEFAULT_MAX_VERSIONS);
+		Configuration conf = conn.getConfiguration();
+		RDFFactory rdfFactory = RDFFactory.create(conf);
+		StatementIndices indices = new StatementIndices(conf, rdfFactory);
+        return createTable(conn, htableName, splitBits < 0 ? null : calculateSplits(splitBits, true, indices), DEFAULT_MAX_VERSIONS);
 	}
 
 	public static Table createTable(Connection conn, TableName htableName, byte[][] splits, int maxVersions) throws IOException {
@@ -227,16 +228,17 @@ public final class HalyardTableUtils {
 	 * @param splitBits must be between 0 and 15, larger values result in more keys.
 	 * @return An array of keys represented as {@code byte[]}s
 	 */
-	static byte[][] calculateSplits(final int splitBits, boolean quads, RDFFactory rdfFactory) {
-		return calculateSplits(splitBits, quads, null, rdfFactory);
+	static byte[][] calculateSplits(final int splitBits, boolean quads, StatementIndices indices) {
+		return calculateSplits(splitBits, quads, null, indices);
 	}
-	static byte[][] calculateSplits(final int splitBits, boolean quads, Map<IRI,Float> predicateRatios, RDFFactory rdfFactory) {
-        StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
-        StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = rdfFactory.getPOSIndex();
-        StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = rdfFactory.getOSPIndex();
-        StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo = rdfFactory.getCSPOIndex();
-        StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos = rdfFactory.getCPOSIndex();
-        StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = rdfFactory.getCOSPIndex();
+	static byte[][] calculateSplits(final int splitBits, boolean quads, Map<IRI,Float> predicateRatios, StatementIndices indices) {
+        StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = indices.getSPOIndex();
+        StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = indices.getPOSIndex();
+        StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = indices.getOSPIndex();
+        StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo = indices.getCSPOIndex();
+        StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos = indices.getCPOSIndex();
+        StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = indices.getCOSPIndex();
+        RDFFactory rdfFactory = indices.getRDFFactory();
         TreeSet<byte[]> splitKeys = new TreeSet<>(Bytes.BYTES_COMPARATOR);
         //basic presplits
         splitKeys.add(new byte[]{ pos.prefix });
@@ -247,13 +249,13 @@ public final class HalyardTableUtils {
 			splitKeys.add(new byte[] { cosp.prefix });
 		}
         //common presplits
-		addSplits(splitKeys, spo.prefix, splitBits, null, rdfFactory);
-		addSplits(splitKeys, pos.prefix, splitBits, transformKeys(predicateRatios, iri -> rdfFactory.createPredicate(iri)), rdfFactory);
-        addSplits(splitKeys, osp.prefix, splitBits, null, rdfFactory);
+		addSplits(splitKeys, spo.prefix, splitBits, null, indices);
+		addSplits(splitKeys, pos.prefix, splitBits, transformKeys(predicateRatios, iri -> rdfFactory.createPredicate(iri)), indices);
+        addSplits(splitKeys, osp.prefix, splitBits, null, indices);
         if (quads) {
-			addSplits(splitKeys, cspo.prefix, splitBits/2, null, rdfFactory);
-			addSplits(splitKeys, cpos.prefix, splitBits/2, null, rdfFactory);
-			addSplits(splitKeys, cosp.prefix, splitBits/2, null, rdfFactory);
+			addSplits(splitKeys, cspo.prefix, splitBits/2, null, indices);
+			addSplits(splitKeys, cpos.prefix, splitBits/2, null, indices);
+			addSplits(splitKeys, cosp.prefix, splitBits/2, null, indices);
         }
         return splitKeys.toArray(new byte[splitKeys.size()][]);
     }
@@ -277,7 +279,7 @@ public final class HalyardTableUtils {
 	 * @param splitBits between 0 and 15, larger values generate smaller split steps
 	 * @param rdfFactory RDFFactory
 	 */
-	private static void addSplits(TreeSet<byte[]> splitKeys, byte prefix, final int splitBits, Map<? extends RDFIdentifier<?>,Float> keyFractions, RDFFactory rdfFactory) {
+	private static void addSplits(TreeSet<byte[]> splitKeys, byte prefix, final int splitBits, Map<? extends RDFIdentifier<?>,Float> keyFractions, StatementIndices indices) {
         if (splitBits == 0) return;
 		if (splitBits < 0 || splitBits > 15) {
 			throw new IllegalArgumentException("Illegal nunmber of split bits");
@@ -305,7 +307,7 @@ public final class HalyardTableUtils {
 		fractionSum = 0.0f;
 		if (keyFractions != null && !keyFractions.isEmpty()) {
 			for (Map.Entry<? extends RDFIdentifier<?>, Float> entry : keyFractions.entrySet()) {
-				byte[] keyHash = entry.getKey().getKeyHash(StatementIndex.toIndex(prefix, rdfFactory));
+				byte[] keyHash = entry.getKey().getKeyHash(indices.toIndex(prefix));
 				byte[] keyPrefix = new byte[1+keyHash.length];
 				keyPrefix[0] = prefix;
 				System.arraycopy(keyHash, 0, keyPrefix, 1, keyHash.length);
@@ -335,49 +337,61 @@ public final class HalyardTableUtils {
 		}
 	}
 
-	public static List<? extends KeyValue> insertKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, RDFFactory rdfFactory) {
-		return toKeyValues(subj, pred, obj, context, false, true, timestamp, rdfFactory);
+	public static List<? extends KeyValue> insertKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, StatementIndices indices) {
+		return toKeyValues(subj, pred, obj, context, false, timestamp, true, indices);
 	}
-	public static List<? extends KeyValue> deleteKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, RDFFactory rdfFactory) {
-		return toKeyValues(subj, pred, obj, context, true, false, timestamp, rdfFactory);
+	public static List<? extends KeyValue> deleteKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, StatementIndices indices) {
+		return toKeyValues(subj, pred, obj, context, true, timestamp, false, indices);
+	}
+
+	public static List<? extends KeyValue> insertSystemKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, StatementIndices indices) {
+		return toKeyValues(subj, pred, obj, context, false, timestamp, false, true, indices);
+	}
+	public static List<? extends KeyValue> deleteSystemKeyValues(Resource subj, IRI pred, Value obj, Resource context, long timestamp, StatementIndices indices) {
+		return toKeyValues(subj, pred, obj, context, true, timestamp, false, false, indices);
 	}
 
 	/**
      * Conversion method from Subj, Pred, Obj and optional Context into an array of HBase keys
      * @param subj subject Resource
-     * @param pred predicate IRI
-     * @param obj object Value
-     * @param context optional context Resource
-     * @param delete boolean switch to produce KeyValues for deletion instead of for insertion
-     * @param includeTriples boolean switch to include KeyValues for triples 
-     * @param timestamp long timestamp value for time-ordering purposes
-     * @param rdfFactory RDFFactory
+	 * @param pred predicate IRI
+	 * @param obj object Value
+	 * @param context optional context Resource
+	 * @param delete boolean switch to produce KeyValues for deletion instead of for insertion
+	 * @param timestamp long timestamp value for time-ordering purposes
+	 * @param includeTriples boolean switch to include KeyValues for triples 
+	 * @param rdfFactory RDFFactory
      * @return List of KeyValues
      */
-	public static List<? extends KeyValue> toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, boolean includeTriples, long timestamp, RDFFactory rdfFactory) {
+	static List<? extends KeyValue> toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, long timestamp, boolean includeTriples, StatementIndices indices) {
+		return toKeyValues(subj, pred, obj, context, delete, timestamp, true, includeTriples, indices);
+	}
+
+	private static List<? extends KeyValue> toKeyValues(Resource subj, IRI pred, Value obj, Resource context, boolean delete, long timestamp, boolean includeInDefaultGraph, boolean includeTriples, StatementIndices indices) {
 		List<KeyValue> kvs =  new ArrayList<KeyValue>(context == null ? PREFIXES : 2 * PREFIXES);
-        KeyValue.Type type = delete ? KeyValue.Type.DeleteColumn : KeyValue.Type.Put;
+		KeyValue.Type type = delete ? KeyValue.Type.DeleteColumn : KeyValue.Type.Put;
 		timestamp = toHalyardTimestamp(timestamp, !delete);
-		appendKeyValues(subj, pred, obj, context, type, timestamp, true, includeTriples, kvs, rdfFactory);
+		appendKeyValues(subj, pred, obj, context, type, timestamp, includeInDefaultGraph, includeTriples, indices, kvs);
 		return kvs;
 	}
 
-    private static void appendKeyValues(Resource subj, IRI pred, Value obj, Resource context, KeyValue.Type type, long timestamp, boolean includeInDefaultGraph, boolean includeTriples, List<KeyValue> kvs, RDFFactory rdfFactory) {
+    private static void appendKeyValues(Resource subj, IRI pred, Value obj, Resource context, KeyValue.Type type, long timestamp, boolean includeInDefaultGraph, boolean includeTriples, StatementIndices indices, List<KeyValue> kvs) {
     	if(subj == null || pred == null || obj == null) {
     		throw new NullPointerException();
     	}
 
+    	RDFFactory rdfFactory = indices.getRDFFactory();
     	RDFSubject sb = rdfFactory.createSubject(subj);
 		RDFPredicate pb = rdfFactory.createPredicate(pred);
 		RDFObject ob = rdfFactory.createObject(obj);
 		RDFContext cb = rdfFactory.createContext(context);
 
-        StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
-        StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = rdfFactory.getPOSIndex();
-        StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = rdfFactory.getOSPIndex();
-        StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo = rdfFactory.getCSPOIndex();
-        StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos = rdfFactory.getCPOSIndex();
-        StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = rdfFactory.getCOSPIndex();
+        StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = indices.getSPOIndex();
+        StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = indices.getPOSIndex();
+        StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = indices.getOSPIndex();
+        StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo = indices.getCSPOIndex();
+        StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos = indices.getCPOSIndex();
+        StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = indices.getCOSPIndex();
 
         // generate HBase key value pairs from: row, family, qualifier, value. Permutations of SPO (and if needed CSPO) are all stored.
         if (includeInDefaultGraph) {
@@ -394,12 +408,12 @@ public final class HalyardTableUtils {
         if (includeTriples) {
 			if (subj.isTriple()) {
 				Triple t = (Triple) subj;
-				appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, false, true, kvs, rdfFactory);
+				appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, false, true, indices, kvs);
 			}
 	
 			if (obj.isTriple()) {
 				Triple t = (Triple) obj;
-				appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, false, true, kvs, rdfFactory);
+				appendKeyValues(t.getSubject(), t.getPredicate(), t.getObject(), HALYARD.TRIPLE_GRAPH_CONTEXT, type, timestamp, false, true, indices, kvs);
 			}
         }
     }
@@ -434,34 +448,34 @@ public final class HalyardTableUtils {
      * @param ctx optional context Resource
      * @return HBase Scan instance to retrieve all data potentially matching the Statement pattern
      */
-	public static Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, RDFFactory rdfFactory) {
+	public static Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, StatementIndices indices) {
 		if (ctx == null) {
 			if (subj == null) {
 				if (pred == null) {
 					if (obj == null) {
-						return rdfFactory.getSPOIndex().scan();
+						return indices.getSPOIndex().scan();
                     } else {
-						return rdfFactory.getOSPIndex().scan(obj);
+						return indices.getOSPIndex().scan(obj);
                     }
                 } else {
 					if (obj == null) {
-						return rdfFactory.getPOSIndex().scan(pred);
+						return indices.getPOSIndex().scan(pred);
                     } else {
-						return rdfFactory.getPOSIndex().scan(pred, obj);
+						return indices.getPOSIndex().scan(pred, obj);
                     }
                 }
             } else {
 				if (pred == null) {
 					if (obj == null) {
-						return rdfFactory.getSPOIndex().scan(subj);
+						return indices.getSPOIndex().scan(subj);
                     } else {
-						return rdfFactory.getOSPIndex().scan(obj, subj);
+						return indices.getOSPIndex().scan(obj, subj);
                     }
                 } else {
 					if (obj == null) {
-						return rdfFactory.getSPOIndex().scan(subj, pred);
+						return indices.getSPOIndex().scan(subj, pred);
                     } else {
-						return StatementIndex.scan(subj, pred, obj, null, rdfFactory);
+						return indices.scan(subj, pred, obj, null);
                     }
                 }
             }
@@ -469,142 +483,146 @@ public final class HalyardTableUtils {
 			if (subj == null) {
 				if (pred == null) {
 					if (obj == null) {
-						return rdfFactory.getCSPOIndex().scan(ctx);
+						return indices.getCSPOIndex().scan(ctx);
                     } else {
-						return rdfFactory.getCOSPIndex().scan(ctx, obj);
+						return indices.getCOSPIndex().scan(ctx, obj);
                     }
                 } else {
 					if (obj == null) {
-						return rdfFactory.getCPOSIndex().scan(ctx, pred);
+						return indices.getCPOSIndex().scan(ctx, pred);
                     } else {
-						return rdfFactory.getCPOSIndex().scan(ctx, pred, obj);
+						return indices.getCPOSIndex().scan(ctx, pred, obj);
                     }
                 }
             } else {
 				if (pred == null) {
 					if (obj == null) {
-						return rdfFactory.getCSPOIndex().scan(ctx, subj);
+						return indices.getCSPOIndex().scan(ctx, subj);
                     } else {
-						return rdfFactory.getCOSPIndex().scan(ctx, obj, subj);
+						return indices.getCOSPIndex().scan(ctx, obj, subj);
                     }
                 } else {
 					if (obj == null) {
-						return rdfFactory.getCSPOIndex().scan(ctx, subj, pred);
+						return indices.getCSPOIndex().scan(ctx, subj, pred);
                     } else {
-						return StatementIndex.scan(subj, pred, obj, ctx, rdfFactory);
+						return indices.scan(subj, pred, obj, ctx);
                     }
                 }
             }
         }
     }
 
-	public static Scan scanWithConstraints(RDFSubject subj, ValueConstraint subjConstraint, RDFPredicate pred, RDFObject obj, ValueConstraint objConstraint, RDFContext ctx, RDFFactory rdfFactory) {
+	public static Scan scanWithConstraints(RDFSubject subj, ValueConstraint subjConstraint, RDFPredicate pred, RDFObject obj, ValueConstraint objConstraint, RDFContext ctx, StatementIndices indices) {
 		if (subj == null && subjConstraint != null && (pred == null || objConstraint == null)) {
-			return scanWithSubjectConstraint(subjConstraint, pred, obj, ctx, rdfFactory);
+			return scanWithSubjectConstraint(subjConstraint, pred, obj, ctx, indices);
 		} else if (obj == null && objConstraint != null) {
-			return scanWithObjectConstraint(subj, pred, objConstraint, ctx, rdfFactory);
+			return scanWithObjectConstraint(subj, pred, objConstraint, ctx, indices);
 		} else {
-			return scan(subj, pred, obj, ctx, rdfFactory);
+			return scan(subj, pred, obj, ctx, indices);
 		}
 	}
 
-	private static Scan scanWithSubjectConstraint(@Nonnull ValueConstraint subjConstraint, RDFPredicate pred, RDFObject obj, RDFContext ctx, RDFFactory rdfFactory) {
+	private static Scan scanWithSubjectConstraint(@Nonnull ValueConstraint subjConstraint, RDFPredicate pred, RDFObject obj, RDFContext ctx, StatementIndices indices) {
 		if (ctx == null) {
 			if (pred == null) {
 				if (obj == null) {
-					return rdfFactory.getSPOIndex().scanWithConstraint(subjConstraint);
+					return indices.getSPOIndex().scanWithConstraint(subjConstraint);
                 } else {
-					return rdfFactory.getOSPIndex().scanWithConstraint(obj, subjConstraint);
+					return indices.getOSPIndex().scanWithConstraint(obj, subjConstraint);
                 }
             } else {
 				if (obj == null) {
-					return rdfFactory.getPOSIndex().scanWithConstraint(pred, null, subjConstraint);
+					return indices.getPOSIndex().scanWithConstraint(pred, null, subjConstraint);
                 } else {
-					return rdfFactory.getPOSIndex().scanWithConstraint(pred, obj, subjConstraint);
+					return indices.getPOSIndex().scanWithConstraint(pred, obj, subjConstraint);
                 }
             }
         } else {
 			if (pred == null) {
 				if (obj == null) {
-					return rdfFactory.getCSPOIndex().scanWithConstraint(ctx, subjConstraint);
+					return indices.getCSPOIndex().scanWithConstraint(ctx, subjConstraint);
                 } else {
-					return rdfFactory.getCOSPIndex().scanWithConstraint(ctx, obj, subjConstraint);
+					return indices.getCOSPIndex().scanWithConstraint(ctx, obj, subjConstraint);
                 }
             } else {
 				if (obj == null) {
-					return rdfFactory.getCPOSIndex().scanWithConstraint(ctx, pred, null, subjConstraint);
+					return indices.getCPOSIndex().scanWithConstraint(ctx, pred, null, subjConstraint);
                 } else {
-					return rdfFactory.getCPOSIndex().scanWithConstraint(ctx, pred, obj, subjConstraint);
+					return indices.getCPOSIndex().scanWithConstraint(ctx, pred, obj, subjConstraint);
                 }
             }
         }
     }
 
-	private static Scan scanWithObjectConstraint(RDFSubject subj, RDFPredicate pred, @Nonnull ValueConstraint objConstraint, RDFContext ctx, RDFFactory rdfFactory) {
+	private static Scan scanWithObjectConstraint(RDFSubject subj, RDFPredicate pred, @Nonnull ValueConstraint objConstraint, RDFContext ctx, StatementIndices indices) {
 		if (ctx == null) {
 			if (subj == null) {
 				if (pred == null) {
-					return rdfFactory.getOSPIndex().scanWithConstraint(objConstraint);
+					return indices.getOSPIndex().scanWithConstraint(objConstraint);
                 } else {
-					return rdfFactory.getPOSIndex().scanWithConstraint(pred, objConstraint);
+					return indices.getPOSIndex().scanWithConstraint(pred, objConstraint);
                 }
             } else {
 				if (pred == null) {
-					return rdfFactory.getSPOIndex().scanWithConstraint(subj, null, objConstraint);
+					return indices.getSPOIndex().scanWithConstraint(subj, null, objConstraint);
                 } else {
-					return rdfFactory.getSPOIndex().scanWithConstraint(subj, pred, objConstraint);
+					return indices.getSPOIndex().scanWithConstraint(subj, pred, objConstraint);
                 }
             }
         } else {
 			if (subj == null) {
 				if (pred == null) {
-					return rdfFactory.getCOSPIndex().scanWithConstraint(ctx, objConstraint);
+					return indices.getCOSPIndex().scanWithConstraint(ctx, objConstraint);
                 } else {
-					return rdfFactory.getCPOSIndex().scanWithConstraint(ctx, pred, objConstraint);
+					return indices.getCPOSIndex().scanWithConstraint(ctx, pred, objConstraint);
                 }
             } else {
 				if (pred == null) {
-					return rdfFactory.getCSPOIndex().scanWithConstraint(ctx, subj, null, objConstraint);
+					return indices.getCSPOIndex().scanWithConstraint(ctx, subj, null, objConstraint);
                 } else {
-					return rdfFactory.getCSPOIndex().scanWithConstraint(ctx, subj, pred, objConstraint);
+					return indices.getCSPOIndex().scanWithConstraint(ctx, subj, pred, objConstraint);
                 }
             }
         }
     }
 
-	public static boolean isTripleReferenced(KeyspaceConnection kc, Triple t, RDFFactory rdfFactory) throws IOException {
-		return HalyardTableUtils.hasSubject(kc, t, rdfFactory)
-			|| HalyardTableUtils.hasObject(kc, t, rdfFactory)
-			|| HalyardTableUtils.hasSubject(kc, t, HALYARD.TRIPLE_GRAPH_CONTEXT, rdfFactory)
-			|| HalyardTableUtils.hasObject(kc, t, HALYARD.TRIPLE_GRAPH_CONTEXT, rdfFactory);
+	public static boolean isTripleReferenced(KeyspaceConnection kc, Triple t, StatementIndices indices) throws IOException {
+		return HalyardTableUtils.hasSubject(kc, t, indices)
+			|| HalyardTableUtils.hasObject(kc, t, indices)
+			|| HalyardTableUtils.hasSubject(kc, t, HALYARD.TRIPLE_GRAPH_CONTEXT, indices)
+			|| HalyardTableUtils.hasObject(kc, t, HALYARD.TRIPLE_GRAPH_CONTEXT, indices);
 	}
 
-	public static boolean hasSubject(KeyspaceConnection kc, Resource subj, RDFFactory rdfFactory) throws IOException {
-		Scan scan = scanSingle(rdfFactory.getSPOIndex().scan(rdfFactory.createSubject(subj)));
+	public static boolean hasSubject(KeyspaceConnection kc, Resource subj, StatementIndices indices) throws IOException {
+		RDFFactory rdfFactory = indices.getRDFFactory();
+		Scan scan = scanSingle(indices.getSPOIndex().scan(rdfFactory.createSubject(subj)));
 		return exists(kc, scan);
 	}
-	public static boolean hasSubject(KeyspaceConnection kc, Resource subj, Resource ctx, RDFFactory rdfFactory) throws IOException {
-		Scan scan = scanSingle(rdfFactory.getCSPOIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createSubject(subj)));
-		return exists(kc, scan);
-	}
-
-	public static boolean hasObject(KeyspaceConnection kc, Value obj, RDFFactory rdfFactory) throws IOException {
-		Scan scan = scanSingle(rdfFactory.getOSPIndex().scan(rdfFactory.createObject(obj)));
-		return exists(kc, scan);
-	}
-	public static boolean hasObject(KeyspaceConnection kc, Value obj, Resource ctx, RDFFactory rdfFactory) throws IOException {
-		Scan scan = scanSingle(rdfFactory.getCOSPIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createObject(obj)));
+	public static boolean hasSubject(KeyspaceConnection kc, Resource subj, Resource ctx, StatementIndices indices) throws IOException {
+		RDFFactory rdfFactory = indices.getRDFFactory();
+		Scan scan = scanSingle(indices.getCSPOIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createSubject(subj)));
 		return exists(kc, scan);
 	}
 
-	public static Resource getSubject(KeyspaceConnection kc, ValueIdentifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
-		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
-		Scan scan = scanSingle(rdfFactory.getSPOIndex().scan(id));
+	public static boolean hasObject(KeyspaceConnection kc, Value obj, StatementIndices indices) throws IOException {
+		RDFFactory rdfFactory = indices.getRDFFactory();
+		Scan scan = scanSingle(indices.getOSPIndex().scan(rdfFactory.createObject(obj)));
+		return exists(kc, scan);
+	}
+	public static boolean hasObject(KeyspaceConnection kc, Value obj, Resource ctx, StatementIndices indices) throws IOException {
+		RDFFactory rdfFactory = indices.getRDFFactory();
+		Scan scan = scanSingle(indices.getCOSPIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createObject(obj)));
+		return exists(kc, scan);
+	}
+
+	public static Resource getSubject(KeyspaceConnection kc, ValueIdentifier id, ValueFactory vf, StatementIndices indices) throws IOException {
+		ValueIO.Reader valueReader = indices.createTableReader(vf, kc);
+		Scan scan = scanSingle(indices.getSPOIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
 				if(!result.isEmpty()) {
 					Cell[] cells = result.rawCells();
-					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, rdfFactory);
+					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, indices);
 					return stmt.getSubject();
 				}
 			}
@@ -612,14 +630,14 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static IRI getPredicate(KeyspaceConnection kc, ValueIdentifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
-		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
-		Scan scan = scanSingle(rdfFactory.getPOSIndex().scan(id));
+	public static IRI getPredicate(KeyspaceConnection kc, ValueIdentifier id, ValueFactory vf, StatementIndices indices) throws IOException {
+		ValueIO.Reader valueReader = indices.createTableReader(vf, kc);
+		Scan scan = scanSingle(indices.getPOSIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
 				if(!result.isEmpty()) {
 					Cell[] cells = result.rawCells();
-					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, rdfFactory);
+					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, indices);
 					return stmt.getPredicate();
 				}
 			}
@@ -627,14 +645,14 @@ public final class HalyardTableUtils {
 		return null;
 	}
 
-	public static Value getObject(KeyspaceConnection kc, ValueIdentifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
-		ValueIO.Reader valueReader = rdfFactory.createTableReader(vf, kc);
-		Scan scan = scanSingle(rdfFactory.getOSPIndex().scan(id));
+	public static Value getObject(KeyspaceConnection kc, ValueIdentifier id, ValueFactory vf, StatementIndices indices) throws IOException {
+		ValueIO.Reader valueReader = indices.createTableReader(vf, kc);
+		Scan scan = scanSingle(indices.getOSPIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
 				if(!result.isEmpty()) {
 					Cell[] cells = result.rawCells();
-					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, rdfFactory);
+					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, indices);
 					return stmt.getObject();
 				}
 			}
@@ -643,7 +661,7 @@ public final class HalyardTableUtils {
 	}
 
 	static Scan scanSingle(Scan scanAll) {
-		return scan(scanAll.getStartRow(), scanAll.getStopRow(), 1, false)
+		return scanAll.setCaching(1).setCacheBlocks(true)
 			.setFilter(new FilterList(scanAll.getFilter(), new FirstKeyOnlyFilter()))
 			.setOneRowLimit();
 	}
@@ -670,17 +688,17 @@ public final class HalyardTableUtils {
 	 * @param valueReader ValueIO.Reader
 	 * @return List of Statements
 	 */
-    public static List<Statement> parseStatements(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, Result res, ValueIO.Reader valueReader, RDFFactory rdfFactory) {
+    public static List<Statement> parseStatements(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, Result res, ValueIO.Reader valueReader, StatementIndices indices) {
     	// multiple triples may have the same hash (i.e. row key)
 		List<Statement> st;
 		if (!res.isEmpty()) {
 			Cell[] cells = res.rawCells();
 			if (cells.length == 1) {
-				st = Collections.singletonList(parseStatement(subj, pred, obj, ctx, cells[0], valueReader, rdfFactory));
+				st = Collections.singletonList(parseStatement(subj, pred, obj, ctx, cells[0], valueReader, indices));
 			} else {
 				st = new ArrayList<>(cells.length);
 				for (Cell c : cells) {
-					st.add(parseStatement(subj, pred, obj, ctx, c, valueReader, rdfFactory));
+					st.add(parseStatement(subj, pred, obj, ctx, c, valueReader, indices));
 				}
 			}
 		} else {
@@ -700,11 +718,11 @@ public final class HalyardTableUtils {
 	 * @param valueReader ValueIO.Reader
 	 * @return Statements
 	 */
-    public static Statement parseStatement(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, Cell cell, ValueIO.Reader valueReader, RDFFactory rdfFactory) {
+    public static Statement parseStatement(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, Cell cell, ValueIO.Reader valueReader, StatementIndices indices) {
     	ByteBuffer row = ByteBuffer.wrap(cell.getRowArray(), cell.getRowOffset(), cell.getRowLength());
         ByteBuffer cq = ByteBuffer.wrap(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
         ByteBuffer cv = ByteBuffer.wrap(cell.getValueArray(), cell.getValueOffset(), cell.getValueLength());
-    	StatementIndex<?,?,?,?> index = StatementIndex.toIndex(row.get(), rdfFactory);
+    	StatementIndex<?,?,?,?> index = indices.toIndex(row.get());
         Statement stmt = index.parseStatement(subj, pred, obj, ctx, row, cq, cv, valueReader);
         assert !row.hasRemaining();
         assert !cq.hasRemaining();
@@ -721,15 +739,17 @@ public final class HalyardTableUtils {
      * @param stopRow stop row key byte array (exclusive)
      * @param rowBatchSize number of rows to fetch per RPC
      * @param indiscriminate if the scan is indiscriminate (e.g. full table scan)
+     * @param conf HBase configuration
      * @return HBase Scan instance
      */
-	static Scan scan(byte[] startRow, byte[] stopRow, int rowBatchSize, boolean indiscriminate) {
+	static Scan scan(byte[] startRow, byte[] stopRow, int rowBatchSize, boolean indiscriminate, Configuration conf) {
         Scan scan = new Scan();
         scan.addFamily(CF_NAME);
 		scan.readVersions(READ_VERSIONS);
         scan.setAllowPartialResults(true);
         scan.setBatch(10);
-        scan.setCaching(Math.min(MAX_CLIENT_SCANNER_CACHE_SIZE, rowBatchSize));
+        int maxCaching = conf.getInt(HConstants.HBASE_CLIENT_SCANNER_CACHING, HConstants.DEFAULT_HBASE_CLIENT_SCANNER_CACHING);
+        scan.setCaching(Math.min(maxCaching, rowBatchSize));
         // dont cause the block cache to be flushed when doing an indiscriminate scan
         scan.setCacheBlocks(!indiscriminate);
         if(startRow != null) {

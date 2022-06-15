@@ -4,6 +4,7 @@ import com.msd.gin.halyard.common.Hashes;
 import com.msd.gin.halyard.common.ValueIdentifier;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 import com.msd.gin.halyard.vocab.HALYARD;
 
@@ -26,7 +27,7 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 
 	protected abstract int statementPosition();
 
-	protected abstract Value getValue(KeyspaceConnection ks, ValueIdentifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException;
+	protected abstract Value getValue(KeyspaceConnection ks, ValueIdentifier id, ValueFactory vf, StatementIndices stmtIndices) throws IOException;
 
 	@Override
 	public final CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> evaluate(ValueFactory vf,
@@ -37,7 +38,8 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 			throw new ValueExprEvaluationException(String.format("%s requires an identifier IRI", getURI()));
 		}
 
-		RDFFactory rdfFactory = (RDFFactory) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE);
+		StatementIndices indices = (StatementIndices) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_INDICES_ATTRIBUTE);
+		RDFFactory rdfFactory = indices.getRDFFactory();
 
 		IRI idIri = (IRI) args[0];
 		ValueIdentifier id;
@@ -56,7 +58,7 @@ public abstract class AbstractReificationTupleFunction implements TupleFunction 
 		KeyspaceConnection keyspace = (KeyspaceConnection) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_KEYSPACE_ATTRIBUTE);
 		Value v;
 		try {
-			v = getValue(keyspace, id, vf, rdfFactory);
+			v = getValue(keyspace, id, vf, indices);
 		} catch (IOException e) {
 			throw new ValueExprEvaluationException(e);
 		}

@@ -1,9 +1,5 @@
 package com.msd.gin.halyard.common;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
-import com.msd.gin.halyard.vocab.HALYARD;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -19,18 +15,17 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.Scan;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
-import org.eclipse.rdf4j.model.Statement;
-import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 
 @ThreadSafe
 public class RDFFactory {
@@ -45,24 +40,12 @@ public class RDFFactory {
 	private final ValueIdentifier.Format idFormat;
 	final int typeSaltSize;
 
-	private final ValueIO valueIO;
+	final ValueIO valueIO;
 
 	final RDFRole<SPOC.S> subject;
 	final RDFRole<SPOC.P> predicate;
 	final RDFRole<SPOC.O> object;
 	final RDFRole<SPOC.C> context;
-
-	final StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo;
-	final StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos;
-	final StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp;
-	final StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo;
-	final StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos;
-	final StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp;
-
-	public static RDFFactory create() {
-		Configuration conf = HBaseConfiguration.create();
-		return create(conf);
-	}
 
 	public static RDFFactory create(Configuration config) {
 		HalyardConfiguration halyardConfig = new HalyardConfiguration(config);
@@ -170,37 +153,6 @@ public class RDFFactory {
 			contextKeySize, contextEndKeySize,
 			0, 0, 0, typeIndex, Short.BYTES
 		);
-
-		this.spo = new StatementIndex<>(
-			StatementIndex.Name.SPO, 0, false,
-			subject, predicate, object, context,
-			this
-		);
-		this.pos = new StatementIndex<>(
-			StatementIndex.Name.POS, 1, false,
-			predicate, object, subject, context,
-			this
-		);
-		this.osp = new StatementIndex<>(
-			StatementIndex.Name.OSP, 2, false,
-			object, subject, predicate, context,
-			this
-		);
-		this.cspo = new StatementIndex<>(
-			StatementIndex.Name.CSPO, 3, true,
-			context, subject, predicate, object,
-			this
-		);
-		this.cpos = new StatementIndex<>(
-			StatementIndex.Name.CPOS, 4, true,
-			context, predicate, object, subject,
-			this
-		);
-		this.cosp = new StatementIndex<>(
-			StatementIndex.Name.COSP, 5, true,
-			context, object, subject, predicate,
-			this
-		);
 	}
 
 	public Collection<Namespace> getWellKnownNamespaces() {
@@ -268,30 +220,6 @@ public class RDFFactory {
 
 	public RDFRole<SPOC.C> getContextRole() {
 		return context;
-	}
-
-	public StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> getSPOIndex() {
-		return spo;
-	}
-
-	public StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> getPOSIndex() {
-		return pos;
-	}
-
-	public StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> getOSPIndex() {
-		return osp;
-	}
-
-	public StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> getCSPOIndex() {
-		return cspo;
-	}
-
-	public StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> getCPOSIndex() {
-		return cpos;
-	}
-
-	public StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> getCOSPIndex() {
-		return cosp;
 	}
 
 	public ValueIdentifier id(Value v) {
@@ -384,56 +312,11 @@ public class RDFFactory {
 		return valueIO.createReader(vf, null);
 	}
 
-	public ValueIO.Reader createTableReader(ValueFactory vf, KeyspaceConnection conn) {
-		return valueIO.createReader(vf, new TableTripleReader(conn));
-	}
-
 
 	private final class IdTripleWriter implements TripleWriter {
 		@Override
 		public ByteBuffer writeTriple(Resource subj, IRI pred, Value obj, ValueIO.Writer writer, ByteBuffer buf) {
 			return writeStatementId(subj, pred, obj, buf);
-		}
-	}
-
-
-	private final class TableTripleReader implements TripleReader {
-		private final KeyspaceConnection conn;
-	
-		public TableTripleReader(KeyspaceConnection conn) {
-			this.conn = conn;
-		}
-	
-		@Override
-		public Triple readTriple(ByteBuffer b, ValueIO.Reader valueReader) {
-			int idSize = getIdSize();
-			byte[] sid = new byte[idSize];
-			byte[] pid = new byte[idSize];
-			byte[] oid = new byte[idSize];
-			b.get(sid).get(pid).get(oid);
-	
-			RDFContext ckey = createContext(HALYARD.TRIPLE_GRAPH_CONTEXT);
-			RDFIdentifier<SPOC.S> skey = createSubjectId(id(sid));
-			RDFIdentifier<SPOC.P> pkey = createPredicateId(id(pid));
-			RDFIdentifier<SPOC.O> okey = createObjectId(id(oid));
-			Scan scan = StatementIndex.scan(skey, pkey, okey, ckey, RDFFactory.this);
-			try {
-				Result result;
-				try (ResultScanner scanner = conn.getScanner(scan)) {
-					result = scanner.next();
-				}
-				if (result == null) {
-					throw new IOException("Triple not found (no result)");
-				}
-				if (result.isEmpty()) {
-					throw new IOException("Triple not found (no cells)");
-				}
-				Cell[] cells = result.rawCells();
-				Statement stmt = HalyardTableUtils.parseStatement(null, null, null, ckey, cells[0], valueReader, RDFFactory.this);
-				return valueReader.getValueFactory().createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
-			} catch (IOException ioe) {
-				throw new RuntimeException(ioe);
-			}
 		}
 	}
 }

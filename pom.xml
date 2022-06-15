@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.pulquero.halyard</groupId>
     <artifactId>halyard</artifactId>
-    <version>3.14-SNAPSHOT</version>
+    <version>4.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Halyard-star</name>
     <description>A fork of Halyard with support for RDF-star</description>
@@ -27,26 +27,28 @@
     </developers>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-        <rdf4j.version>3.7.7</rdf4j.version>
-        <hbase.version>2.4.13</hbase.version>
-        <hadoop.version>3.2.3</hadoop.version>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <rdf4j.version>4.0.5</rdf4j.version>
+        <hbase.version>2.5.0</hbase.version>
+        <hadoop.version>3.3.4</hadoop.version>
         <jersey.version>2.25.1</jersey.version>
-        <jetty.version>9.4.20.v20190813</jetty.version>
-        <elasticsearch.version>8.2.2</elasticsearch.version>
+        <jetty.version>9.4.43.v20210629</jetty.version>
+        <elasticsearch.version>8.4.2</elasticsearch.version>
         <saxon.version>9.9.1-6</saxon.version>
+        <slf4j.version>1.7.35</slf4j.version>
         <lz4.version>1.8.0</lz4.version>
         <icu4j.version>71.1</icu4j.version>
         <junit4.version>4.13.2</junit4.version>
         <junit5.version>5.8.2</junit5.version>
+        <assertj.version>3.19.0</assertj.version>
         <test.working.directory>${project.build.directory}</test.working.directory>
     </properties>
 	<scm>
 		<connection>scm:git:git@github.com:pulquero/Halyard.git</connection>
 		<developerConnection>scm:git:git@github.com:pulquero/Halyard.git</developerConnection>
 		<url>https://github.com/pulquero/Halyard</url>
-		<tag>halyard-parent-2.6</tag>
+		<tag>v4.0</tag>
 	</scm>
     <modules>
         <module>common</module>
@@ -62,7 +64,7 @@
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>4.0.4</version>
+                <version>4.7.2.0</version>
                 <executions>
                     <execution>
                         <id>spotbugs-on-package</id>
@@ -82,10 +84,10 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.0.0-M7</version>
                 <configuration>
+                    <argLine>@{argLine} -XshowSettings:vm -Xmx8g</argLine>
                     <trimStackTrace>false</trimStackTrace>
                     <workingDirectory>${test.working.directory}</workingDirectory>
                     <systemPropertyVariables>
-                        <argLine>${argLine}</argLine>
                         <TMP>${project.build.directory}</TMP>
                     </systemPropertyVariables>
                 </configuration>
@@ -105,7 +107,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.6</version>
+                <version>0.8.8</version>
                 <configuration>
                     <includes>
                         <include>com/msd/gin/halyard/**</include>
@@ -213,8 +215,13 @@
 	        <dependency>
 	            <groupId>commons-codec</groupId>
 	            <artifactId>commons-codec</artifactId>
-	            <version>1.11</version>
+	            <version>1.13</version>
 	        </dependency>
+          <dependency>
+              <groupId>org.apache.commons</groupId>
+              <artifactId>commons-compress</artifactId>
+              <version>1.21</version>
+          </dependency>
 	        <dependency>
 	            <groupId>org.apache.hadoop</groupId>
 	            <artifactId>hadoop-annotations</artifactId>
@@ -327,40 +334,19 @@
     	</dependencies>
     </dependencyManagement>
     <profiles>
-    <profile>
-      <id>jdk9</id>
-      <activation>
-        <jdk>[1.9,)</jdk>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <configuration>
-              <release>8</release>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     	<profile>
-    		<id>windows</id>
-    		<activation>
-    			<os>
-    				<family>windows</family>
-    			</os>
-    		</activation>
-		    <dependencyManagement>
-		    	<dependencies>
-		    		<dependency>
-		    			<groupId>jdk.tools</groupId>
-		    			<artifactId>jdk.tools</artifactId>
-		    			<version>1.8</version>
-		    			<systemPath>${JAVA_HOME}/lib/tools.jar</systemPath>
-		    			<scope>system</scope>
-		    		</dependency>
-		    	</dependencies>
-		    </dependencyManagement>
+    		<id>dev</id>
+    		<build>
+    			<plugins>
+    				<plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <configuration>
+                	<skip>true</skip>
+                </configuration>
+    				</plugin>
+    			</plugins>
+    		</build>
     	</profile>
         <profile>
             <id>third-party-licenses</id>

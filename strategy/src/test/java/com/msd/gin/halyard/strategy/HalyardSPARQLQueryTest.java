@@ -25,7 +25,7 @@ import java.util.Deque;
 import java.util.List;
 
 import org.eclipse.rdf4j.query.Dataset;
-import org.eclipse.rdf4j.query.parser.sparql.manifest.SPARQLQueryComplianceTest;
+import org.eclipse.rdf4j.testsuite.query.parser.sparql.manifest.SPARQLQueryComplianceTest;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.dataset.DatasetRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepository;

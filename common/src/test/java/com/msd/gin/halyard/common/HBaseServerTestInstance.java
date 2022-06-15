@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.common;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -35,17 +36,20 @@ import org.apache.zookeeper.server.ZooKeeperServer;
  *
  * @author Adam Sotona (MSD)
  */
-public class HBaseServerTestInstance {
+public final class HBaseServerTestInstance {
 
-    private static Configuration conf = null;
+    private static Configuration conf;
+    private static ZooKeeperServer zookeeper;
+    private static MiniMRYarnCluster miniCluster;
+    private static LocalHBaseCluster cluster;
 
     public static synchronized Configuration getInstanceConfig() throws Exception {
         if (conf == null) {
             File zooRoot = File.createTempFile("hbase-zookeeper", "");
             zooRoot.delete();
-            ZooKeeperServer zookeper = new ZooKeeperServer(zooRoot, zooRoot, 2000);
+            zookeeper = new ZooKeeperServer(zooRoot, zooRoot, 2000);
             ServerCnxnFactory factory = ServerCnxnFactory.createFactory(new InetSocketAddress("localhost", 0), 5000);
-            factory.startup(zookeper);
+            factory.startup(zookeeper);
 
             YarnConfiguration yconf = new YarnConfiguration();
             String argLine = System.getProperty("argLine");
@@ -54,7 +58,7 @@ public class HBaseServerTestInstance {
             }
             yconf.setBoolean(MRConfig.MAPREDUCE_MINICLUSTER_CONTROL_RESOURCE_MONITORING, false);
             yconf.setClass(YarnConfiguration.RM_SCHEDULER, FifoScheduler.class, ResourceScheduler.class);
-            MiniMRYarnCluster miniCluster = new MiniMRYarnCluster("testCluster");
+            miniCluster = new MiniMRYarnCluster("testCluster");
             miniCluster.init(yconf);
             String resourceManagerLink = yconf.get(YarnConfiguration.RM_ADDRESS);
             yconf.setBoolean(MRJobConfig.JOB_UBERTASK_ENABLE, true);
@@ -77,9 +81,33 @@ public class HBaseServerTestInstance {
             conf.setBoolean("hbase.procedure.store.wal.use.hsync", false);
             conf.setBoolean("hbase.unsafe.stream.capability.enforce", false);
             conf.set("hbase.fs.tmp.dir", new File(System.getProperty("java.io.tmpdir")).toURI().toURL().toString());
-            LocalHBaseCluster cluster = new LocalHBaseCluster(conf);
+            cluster = new LocalHBaseCluster(conf);
             cluster.startup();
         }
         return new Configuration(conf);
     }
+
+	public static synchronized void shutdown() throws IOException {
+		if (conf != null) {
+			try {
+				cluster.shutdown();
+			} catch (Exception ignore) {
+			} finally {
+				cluster = null;
+			}
+			try {
+				miniCluster.close();
+			} catch (Exception ignore) {
+			} finally {
+				miniCluster = null;
+			}
+			try {
+				zookeeper.shutdown();
+			} catch (Exception ignore) {
+			} finally {
+				zookeeper = null;
+			}
+			conf = null;
+		}
+	}
 }

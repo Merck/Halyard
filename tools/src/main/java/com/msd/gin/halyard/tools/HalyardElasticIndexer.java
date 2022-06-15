@@ -16,6 +16,14 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Keyspace;
+import com.msd.gin.halyard.common.KeyspaceConnection;
+import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.SSLSettings;
+import com.msd.gin.halyard.common.StatementIndices;
+import com.msd.gin.halyard.sail.search.SearchDocument;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -68,14 +76,6 @@ import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
 import org.elasticsearch.hadoop.mr.EsOutputFormat;
 import org.json.JSONObject;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.Keyspace;
-import com.msd.gin.halyard.common.KeyspaceConnection;
-import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.SSLSettings;
-import com.msd.gin.halyard.common.StatementIndex;
-import com.msd.gin.halyard.sail.search.SearchDocument;
-
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
  * @author Adam Sotona (MSD)
@@ -119,13 +119,13 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             }
 
             byte[] hash = new byte[objectKeySize];
-            System.arraycopy(key.get(), key.getOffset() + 1 + (StatementIndex.toIndex(key.get()[key.getOffset()], rdfFactory).isQuadIndex() ? contextKeySize : 0), hash, 0, objectKeySize);
+            System.arraycopy(key.get(), key.getOffset() + 1 + (stmtIndices.toIndex(key.get()[key.getOffset()]).isQuadIndex() ? contextKeySize : 0), hash, 0, objectKeySize);
             if (!Arrays.equals(hash, lastHash)) {
             	literals = new HashSet<>();
             	lastHash = hash;
             }
 
-            for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, valueReader, rdfFactory)) {
+            for (Statement st : HalyardTableUtils.parseStatements(null, null, null, null, value, valueReader, stmtIndices)) {
                 statements++;
             	Literal l = (Literal) st.getObject();
                 if (literals.add(l)) {
@@ -326,10 +326,11 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 		} finally {
 			keyspace.close();
 		}
+        StatementIndices indices = new StatementIndices(getConf(), rdfFactory);
         SimpleValueFactory vf = SimpleValueFactory.getInstance();
         IRI predicateIRI = (predicate != null) ? vf.createIRI(predicate) : null;
         Resource graphIRI = (namedGraph != null) ? vf.createIRI(namedGraph) : null;
-        Scan scan = StatementIndex.scanLiterals(predicateIRI, graphIRI, rdfFactory);
+        Scan scan = indices.scanLiterals(predicateIRI, graphIRI);
         keyspace.initMapperJob(
             scan,
             IndexerMapper.class,

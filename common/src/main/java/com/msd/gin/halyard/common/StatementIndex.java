@@ -2,15 +2,13 @@ package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.filter.ColumnPrefixFilter;
 import org.apache.hadoop.hbase.filter.Filter;
@@ -30,177 +28,7 @@ import org.eclipse.rdf4j.model.ValueFactory;
 public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 extends SPOC<?>,T4 extends SPOC<?>> {
 	public enum Name {SPO, POS, OSP, CSPO, CPOS, COSP};
 	private static final byte WELL_KNOWN_IRI_MARKER = (byte) ('#' | 0x80);  // marker must be negative (msb set) so it is distinguishable from a length (>=0)
-	private static final int VAR_CARDINALITY = 10;
-
-	public static StatementIndex<?,?,?,?> toIndex(byte prefix, RDFFactory rdfFactory) {
-		switch(prefix) {
-			case 0: return rdfFactory.getSPOIndex();
-			case 1: return rdfFactory.getPOSIndex();
-			case 2: return rdfFactory.getOSPIndex();
-			case 3: return rdfFactory.getCSPOIndex();
-			case 4: return rdfFactory.getCPOSIndex();
-			case 5: return rdfFactory.getCOSPIndex();
-			default: throw new AssertionError(String.format("Invalid prefix: %s", prefix));
-		}
-	}
-
-	public static final Scan scanAll(RDFFactory rdfFactory) {
-		StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
-		StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = rdfFactory.getCOSPIndex();
-		int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
-		return HalyardTableUtils.scan(
-			spo.concat(false, spo.role1.startKey(), spo.role2.startKey(), spo.get3StartKey(), spo.get4StartKey()),
-			cosp.concat(true, cosp.role1.stopKey(), cosp.role2.stopKey(), cosp.get3StopKey(), cosp.role4.endStopKey()),
-			cardinality,
-			true
-		);
-	}
-
-	public static final Scan scanDefaultIndices(RDFFactory rdfFactory) {
-		StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
-		StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = rdfFactory.getOSPIndex();
-		int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
-		return HalyardTableUtils.scan(
-			spo.concat(false, spo.role1.startKey(), spo.role2.startKey(), spo.get3StartKey(), spo.get4StartKey()),
-			osp.concat(true, osp.role1.stopKey(), osp.role2.stopKey(), osp.get3StopKey(), osp.role4.endStopKey()),
-			cardinality,
-			true
-		);
-	}
-
-	public static final List<Scan> scanContextIndices(Resource graph, RDFFactory rdfFactory) {
-		List<Scan> scans = new ArrayList<>(3);
-		RDFContext ctx = rdfFactory.createContext(graph);
-		List<StatementIndex<SPOC.C,?,?,?>> indices = Arrays.asList(rdfFactory.getCSPOIndex(), rdfFactory.getCPOSIndex(), rdfFactory.getCOSPIndex());
-		for (StatementIndex<SPOC.C,?,?,?> index : indices) {
-			scans.add(index.scan(ctx));
-		}
-		return scans;
-	}
-
-	public static final Scan scanLiterals(IRI predicate, Resource graph, RDFFactory rdfFactory) {
-		if (predicate != null && graph != null) {
-			return scanPredicateGraphLiterals(predicate, graph, rdfFactory);
-		} else if (predicate != null && graph == null) {
-			return scanPredicateLiterals(predicate, rdfFactory);
-		} else if (predicate == null && graph != null) {
-			return scanGraphLiterals(graph, rdfFactory);
-		} else {
-			return scanAllLiterals(rdfFactory);
-		}
-	}
-
-	private static final Scan scanAllLiterals(RDFFactory rdfFactory) {
-		StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> index = rdfFactory.getOSPIndex();
-		int typeSaltSize = rdfFactory.typeSaltSize;
-		if (typeSaltSize == 1) {
-			int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
-			return index.scan(
-				rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role1.startKey()), index.role2.startKey(), index.get3StartKey(), index.get4StartKey(),
-				rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role1.stopKey()), index.role2.stopKey(), index.get3StopKey(), index.role4.endStopKey(),
-				cardinality,
-				true
-			);
-		} else {
-			return index.scanWithConstraint(new ValueConstraint(ValueType.LITERAL));
-		}
-	}
-
-	private static final Scan scanGraphLiterals(Resource graph, RDFFactory rdfFactory) {
-		RDFContext ctx = rdfFactory.createContext(graph);
-		StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> index = rdfFactory.getCOSPIndex();
-		int typeSaltSize = rdfFactory.typeSaltSize;
-		if (typeSaltSize == 1) {
-			ByteSequence ctxb = new ByteArray(ctx.getKeyHash(index));
-			int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
-			return index.scan(
-				ctxb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role2.startKey()), index.get3StartKey(), index.get4StartKey(),
-				ctxb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role2.stopKey()), index.get3StopKey(), index.role4.endStopKey(),
-				cardinality,
-				true
-			);
-		} else {
-			return index.scanWithConstraint(ctx, new ValueConstraint(ValueType.LITERAL));
-		}
-	}
-
-	private static final Scan scanPredicateLiterals(IRI predicate, RDFFactory rdfFactory) {
-		RDFPredicate pred = rdfFactory.createPredicate(predicate);
-		StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> index = rdfFactory.getPOSIndex();
-		int typeSaltSize = rdfFactory.typeSaltSize;
-		if (typeSaltSize == 1) {
-			ByteSequence predb = new ByteArray(pred.getKeyHash(index));
-			int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
-			return index.scan(
-				predb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role2.startKey()), index.get3StartKey(), index.get4StartKey(),
-				predb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role2.stopKey()), index.get3StopKey(), index.role4.endStopKey(),
-				cardinality,
-				true
-			);
-		} else {
-			return index.scanWithConstraint(pred, new ValueConstraint(ValueType.LITERAL));
-		}
-	}
-
-	private static final Scan scanPredicateGraphLiterals(IRI predicate, Resource graph, RDFFactory rdfFactory) {
-		RDFPredicate pred = rdfFactory.createPredicate(predicate);
-		RDFContext ctx = rdfFactory.createContext(graph);
-		StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> index = rdfFactory.getCPOSIndex();
-		int typeSaltSize = rdfFactory.typeSaltSize;
-		if (typeSaltSize == 1) {
-			ByteSequence predb = new ByteArray(pred.getKeyHash(index));
-			ByteSequence ctxb = new ByteArray(ctx.getKeyHash(index));
-			int cardinality = VAR_CARDINALITY*VAR_CARDINALITY;
-			return index.scan(
-				ctxb, predb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role3.startKey()), index.get4StartKey(),
-				ctxb, predb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role3.stopKey()), index.role4.endStopKey(),
-				cardinality,
-				true
-			);
-		} else {
-			return index.scanWithConstraint(ctx, pred, new ValueConstraint(ValueType.LITERAL));
-		}
-	}
-
-	/**
-	 * Performs a scan using any suitable index.
-	 */
-	public static final Scan scan(@Nonnull RDFIdentifier<? extends SPOC.S> s, @Nonnull RDFIdentifier<? extends SPOC.P> p, @Nonnull RDFIdentifier<? extends SPOC.O> o, @Nullable RDFIdentifier<? extends SPOC.C> c, @Nonnull RDFFactory rdfFactory) {
-		Scan scan;
-		if (c == null) {
-			int h = Math.floorMod(Objects.hash(s, p, o), 3);
-			switch (h) {
-				case 0:
-					scan = rdfFactory.getSPOIndex().scan(s, p, o);
-					break;
-				case 1:
-					scan = rdfFactory.getPOSIndex().scan(p, o, s);
-					break;
-				case 2:
-					scan = rdfFactory.getOSPIndex().scan(o, s, p);
-					break;
-				default:
-					throw new AssertionError();
-			}
-		} else {
-			int h = Math.floorMod(Objects.hash(s, p, o, c), 3);
-			switch (h) {
-				case 0:
-					scan = rdfFactory.getCSPOIndex().scan(c, s, p, o);
-					break;
-				case 1:
-					scan = rdfFactory.getCPOSIndex().scan(c, p, o, s);
-					break;
-				case 2:
-					scan = rdfFactory.getCOSPIndex().scan(c, o, s, p);
-					break;
-				default:
-					throw new AssertionError();
-			}
-			scan = HalyardTableUtils.scanSingle(scan);
-		}
-		return scan;
-	}
+	static final int VAR_CARDINALITY = 10;
 
 	/**
 	 * @param sizeLen length of size field, 2 for short, 4 for int.
@@ -281,15 +109,16 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	private final Name name;
 	final byte prefix;
 	private final boolean isQuadIndex;
-	private final RDFRole<T1> role1;
-	private final RDFRole<T2> role2;
-	private final RDFRole<T3> role3;
-	private final RDFRole<T4> role4;
+	final RDFRole<T1> role1;
+	final RDFRole<T2> role2;
+	final RDFRole<T3> role3;
+	final RDFRole<T4> role4;
 	private final int[] argIndices;
 	private final int[] spocIndices;
 	private final RDFFactory rdfFactory;
+	private final Configuration conf;
 
-	StatementIndex(Name name, int prefix, boolean isQuadIndex, RDFRole<T1> role1, RDFRole<T2> role2, RDFRole<T3> role3, RDFRole<T4> role4, RDFFactory rdfFactory) {
+	StatementIndex(Name name, int prefix, boolean isQuadIndex, RDFRole<T1> role1, RDFRole<T2> role2, RDFRole<T3> role3, RDFRole<T4> role4, RDFFactory rdfFactory, Configuration conf) {
 		this.name = name;
 		this.prefix = (byte) prefix;
 		this.isQuadIndex = isQuadIndex;
@@ -298,6 +127,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		this.role3 = role3;
 		this.role4 = role4;
 		this.rdfFactory = rdfFactory;
+		this.conf = conf;
 
 		this.argIndices = new int[4];
 		this.spocIndices = new int[4];
@@ -317,10 +147,10 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return isQuadIndex;
 	}
 
-	private ByteSequence get3StartKey() {
+	ByteSequence get3StartKey() {
 		return isQuadIndex ? role3.startKey() : role3.endStartKey();
 	}
-	private ByteSequence get3StopKey() {
+	ByteSequence get3StopKey() {
 		return isQuadIndex ? role3.stopKey() : role3.endStopKey();
 	}
 	private int get3KeyHashSize() {
@@ -339,7 +169,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 			k.writeEndQualifierHashTo(b);
 		}
 	}
-	private ByteSequence get4StartKey() {
+	ByteSequence get4StartKey() {
 		return isQuadIndex ? role4.endStartKey() : ByteSequence.EMPTY;
 	}
 
@@ -487,8 +317,8 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return rdfFactory.id(idBytes);
 	}
 
-	private Scan scan(ByteSequence k1Start, ByteSequence k2Start, ByteSequence k3Start, ByteSequence k4Start, ByteSequence k1Stop, ByteSequence k2Stop, ByteSequence k3Stop, ByteSequence k4Stop, int cardinality, boolean indiscriminate) {
-		return HalyardTableUtils.scan(concat(false, k1Start, k2Start, k3Start, k4Start), concat(true, k1Stop, k2Stop, k3Stop, k4Stop), cardinality, indiscriminate);
+	Scan scan(ByteSequence k1Start, ByteSequence k2Start, ByteSequence k3Start, ByteSequence k4Start, ByteSequence k1Stop, ByteSequence k2Stop, ByteSequence k3Stop, ByteSequence k4Stop, int cardinality, boolean indiscriminate) {
+		return HalyardTableUtils.scan(concat(false, k1Start, k2Start, k3Start, k4Start), concat(true, k1Stop, k2Stop, k3Stop, k4Stop), cardinality, indiscriminate, conf);
 	}
 
 	Scan scan(ValueIdentifier id) {
@@ -670,7 +500,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
      * @param fragments variable number of the key fragments as ByteSequences
      * @return concatenated key as byte array
      */
-    private byte[] concat(boolean trailingZero, ByteSequence... fragments) {
+    byte[] concat(boolean trailingZero, ByteSequence... fragments) {
         int totalLen = 1; // for prefix
         for (ByteSequence fr : fragments) {
             totalLen += fr.size();

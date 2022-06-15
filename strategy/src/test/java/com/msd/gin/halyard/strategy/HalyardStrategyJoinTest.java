@@ -1,9 +1,9 @@
 package com.msd.gin.halyard.strategy;
 
-import com.msd.gin.halyard.algebra.HashJoin;
-import com.msd.gin.halyard.algebra.NestedLoops;
+import com.msd.gin.halyard.algebra.Algorithms;
 
 import java.io.InputStream;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -71,9 +71,9 @@ public class HalyardStrategyJoinTest {
 
     private String expectedAlgo() {
     	if (optHashJoinLimit == 0) {
-    		return NestedLoops.NAME;
+    		return Algorithms.NESTED_LOOPS;
     	} else {
-    		return HashJoin.NAME;
+    		return Algorithms.HASH_JOIN;
     	}
     }
 
@@ -185,13 +185,13 @@ public class HalyardStrategyJoinTest {
     @Test
     public void testNoncommutativeAnd1() throws Exception {
         String q = "prefix : <http://example/> select ?x ?y ?z where {?x :name 'paul'. {?y :name 'george'. optional {?x :email ?z}} }";
-        joinTest(q, "/test-cases/cs-0605124.ttl", "/test-cases/cs-0605124-ex4.srx", 2, HashJoin.NAME, expectedAlgo());
+        joinTest(q, "/test-cases/cs-0605124.ttl", "/test-cases/cs-0605124-ex4.srx", 2, Algorithms.HASH_JOIN, expectedAlgo());
     }
 
     @Test
     public void testNoncommutativeAnd2() throws Exception {
         String q = "prefix : <http://example/> select ?x ?y ?z where {{?y :name 'george'. optional {?x :email ?z}} ?x :name 'paul'. }";
-        joinTest(q, "/test-cases/cs-0605124.ttl", "/test-cases/cs-0605124-ex4.srx", 2, HashJoin.NAME, expectedAlgo());
+        joinTest(q, "/test-cases/cs-0605124.ttl", "/test-cases/cs-0605124-ex4.srx", 2, Algorithms.HASH_JOIN, expectedAlgo());
     }
 
     @Test
@@ -221,7 +221,7 @@ public class HalyardStrategyJoinTest {
         }
         Set<BindingSet> expectedResults;
         try (InputStream in = getClass().getResourceAsStream(expectedOutput)) {
-            try (TupleQueryResult res = QueryResultIO.parseTuple(in, TupleQueryResultFormat.SPARQL)) {
+            try (TupleQueryResult res = QueryResultIO.parseTuple(in, TupleQueryResultFormat.SPARQL, new WeakReference<Object>(this))) {
                 expectedResults = toSet(res);
             }
         }

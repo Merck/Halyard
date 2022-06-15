@@ -2,6 +2,7 @@ package com.msd.gin.halyard.sail.spin;
 
 import com.google.common.collect.Lists;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
+import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HBaseSail;
 
 import java.util.Arrays;
@@ -9,6 +10,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
 import org.eclipse.rdf4j.common.iteration.Iterations;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
@@ -21,7 +25,6 @@ import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
-import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.junit.After;
 import org.junit.Assert;
@@ -44,6 +47,8 @@ public class HBaseSailSpifTest {
 		return Arrays.asList(new Object[] { true }, new Object[] { false });
 	}
 
+	private final String tableName;
+
 	private boolean usePushStrategy;
 
 	private Repository repo;
@@ -57,11 +62,13 @@ public class HBaseSailSpifTest {
 
 	public HBaseSailSpifTest(boolean usePushStrategy) {
 		this.usePushStrategy = usePushStrategy;
+		this.tableName = "spifTestTable-" + (usePushStrategy ? "push" : "pull");
 	}
 
 	@Before
 	public void setup() throws Exception {
-		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "spifTestTable", true, 0, usePushStrategy, 10, null, null);
+		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+		HBaseSail sail = new HBaseSail(conf, tableName, true, 0, usePushStrategy, 10, null, null);
 		repo = new SailRepository(sail);
 		repo.init();
 		conn = repo.getConnection();
@@ -75,22 +82,24 @@ public class HBaseSailSpifTest {
 	}
 
 	@After
-	public void tearDown() throws RepositoryException {
+	public void tearDown() throws Exception {
 		Locale.setDefault(platformLocale);
-		conn.clear();
 		conn.close();
 		repo.shutDown();
+		try (Connection hconn = HalyardTableUtils.getConnection(HBaseServerTestInstance.getInstanceConfig())) {
+			HalyardTableUtils.deleteTable(hconn, TableName.valueOf(tableName));
+		}
 	}
 
 	@Test
 	public void runTests() throws Exception {
 		SpinInferencing.insertSchema(conn);
+
 		TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL,
 				"prefix spin: <http://spinrdf.org/spin#> " + "prefix spl: <http://spinrdf.org/spl#> "
 						+ "select ?testCase ?expected ?actual where {?testCase a spl:TestCase. ?testCase spl:testResult ?expected. ?testCase spl:testExpression ?expr. " + "BIND(spin:eval(?expr) as ?actual) "
 						+ "FILTER(?expected != ?actual) " + "FILTER(strstarts(str(?testCase), 'http://spinrdf.org/spif#'))}");
-		try ( // returns failed tests
-				TupleQueryResult tqr = tq.evaluate()) {
+		try (TupleQueryResult tqr = tq.evaluate()) {
 			while (tqr.hasNext()) {
 				BindingSet bs = tqr.next();
 				Value testCase = bs.getValue("testCase");

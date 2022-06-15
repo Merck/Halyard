@@ -17,10 +17,9 @@
 package com.msd.gin.halyard.strategy;
 
 import com.msd.gin.halyard.algebra.Algebra;
+import com.msd.gin.halyard.algebra.Algorithms;
 import com.msd.gin.halyard.algebra.ConstrainedStatementPattern;
 import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
-import com.msd.gin.halyard.algebra.HashJoin;
-import com.msd.gin.halyard.algebra.NestedLoops;
 import com.msd.gin.halyard.algebra.StarJoin;
 import com.msd.gin.halyard.common.LiteralConstraint;
 import com.msd.gin.halyard.common.ValueConstraint;
@@ -48,6 +47,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -59,7 +59,6 @@ import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
 import org.eclipse.rdf4j.common.iteration.SilentIteration;
-import org.eclipse.rdf4j.common.lang.ObjectUtil;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
@@ -135,7 +134,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunction;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.TupleFunctionEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.DescribeIteration;
@@ -226,8 +224,6 @@ final class HalyardTupleExprEvaluation {
 		} else if (expr instanceof TupleFunctionCall) {
 			// all TupleFunctionCalls are expected to be ExtendedTupleFunctionCalls
 			evaluateTupleFunctionCall(parent, (ExtendedTupleFunctionCall) expr, bindings);
-        } else if (expr instanceof ExternalSet) {
-            evaluateExternalSet(parent, (ExternalSet) expr, bindings);
         } else if (expr == null) {
             parent.handleException(new IllegalArgumentException("expr must not be null"));
         } else {
@@ -1070,7 +1066,7 @@ final class HalyardTupleExprEvaluation {
 				for (String name : group.getGroupBindingNames()) {
 					Value v1 = bindingSet.getValue(name);
 					Value v2 = otherSolution.getValue(name);
-					if (!ObjectUtil.nullEquals(v1, v2)) {
+					if (!Objects.equals(v1, v2)) {
 						return false;
 					}
 				}
@@ -1401,10 +1397,10 @@ final class HalyardTupleExprEvaluation {
     private void evaluateJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
     	String algorithm = join.getAlgorithmName();
     	if (isOutOfScopeForLeftArgBindings(join.getRightArg())) {
-    		algorithm = HashJoin.NAME;
+    		algorithm = Algorithms.HASH_JOIN;
     	}
 
-    	if (HashJoin.NAME.equals(algorithm)) {
+    	if (Algorithms.HASH_JOIN.equals(algorithm)) {
     		evaluateHashJoin(topPipe, join, bindings);
     	} else {
     		evaluateNestedLoopsJoin(topPipe, join, bindings);
@@ -1416,7 +1412,7 @@ final class HalyardTupleExprEvaluation {
 	}
 
     private void evaluateNestedLoopsJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
-    	join.setAlgorithm(NestedLoops.INSTANCE);
+    	join.setAlgorithm(Algorithms.NESTED_LOOPS);
     	TupleExpr outerExpr = join.getLeftArg();
     	TupleExpr innerExpr = join.getRightArg();
     	parentStrategy.initTracking(join);
@@ -1474,10 +1470,10 @@ final class HalyardTupleExprEvaluation {
     private void evaluateLeftJoin(BindingSetPipe parentPipe, final LeftJoin leftJoin, final BindingSet bindings) {
     	String algorithm = leftJoin.getAlgorithmName();
     	if (TupleExprs.containsSubquery(leftJoin.getRightArg())) {
-    		algorithm = HashJoin.NAME;
+    		algorithm = Algorithms.HASH_JOIN;
     	}
 
-    	if (HashJoin.NAME.equals(algorithm)) {
+    	if (Algorithms.HASH_JOIN.equals(algorithm)) {
     		evaluateHashLeftJoin(parentPipe, leftJoin, bindings);
     	} else {
     		evaluateNestedLoopsLeftJoin(parentPipe, leftJoin, bindings);
@@ -1491,7 +1487,7 @@ final class HalyardTupleExprEvaluation {
     }
 
     private void evaluateNestedLoopsLeftJoin(BindingSetPipe parentPipe, final LeftJoin leftJoin, final BindingSet bindings) {
-    	leftJoin.setAlgorithm(NestedLoops.INSTANCE);
+    	leftJoin.setAlgorithm(Algorithms.NESTED_LOOPS);
     	parentStrategy.initTracking(leftJoin);
     	// Check whether optional join is "well designed" as defined in section
         // 4.2 of "Semantics and Complexity of SPARQL", 2006, Jorge Pérez et al.
@@ -1618,7 +1614,7 @@ final class HalyardTupleExprEvaluation {
     }
 
     private void buildHashTable(AbstractHashTableJoiner joiner, final BindingSet bindings, final int hashJoinLimit) {
-    	joiner.join.setAlgorithm(HashJoin.INSTANCE);
+    	joiner.join.setAlgorithm(Algorithms.HASH_JOIN);
     	parentStrategy.initTracking(joiner.join);
 		evaluateTupleExpr(new BindingSetPipe(null) {
 	    	HashJoinTable hashTable = joiner.createHashTable();
@@ -2145,20 +2141,6 @@ final class HalyardTupleExprEvaluation {
 		parentStrategy.initTracking(emptySet);
 		parent.empty();
 	}
-
-    /**
-     * Evaluate {@link ExternalSet} query model nodes
-     * @param parent
-     * @param externalSet
-     * @param bindings
-     */
-    private void evaluateExternalSet(BindingSetPipe parent, ExternalSet externalSet, BindingSet bindings) {
-        try {
-        	executor.pullAndPushAsync(parent, externalSet.evaluate(bindings), externalSet, parentStrategy);
-        } catch (QueryEvaluationException e) {
-            parent.handleException(e);
-        }
-    }
 
 	/**
 	 * Evaluate {@link ZeroLengthPath} query model nodes

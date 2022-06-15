@@ -10,6 +10,7 @@ import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.base.CoreDatatype;
 import org.eclipse.rdf4j.model.vocabulary.GEO;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.ParseException;
@@ -62,6 +63,11 @@ public class WKTLiteral implements ObjectLiteral<Geometry> {
 	@Override
 	public IRI getDatatype() {
 		return GEO.WKT_LITERAL;
+	}
+
+	@Override
+	public CoreDatatype getCoreDatatype() {
+		return CoreDatatype.GEO.WKT_LITERAL;
 	}
 
 	public Geometry objectValue() {

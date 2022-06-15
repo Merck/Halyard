@@ -23,7 +23,7 @@ import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class HalyardTableUtilsKeyValueTest {
-    private static final RDFFactory rdfFactory = RDFFactory.create();
+    private static final StatementIndices indices = StatementIndices.create();
 	private static final ValueFactory vf = TimestampedValueFactory.INSTANCE;
 
     private static final IRI SUBJ1 = vf.createIRI("http://whatever/subj1");
@@ -67,12 +67,14 @@ public class HalyardTableUtilsKeyValueTest {
            });
     }
 
+    private final RDFFactory rdfFactory;
     private final RDFSubject s;
     private final RDFPredicate p;
     private final RDFObject o;
     private final RDFContext c;
 
 	public HalyardTableUtilsKeyValueTest(Resource s, IRI p, Value o, Resource c) {
+		this.rdfFactory = indices.getRDFFactory();
         this.s = rdfFactory.createSubject(s);
         this.p = rdfFactory.createPredicate(p);
         this.o = rdfFactory.createObject(o);
@@ -84,7 +86,7 @@ public class HalyardTableUtilsKeyValueTest {
 		long ts = 0;
 		Resource ctx = c != null ? c.val : null;
 		Statement expected = vf.createStatement(s.val, p.val, o.val, ctx);
-		List<? extends Cell> kvs = HalyardTableUtils.insertKeyValues(s.val, p.val, o.val, ctx, ts, rdfFactory);
+		List<? extends Cell> kvs = HalyardTableUtils.insertKeyValues(s.val, p.val, o.val, ctx, ts, indices);
 		for(Cell kv : kvs) {
 			testParseStatement("spoc", expected, s, p, o, c != null ? c : null, kv, ts);
 			testParseStatement("_poc", expected, null, p, o, c != null ? c : null, kv, ts);
@@ -95,7 +97,7 @@ public class HalyardTableUtilsKeyValueTest {
 	}
 
 	private void testParseStatement(String msg, Statement expected, RDFSubject s, RDFPredicate p, RDFObject o, RDFContext c, Cell kv, long ts) {
-		Statement actual = HalyardTableUtils.parseStatement(s, p, o, c, kv, rdfFactory.createReader(vf), rdfFactory);
+		Statement actual = HalyardTableUtils.parseStatement(s, p, o, c, kv, rdfFactory.createReader(vf), indices);
 		assertEquals(msg, expected, actual);
 		assertEquals(ts, ((Timestamped)actual).getTimestamp());
 		if(s == null) {

@@ -15,6 +15,9 @@ public class HBaseRepository extends SailRepository {
 
 	@Override
 	public SailRepositoryConnection getConnection() throws RepositoryException {
+		if (!isInitialized()) {
+			init();
+		}
 		try {
 			return new HBaseRepositoryConnection(this, getSail().getConnection());
 		} catch (SailException e) {

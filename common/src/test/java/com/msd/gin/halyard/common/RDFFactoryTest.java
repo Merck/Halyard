@@ -30,7 +30,7 @@ import static org.junit.Assert.*;
 
 @RunWith(Parameterized.class)
 public class RDFFactoryTest {
-    private static final RDFFactory rdfFactory = RDFFactory.create();
+    private static final StatementIndices stmtIndices = StatementIndices.create();
 	private static final Date NOW = new Date();
 
 	private static String longString(String s) {
@@ -95,10 +95,12 @@ public class RDFFactoryTest {
 		return testValues;
 	}
 
+	private final RDFFactory rdfFactory;
 	private Value expectedValue;
 	private byte expectedEncodingType;
 
 	public RDFFactoryTest(Value v, byte encodingType) {
+		this.rdfFactory = stmtIndices.getRDFFactory();
 		this.expectedValue = v;
 		this.expectedEncodingType = encodingType;
 	}
@@ -184,12 +186,13 @@ public class RDFFactoryTest {
 	}
 
 	private static void assertRDFValueHashes(ValueIdentifier id, RDFValue<?,?> v) {
-        StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
-        StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = rdfFactory.getPOSIndex();
-        StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = rdfFactory.getOSPIndex();
-        StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo = rdfFactory.getCSPOIndex();
-        StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos = rdfFactory.getCPOSIndex();
-        StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = rdfFactory.getCOSPIndex();
+        StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = stmtIndices.getSPOIndex();
+        StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos = stmtIndices.getPOSIndex();
+        StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = stmtIndices.getOSPIndex();
+        StatementIndex<SPOC.C,SPOC.S,SPOC.P,SPOC.O> cspo = stmtIndices.getCSPOIndex();
+        StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> cpos = stmtIndices.getCPOSIndex();
+        StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> cosp = stmtIndices.getCOSPIndex();
+        RDFFactory rdfFactory = stmtIndices.getRDFFactory();
 		for(StatementIndex<?,?,?,?> idx : new StatementIndex[] {spo, pos, osp, cspo, cpos, cosp}) {
 			String testName = v.toString() + " for " + idx.toString();
 			byte[] keyHash = v.getKeyHash(idx);

@@ -22,6 +22,7 @@ import com.msd.gin.halyard.sail.HBaseSail;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -53,6 +54,7 @@ import org.eclipse.rdf4j.repository.sparql.federation.SPARQLServiceResolver;
  */
 public final class HBaseRepositoryManager extends RepositoryManager {
     private static final String SYSTEM_REPO_ID = "RDF4JSYSTEM";
+	private static final String SYSTEM_ID = "SYSTEM";
     private volatile SharedHttpClientSessionManager client;
     private volatile SPARQLServiceResolver serviceResolver;
     private volatile Configuration config = HBaseConfiguration.create();
@@ -64,8 +66,6 @@ public final class HBaseRepositoryManager extends RepositoryManager {
         this.config = config;
     }
 
-    @Override
-    @Deprecated
     protected Repository createSystemRepository() throws RepositoryException {
 		config.set(Config.ID_HASH, "Murmur3-128");
         SailRepository repo = new SailRepository(new HBaseSail(config, SYSTEM_REPO_ID, true, 0, true, 180, null, null));
@@ -210,6 +210,41 @@ public final class HBaseRepositoryManager extends RepositoryManager {
 
     @Override
     public RepositoryConfig getRepositoryConfig(String repositoryID) throws RepositoryConfigException, RepositoryException {
-        return super.getRepositoryConfig(repositoryID);
-    }
+		Repository systemRepository = getSystemRepository();
+		if (systemRepository == null) {
+			return null;
+		} else {
+			return RepositoryConfigUtil.getRepositoryConfig(systemRepository, repositoryID);
+		}
+	}
+
+	public Repository getSystemRepository() {
+		if (!isInitialized()) {
+			throw new IllegalStateException("Repository Manager is not initialized");
+		}
+		synchronized (initializedRepositories) {
+			Repository systemRepository = initializedRepositories.get(SYSTEM_ID);
+			if (systemRepository != null && systemRepository.isInitialized()) {
+				return systemRepository;
+			}
+			systemRepository = createSystemRepository();
+			if (systemRepository != null) {
+				initializedRepositories.put(SYSTEM_ID, systemRepository);
+			}
+			return systemRepository;
+		}
+	}
+
+	@Override
+	public void addRepositoryConfig(RepositoryConfig config) throws RepositoryException, RepositoryConfigException {
+		Repository systemRepository = getSystemRepository();
+		if (systemRepository != null && !SYSTEM_ID.equals(config.getID())) {
+			RepositoryConfigUtil.updateRepositoryConfigs(systemRepository, config);
+		}
+	}
+
+	@Override
+	public Collection<RepositoryInfo> getAllRepositoryInfos() throws RepositoryException {
+		return getAllRepositoryInfos(false);
+	}
 }

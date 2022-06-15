@@ -6,7 +6,7 @@
     <parent>
         <groupId>io.github.pulquero.halyard</groupId>
         <artifactId>halyard</artifactId>
-        <version>3.14-SNAPSHOT</version>
+        <version>4.0-SNAPSHOT</version>
     </parent>
     <dependencies>
         <dependency>
@@ -29,7 +29,7 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-            <version>1.7.35</version>
+            <version>${slf4j.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
