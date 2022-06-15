@@ -70,6 +70,7 @@ import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExprTripleRef;
 import org.eclipse.rdf4j.query.algebra.Var;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
@@ -88,11 +89,13 @@ class HalyardValueExprEvaluation {
     private final HalyardEvaluationStrategy parentStrategy;
 	private final FunctionRegistry functionRegistry;
     private final TripleSource tripleSource;
+    private final QueryContext queryContext;
     private final ValueFactory valueFactory;
 
-	HalyardValueExprEvaluation(HalyardEvaluationStrategy parentStrategy, FunctionRegistry functionRegistry,
+	HalyardValueExprEvaluation(HalyardEvaluationStrategy parentStrategy, QueryContext queryContext, FunctionRegistry functionRegistry,
 			TripleSource tripleSource) {
         this.parentStrategy = parentStrategy;
+        this.queryContext = queryContext;
 		this.functionRegistry = functionRegistry;
         this.tripleSource = tripleSource;
         this.valueFactory = tripleSource.getValueFactory();
@@ -599,7 +602,7 @@ class HalyardValueExprEvaluation {
         Value val = evaluate(node.getArg(), bindings);
         String strVal = null;
         if (val instanceof IRI) {
-            strVal = ((IRI) val).toString();
+            strVal = ((IRI) val).stringValue();
         } else if (val instanceof Literal) {
             strVal = ((Literal) val).getLabel();
         }
@@ -667,21 +670,26 @@ class HalyardValueExprEvaluation {
      * Evaluates a function.
      */
     private Value evaluate(FunctionCall node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-		Optional<Function> function = functionRegistry.get(node.getURI());
-        if (!function.isPresent()) {
-            throw new QueryEvaluationException(String.format("Unknown function '%s'", node.getURI()));
-        }
-        // the NOW function is a special case as it needs to keep a shared return
+		Function function = functionRegistry.get(node.getURI()).orElseThrow(() -> new QueryEvaluationException(String.format("Unknown function '%s'", node.getURI())));
+
+		// the NOW function is a special case as it needs to keep a shared return
         // value for the duration of the query.
-        if (function.get() instanceof Now) {
-            return evaluate((Now) function.get(), bindings);
+        if (function instanceof Now) {
+            return evaluate((Now) function, bindings);
         }
         List<ValueExpr> args = node.getArgs();
         Value[] argValues = new Value[args.size()];
         for (int i = 0; i < args.size(); i++) {
             argValues[i] = evaluate(args.get(i), bindings);
         }
-        return function.get().evaluate(tripleSource, argValues);
+        Value result;
+        queryContext.begin();
+        try {
+        	result = function.evaluate(tripleSource, argValues);
+        } finally {
+        	queryContext.end();
+        }
+        return result;
     }
 
     /**

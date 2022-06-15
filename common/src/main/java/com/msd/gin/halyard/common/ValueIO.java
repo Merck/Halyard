@@ -725,7 +725,6 @@ public class ValueIO {
 				GregorianCalendar c = newGregorianCalendar();
 				c.setTimeInMillis(millis);
 				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
-				if(tz == Short.MIN_VALUE) {
 				if (BigDecimal.ZERO.compareTo(cal.getFractionalSecond()) == 0) {
 					cal.setFractionalSecond(null);
 				}

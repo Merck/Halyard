@@ -101,7 +101,7 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
         this.serviceResolver = serviceResolver;
 		this.tupleEval = new HalyardTupleExprEvaluation(this, queryContext, tupleFunctionRegistry, tripleSource,
 				dataset);
-		this.valueEval = new HalyardValueExprEvaluation(this, functionRegistry, tripleSource);
+		this.valueEval = new HalyardValueExprEvaluation(this, queryContext, functionRegistry, tripleSource);
 		this.pipeline = new HalyardQueryOptimizerPipeline(this, tripleSource.getValueFactory(), statistics);
         EvaluationStrategies.register(this);
     }

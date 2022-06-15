@@ -1,0 +1,33 @@
+@prefix sp: <http://spinrdf.org/sp#> .
+@prefix spin: <http://spinrdf.org/spin#> .
+@prefix s: <http://schema.org/> .
+
+<http://whatever/AgeConstraint> a sp:Ask ;
+ sp:text """
+  prefix s: <http://schema.org/>
+  ask where { ?this s:age ?age. filter(?age < 0 || ?age > 100) }
+ """ .
+
+<http://whatever/NameConstraint> a sp:Construct ;
+ sp:text """
+  prefix s: <http://schema.org/>
+  prefix spin: <http://spinrdf.org/spin#>
+  construct {
+    [ rdfs:label "Invalid name";
+      spin:violationValue ?type
+    ]
+  }
+  where {
+    ?this s:name ?name.
+    bind(datatype(?name) as ?type)
+    filter(?type != xsd:string)
+  }
+ """ .
+
+<http://whatever/ValidExample> a s:Person ;
+ s:name "Bob" ;
+ s:age 42 .
+
+<http://whatever/InvalidExample> a s:Person ;
+ s:name 2.4 ;
+ s:age -8 .

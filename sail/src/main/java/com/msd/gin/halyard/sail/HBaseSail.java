@@ -23,6 +23,8 @@ import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.function.DynamicFunctionRegistry;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
+import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.File;
@@ -41,11 +43,8 @@ import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.model.vocabulary.FN;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SD;
-import org.eclipse.rdf4j.model.vocabulary.SPIF;
-import org.eclipse.rdf4j.model.vocabulary.SPIN;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContextInitializer;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.AbstractFederatedServiceResolver;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
@@ -56,12 +55,6 @@ import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.spin.SpinParser;
-import org.eclipse.rdf4j.spin.function.AskFunction;
-import org.eclipse.rdf4j.spin.function.ConstructTupleFunction;
-import org.eclipse.rdf4j.spin.function.EvalFunction;
-import org.eclipse.rdf4j.spin.function.SelectTupleFunction;
-import org.eclipse.rdf4j.spin.function.spif.CanInvoke;
-import org.eclipse.rdf4j.spin.function.spif.ConvertSpinRDFToString;
 
 /**
  * HBaseSail is the RDF Storage And Inference Layer (SAIL) implementation on top of Apache HBase.
@@ -223,7 +216,7 @@ public class HBaseSail implements Sail {
 	}
 
 	@Override
-    public void initialize() throws SailException { //initialize the SAIL
+	public void initialize() throws SailException {
 		try {
 			if (tableName != null) {
 				if (!hConnectionIsShared) {
@@ -264,8 +257,8 @@ public class HBaseSail implements Sail {
 			return fedStats;
 		});
 
-		registerSpinParsingFunctions();
-		registerSpinParsingTupleFunctions();
+		SpinFunctionInterpreter.registerSpinParsingFunctions(spinParser, pushStrategy ? functionRegistry : FunctionRegistry.getInstance(), pushStrategy ? tupleFunctionRegistry : TupleFunctionRegistry.getInstance());
+		SpinMagicPropertyInterpreter.registerSpinParsingTupleFunctions(spinParser, pushStrategy ? tupleFunctionRegistry : TupleFunctionRegistry.getInstance());
     }
 
 	private boolean isInitialized() {
@@ -281,33 +274,6 @@ public class HBaseSail implements Sail {
 				}
 				conn.addStatement(HALYARD.SYSTEM_GRAPH_CONTEXT, RDF.TYPE, SD.GRAPH_CLASS, HALYARD.SYSTEM_GRAPH_CONTEXT);
 			}
-		}
-	}
-
-	private void registerSpinParsingFunctions() {
-		if (!(functionRegistry.get(FN.CONCAT.stringValue()).get() instanceof org.eclipse.rdf4j.spin.function.Concat)) {
-			functionRegistry.add(new org.eclipse.rdf4j.spin.function.Concat());
-		}
-		if (!functionRegistry.has(SPIN.EVAL_FUNCTION.stringValue())) {
-			functionRegistry.add(new EvalFunction(spinParser));
-		}
-		if (!functionRegistry.has(SPIN.ASK_FUNCTION.stringValue())) {
-			functionRegistry.add(new AskFunction(spinParser));
-		}
-		if (!functionRegistry.has(SPIF.CONVERT_SPIN_RDF_TO_STRING_FUNCTION.stringValue())) {
-			functionRegistry.add(new ConvertSpinRDFToString(spinParser));
-		}
-		if (!functionRegistry.has(SPIF.CAN_INVOKE_FUNCTION.stringValue())) {
-			functionRegistry.add(new CanInvoke(spinParser));
-		}
-	}
-
-	void registerSpinParsingTupleFunctions() {
-		if (!tupleFunctionRegistry.has(SPIN.CONSTRUCT_PROPERTY.stringValue())) {
-			tupleFunctionRegistry.add(new ConstructTupleFunction(spinParser));
-		}
-		if (!tupleFunctionRegistry.has(SPIN.SELECT_PROPERTY.stringValue())) {
-			tupleFunctionRegistry.add(new SelectTupleFunction(spinParser));
 		}
 	}
 

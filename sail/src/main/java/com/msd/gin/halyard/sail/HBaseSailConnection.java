@@ -24,6 +24,8 @@ import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.sail.HBaseSail.SailConnectionFactory;
+import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
+import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -78,14 +80,13 @@ import org.eclipse.rdf4j.query.algebra.evaluation.QueryContextInitializer;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExtendedEvaluationStrategy;
+import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailConnectionQueryPreparer;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.eclipse.rdf4j.sail.UpdateContext;
-import org.eclipse.rdf4j.sail.spin.SpinFunctionInterpreter;
-import org.eclipse.rdf4j.sail.spin.SpinMagicPropertyInterpreter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -225,6 +226,10 @@ public class HBaseSailConnection implements SailConnection {
 				// evaluate the expression against the TripleSource according to the
 				// EvaluationStrategy.
 				CloseableIteration<BindingSet, QueryEvaluationException> iter = evaluateInternal(strategy, optimizedTupleExpr);
+				if (!sail.pushStrategy) {
+					// NB: Iteration methods may do on-demand evaluation hence need to wrap these too
+					iter = new QueryContextIteration(iter, queryContext);
+				}
 				return sail.evaluationTimeout <= 0 ? iter
 						: new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter, TimeUnit.SECONDS.toMillis(sail.evaluationTimeout)) {
 							@Override
