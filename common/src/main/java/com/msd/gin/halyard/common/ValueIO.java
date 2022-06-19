@@ -677,6 +677,9 @@ public class ValueIO {
 				cal.setYear(null);
 				cal.setMonth(DatatypeConstants.FIELD_UNDEFINED);
 				cal.setDay(DatatypeConstants.FIELD_UNDEFINED);
+				if (BigDecimal.ZERO.compareTo(cal.getFractionalSecond()) == 0) {
+					cal.setFractionalSecond(null);
+				}
 				if(tz == Short.MIN_VALUE) {
 					tz = DatatypeConstants.FIELD_UNDEFINED;
 				}
@@ -723,6 +726,10 @@ public class ValueIO {
 				c.setTimeInMillis(millis);
 				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
 				if(tz == Short.MIN_VALUE) {
+				if (BigDecimal.ZERO.compareTo(cal.getFractionalSecond()) == 0) {
+					cal.setFractionalSecond(null);
+				}
+				if (tz == Short.MIN_VALUE) {
 					tz = DatatypeConstants.FIELD_UNDEFINED;
 				}
 				cal.setTimezone(tz);
