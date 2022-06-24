@@ -59,16 +59,21 @@ import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardPreSplit extends AbstractHalyardTool {
-
-    private static final String TABLE_PROPERTY = "halyard.presplit.table";
-    private static final String SPLIT_LIMIT_PROPERTY = "halyard.presplit.limit";
-    private static final String DECIMATION_FACTOR_PROPERTY = "halyard.presplit.decimation";
-    private static final String OVERWRITE_PROPERTY = "halyard.presplit.overwrite";
-    private static final String MAX_VERSIONS_PROPERTY = "halyard.presplit.maxVersions";
+	private static final String TOOL_NAME = "presplit";
+    private static final String TABLE_PROPERTY = confProperty(TOOL_NAME, "table");
+    private static final String SPLIT_LIMIT_PROPERTY = confProperty(TOOL_NAME, "limit");
+    private static final String DECIMATION_FACTOR_PROPERTY = confProperty(TOOL_NAME, "decimation");
+    private static final String OVERWRITE_PROPERTY = confProperty(TOOL_NAME, "overwrite");
+    private static final String MAX_VERSIONS_PROPERTY = confProperty(TOOL_NAME, "maxVersions");
 
     private static final long DEFAULT_SPLIT_LIMIT = 80000000l;
     private static final int DEFAULT_DECIMATION_FACTOR = 1000;
     private static final int DEFAULT_MAX_VERSIONS = 1;
+
+    enum Counters {
+    	STATEMENTS_PROCESSED,
+    	TOTAL_SPLITS
+    }
 
     /**
      * Mapper class transforming randomly selected sample of parsed Statement into set of HBase Keys and sizes
@@ -81,6 +86,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         private RDFFactory rdfFactory;
         private long counter = 0, next = 0;
         private int decimationFactor;
+        private long stmtCount = 0L;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -102,7 +108,13 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
                     keyValueLength.set(keyValue.getLength());
                     context.write(rowKey, keyValueLength);
                 }
+                stmtCount++;
             }
+        }
+
+        @Override
+        protected void cleanup(Context context) throws IOException, InterruptedException {
+        	context.getCounter(Counters.STATEMENTS_PROCESSED).increment(stmtCount);
         }
     }
 
@@ -134,6 +146,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
+        	context.getCounter(Counters.TOTAL_SPLITS).setValue(splits.size());
             Configuration conf = context.getConfiguration();
             TableName tableName = TableName.valueOf(conf.get(TABLE_PROPERTY));
             int maxVersions = conf.getInt(MAX_VERSIONS_PROPERTY, DEFAULT_MAX_VERSIONS);
@@ -154,7 +167,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 
     public HalyardPreSplit() {
         super(
-            "presplit",
+            TOOL_NAME,
             "Halyard Presplit is a MapReduce application designed to estimate optimal HBase region splits for big datasets before the Bulk Load. "
                 + "Halyard PreSplit creates an empty HBase table based on calculations from the dataset sources sampling. "
                 + "For very large datasets it is wise to calculate the pre-splits before the HBase table is created to allow more efficient following Bulk Load process of the data. "
@@ -164,22 +177,21 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         );
         addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, optional HBase namespace of the target table must already exist", true, true);
-        addOption("i", "allow-invalid", null, "Optionally allow invalid IRI values (less overhead)", false, false);
-        addOption("g", "default-named-graph", "named_graph", "Optionally specify default target named graph", false, true);
-        addOption("o", "named-graph-override", null, "Optionally override named graph also for quads, named graph is stripped from quads if --default-named-graph option is not specified", false, false);
-        addOption("d", "decimation-factor", "decimation_factor", String.format("Optionally overide pre-split random decimation factor (default is %d)", DEFAULT_DECIMATION_FACTOR), false, true);
-        addOption("l", "split-limit-size", "size", String.format("Optionally override calculated split size (default is %d)", DEFAULT_SPLIT_LIMIT), false, true);
-        addOption("f", "force", null, "Overwrite existing table", false, false);
-        addOption("n", "max-versions", "versions", String.format("Optionally set the maximum number of versions for the table (default is %d)", DEFAULT_MAX_VERSIONS), false, true);
+        addOption("i", "allow-invalid", null, SKIP_INVALID_PROPERTY, "Optionally allow invalid IRI values (less overhead)", false, false);
+        addOption("g", "default-named-graph", "named_graph", DEFAULT_CONTEXT_PROPERTY, "Optionally specify default target named graph", false, true);
+        addOption("o", "named-graph-override", null, OVERRIDE_CONTEXT_PROPERTY, "Optionally override named graph also for quads, named graph is stripped from quads if --default-named-graph option is not specified", false, false);
+        addOption("d", "decimation-factor", "decimation_factor", DECIMATION_FACTOR_PROPERTY, String.format("Optionally overide pre-split random decimation factor (default is %d)", DEFAULT_DECIMATION_FACTOR), false, true);
+        addOption("l", "split-limit-size", "size", SPLIT_LIMIT_PROPERTY, String.format("Optionally override calculated split size (default is %d)", DEFAULT_SPLIT_LIMIT), false, true);
+        addOption("f", "force", null, OVERWRITE_PROPERTY, "Overwrite existing table", false, false);
+        addOption("n", "max-versions", "versions", MAX_VERSIONS_PROPERTY, String.format("Optionally set the maximum number of versions for the table (default is %d)", DEFAULT_MAX_VERSIONS), false, true);
     }
 
     @Override
     protected int run(CommandLine cmd) throws Exception {
         String source = cmd.getOptionValue('s');
         String target = cmd.getOptionValue('t');
-        if (cmd.hasOption('f')) {
-        	getConf().setBoolean(OVERWRITE_PROPERTY, true);
-        } else {
+        configureBoolean(cmd, 'f');
+        if (!getConf().getBoolean(OVERWRITE_PROPERTY, false)) {
 	        try (Connection con = ConnectionFactory.createConnection(getConf())) {
 	            try (Admin admin = con.getAdmin()) {
 	                if (admin.tableExists(TableName.valueOf(target))) {
@@ -189,11 +201,9 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 	            }
 	        }
         }
-        getConf().setBoolean(SKIP_INVALID_PROPERTY, cmd.hasOption('i'));
-        if (cmd.hasOption('g')) {
-        	getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
-        }
-        getConf().setBoolean(OVERRIDE_CONTEXT_PROPERTY, cmd.hasOption('o'));
+        configureBoolean(cmd, 'i');
+        configureString(cmd, 'g', null);
+        configureBoolean(cmd, 'o');
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                 NTriplesUtil.class,
                 Rio.class,
@@ -201,8 +211,8 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        getConf().setInt(DECIMATION_FACTOR_PROPERTY, Integer.parseInt(cmd.getOptionValue('d', String.valueOf(DEFAULT_DECIMATION_FACTOR))));
-        getConf().setLong(SPLIT_LIMIT_PROPERTY, Long.parseLong(cmd.getOptionValue('l', String.valueOf(DEFAULT_SPLIT_LIMIT))));
+        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
+        configureLong(cmd, 'l', DEFAULT_SPLIT_LIMIT);
         Job job = Job.getInstance(getConf(), "HalyardPreSplit -> " + target);
         job.getConfiguration().set(TABLE_PROPERTY, target);
         job.setJarByClass(HalyardPreSplit.class);

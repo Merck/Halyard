@@ -90,13 +90,16 @@ import org.eclipse.rdf4j.sail.SailConnection;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardStats extends AbstractHalyardTool {
+	private static final String TOOL_NAME = "stats";
 
-    private static final String SOURCE = "halyard.stats.source";
-    private static final String SNAPSHOT_PATH = "halyard.stats.snapshot";
-    private static final String TARGET = "halyard.stats.target";
-    private static final String THRESHOLD = "halyard.stats.threshold";
-    private static final String TARGET_GRAPH = "halyard.stats.target.graph";
-    private static final String GRAPH_CONTEXT = "halyard.stats.graph.context";
+    private static final String SOURCE = confProperty(TOOL_NAME, "source");
+    private static final String SNAPSHOT_PATH = confProperty(TOOL_NAME, "snapshot");
+    private static final String TARGET = confProperty(TOOL_NAME, "target");
+    private static final String THRESHOLD = confProperty(TOOL_NAME, "threshold");
+    private static final String TARGET_GRAPH = confProperty(TOOL_NAME, "target.graph");
+    private static final String GRAPH_CONTEXT = confProperty(TOOL_NAME, "graph.context");
+
+    private static final long DEFAULT_THRESHOLD = 1000;
 
     static final class StatsMapper extends RdfTableMapper<ImmutableBytesWritable, LongWritable>  {
 
@@ -161,7 +164,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         	POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(pos);
         	CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(cpos);
             update = conf.get(TARGET) == null;
-            threshold = conf.getLong(THRESHOLD, 1000);
+            threshold = conf.getLong(THRESHOLD, DEFAULT_THRESHOLD);
             ValueFactory vf = IdValueFactory.INSTANCE;
             statsContext = vf.createIRI(conf.get(TARGET_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
             String gc = conf.get(GRAPH_CONTEXT);
@@ -532,15 +535,15 @@ public final class HalyardStats extends AbstractHalyardTool {
 
     public HalyardStats() {
         super(
-            "stats",
+            TOOL_NAME,
             "Halyard Stats is a MapReduce application that calculates dataset statistics and stores them in the named graph within the dataset or exports them into a file. The generated statistics are described by the VoID vocabulary, its extensions, and the SPARQL 1.1 Service Description.",
             "Example: halyard stats -s my_dataset [-g 'http://whatever/mystats'] [-t hdfs:/my_folder/my_stats.trig]");
-        addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
-        addOption("t", "target-file", "target_url", "Optional target file to export the statistics (instead of update) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]", false, true);
-        addOption("r", "threshold", "size", "Optional minimal size of a named graph to calculate statistics for (default is 1000)", false, true);
-        addOption("c", "named-graph", "named_graph", "Optional restrict stats calculation to the given named graph only", false, true);
-        addOption("g", "stats-named-graph", "target_graph", "Optional target named graph of the exported statistics (default value is '" + HALYARD.STATS_GRAPH_CONTEXT.stringValue() + "'), modification is recomended only for external export as internal Halyard optimizers expect the default value", false, true);
-        addOption("u", "restore-dir", "restore_folder", "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
+        addOption("s", "source-dataset", "dataset_table", SOURCE, "Source HBase table with Halyard RDF store", true, true);
+        addOption("t", "target-file", "target_url", TARGET, "Optional target file to export the statistics (instead of update) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]", false, true);
+        addOption("r", "threshold", "size", THRESHOLD, "Optional minimal size of a named graph to calculate statistics for (default is 1000)", false, true);
+        addOption("c", "named-graph", "named_graph", GRAPH_CONTEXT, "Optional restrict stats calculation to the given named graph only", false, true);
+        addOption("g", "stats-named-graph", "target_graph", TARGET_GRAPH, "Optional target named graph of the exported statistics (default value is '" + HALYARD.STATS_GRAPH_CONTEXT.stringValue() + "'), modification is recomended only for external export as internal Halyard optimizers expect the default value", false, true);
+        addOption("u", "restore-dir", "restore_folder", SNAPSHOT_PATH, "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
     }
 
     @Override
@@ -548,11 +551,17 @@ public final class HalyardStats extends AbstractHalyardTool {
     	if (cmd.hasOption('u') && !cmd.hasOption('t')) {
     		throw new MissingOptionException("Statistics cannot be written to a snapshot, please specify -t.");
     	}
-        String source = cmd.getOptionValue('s');
-        String target = cmd.getOptionValue('t');
-        String targetGraph = cmd.getOptionValue('g');
-        String graphContext = cmd.getOptionValue('c');
-        String thresh = cmd.getOptionValue('r');
+        configureString(cmd, 's', null);
+        configureString(cmd, 't', null);
+        configureString(cmd, 'g', null);
+        configureString(cmd, 'c', null);
+        configureString(cmd, 'u', null);
+        configureLong(cmd, 'r', DEFAULT_THRESHOLD);
+        String source = getConf().get(SOURCE);
+        String target = getConf().get(TARGET);
+        String targetGraph = getConf().get(TARGET_GRAPH);
+        String graphContext = getConf().get(GRAPH_CONTEXT);
+        String snapshotPath = getConf().get(SNAPSHOT_PATH);
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                NTriplesUtil.class,
                Rio.class,
@@ -564,31 +573,18 @@ public final class HalyardStats extends AbstractHalyardTool {
                AuthenticationProtos.class);
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardStats " + source + (target == null ? " update" : " -> " + target));
-        job.getConfiguration().set(SOURCE, source);
-        if (cmd.hasOption('u')) {
+        if (snapshotPath != null) {
 			FileSystem fs = CommonFSUtils.getRootDirFileSystem(getConf());
-        	if (fs.exists(new Path(cmd.getOptionValue('u')))) {
+        	if (fs.exists(new Path(snapshotPath))) {
         		throw new IOException("Snapshot restore directory already exists");
         	}
-            job.getConfiguration().set(SNAPSHOT_PATH, cmd.getOptionValue('u'));
-        }
-        if (target != null) {
-            job.getConfiguration().set(TARGET, target);
-        }
-        if (targetGraph != null) {
-            job.getConfiguration().set(TARGET_GRAPH, targetGraph);
-        }
-        if (graphContext != null) {
-            job.getConfiguration().set(GRAPH_CONTEXT, graphContext);
-        }
-        if (thresh != null) {
-            job.getConfiguration().setLong(THRESHOLD, Long.parseLong(thresh));
+            job.getConfiguration().set(SNAPSHOT_PATH, snapshotPath);
         }
         job.setJarByClass(HalyardStats.class);
         TableMapReduceUtil.initCredentials(job);
 
         RDFFactory rdfFactory;
-        Keyspace keyspace = HalyardTableUtils.getKeyspace(getConf(), source, cmd.getOptionValue('u'));
+        Keyspace keyspace = HalyardTableUtils.getKeyspace(getConf(), source, snapshotPath);
         try {
         	try (KeyspaceConnection kc = keyspace.getConnection()) {
         		rdfFactory = RDFFactory.create(kc);

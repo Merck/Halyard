@@ -53,6 +53,10 @@ public abstract class AbstractHalyardTool implements Tool {
 
     static final Logger LOG = LoggerFactory.getLogger(AbstractHalyardTool.class);
 
+    protected static String confProperty(String tool, String key) {
+        return "halyard-tools."+tool+"."+key;
+    }
+
     private Configuration conf;
     final String name, header, footer;
     private final Options options = new Options();
@@ -77,8 +81,11 @@ public abstract class AbstractHalyardTool implements Tool {
         hf.setOptionComparator(new Comparator<Option>() {
             @Override
             public int compare(Option o1, Option o2) {
-                if (o1 instanceof OrderedOption && o2 instanceof OrderedOption) return ((OrderedOption)o1).order - ((OrderedOption)o2).order;
-                else return 0;
+                if (o1 instanceof OrderedOption && o2 instanceof OrderedOption) {
+                	return ((OrderedOption)o1).order - ((OrderedOption)o2).order;
+                } else {
+                	return 0;
+                }
             }
         });
         hf.printHelp(100, "halyard " + name, header, options, footer, true);
@@ -94,8 +101,50 @@ public abstract class AbstractHalyardTool implements Tool {
         this.conf = c;
     }
 
+    protected void configureString(CommandLine cmd, char opt, String defaultValue) {
+    	OrderedOption option = (OrderedOption) options.getOption(Character.toString(opt));
+    	// command line args always override
+    	if (cmd.hasOption(opt)) {
+    		conf.set(option.confProperty, cmd.getOptionValue(opt));
+    	} else if (defaultValue != null) {
+    		conf.setIfUnset(option.confProperty, String.valueOf(defaultValue));
+    	}
+    }
+
+    protected void configureBoolean(CommandLine cmd, char opt) {
+    	OrderedOption option = (OrderedOption) options.getOption(Character.toString(opt));
+    	// command line args always override
+    	if (cmd.hasOption(opt)) {
+    		conf.setBoolean(option.confProperty, true);
+    	}
+    }
+
+    protected void configureInt(CommandLine cmd, char opt, int defaultValue) {
+    	OrderedOption option = (OrderedOption) options.getOption(Character.toString(opt));
+    	// command line args always override
+    	if (cmd.hasOption(opt)) {
+    		conf.setInt(option.confProperty, Integer.parseInt(cmd.getOptionValue(opt)));
+    	} else {
+    		conf.setIfUnset(option.confProperty, String.valueOf(defaultValue));
+    	}
+    }
+
+    protected void configureLong(CommandLine cmd, char opt, long defaultValue) {
+    	OrderedOption option = (OrderedOption) options.getOption(Character.toString(opt));
+    	// command line args always override
+    	if (cmd.hasOption(opt)) {
+    		conf.setLong(option.confProperty, Long.parseLong(cmd.getOptionValue(opt)));
+    	} else {
+    		conf.setIfUnset(option.confProperty, String.valueOf(defaultValue));
+    	}
+    }
+
     protected final void addOption(String opt, String longOpt, String argName, String description, boolean required, boolean single) {
-        Option o = new OrderedOption(opts++, opt, longOpt, argName, description, required);
+    	addOption(opt, longOpt, argName, null, description, required, single);
+    }
+
+    protected final void addOption(String opt, String longOpt, String argName, String confProperty, String description, boolean required, boolean single) {
+        Option o = new OrderedOption(opts++, opt, longOpt, argName, confProperty, description, required);
         options.addOption(o);
         if (single) {
             singleOptions.add(opt == null ? longOpt : opt);
@@ -116,12 +165,18 @@ public abstract class AbstractHalyardTool implements Tool {
     }
 
     private static final class OrderedOption extends Option {
-        final int order;
-        public OrderedOption(int order, String opt, String longOpt, String argName, String description, boolean required) {
-            super(opt, longOpt, argName != null, description);
+    	static String buildDescription(String desc, String confProperty) {
+    		 return (confProperty != null) ? desc+" (configuration file property: "+confProperty+")" : desc;
+    	}
+
+    	final int order;
+    	final String confProperty;
+        public OrderedOption(int order, String opt, String longOpt, String argName, String confProperty, String description, boolean required) {
+            super(opt, longOpt, argName != null, buildDescription(description, confProperty));
             setArgName(argName);
             setRequired(required);
             this.order = order;
+            this.confProperty = confProperty;
         }
     }
 

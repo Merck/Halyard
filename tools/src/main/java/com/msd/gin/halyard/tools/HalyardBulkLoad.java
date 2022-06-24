@@ -92,46 +92,49 @@ import org.eclipse.rdf4j.rio.turtle.TurtleParser;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardBulkLoad extends AbstractHalyardTool {
+	private static final String TOOL_NAME = "bulkload";
 
     /**
      * Property defining number of bits used for HBase region pre-splits calculation for new table
      */
-    public static final String SPLIT_BITS_PROPERTY = "halyard.table.splitbits";
+    public static final String SPLIT_BITS_PROPERTY = confProperty(TOOL_NAME, "table.splitbits");
 
     /**
      * Property truncating existing HBase table just before the bulk load
      */
-    public static final String TRUNCATE_PROPERTY = "halyard.table.truncate";
-
-    /**
-     * Boolean property ignoring RDF parsing errors
-     */
-    public static final String SKIP_INVALID_PROPERTY = "halyard.parser.skipinvalid";
-
-    /**
-     * Boolean property enabling RDF parser verification of data values
-     */
-    public static final String VERIFY_DATATYPE_VALUES_PROPERTY = "halyard.parser.verify.datatype.values";
-
-    /**
-     * Boolean property enforcing triples and quads context override with the default context
-     */
-    public static final String OVERRIDE_CONTEXT_PROPERTY = "halyard.parser.context.override";
-
-    /**
-     * Property defining default context for triples (or even for quads when context override is set)
-     */
-    public static final String DEFAULT_CONTEXT_PROPERTY = "halyard.parser.context.default";
+    public static final String TRUNCATE_PROPERTY = confProperty(TOOL_NAME, "table.truncate");
 
     /**
      * Property defining exact timestamp of all loaded triples (System.currentTimeMillis() is the default value)
      */
-    public static final String TIMESTAMP_PROPERTY = "halyard.bulk.timestamp";
+    public static final String TIMESTAMP_PROPERTY = confProperty(TOOL_NAME, "timestamp");
+
+    /**
+     * Boolean property ignoring RDF parsing errors
+     */
+    public static final String SKIP_INVALID_PROPERTY = confProperty("parser", "skipinvalid");
+
+    /**
+     * Boolean property enabling RDF parser verification of data values
+     */
+    public static final String VERIFY_DATATYPE_VALUES_PROPERTY = confProperty("parser", "verify.datatype.values");
+
+    /**
+     * Boolean property enforcing triples and quads context override with the default context
+     */
+    public static final String OVERRIDE_CONTEXT_PROPERTY = confProperty("parser", "context.override");
+
+    /**
+     * Property defining default context for triples (or even for quads when context override is set)
+     */
+    public static final String DEFAULT_CONTEXT_PROPERTY = confProperty("parser", "context.default");
 
     /**
      * Multiplier limiting maximum single file size in relation to the maximum split size, before it is processed in parallel (10x maximum split size)
      */
     private static final long MAX_SINGLE_FILE_MULTIPLIER = 10;
+    private static final int DEFAULT_SPLIT_BITS = 3;
+    private static final long DEFAULT_SPLIT_MAXSIZE = 200000000l;
 
     enum Counters {
 		ADDED_KVS,
@@ -279,7 +282,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         @Override
         public List<InputSplit> getSplits(JobContext job) throws IOException {
             List<InputSplit> splits = super.getSplits(job);
-            long maxSize = MAX_SINGLE_FILE_MULTIPLIER * job.getConfiguration().getLong("mapreduce.input.fileinputformat.split.maxsize", 0);
+            long maxSize = MAX_SINGLE_FILE_MULTIPLIER * job.getConfiguration().getLong(FileInputFormat.SPLIT_MAXSIZE, 0);
             if (maxSize > 0) {
                 List<InputSplit> newSplits = new ArrayList<>();
                 for (InputSplit spl : splits) {
@@ -408,7 +411,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
             this.verifyDataTypeValues = conf.getBoolean(VERIFY_DATATYPE_VALUES_PROPERTY, false);
             this.overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
             this.defaultRdfContextPattern = conf.get(DEFAULT_CONTEXT_PROPERTY);
-            this.maxSize = MAX_SINGLE_FILE_MULTIPLIER * conf.getLong("mapreduce.input.fileinputformat.split.maxsize", 0);
+            this.maxSize = MAX_SINGLE_FILE_MULTIPLIER * conf.getLong(FileInputFormat.SPLIT_MAXSIZE, 0);
         }
 
         public Statement getNext() throws IOException, InterruptedException {
@@ -569,7 +572,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
     public HalyardBulkLoad() {
         super(
-            "bulkload",
+            TOOL_NAME,
             "Halyard Bulk Load is a MapReduce application designed to efficiently load RDF data from Hadoop Filesystem (HDFS) into HBase in the form of a Halyard dataset.",
             "Halyard Bulk Load consumes RDF files in various formats supported by RDF4J RIO, including:\n"
                 + listRDF()
@@ -583,14 +586,14 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, target table is created if it does not exist, however optional HBase namespace of the target table must already exist", true, true);
-        addOption("i", "allow-invalid", null, "Optionally allow invalid IRI values (less overhead)", false, false);
-        addOption("d", "verify-data-types", null, "Optionally verify RDF data type values while parsing", false, false);
-        addOption("r", "truncate-target", null, "Optionally truncate target table just before the loading the new data", false, false);
-        addOption("b", "pre-split-bits", "bits", "Optionally specify bit depth of region pre-splits for a case when target table does not exist (default is 3)", false, true);
-        addOption("g", "default-named-graph", "named_graph", "Optionally specify default target named graph", false, true);
-        addOption("o", "named-graph-override", null, "Optionally override named graph also for quads, named graph is stripped from quads if --default-named-graph option is not specified", false, false);
-        addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all loaded records (default is actual time of the operation)", false, true);
-        addOption("m", "max-split-size", "size_in_bytes", "Optionally override maximum input split size, where also significantly larger single files will be processed in parallel (0 means no limit, default is 200000000)", false, true);
+        addOption("i", "allow-invalid", null, SKIP_INVALID_PROPERTY, "Optionally allow invalid IRI values (less overhead)", false, false);
+        addOption("d", "verify-data-types", null, VERIFY_DATATYPE_VALUES_PROPERTY, "Optionally verify RDF data type values while parsing", false, false);
+        addOption("r", "truncate-target", null, TRUNCATE_PROPERTY, "Optionally truncate target table just before the loading the new data", false, false);
+        addOption("b", "pre-split-bits", "bits", SPLIT_BITS_PROPERTY, "Optionally specify bit depth of region pre-splits for a case when target table does not exist (default is 3)", false, true);
+        addOption("g", "default-named-graph", "named_graph", DEFAULT_CONTEXT_PROPERTY, "Optionally specify default target named graph", false, true);
+        addOption("o", "named-graph-override", null, OVERRIDE_CONTEXT_PROPERTY, "Optionally override named graph also for quads, named graph is stripped from quads if --default-named-graph option is not specified", false, false);
+        addOption("e", "target-timestamp", "timestamp", TIMESTAMP_PROPERTY, "Optionally specify timestamp of all loaded records (default is actual time of the operation)", false, true);
+        addOption("m", "max-split-size", "size_in_bytes", FileInputFormat.SPLIT_MAXSIZE, "Optionally override maximum input split size, where significantly larger single files will be processed in parallel (0 means no limit, default is 200000000)", false, true);
     }
 
     @Override
@@ -598,18 +601,14 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         String source = cmd.getOptionValue('s');
         String workdir = cmd.getOptionValue('w');
         String target = cmd.getOptionValue('t');
-        getConf().setBoolean(SKIP_INVALID_PROPERTY, cmd.hasOption('i'));
-        getConf().setBoolean(VERIFY_DATATYPE_VALUES_PROPERTY, cmd.hasOption('d'));
-        getConf().setBoolean(TRUNCATE_PROPERTY, cmd.hasOption('r'));
-        getConf().setInt(SPLIT_BITS_PROPERTY, Integer.parseInt(cmd.getOptionValue('b', "3")));
-        if (cmd.hasOption('g')) {
-        	getConf().set(DEFAULT_CONTEXT_PROPERTY, cmd.getOptionValue('g'));
-        }
-        getConf().setBoolean(OVERRIDE_CONTEXT_PROPERTY, cmd.hasOption('o'));
-        getConf().setLong(TIMESTAMP_PROPERTY, cmd.hasOption('e') ? Long.parseLong(cmd.getOptionValue('e')) : System.currentTimeMillis());
-        if (cmd.hasOption('m')) {
-        	getConf().setLong("mapreduce.input.fileinputformat.split.maxsize", Long.parseLong(cmd.getOptionValue('m')));
-        }
+        configureBoolean(cmd, 'i');
+        configureBoolean(cmd, 'd');
+        configureBoolean(cmd, 'r');
+        configureInt(cmd, 'b', DEFAULT_SPLIT_BITS);
+        configureString(cmd, 'g', null);
+        configureBoolean(cmd, 'o');
+        configureLong(cmd, 'e', System.currentTimeMillis());
+        configureLong(cmd, 'm', DEFAULT_SPLIT_MAXSIZE);
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
             NTriplesUtil.class,
             Rio.class,
@@ -626,7 +625,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         job.setSpeculativeExecution(false);
         job.setReduceSpeculativeExecution(false);
 		Connection conn = HalyardTableUtils.getConnection(getConf());
-		try (Table hTable = HalyardTableUtils.getTable(conn, target, true, getConf().getInt(SPLIT_BITS_PROPERTY, 3))) {
+		try (Table hTable = HalyardTableUtils.getTable(conn, target, true, getConf().getInt(SPLIT_BITS_PROPERTY, DEFAULT_SPLIT_BITS))) {
 			RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());
 			HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), regionLocator);
             FileInputFormat.setInputDirRecursive(job, true);
