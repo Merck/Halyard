@@ -382,6 +382,17 @@ public class ValueIO {
 	private void loadNamespaces(Class<?> vocab) {
 		Collection<Namespace> namespaces = getNamespace(vocab);
 		addNamespaces(namespaces);
+
+		try {
+			Method getNamespaces = vocab.getMethod("getNamespaces");
+			namespaces = (Collection<Namespace>) getNamespaces.invoke(null);
+			addNamespaces(namespaces);
+		} catch (NoSuchMethodException e) {
+		} catch (IllegalAccessException e) {
+			throw new RuntimeException(e);
+		} catch (InvocationTargetException e) {
+			throw new RuntimeException(e.getCause());
+		}
 	}
 
 	private Set<Namespace> getNamespace(Class<?> vocabulary) {
