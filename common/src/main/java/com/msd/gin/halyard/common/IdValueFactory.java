@@ -25,7 +25,7 @@ public class IdValueFactory implements ValueFactory {
 	private final Literal FALSE;
 	public static final ValueFactory INSTANCE = new IdValueFactory();
 
-	IdValueFactory() {
+	protected IdValueFactory() {
 		this.TRUE = new IdentifiableLiteral(DELEGATE.createLiteral(true));
 		this.FALSE = new IdentifiableLiteral(DELEGATE.createLiteral(false));
 	}

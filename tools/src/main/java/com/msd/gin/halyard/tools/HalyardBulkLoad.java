@@ -30,7 +30,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -139,6 +138,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     enum Counters {
 		ADDED_KVS,
 		ADDED_STATEMENTS,
+		PARSE_QUEUE_EMPTY,
 		PARSE_QUEUE_FULL
 	}
 
@@ -212,12 +212,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     public static final class RDFMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, KeyValue> {
 
         private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
-        // formats like Turtle tend to favour recently used identifiers
-        private final LRUCache<Value,IRI> canonicalIdentifierCache = new LRUCache<>(100);
-        // predicates tend to have a more global distribution
-        private final LFUCache<Value,IRI> canonicalPredicateCache = new LFUCache<>(500, 0.2f);
         private RDFFactory rdfFactory;
-        private ValueFactory idValueFactory;
         private long timestamp;
         private long addedKvs;
         private long addedStmts;
@@ -226,31 +221,12 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             rdfFactory = RDFFactory.create(conf);
-            idValueFactory = IdValueFactory.INSTANCE;
             timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
-        }
-
-        private IRI getIdentifiableIRI(Map<Value,IRI> cache, Value iri) {
-            return cache.computeIfAbsent(iri, v -> idValueFactory.createIRI(v.stringValue()));
         }
 
         @Override
         protected void map(LongWritable key, Statement stmt, final Context output) throws IOException, InterruptedException {
-            Resource subj = stmt.getSubject();
-            if (subj.isIRI()) {
-                // subject may appear multiple times so cache hash and serialized form
-            	subj = getIdentifiableIRI(canonicalIdentifierCache, subj);
-            }
-            IRI pred = stmt.getPredicate();
-            // predicate may appear multiple times so cache hash and serialized form
-            pred = getIdentifiableIRI(canonicalPredicateCache, pred);
-            Value obj = stmt.getObject();
-            if (obj.isIRI()) {
-                // object may appear multiple times so cache hash and serialized form
-            	obj = getIdentifiableIRI(canonicalIdentifierCache, obj);
-            }
-            Resource ctx = stmt.getContext();
-            for (KeyValue keyValue: HalyardTableUtils.insertKeyValues(subj, pred, obj, ctx, timestamp, rdfFactory)) {
+            for (KeyValue keyValue: HalyardTableUtils.insertKeyValues(stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), stmt.getContext(), timestamp, rdfFactory)) {
                 rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                 output.write(rowKey, keyValue);
                 addedKvs++;
@@ -415,8 +391,12 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         }
 
         public Statement getNext() throws IOException, InterruptedException {
-            // empties queue on error
-            Statement s = queue.take();
+            // remove from queue even on error to empty it
+            Statement s = queue.poll();
+            if (s == null) {
+            	context.getCounter(Counters.PARSE_QUEUE_EMPTY).increment(1);
+            	s = queue.take();
+            }
             if (ex != null) {
                 throw new IOException("Exception while parsing: " + baseUri, ex);
             }
@@ -478,17 +458,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                     parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
                     if (defaultRdfContextPattern != null || overrideRdfContext) {
                         final IRI defaultRdfContext = defaultRdfContextPattern == null ? null : VF.createIRI(MessageFormat.format(defaultRdfContextPattern, localBaseUri, file.toUri().getPath(), file.getName()));
-                        parser.setValueFactory(new SimpleValueFactory(){
-                            @Override
-                            public Statement createStatement(Resource subject, IRI predicate, Value object) {
-                                return super.createStatement(subject, predicate, object, defaultRdfContext);
-                            }
-
-                            @Override
-                            public Statement createStatement(Resource subject, IRI predicate, Value object, Resource context) {
-                                return super.createStatement(subject, predicate, object, overrideRdfContext || context == null ? defaultRdfContext : context);
-                            }
-                        });
+                        parser.setValueFactory(new CachingIdValueFactory(overrideRdfContext, defaultRdfContext));
                     }
                     parser.parse(localIn, localBaseUri);
                 } catch (Exception e) {
@@ -549,6 +519,58 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         @Override
         public void fatalError(String msg, long lineNo, long colNo) {
             LOG.error(msg);
+        }
+    }
+
+    static final class CachingIdValueFactory extends IdValueFactory {
+        // LRU cache as formats like Turtle tend to favour recently used identifiers as subjects
+        private final LRUCache<String,IRI> lruIriCache = new LRUCache<>(100);
+        // LFU cache as predicates tend to have a more global distribution
+        private final LFUCache<String,IRI> lfuIriCache = new LFUCache<>(500, 0.2f);
+    	private final boolean overrideRdfContext;
+    	private final IRI defaultRdfContext;
+
+    	CachingIdValueFactory(boolean overrideRdfContext, IRI defaultRdfContext) {
+			this.overrideRdfContext = overrideRdfContext;
+			this.defaultRdfContext = defaultRdfContext;
+		}
+
+    	private IRI getOrCreateIRI(String v) {
+    		// check both caches
+    		IRI lruIri = lruIriCache.get(v);
+    		boolean inLru = (lruIri != null);
+    		IRI lfuIri = lfuIriCache.get(v);
+    		boolean inLfu = (lfuIri != null);
+    		// ascertain a value
+    		IRI iri = inLru ? lruIri : (inLfu ? lfuIri : super.createIRI(v));
+    		// update caches
+    		if (!inLru) {
+    			lruIriCache.put(v, iri);
+    		}
+    		if (!inLfu) {
+    			lfuIriCache.put(v, iri);
+    		}
+    		return iri;
+    	}
+
+    	@Override
+    	public IRI createIRI(String iri) {
+    		return getOrCreateIRI(iri);
+    	}
+
+    	@Override
+    	public IRI createIRI(String namespace, String localName) {
+    		return getOrCreateIRI(namespace+localName);
+    	}
+
+		@Override
+        public Statement createStatement(Resource subject, IRI predicate, Value object) {
+            return super.createStatement(subject, predicate, object, defaultRdfContext);
+        }
+
+        @Override
+        public Statement createStatement(Resource subject, IRI predicate, Value object, Resource context) {
+            return super.createStatement(subject, predicate, object, overrideRdfContext || context == null ? defaultRdfContext : context);
         }
     }
 
