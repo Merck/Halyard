@@ -66,7 +66,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
     private static final String OVERWRITE_PROPERTY = confProperty(TOOL_NAME, "overwrite");
     private static final String MAX_VERSIONS_PROPERTY = confProperty(TOOL_NAME, "maxVersions");
 
-    private static final long DEFAULT_SPLIT_LIMIT = 80000000l;
+    private static final long DEFAULT_SPLIT_LIMIT = 40000000000l;
     private static final int DEFAULT_DECIMATION_FACTOR = 1000;
     private static final int DEFAULT_MAX_VERSIONS = 1;
 
@@ -85,14 +85,15 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         private final Random random = new Random(0);
         private RDFFactory rdfFactory;
         private long counter = 0, next = 0;
-        private int decimationFactor;
+        private int maxIncrement;
         private long stmtCount = 0L;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             rdfFactory = RDFFactory.create(conf);
-            decimationFactor = conf.getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
+            int decimationFactor = conf.getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
+            maxIncrement = 2*decimationFactor - 1;
             // prefix splits
             for (byte b = 1; b < StatementIndex.Name.values().length; b++) {
                 context.write(new ImmutableBytesWritable(new byte[] {b}), new LongWritable(1));
@@ -102,7 +103,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         @Override
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
             if (counter++ == next) {
-                next = counter + random.nextInt(decimationFactor);
+                next = counter + random.nextInt(maxIncrement);
                 for (KeyValue keyValue: HalyardTableUtils.insertKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), 0, rdfFactory)) {
                     rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                     keyValueLength.set(keyValue.getLength());
@@ -120,13 +121,15 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 
     static final class PreSplitReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
 
-        private long size = 0, splitLimit;
-        private byte lastRegion = 0;
         private final List<byte[]> splits = new ArrayList<>();
+        private long size = 0, splitLimit;
+        private int decimationFactor;
+        private byte lastRegion = 0;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             splitLimit = context.getConfiguration().getLong(SPLIT_LIMIT_PROPERTY, DEFAULT_SPLIT_LIMIT);
+            decimationFactor = context.getConfiguration().getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
         }
 
         @Override
@@ -140,7 +143,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
                 size = 0;
             }
             for (LongWritable val : values) {
-                size += val.get();
+                size += val.get() * decimationFactor;
             }
         }
 
