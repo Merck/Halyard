@@ -137,9 +137,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
     enum Counters {
 		ADDED_KVS,
-		ADDED_STATEMENTS,
-		PARSE_QUEUE_EMPTY,
-		PARSE_QUEUE_FULL
+		ADDED_STATEMENTS
 	}
 
     static void setParsers() {
@@ -359,6 +357,12 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     private static final Statement END_STATEMENT = VF.createStatement(NOP, NOP, NOP);
 
     private static final class ParserPump extends AbstractRDFHandler implements Closeable, Runnable, ParseErrorListener {
+
+    	enum Counters {
+    		PARSE_QUEUE_EMPTY,
+    		PARSE_QUEUE_FULL
+    	}
+
         private final TaskAttemptContext context;
         private final Path paths[];
         private final long[] sizes, offsets;

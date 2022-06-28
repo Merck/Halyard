@@ -57,6 +57,10 @@ public abstract class AbstractHalyardTool implements Tool {
         return "halyard-tools."+tool+"."+key;
     }
 
+    private static final String SOURCE_PROPERTIES = "source";
+    protected static final String SOURCE_TABLE_PROPERTY = confProperty(SOURCE_PROPERTIES, "table");
+    protected static final String SNAPSHOT_PATH_PROPERTY = confProperty(SOURCE_PROPERTIES, "snapshot");
+
     private Configuration conf;
     final String name, header, footer;
     private final Options options = new Options();

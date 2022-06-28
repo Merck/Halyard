@@ -70,13 +70,16 @@ import org.json.JSONObject;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardElasticIndexer extends AbstractHalyardTool {
+	private static final String TOOL_NAME = "esindex";
 
-    private static final String SOURCE = "halyard.elastic.source";
-    private static final String SNAPSHOT_PATH = "halyard.elastic.snapshot";
+	private static final String NAMED_GRAPH_PROPERTY = confProperty(TOOL_NAME, "namedGraph");
+	private static final String MULTITABLE_PROPERTY = confProperty(TOOL_NAME, "multitable");
 
     static final class IndexerMapper extends RdfTableMapper<NullWritable, Text>  {
 
         final Text outputJson = new Text();
+        String source;
+        boolean isMultitable;
         int objectKeySize;
         int contextKeySize;
         long counter = 0, exports = 0, statements = 0;
@@ -86,7 +89,9 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException {
             Configuration conf = context.getConfiguration();
-            openKeyspace(conf, conf.get(SOURCE), conf.get(SNAPSHOT_PATH));
+            source =  conf.get(SOURCE_TABLE_PROPERTY);
+            isMultitable = conf.getBoolean(MULTITABLE_PROPERTY, false);
+            openKeyspace(conf, source, conf.get(SNAPSHOT_PATH_PROPERTY));
             objectKeySize = rdfFactory.getObjectRole().keyHashSize();
             contextKeySize = rdfFactory.getContextRole().keyHashSize();
             lastHash = new byte[objectKeySize];
@@ -111,7 +116,11 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 if (literals.add(l)) {
             		try(StringBuilderWriter json = new StringBuilderWriter(128)) {
 		                json.append("{\"id\":");
-		                JSONObject.quote(rdfFactory.id(l).toString(), json);
+		                String id = rdfFactory.id(l).toString();
+		                if (isMultitable) {
+		                	id = source + ':' + id;
+		                }
+		                JSONObject.quote(id, json);
 		                json.append(",\"label\":");
 		                JSONObject.quote(l.getLabel(), json);
 		                if(l.getLanguage().isPresent()) {
@@ -138,29 +147,36 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
     public HalyardElasticIndexer() {
         super(
-            "esindex",
+            TOOL_NAME,
             "Halyard ElasticSearch Index is a MapReduce application that indexes all literals in the given dataset into a supplementary ElasticSearch server/cluster. "
                 + "A Halyard repository configured with such supplementary ElasticSearch index can then provide more advanced text search features over the indexed literals.",
             "Default index configuration is:\n"
-            + getMappingConfig("\u00A0", "2*<num_of_region_servers>", "1")
+            + getMappingConfig("\u00A0", "2*<num_of_region_servers>", "1", "<table_name>")
             + "Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index"
         );
-        addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
+        addOption("s", "source-dataset", "dataset_table", SOURCE_TABLE_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-index", "target_url", "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
         addOption("c", "create-index", null, "Optionally create Elasticsearch index", false, true);
-        addOption("g", "named-graph", "named_graph", "Optional restrict indexing to the given named graph only", false, true);
-        addOption("u", "restore-dir", "restore_folder", "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
+        addOption("g", "named-graph", "named_graph", NAMED_GRAPH_PROPERTY, "Optionally restrict indexing to the given named graph only", false, true);
+        addOption("u", "restore-dir", "restore_folder", SNAPSHOT_PATH_PROPERTY, "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
+        addOption("m", "multitable-index", null, MULTITABLE_PROPERTY, "Create a multitable index", false, true);
     }
 
-    private static String getMappingConfig(String linePrefix, String shards, String replicas) {
-        return    linePrefix + "{\n"
+    private static String getMappingConfig(String linePrefix, String shards, String replicas, String tableName) {
+        String config =
+                  linePrefix + "{\n"
                 + linePrefix + "    \"mappings\" : {\n"
                 + linePrefix + "        \"properties\" : {\n"
                 + linePrefix + "            \"id\" : { \"type\" : \"keyword\", \"index\" : false },\n"
                 + linePrefix + "            \"label\" : { \"type\" : \"text\" },\n"
                 + linePrefix + "            \"datatype\" : { \"type\" : \"keyword\", \"index\" : false },\n"
-                + linePrefix + "            \"lang\" : { \"type\" : \"keyword\", \"index\" : false }\n"
-                + linePrefix + "        }\n"
+                + linePrefix + "            \"lang\" : { \"type\" : \"keyword\", \"index\" : false },\n";
+        if (tableName != null) {
+        config += linePrefix + "            \"table\" : { \"type\" : \"constant_keyword\", \"value\" : \"" + tableName + "\" }\n";
+        } else {
+        config += linePrefix + "            \"table\" : { \"type\" : \"keyword\", \"index\" : false }\n";
+        }
+        config += linePrefix + "        }\n"
                 + linePrefix + "    },\n"
                 + linePrefix + "   \"settings\": {\n"
                 + linePrefix + "       \"index.query.default_field\": \"label\",\n"
@@ -169,13 +185,27 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 + linePrefix + "       \"number_of_replicas\": " + replicas + "\n"
                 + linePrefix + "    }\n"
                 + linePrefix + "}\n";
+        return config;
     }
 
     @Override
     public int run(CommandLine cmd) throws Exception {
-        String source = cmd.getOptionValue('s');
+        configureString(cmd, 's', null);
+        configureString(cmd, 'u', null);
+        configureBoolean(cmd, 'm');
+        configureString(cmd, 'g', null);
+        String source = getConf().get(SOURCE_TABLE_PROPERTY);
         String target = cmd.getOptionValue('t');
         URL targetUrl = new URL(target);
+        String snapshotPath = getConf().get(SNAPSHOT_PATH_PROPERTY);
+        if (snapshotPath != null) {
+			FileSystem fs = CommonFSUtils.getRootDirFileSystem(getConf());
+        	if (fs.exists(new Path(snapshotPath))) {
+        		throw new IOException("Snapshot restore directory already exists");
+        	}
+        }
+        String namedGraph = getConf().get(NAMED_GRAPH_PROPERTY);
+        boolean isMultitable = getConf().getBoolean(MULTITABLE_PROPERTY, false);
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                NTriplesUtil.class,
                Rio.class,
@@ -190,14 +220,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         }
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardElasticIndexer " + source + " -> " + target);
-        job.getConfiguration().set(SOURCE, source);
-        if (cmd.hasOption('u')) {
-			FileSystem fs = CommonFSUtils.getRootDirFileSystem(getConf());
-        	if (fs.exists(new Path(cmd.getOptionValue('u')))) {
-        		throw new IOException("Snapshot restore directory already exists");
-        	}
-            job.getConfiguration().set(SNAPSHOT_PATH, cmd.getOptionValue('u'));
-        }
         if (cmd.hasOption('c')) {
             int shards;
             int replicas = 1;
@@ -210,7 +232,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             http.setRequestMethod("PUT");
             http.setDoOutput(true);
             http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-            byte b[] = Bytes.toBytes(getMappingConfig("", Integer.toString(shards), Integer.toString(replicas)));
+            byte b[] = Bytes.toBytes(getMappingConfig("", Integer.toString(shards), Integer.toString(replicas), isMultitable ? null : source));
             http.setFixedLengthStreamingMode(b.length);
             http.connect();
             try {
@@ -240,7 +262,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         TableMapReduceUtil.initCredentials(job);
 
         RDFFactory rdfFactory;
-        Keyspace keyspace = HalyardTableUtils.getKeyspace(getConf(), source, cmd.getOptionValue('u'));
+        Keyspace keyspace = HalyardTableUtils.getKeyspace(getConf(), source, snapshotPath);
         try {
         	try (KeyspaceConnection kc = keyspace.getConnection()) {
         		rdfFactory = RDFFactory.create(kc);
@@ -249,9 +271,9 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 			keyspace.close();
 		}
         Scan scan;
-        if (cmd.hasOption('g')) {
+        if (namedGraph != null) {
             //scan only given named graph from COSP literal region(s)
-        	Resource graph = NTriplesUtil.parseResource(cmd.getOptionValue('g'), SimpleValueFactory.getInstance());
+        	Resource graph = NTriplesUtil.parseResource(namedGraph, SimpleValueFactory.getInstance());
         	scan = StatementIndex.scanLiterals(graph, rdfFactory);
         } else {
             //scan OSP literal region(s)
