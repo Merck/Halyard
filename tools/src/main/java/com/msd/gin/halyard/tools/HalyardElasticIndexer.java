@@ -89,7 +89,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException {
             Configuration conf = context.getConfiguration();
-            source =  conf.get(SOURCE_TABLE_PROPERTY);
+            source =  conf.get(SOURCE_NAME_PROPERTY);
             isMultitable = conf.getBoolean(MULTITABLE_PROPERTY, false);
             openKeyspace(conf, source, conf.get(SNAPSHOT_PATH_PROPERTY));
             objectKeySize = rdfFactory.getObjectRole().keyHashSize();
@@ -154,7 +154,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             + getMappingConfig("\u00A0", "2*<num_of_region_servers>", "1", "<table_name>")
             + "Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index"
         );
-        addOption("s", "source-dataset", "dataset_table", SOURCE_TABLE_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
+        addOption("s", "source-dataset", "dataset_table", SOURCE_NAME_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-index", "target_url", "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
         addOption("c", "create-index", null, "Optionally create Elasticsearch index", false, true);
         addOption("g", "named-graph", "named_graph", NAMED_GRAPH_PROPERTY, "Optionally restrict indexing to the given named graph only", false, true);
@@ -194,7 +194,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         configureString(cmd, 'u', null);
         configureBoolean(cmd, 'm');
         configureString(cmd, 'g', null);
-        String source = getConf().get(SOURCE_TABLE_PROPERTY);
+        String source = getConf().get(SOURCE_NAME_PROPERTY);
         String target = cmd.getOptionValue('t');
         URL targetUrl = new URL(target);
         String snapshotPath = getConf().get(SNAPSHOT_PATH_PROPERTY);

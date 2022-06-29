@@ -58,7 +58,7 @@ public abstract class AbstractHalyardTool implements Tool {
     }
 
     private static final String SOURCE_PROPERTIES = "source";
-    protected static final String SOURCE_TABLE_PROPERTY = confProperty(SOURCE_PROPERTIES, "table");
+    protected static final String SOURCE_NAME_PROPERTY = confProperty(SOURCE_PROPERTIES, "name");
     protected static final String SNAPSHOT_PATH_PROPERTY = confProperty(SOURCE_PROPERTIES, "snapshot");
 
     private Configuration conf;
