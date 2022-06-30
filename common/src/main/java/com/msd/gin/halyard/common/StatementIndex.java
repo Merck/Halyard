@@ -2,6 +2,7 @@ package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -50,6 +51,28 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 			cardinality,
 			true
 		);
+	}
+
+	public static final Scan scanDefaultIndices(RDFFactory rdfFactory) {
+		StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo = rdfFactory.getSPOIndex();
+		StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> osp = rdfFactory.getOSPIndex();
+		int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
+		return HalyardTableUtils.scan(
+			spo.concat(false, spo.role1.startKey(), spo.role2.startKey(), spo.get3StartKey(), spo.get4StartKey()),
+			osp.concat(true, osp.role1.stopKey(), osp.role2.stopKey(), osp.get3StopKey(), osp.role4.endStopKey()),
+			cardinality,
+			true
+		);
+	}
+
+	public static final List<Scan> scanContextIndices(Resource graph, RDFFactory rdfFactory) {
+		List<Scan> scans = new ArrayList<>(3);
+		RDFContext ctx = rdfFactory.createContext(graph);
+		List<StatementIndex<SPOC.C,?,?,?>> indices = Arrays.asList(rdfFactory.getCSPOIndex(), rdfFactory.getCPOSIndex(), rdfFactory.getCOSPIndex());
+		for (StatementIndex<SPOC.C,?,?,?> index : indices) {
+			scans.add(index.scan(ctx));
+		}
+		return scans;
 	}
 
 	public static final Scan scanLiterals(RDFFactory rdfFactory) {

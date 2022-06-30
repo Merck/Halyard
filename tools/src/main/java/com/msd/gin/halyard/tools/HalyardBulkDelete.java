@@ -247,7 +247,20 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 		} finally {
 			keyspace.close();
 		}
-        List<Scan> scans = Collections.singletonList(StatementIndex.scanAll(rdfFactory));
+        String[] namedGraphs = cmd.getOptionValues('g');
+        List<Scan> scans;
+        if (namedGraphs != null && namedGraphs.length > 0) {
+        	scans = new ArrayList<>(1 + namedGraphs.length);
+        	scans.add(StatementIndex.scanDefaultIndices(rdfFactory));
+        	for (String graph : namedGraphs) {
+        		if (!DEFAULT_GRAPH_KEYWORD.equals(graph)) {
+        			Resource ctx = IdValueFactory.INSTANCE.createIRI(graph);
+            		scans.addAll(StatementIndex.scanContextIndices(ctx, rdfFactory));
+        		}
+        	}
+        } else {
+        	scans = Collections.singletonList(StatementIndex.scanAll(rdfFactory));
+        }
         try {
             for (int i=0; !scans.isEmpty(); i++) {
                 Job job = Job.getInstance(getConf(), "HalyardDelete " + source);

@@ -45,6 +45,8 @@ public class StatementIndexScanTest {
 	private static RDFFactory rdfFactory;
 	private static ValueIO.Reader reader;
     private static Set<Statement> allStatements;
+    private static Set<Statement> defaultGraphStatements;
+    private static Set<Statement> namedGraphStatements;
     private static Set<Literal> allLiterals;
     private static Set<Literal> stringLiterals;
     private static Set<Literal> nonstringLiterals;
@@ -74,17 +76,26 @@ public class StatementIndexScanTest {
         allLiterals.addAll(stringLiterals);
         allLiterals.addAll(nonstringLiterals);
         Resource subj = vf.createIRI(SUBJ);
+        Resource ctx = vf.createIRI(CTX);
         allStatements = new HashSet<>();
+        namedGraphStatements = new HashSet<>();
         allTriples = new HashSet<>();
         for (Literal l : allLiterals) {
-            allStatements.add(vf.createStatement(subj, RDF.VALUE, l, vf.createIRI(CTX)));
+        	Statement stmt = vf.createStatement(subj, RDF.VALUE, l, ctx);
+        	namedGraphStatements.add(stmt);
+            allStatements.add(stmt);
             // add some non-literal objects
-            allStatements.add(vf.createStatement(subj, OWL.SAMEAS, vf.createBNode(), vf.createIRI(CTX)));
+            stmt = vf.createStatement(subj, OWL.SAMEAS, vf.createBNode(), ctx);
+        	namedGraphStatements.add(stmt);
+            allStatements.add(stmt);
             // add some triples
             Triple t = vf.createTriple(subj, RDF.VALUE, l);
             allTriples.add(t);
             allStatements.add(vf.createStatement(subj, RDFS.SEEALSO, t));
         }
+        defaultGraphStatements = new HashSet<>();
+        defaultGraphStatements.addAll(allStatements);
+        defaultGraphStatements.addAll(namedGraphStatements);
         long timestamp = System.currentTimeMillis();
 		List<Put> puts = new ArrayList<>();
 		for (Statement stmt : allStatements) {
@@ -117,6 +128,38 @@ public class StatementIndexScanTest {
             }
         }
         assertSets(allStatements, actual);
+    }
+
+    @Test
+    public void testScanDefaultIndices() throws Exception {
+        Set<Statement> actual = new HashSet<>();
+        Scan scan = StatementIndex.scanDefaultIndices(rdfFactory);
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
+            Result r;
+            while ((r = rs.next()) != null) {
+                for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
+                    actual.add(stmt);
+                }
+            }
+        }
+        assertSets(defaultGraphStatements, actual);
+    }
+
+    @Test
+    public void testScanContextIndices() throws Exception {
+        Set<Statement> actual = new HashSet<>();
+        List<Scan> scans = StatementIndex.scanContextIndices(vf.createIRI(CTX), rdfFactory);
+        for (Scan scan : scans) {
+	        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
+	            Result r;
+	            while ((r = rs.next()) != null) {
+	                for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
+	                    actual.add(stmt);
+	                }
+	            }
+	        }
+	        assertSets(namedGraphStatements, actual);
+        }
     }
 
     @Test
