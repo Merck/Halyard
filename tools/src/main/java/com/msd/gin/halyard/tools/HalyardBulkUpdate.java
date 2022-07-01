@@ -262,7 +262,6 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
             job.setMapOutputValueClass(KeyValue.class);
             job.setInputFormatClass(QueryInputFormat.class);
             job.setSpeculativeExecution(false);
-            job.setReduceSpeculativeExecution(false);
 			Connection conn = HalyardTableUtils.getConnection(getConf());
 			try (Table hTable = HalyardTableUtils.getTable(conn, source, false, 0)) {
 				RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());

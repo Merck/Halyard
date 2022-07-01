@@ -650,7 +650,6 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         job.setMapOutputValueClass(KeyValue.class);
         job.setInputFormatClass(RioFileInputFormat.class);
         job.setSpeculativeExecution(false);
-        job.setReduceSpeculativeExecution(false);
 		Connection conn = HalyardTableUtils.getConnection(getConf());
 		try (Table hTable = HalyardTableUtils.getTable(conn, target, true, getConf().getInt(SPLIT_BITS_PROPERTY, DEFAULT_SPLIT_BITS))) {
 			RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());

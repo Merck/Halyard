@@ -275,8 +275,6 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
                 job.setMapOutputKeyClass(ImmutableBytesWritable.class);
                 job.setMapOutputValueClass(KeyValue.class);
                 job.setSpeculativeExecution(false);
-                job.setMapSpeculativeExecution(false);
-                job.setReduceSpeculativeExecution(false);
                 TableName hTableName;
         		try (Connection conn = HalyardTableUtils.getConnection(getConf())) {
         			try (Table hTable = HalyardTableUtils.getTable(conn, target, false, 0)) {

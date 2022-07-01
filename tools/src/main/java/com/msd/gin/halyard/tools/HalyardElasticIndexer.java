@@ -28,10 +28,20 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.Set;
+
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.io.IOUtils;
@@ -73,10 +83,14 @@ import org.json.JSONObject;
 public final class HalyardElasticIndexer extends AbstractHalyardTool {
 	private static final String TOOL_NAME = "esindex";
 
-	private static final String INDEX_URL_PROPERTY = confProperty(TOOL_NAME, "index-url");
-	private static final String CREATE_INDEX_PROPERTY = confProperty(TOOL_NAME, "create-index");
+	private static final String INDEX_URL_PROPERTY = confProperty(TOOL_NAME, "index.url");
+	private static final String CREATE_INDEX_PROPERTY = confProperty(TOOL_NAME, "index.create");
 	private static final String NAMED_GRAPH_PROPERTY = confProperty(TOOL_NAME, "named-graph");
 	private static final String MULTITABLE_PROPERTY = confProperty(TOOL_NAME, "multitable");
+
+	enum Counters {
+		INDEXED_LITERALS
+	}
 
     static final class IndexerMapper extends RdfTableMapper<NullWritable, Text>  {
 
@@ -145,6 +159,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         @Override
         protected void cleanup(Context output) throws IOException {
         	closeKeyspace();
+        	output.getCounter(Counters.INDEXED_LITERALS).setValue(exports);
         }
     }
 
@@ -212,6 +227,14 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         }
         String namedGraph = getConf().get(NAMED_GRAPH_PROPERTY);
         boolean isMultitable = getConf().getBoolean(MULTITABLE_PROPERTY, false);
+
+        getConf().set("es.nodes", targetUrl.getHost()+":"+targetUrl.getPort());
+        getConf().set("es.resource", targetUrl.getPath());
+        getConf().set("es.mapping.id", "id");
+        getConf().set("es.input.json", "yes");
+        getConf().setIfUnset("es.batch.size.bytes", Integer.toString(5*1024*1024));
+        getConf().setIfUnset("es.batch.size.entries", Integer.toString(10000));
+
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                NTriplesUtil.class,
                Rio.class,
@@ -235,9 +258,19 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 }
             }
             HttpURLConnection http = (HttpURLConnection)targetUrl.openConnection();
+            if (http instanceof HttpsURLConnection) {
+            	configureSSL((HttpsURLConnection) http);
+            }
             http.setRequestMethod("PUT");
             http.setDoOutput(true);
             http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            String esUser = getConf().get("es.net.http.auth.user");
+            if (esUser != null) {
+            	String esPassword = getConf().get("es.net.http.auth.pass");
+            	String userPass = esUser + ':' + esPassword;
+            	String basicAuth = "Basic " + Base64.getEncoder().encodeToString(userPass.getBytes(StandardCharsets.UTF_8));
+            	http.setRequestProperty("Authorization", basicAuth);
+            }
             byte b[] = Bytes.toBytes(getMappingConfig("", Integer.toString(shards), Integer.toString(replicas), isMultitable ? null : source));
             http.setFixedLengthStreamingMode(b.length);
             http.connect();
@@ -292,19 +325,15 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             NullWritable.class,
             Text.class,
             job);
-        job.getConfiguration().setBoolean("mapreduce.map.speculative", false);    
-        job.getConfiguration().setBoolean("mapreduce.reduce.speculative", false); 
-        job.getConfiguration().set("es.nodes", targetUrl.getHost()+":"+targetUrl.getPort());
-        job.getConfiguration().set("es.resource", targetUrl.getPath());
-        job.getConfiguration().set("es.mapping.id", "id");
-        job.getConfiguration().setInt("es.batch.size.bytes", 5*1024*1024);
-        job.getConfiguration().setInt("es.batch.size.entries", 10000);
-        job.getConfiguration().set("es.input.json", "yes");
         job.setOutputFormatClass(EsOutputFormat.class);
         job.setNumReduceTasks(0);
+        job.setSpeculativeExecution(false);
 	    try {
 	        if (job.waitForCompletion(true)) {
 	            HttpURLConnection http = (HttpURLConnection)new URL(target + "_refresh").openConnection();
+	            if (http instanceof HttpsURLConnection) {
+	            	configureSSL((HttpsURLConnection) http);
+	            }
 	            http.connect();
 	            http.disconnect();
 	            LOG.info("Elastic indexing completed.");
@@ -316,5 +345,38 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         } finally {
         	keyspace.destroy();
         }
+    }
+
+    private void configureSSL(HttpsURLConnection https) throws IOException, GeneralSecurityException {
+    	KeyManager[] keyManagers = null;
+    	String keyStoreLocation = getConf().get("es.net.ssl.keystore.location");
+    	if (keyStoreLocation != null) {
+    		String keyStoreType = getConf().get("es.net.ssl.keystore.type", "jks");
+    		char[] keyStorePass = getConf().get("es.net.ssl.keystore.pass").toCharArray();
+    		KeyStore keyStore = KeyStore.getInstance(keyStoreType);
+    		try (InputStream keyStoreIn = new URL(keyStoreLocation).openStream()) {
+    			keyStore.load(keyStoreIn, keyStorePass);
+    		}
+    		KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+    		keyManagerFactory.init(keyStore, keyStorePass);
+    		keyManagers = keyManagerFactory.getKeyManagers();
+    	}
+
+    	TrustManager[] trustManagers = null;
+    	String trustStoreLocation = getConf().get("es.net.ssl.truststore.location");
+    	if (trustStoreLocation != null) {
+    		char[] trustStorePass = getConf().get("es.net.ssl.truststore.pass").toCharArray();
+    		KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+    		try (InputStream trustStoreIn = new URL(keyStoreLocation).openStream()) {
+    			trustStore.load(trustStoreIn, trustStorePass);
+    		}
+    		TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+    		trustManagerFactory.init(trustStore);
+    		trustManagers = trustManagerFactory.getTrustManagers();
+    	}
+
+    	SSLContext sslContext = SSLContext.getInstance(getConf().get("es.net.ssl.protocol", "TLS"));
+    	sslContext.init(keyManagers, trustManagers, null);
+    	https.setSSLSocketFactory(sslContext.getSocketFactory());
     }
 }
