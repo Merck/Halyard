@@ -1116,25 +1116,26 @@ public class ValueIO {
 					IRI iri = wellKnownIris.get(irihash);
 					if (iri == null) {
 						b.limit(b.position()).reset();
-						throw new IllegalStateException(String.format("Unknown IRI hash: %s", Hashes.encode(b)));
+						throw new IllegalStateException(String.format("Unknown IRI hash: %s (%d)", Hashes.encode(b), irihash));
 					}
 					return iri;
 				case NAMESPACE_HASH_TYPE:
 					b.mark();
 					Short nshash = b.getShort(); // 16-bit hash
 					String namespace = wellKnownNamespaces.get(nshash);
+					String localName = readUncompressedString(b);
 					if (namespace == null) {
 						b.limit(b.position()).reset();
-						throw new IllegalStateException(String.format("Unknown namespace hash: %s", Hashes.encode(b)));
+						throw new IllegalStateException(String.format("Unknown namespace hash: %s (%d) (local name %s)", Hashes.encode(b), nshash, localName));
 					}
-					return vf.createIRI(namespace, readUncompressedString(b));
+					return vf.createIRI(namespace, localName);
 				case ENCODED_IRI_TYPE:
 					b.mark();
 					nshash = b.getShort(); // 16-bit hash
 					IRIEncodingNamespace iriEncoder = iriEncoders.get(nshash);
 					if (iriEncoder == null) {
 						b.limit(b.position()).reset();
-						throw new IllegalStateException(String.format("Unknown IRI encoder hash: %s", Hashes.encode(b)));
+						throw new IllegalStateException(String.format("Unknown IRI encoder hash: %s (%d)", Hashes.encode(b), nshash));
 					}
 					return vf.createIRI(iriEncoder.getName(), iriEncoder.readBytes(b));
 				case END_SLASH_ENCODED_IRI_TYPE:
@@ -1143,7 +1144,7 @@ public class ValueIO {
 					iriEncoder = iriEncoders.get(nshash);
 					if (iriEncoder == null) {
 						b.limit(b.position()).reset();
-						throw new IllegalStateException(String.format("Unknown IRI encoder hash: %s", Hashes.encode(b)));
+						throw new IllegalStateException(String.format("Unknown IRI encoder hash: %s (%d)", Hashes.encode(b), nshash));
 					}
 					return vf.createIRI(iriEncoder.getName()+iriEncoder.readBytes(b)+'/');
 				case BNODE_TYPE:
@@ -1151,24 +1152,27 @@ public class ValueIO {
 				case LANGUAGE_HASH_LITERAL_TYPE:
 					b.mark();
 					Short langHash = b.getShort(); // 16-bit hash
+					String label = readString(b);
 					String lang = wellKnownLangs.get(langHash);
 					if (lang == null) {
 						b.limit(b.position()).reset();
-						throw new IllegalStateException(String.format("Unknown language tag hash: %s", Hashes.encode(b)));
+						throw new IllegalStateException(String.format("Unknown language tag hash: %s (%d) (label %s)", Hashes.encode(b), langHash, label));
 					}
-					return vf.createLiteral(readString(b), lang);
+					return vf.createLiteral(label, lang);
 				case LANGUAGE_LITERAL_TYPE:
 					int langSize = b.get();
 					b.limit(b.position()+langSize);
 					lang = readUncompressedString(b);
 					b.limit(originalLimit);
-					return vf.createLiteral(readString(b), lang);
+					label = readString(b);
+					return vf.createLiteral(label, lang);
 				case DATATYPE_LITERAL_TYPE:
 					int dtSize = b.getShort();
 					b.limit(b.position()+dtSize);
 					IRI datatype = (IRI) readValue(b);
 					b.limit(originalLimit);
-					return vf.createLiteral(readUncompressedString(b), datatype);
+					label = readUncompressedString(b);
+					return vf.createLiteral(label, datatype);
 				case TRIPLE_TYPE:
 					if (tf == null) {
 						throw new IllegalStateException("Unexpected triple value or missing TripleFactory");
