@@ -223,8 +223,8 @@ Example: halyard bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t my
 ### Halyard Stats
 ```
 $ ./halyard stats -h
-usage: halyard stats [-h] [-v] -s <dataset_table> [-t <target_url>] [-r <size>] [-c <named_graph>]
-       [-g <target_graph>]
+usage: halyard stats [-h] [-v] -s <dataset_table> [-t <target_url>] [-r <size>] [-g <named_graph>]
+       [-o <target_graph>]
 Halyard Stats is a MapReduce application that calculates dataset statistics and stores them in the
 named graph within the dataset or exports them into a file. The generated statistics are described
 by the VoID vocabulary, its extensions, and the SPARQL 1.1 Service Description.
@@ -236,9 +236,9 @@ by the VoID vocabulary, its extensions, and the SPARQL 1.1 Service Description.
                                          hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]
  -r,--threshold <size>                   Optional minimal size of a named graph to calculate
                                          statistics for (default is 1000)
- -c,--named-graph <named_graph>          Optional restrict stats calculation to the given named
+ -g,--named-graph <named_graph>          Optional restrict stats calculation to the given named
                                          graph only
- -g,--stats-named-graph <target_graph>   Optional target named graph of the exported statistics
+ -o,--stats-named-graph <target_graph>   Optional target named graph of the exported statistics
                                          (default value is
                                          'http://merck.github.io/Halyard/ns#statsContext'),
                                          modification is recomended only for external export as
@@ -538,14 +538,14 @@ hdfs:/my_folder/{0}-{1}.csv.gz
 ### Halyard Bulk Delete
 ```
 $ ./halyard bulkdelete -h
-usage: halyard bulkdelete [-h] [-v] -t <dataset_table> -f <temporary_folder> [-s <subject>] [-p
+usage: halyard bulkdelete [-h] [-v] -t <dataset_table> -w <temporary_folder> [-s <subject>] [-p
        <predicate>] [-o <object>] [-g <named_graph>]
 Halyard Bulk Delete is a MapReduce application that effectively deletes large set of triples or
 whole named graphs, based on specified statement pattern and/or named graph(s).
  -h,--help                             Prints this help
  -v,--version                          Prints version
  -t,--target-dataset <dataset_table>   HBase table with Halyard RDF store
- -f,--temp-folder <temporary_folder>   Temporary folder for HBase files
+ -w,--temp-folder <temporary_folder>   Temporary folder for HBase files
  -s,--subject <subject>                Optional subject to delete
  -p,--predicate <predicate>            Optional predicate to delete
  -o,--object <object>                  Optional object to delete

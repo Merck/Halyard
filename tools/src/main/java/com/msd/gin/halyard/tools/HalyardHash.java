@@ -33,8 +33,9 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
 
 public final class HalyardHash extends AbstractHalyardTool {
-	private static final String SOURCE_PROPERTY = "halyard.hash.source";
-	private static final String DECIMATION_FACTOR_PROPERTY = "halyard.hash.decimation";
+	private static final String TOOL_NAME = "hash";
+
+	private static final String DECIMATION_FACTOR_PROPERTY = confProperty(TOOL_NAME, "decimation-factor");
 	
 	private static final int DEFAULT_DECIMATION_FACTOR = 0;
 
@@ -44,12 +45,12 @@ public final class HalyardHash extends AbstractHalyardTool {
 
 	public HalyardHash() {
 		super(
-			"hash",
+			TOOL_NAME,
 			"Halyard Hash is a MapReduce application that checks the uniqueness of ID hashes.",
 			"Example: halyard hash -s hdfs://my_RDF_files"
 		);
-        addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
-		addOption("d", "decimation-factor", "decimation_factor", "Optionally overide random decimation factor (default is 0)", false, true);
+        addOption("s", "source", "source_paths", SOURCE_PATHS_PROPERTY, "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
+		addOption("d", "decimation-factor", "decimation_factor", DECIMATION_FACTOR_PROPERTY, "Optionally overide random decimation factor (default is 0)", false, true);
 	}
 
 	static final class HashMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, ImmutableBytesWritable> {
@@ -153,18 +154,18 @@ public final class HalyardHash extends AbstractHalyardTool {
 
 	@Override
 	public int run(CommandLine cmd) throws Exception {
-		String source = cmd.getOptionValue('s');
-		getConf().set(SOURCE_PROPERTY, source);
-		getConf().setInt(DECIMATION_FACTOR_PROPERTY, Integer.parseInt(cmd.getOptionValue('d', String.valueOf(DEFAULT_DECIMATION_FACTOR))));
+    	configureString(cmd, 's', null);
+        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
 		getConf().setBoolean(HalyardBulkLoad.SKIP_INVALID_PROPERTY, true);
-        TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
+        String sourcePaths = getConf().get(SOURCE_PATHS_PROPERTY);
+		TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                 NTriplesUtil.class,
                 Rio.class,
                 AbstractRDFHandler.class,
                 RDFFormat.class,
                 RDFParser.class);
 		HBaseConfiguration.addHbaseResources(getConf());
-		Job job = Job.getInstance(getConf(), "HalyardHash " + source);
+		Job job = Job.getInstance(getConf(), "HalyardHash " + sourcePaths);
 		TableMapReduceUtil.addDependencyJars(job);
 		TableMapReduceUtil.initCredentials(job);
 		job.setJarByClass(HalyardHash.class);
@@ -173,7 +174,7 @@ public final class HalyardHash extends AbstractHalyardTool {
 		job.setMapOutputValueClass(ImmutableBytesWritable.class);
 		job.setInputFormatClass(RioFileInputFormat.class);
 		FileInputFormat.setInputDirRecursive(job, true);
-		FileInputFormat.setInputPaths(job, source);
+		FileInputFormat.setInputPaths(job, sourcePaths);
 		job.setCombinerClass(HashCombiner.class);
 		job.setReducerClass(HashReducer.class);
 		job.setOutputFormatClass(NullOutputFormat.class);

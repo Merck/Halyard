@@ -62,9 +62,9 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 	private static final String TOOL_NAME = "presplit";
     private static final String TABLE_PROPERTY = confProperty(TOOL_NAME, "table");
     private static final String SPLIT_LIMIT_PROPERTY = confProperty(TOOL_NAME, "limit");
-    private static final String DECIMATION_FACTOR_PROPERTY = confProperty(TOOL_NAME, "decimation");
+    private static final String DECIMATION_FACTOR_PROPERTY = confProperty(TOOL_NAME, "decimation-factor");
     private static final String OVERWRITE_PROPERTY = confProperty(TOOL_NAME, "overwrite");
-    private static final String MAX_VERSIONS_PROPERTY = confProperty(TOOL_NAME, "maxVersions");
+    private static final String MAX_VERSIONS_PROPERTY = confProperty(TOOL_NAME, "max-versions");
 
     private static final long DEFAULT_SPLIT_LIMIT = 40000000000l;
     private static final int DEFAULT_DECIMATION_FACTOR = 1000;
@@ -178,7 +178,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
                 + "Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.",
             "Example: halyard presplit -s hdfs://my_RDF_files -t mydataset"
         );
-        addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
+        addOption("s", "source", "source_paths", SOURCE_PATHS_PROPERTY, "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, optional HBase namespace of the target table must already exist", true, true);
         addOption("i", "allow-invalid", null, SKIP_INVALID_PROPERTY, "Optionally allow invalid IRI values (less overhead)", false, false);
         addOption("g", "default-named-graph", "named_graph", DEFAULT_CONTEXT_PROPERTY, "Optionally specify default target named graph", false, true);
@@ -191,7 +191,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 
     @Override
     protected int run(CommandLine cmd) throws Exception {
-        String source = cmd.getOptionValue('s');
+    	configureString(cmd, 's', null);
         String target = cmd.getOptionValue('t');
         configureBoolean(cmd, 'f');
         if (!getConf().getBoolean(OVERWRITE_PROPERTY, false)) {
@@ -207,6 +207,9 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         configureBoolean(cmd, 'i');
         configureString(cmd, 'g', null);
         configureBoolean(cmd, 'o');
+        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
+        configureLong(cmd, 'l', DEFAULT_SPLIT_LIMIT);
+        String sourcePaths = getConf().get(SOURCE_PATHS_PROPERTY);
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                 NTriplesUtil.class,
                 Rio.class,
@@ -214,8 +217,6 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
                 RDFFormat.class,
                 RDFParser.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
-        configureLong(cmd, 'l', DEFAULT_SPLIT_LIMIT);
         Job job = Job.getInstance(getConf(), "HalyardPreSplit -> " + target);
         job.getConfiguration().set(TABLE_PROPERTY, target);
         job.setJarByClass(HalyardPreSplit.class);
@@ -224,7 +225,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         job.setMapOutputValueClass(LongWritable.class);
         job.setInputFormatClass(RioFileInputFormat.class);
         FileInputFormat.setInputDirRecursive(job, true);
-        FileInputFormat.setInputPaths(job, source);
+        FileInputFormat.setInputPaths(job, sourcePaths);
         TableMapReduceUtil.addDependencyJars(job);
         TableMapReduceUtil.initCredentials(job);
         job.setReducerClass(PreSplitReducer.class);

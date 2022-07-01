@@ -38,22 +38,22 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 
 public final class HalyardKeys extends AbstractHalyardTool {
-	private static final String SOURCE_PROPERTY = "halyard.keys.source";
-	private static final String TARGET_PROPERTY = "halyard.keys.target";
-	private static final String DECIMATION_FACTOR_PROPERTY = "halyard.keys.decimation";
+	private static final String TOOL_NAME = "keys";
+	private static final String TARGET_PROPERTY = confProperty(TOOL_NAME, "target");
+	private static final String DECIMATION_FACTOR_PROPERTY = confProperty(TOOL_NAME, "decimation-factor");
 	
 	private static final int DEFAULT_DECIMATION_FACTOR = 0;
 
 	public HalyardKeys() {
 		super(
-			"keys",
+			TOOL_NAME,
 			"Halyard Keys is a MapReduce application that calculates key distribution statistics.",
 			"Example: halyard keys -s my_dataset -t key_stats.csv"
 		);
-        addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
-        addOption("t", "target-file", "target_url", "Target file to export the statistics to.", true, true);
-		addOption("d", "decimation-factor", "decimation_factor", "Optionally overide random decimation factor (default is 0)", false, true);
-        addOption("u", "restore-dir", "restore_folder", "If specified then -s is a snapshot name and this is the folder to restore to on HDFS", false, true);
+        addOption("s", "source-dataset", "dataset_table", SOURCE_NAME_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
+        addOption("t", "target-file", "target_url", TARGET_PROPERTY, "Target file to export the statistics to.", true, true);
+		addOption("d", "decimation-factor", "decimation_factor", DECIMATION_FACTOR_PROPERTY, "Optionally overide random decimation factor (default is 0)", false, true);
+        addOption("u", "restore-dir", "restore_folder", SNAPSHOT_PATH_PROPERTY, "If specified then -s is a snapshot name and this is the folder to restore to on HDFS", false, true);
 	}
 
 	static final class KeyColumnMapper extends TableMapper<ImmutableBytesWritable, LongWritable> {
@@ -187,23 +187,25 @@ public final class HalyardKeys extends AbstractHalyardTool {
 
 	@Override
 	public int run(CommandLine cmd) throws Exception {
-		String source = cmd.getOptionValue('s');
-		HBaseConfiguration.addHbaseResources(getConf());
-		Job job = Job.getInstance(getConf(), "HalyardKeys " + source);
-        if (cmd.hasOption('u')) {
+    	configureString(cmd, 's', null);
+    	configureString(cmd, 't', null);
+    	configureString(cmd, 'u', null);
+        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
+        String source = getConf().get(SOURCE_NAME_PROPERTY);
+        String snapshotPath = getConf().get(SNAPSHOT_PATH_PROPERTY);
+        if (snapshotPath != null) {
 			FileSystem fs = CommonFSUtils.getRootDirFileSystem(getConf());
-        	if (fs.exists(new Path(cmd.getOptionValue('u')))) {
+        	if (fs.exists(new Path(snapshotPath))) {
         		throw new IOException("Snapshot restore directory already exists");
         	}
         }
-        job.getConfiguration().set(SOURCE_PROPERTY, source);
-        job.getConfiguration().set(TARGET_PROPERTY, cmd.getOptionValue('t'));
-        job.getConfiguration().setInt(DECIMATION_FACTOR_PROPERTY, Integer.parseInt(cmd.getOptionValue('d', String.valueOf(DEFAULT_DECIMATION_FACTOR))));
+		HBaseConfiguration.addHbaseResources(getConf());
+		Job job = Job.getInstance(getConf(), "HalyardKeys " + source);
 		TableMapReduceUtil.addDependencyJars(job);
 		TableMapReduceUtil.initCredentials(job);
 
         RDFFactory rdfFactory;
-        Keyspace keyspace = HalyardTableUtils.getKeyspace(getConf(), source, cmd.getOptionValue('u'));
+        Keyspace keyspace = HalyardTableUtils.getKeyspace(getConf(), source, snapshotPath);
         try {
         	try (KeyspaceConnection kc = keyspace.getConnection()) {
         		rdfFactory = RDFFactory.create(kc);

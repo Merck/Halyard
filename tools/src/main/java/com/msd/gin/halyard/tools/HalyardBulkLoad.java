@@ -111,12 +111,12 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     /**
      * Boolean property ignoring RDF parsing errors
      */
-    public static final String SKIP_INVALID_PROPERTY = confProperty("parser", "skipinvalid");
+    public static final String SKIP_INVALID_PROPERTY = confProperty("parser", "skip-invalid");
 
     /**
      * Boolean property enabling RDF parser verification of data values
      */
-    public static final String VERIFY_DATATYPE_VALUES_PROPERTY = confProperty("parser", "verify.datatype.values");
+    public static final String VERIFY_DATATYPE_VALUES_PROPERTY = confProperty("parser", "verify-datatype-values");
 
     /**
      * Boolean property enforcing triples and quads context override with the default context
@@ -609,7 +609,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                 + "* Snappy (.snappy)\n"
                 + "Example: halyard bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t mydataset"
         );
-        addOption("s", "source", "source_paths", "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
+        addOption("s", "source", "source_paths", SOURCE_PATHS_PROPERTY, "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, target table is created if it does not exist, however optional HBase namespace of the target table must already exist", true, true);
         addOption("i", "allow-invalid", null, SKIP_INVALID_PROPERTY, "Optionally allow invalid IRI values (less overhead)", false, false);
@@ -624,7 +624,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
     @Override
     protected int run(CommandLine cmd) throws Exception {
-        String source = cmd.getOptionValue('s');
+    	configureString(cmd, 's', null);
         String workdir = cmd.getOptionValue('w');
         String target = cmd.getOptionValue('t');
         configureBoolean(cmd, 'i');
@@ -635,6 +635,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         configureBoolean(cmd, 'o');
         configureLong(cmd, 'e', System.currentTimeMillis());
         configureLong(cmd, 'm', DEFAULT_SPLIT_MAXSIZE);
+        String sourcePaths = getConf().get(SOURCE_PATHS_PROPERTY);
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
             NTriplesUtil.class,
             Rio.class,
@@ -655,7 +656,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 			RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());
 			HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), regionLocator);
             FileInputFormat.setInputDirRecursive(job, true);
-            FileInputFormat.setInputPaths(job, source);
+            FileInputFormat.setInputPaths(job, sourcePaths);
             FileOutputFormat.setOutputPath(job, new Path(workdir));
             TableMapReduceUtil.addDependencyJars(job);
             TableMapReduceUtil.initCredentials(job);

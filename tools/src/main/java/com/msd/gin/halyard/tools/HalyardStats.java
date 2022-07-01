@@ -94,8 +94,8 @@ public final class HalyardStats extends AbstractHalyardTool {
 
     private static final String TARGET = confProperty(TOOL_NAME, "target");
     private static final String THRESHOLD = confProperty(TOOL_NAME, "threshold");
-    private static final String STATS_GRAPH = confProperty(TOOL_NAME, "statsGraph");
-    private static final String NAMED_GRAPH_PROPERTY = confProperty(TOOL_NAME, "namedGraph");
+    private static final String STATS_GRAPH = confProperty(TOOL_NAME, "stats-graph");
+    private static final String NAMED_GRAPH_PROPERTY = confProperty(TOOL_NAME, "named-graph");
 
     private static final long DEFAULT_THRESHOLD = 1000;
 

@@ -23,6 +23,7 @@ import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.StatementIndex;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -72,7 +73,9 @@ import org.json.JSONObject;
 public final class HalyardElasticIndexer extends AbstractHalyardTool {
 	private static final String TOOL_NAME = "esindex";
 
-	private static final String NAMED_GRAPH_PROPERTY = confProperty(TOOL_NAME, "namedGraph");
+	private static final String INDEX_URL_PROPERTY = confProperty(TOOL_NAME, "index-url");
+	private static final String CREATE_INDEX_PROPERTY = confProperty(TOOL_NAME, "create-index");
+	private static final String NAMED_GRAPH_PROPERTY = confProperty(TOOL_NAME, "named-graph");
 	private static final String MULTITABLE_PROPERTY = confProperty(TOOL_NAME, "multitable");
 
     static final class IndexerMapper extends RdfTableMapper<NullWritable, Text>  {
@@ -155,8 +158,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             + "Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index"
         );
         addOption("s", "source-dataset", "dataset_table", SOURCE_NAME_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
-        addOption("t", "target-index", "target_url", "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
-        addOption("c", "create-index", null, "Optionally create Elasticsearch index", false, true);
+        addOption("t", "target-index", "target_url", INDEX_URL_PROPERTY, "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
+        addOption("c", "create-index", null, CREATE_INDEX_PROPERTY, "Optionally create Elasticsearch index", false, true);
         addOption("g", "named-graph", "named_graph", NAMED_GRAPH_PROPERTY, "Optionally restrict indexing to the given named graph only", false, true);
         addOption("u", "restore-dir", "restore_folder", SNAPSHOT_PATH_PROPERTY, "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
         addOption("m", "multitable-index", null, MULTITABLE_PROPERTY, "Create a multitable index", false, true);
@@ -191,12 +194,15 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
     @Override
     public int run(CommandLine cmd) throws Exception {
         configureString(cmd, 's', null);
+        configureString(cmd, 't', null);
         configureString(cmd, 'u', null);
+        configureBoolean(cmd, 'c');
         configureBoolean(cmd, 'm');
         configureString(cmd, 'g', null);
         String source = getConf().get(SOURCE_NAME_PROPERTY);
-        String target = cmd.getOptionValue('t');
+        String target = getConf().get(INDEX_URL_PROPERTY);
         URL targetUrl = new URL(target);
+        boolean createIndex = getConf().getBoolean(CREATE_INDEX_PROPERTY, false);
         String snapshotPath = getConf().get(SNAPSHOT_PATH_PROPERTY);
         if (snapshotPath != null) {
 			FileSystem fs = CommonFSUtils.getRootDirFileSystem(getConf());
@@ -220,7 +226,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         }
         HBaseConfiguration.addHbaseResources(getConf());
         Job job = Job.getInstance(getConf(), "HalyardElasticIndexer " + source + " -> " + target);
-        if (cmd.hasOption('c')) {
+        if (createIndex) {
             int shards;
             int replicas = 1;
             try (Connection conn = ConnectionFactory.createConnection(getConf())) {
@@ -244,7 +250,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 if (response == 200) {
                     LOG.info("Elastic index succesfully configured.");
                 } else {
-                    String resp = IOUtils.toString(http.getErrorStream(), StandardCharsets.UTF_8);
+                    InputStream errStream = http.getErrorStream();
+                    String resp = (errStream != null) ? IOUtils.toString(errStream, StandardCharsets.UTF_8) : "";
                     LOG.warn("Elastic index responded with {}: {}", response, resp);
                     boolean alreadyExist = false;
                     if (response == 400) try {
