@@ -4,6 +4,8 @@ import com.msd.gin.halyard.common.ValueType;
 
 import java.util.Objects;
 
+import javax.annotation.Nonnull;
+
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.UnaryValueOperator;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
@@ -48,7 +50,7 @@ public class ConstrainedStatementPattern extends StatementPattern {
 		return this.objectType;
 	}
 
-	public void setLiteralConstraint(UnaryValueOperator func, ValueExpr value) {
+	public void setLiteralConstraint(@Nonnull UnaryValueOperator func, @Nonnull ValueExpr value) {
 		this.objectType = ValueType.LITERAL;
 		this.literalConstraintFunction = func;
 		this.literalConstraintValue = value;
@@ -87,7 +89,11 @@ public class ConstrainedStatementPattern extends StatementPattern {
 		ConstrainedStatementPattern clone = (ConstrainedStatementPattern) super.clone();
 		clone.setObjectType(getObjectType());
 		if (getObjectType() == ValueType.LITERAL) {
-			clone.setLiteralConstraint(getLiteralConstraintFunction().clone(), getLiteralConstraintValue().clone());
+			UnaryValueOperator constraintFunc = getLiteralConstraintFunction();
+			ValueExpr constraintValue = getLiteralConstraintValue();
+			if (constraintFunc != null && constraintValue != null) {
+				clone.setLiteralConstraint(constraintFunc.clone(), constraintValue.clone());
+			}
 		}
 
 		return clone;

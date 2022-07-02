@@ -270,10 +270,10 @@ final class HalyardTupleExprEvaluation {
 									parent.empty();
 									return;
 								}
-								Literal lang = (Literal) v;
-								String label = lang.getLabel();
-								if (!label.isEmpty()) {
-					    			objConstraint = new LiteralConstraint(lang.getLabel());
+								Literal langValue = (Literal) v;
+								String lang = langValue.getLabel();
+								if (!lang.isEmpty()) {
+					    			objConstraint = new LiteralConstraint(lang);
 								} else {
 					    			objConstraint = new ValueConstraint(ValueType.LITERAL);
 								}
