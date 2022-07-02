@@ -71,6 +71,7 @@ public class RDFFactoryTest {
 			new Object[] {vf.createLiteral("foo", vf.createIRI("urn:bar:1")), ValueIO.DATATYPE_LITERAL_TYPE},
 			new Object[] {vf.createLiteral("foo", "en-GB"), ValueIO.LANGUAGE_HASH_LITERAL_TYPE},
 			new Object[] {vf.createLiteral("bar", "zx-XY"), ValueIO.LANGUAGE_LITERAL_TYPE},
+			new Object[] {vf.createLiteral("漫画", "ja"), ValueIO.LANGUAGE_HASH_LITERAL_TYPE},
 			new Object[] {vf.createLiteral("POINT (139.81 35.6972)", GEO.WKT_LITERAL), ValueIO.WKT_LITERAL_TYPE},
 			new Object[] {vf.createLiteral("invalid still works (139.81 35.6972)", GEO.WKT_LITERAL), ValueIO.WKT_LITERAL_TYPE},
 			new Object[] {vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL), ValueIO.XML_TYPE},

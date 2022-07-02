@@ -2,6 +2,9 @@ package com.msd.gin.halyard.common;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Sets;
+import com.ibm.icu.text.UnicodeCompressor;
+import com.ibm.icu.text.UnicodeDecompressor;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -14,6 +17,7 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -70,12 +74,17 @@ import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 
 public class ValueIO {
-	public static final int DEFAULT_BUFFER_SIZE = 128;
+	public static final int DEFAULT_BUFFER_SIZE = 256;
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(ValueIO.class);
 	private static final int IRI_HASH_SIZE = 4;
 	private static final int NAMESPACE_HASH_SIZE = 2;
 	private static final int LANG_HASH_SIZE = 2;
+	private static final Set<String> SCSU_OPTIMAL_LANGS = Sets.newHashSet(
+		"ar", "arz", "azb", "ba", "be", "bg", "bn", "ckb", "dty", "dv", "el", "fa","gan", "gu", "he", "hi", "hy", "ja",
+		"ka", "kk", "kn", "ko", "ky", "mk", "ml", "mn", "my", "or",
+		"ne", "ps", "ru", "sd", "sh", "sr", "ta", "tg", "th", "tt", "uk", "ur", "vi", "wuu", "yue", "zh"
+	);
 
 	private static List<Class<?>> getVocabularies() {
 		List<Class<?>> vocabs = new ArrayList<>(25);
@@ -110,8 +119,7 @@ public class ValueIO {
 	static {
 		try {
 			DATATYPE_FACTORY = DatatypeFactory.newInstance();
-		}
-		catch (DatatypeConfigurationException e) {
+		} catch (DatatypeConfigurationException e) {
 			throw new AssertionError(e);
 		}
 	}
@@ -146,6 +154,7 @@ public class ValueIO {
 	static final byte DOUBLE_TYPE = 'd';
 	static final byte COMPRESSED_STRING_TYPE = 'z';
 	static final byte UNCOMPRESSED_STRING_TYPE = 'Z';
+	static final byte SCSU_STRING_TYPE = 'U';
 	static final byte TIME_TYPE = 't';
 	static final byte DATE_TYPE = 'D';
 	static final byte BIG_FLOAT_TYPE = 'F';
@@ -181,6 +190,8 @@ public class ValueIO {
 				return readUncompressedString(b);
 			case COMPRESSED_STRING_TYPE:
 				return readCompressedString(b);
+			case SCSU_STRING_TYPE:
+				return readScsuString(b);
 			default:
 				throw new AssertionError(String.format("Unrecognized string type: %d", type));
 		}
@@ -199,6 +210,7 @@ public class ValueIO {
 		int uncompressedLen = uncompressed.remaining();
 		ByteBuffer compressed = compress(uncompressed);
 		b = ensureCapacity(b, Integer.BYTES + compressed.remaining());
+		assert uncompressedLen < Integer.MAX_VALUE;
 		return b.putInt(uncompressedLen).put(compressed);
 	}
 
@@ -224,6 +236,43 @@ public class ValueIO {
 		decompressor.decompress(b, uncompressed);
 		uncompressed.flip();
 		return uncompressed;
+	}
+
+	private static ByteBuffer writeScsuString(String s, ByteBuffer b) {
+		char[] chars = s.toCharArray();
+		int len = chars.length;
+		UnicodeCompressor compressor = new UnicodeCompressor();
+		int[] charsReadHolder = new int[1];
+		int totalCharsRead = 0;
+		do {
+			// ensure we have a decent amount of available buffer to write to
+			b = ensureCapacity(b, 512);
+			int pos = b.position();
+			int bytesWritten = compressor.compress(chars, totalCharsRead, len, charsReadHolder, b.array(), b.arrayOffset() + pos, b.remaining());
+			b.position(pos + bytesWritten);
+			totalCharsRead += charsReadHolder[0];
+		} while (totalCharsRead < len);
+		return b;
+	}
+
+	private static String readScsuString(ByteBuffer b) {
+		byte[] bytes = b.array();
+		int offset = b.arrayOffset();
+		int len = b.limit();
+		CharBuffer c = CharBuffer.allocate(512);
+		UnicodeDecompressor decompressor = new UnicodeDecompressor();
+		int[] bytesReadHolder = new int[1];
+		do {
+			// ensure we have a decent amount of available buffer to write to
+			c = ensureCapacity(c, 512);
+			int bpos = b.position();
+			int cpos = c.position();
+			int charsWritten = decompressor.decompress(bytes, offset + bpos, len, bytesReadHolder, c.array(), c.arrayOffset() + cpos, c.remaining());
+			b.position(bpos + bytesReadHolder[0]);
+			c.position(cpos + charsWritten);
+		} while (b.hasRemaining());
+		c.flip();
+		return c.toString();
 	}
 
 	private static final int MAX_LONG_STRING_LENGTH = Long.toString(Long.MAX_VALUE).length();
@@ -291,6 +340,18 @@ public class ValueIO {
 			return newb;
 		} else {
 			return b;
+		}
+	}
+
+	public static CharBuffer ensureCapacity(CharBuffer c, int requiredSize) {
+		if (c.remaining() < requiredSize) {
+			// leave some spare capacity
+			CharBuffer newc = CharBuffer.allocate(3*c.capacity()/2 + 2*requiredSize);
+			c.flip();
+			newc.put(c);
+			return newc;
+		} else {
+			return c;
 		}
 	}
 
@@ -823,19 +884,39 @@ public class ValueIO {
 		});
 	}
 
+	private ByteBuffer writeString(String s, ByteBuffer b, String langTag) {
+		int charLen = s.length();
+		int estimatedByteSize = Character.BYTES * charLen;
+		int sepPos = langTag.indexOf('-');
+		String lang = (sepPos != -1) ? langTag.substring(0, sepPos) : langTag;
+		if (estimatedByteSize < stringCompressionThreshold && SCSU_OPTIMAL_LANGS.contains(lang)) {
+			b.put(SCSU_STRING_TYPE);
+			return writeScsuString(s, b);
+		} else {
+			b.put(COMPRESSED_STRING_TYPE);
+			return writeCompressedString(s, b);
+		}
+	}
+
 	private ByteBuffer writeString(String s, ByteBuffer b) {
 		ByteBuffer uncompressed = writeUncompressedString(s);
 		int uncompressedLen = uncompressed.remaining();
 		ByteBuffer compressed;
+		int compressedLen;
 		if (uncompressedLen > stringCompressionThreshold) {
 			compressed = compress(uncompressed);
+			compressedLen = compressed.remaining();
 		} else {
 			compressed = null;
+			compressedLen = -1;
 		}
-		if (compressed != null && Integer.BYTES + compressed.remaining() < uncompressedLen) {
-			b = ensureCapacity(b, 1 + Integer.BYTES + compressed.remaining());
+		if (compressed != null && Integer.BYTES + compressedLen < uncompressedLen) {
+			b = ensureCapacity(b, 1 + Integer.BYTES + compressedLen);
 			return b.put(COMPRESSED_STRING_TYPE).putInt(uncompressedLen).put(compressed);
 		} else {
+			if (compressed != null && LOGGER.isDebugEnabled()) {
+				LOGGER.debug("Ineffective compression of string of byte length %d", uncompressedLen);
+			}
 			b = ensureCapacity(b, 1 + uncompressedLen);
 			return b.put(UNCOMPRESSED_STRING_TYPE).put(uncompressed);
 		}
@@ -1007,7 +1088,7 @@ public class ValueIO {
 			if(l.getLanguage().isPresent()) {
 				String langTag = l.getLanguage().get();
 				b = writeLanguagePrefix(langTag, b);
-				return writeString(l.getLabel(), b);
+				return writeString(l.getLabel(), b, langTag);
 			} else {
 				ByteWriter writer = byteWriters.get(l.getDatatype());
 				if (writer != null) {

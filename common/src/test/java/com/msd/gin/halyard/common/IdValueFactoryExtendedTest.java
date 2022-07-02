@@ -66,6 +66,7 @@ public class IdValueFactoryExtendedTest {
 			vf.createLiteral("foo", vf.createIRI("urn:bar:1")),
 			vf.createLiteral("foo", "en-GB"),
 			vf.createLiteral("bar", "zx-XY"),
+			vf.createLiteral("漫画", "ja"),
 			vf.createLiteral("POINT (139.81 35.6972)", GEO.WKT_LITERAL),
 			vf.createLiteral("invalid still works (139.81 35.6972)", GEO.WKT_LITERAL),
 			vf.createLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>", RDF.XMLLITERAL),
