@@ -210,7 +210,7 @@ public class ValueIO {
 		int uncompressedLen = uncompressed.remaining();
 		ByteBuffer compressed = compress(uncompressed);
 		b = ensureCapacity(b, Integer.BYTES + compressed.remaining());
-		assert uncompressedLen < Integer.MAX_VALUE;
+		assert uncompressedLen <= Integer.MAX_VALUE;
 		return b.putInt(uncompressedLen).put(compressed);
 	}
 
@@ -732,6 +732,41 @@ public class ValueIO {
 			}
 		});
 
+		addByteWriter(RDF.LANGSTRING, new ByteWriter() {
+			@Override
+			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
+				String langTag = l.getLanguage().get();
+				b = writeLanguagePrefix(langTag, b);
+				return writeString(l.getLabel(), b, langTag);
+			}
+		});
+		addByteReader(LANGUAGE_HASH_LITERAL_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				b.mark();
+				Short langHash = b.getShort(); // 16-bit hash
+				String label = readString(b);
+				String lang = wellKnownLangs.get(langHash);
+				if (lang == null) {
+					b.limit(b.position()).reset();
+					throw new IllegalStateException(String.format("Unknown language tag hash: %s (%d) (label %s)", Hashes.encode(b), langHash, label));
+				}
+				return vf.createLiteral(label, lang);
+			}
+		});
+		addByteReader(LANGUAGE_LITERAL_TYPE, new ByteReader() {
+			@Override
+			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
+				int originalLimit = b.limit();
+				int langSize = b.get();
+				b.limit(b.position()+langSize);
+				String lang = readUncompressedString(b);
+				b.limit(originalLimit);
+				String label = readString(b);
+				return vf.createLiteral(label, lang);
+			}
+		});
+
 		addByteWriter(XSD.TIME, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
@@ -922,6 +957,32 @@ public class ValueIO {
 		}
 	}
 
+	private ByteBuffer writeLanguagePrefix(String langTag, ByteBuffer b) {
+		Short hash = wellKnownLangs.inverse().get(langTag);
+		if (hash != null) {
+			b = ensureCapacity(b, 1+LANG_HASH_SIZE);
+			b.put(LANGUAGE_HASH_LITERAL_TYPE);
+			b.putShort(hash);
+		} else {
+			if (langTag.length() > Short.MAX_VALUE) {
+				int truncatePos = langTag.lastIndexOf('-', Short.MAX_VALUE-1);
+				// check for single tag
+				if (langTag.charAt(truncatePos-2) == '-') {
+					truncatePos -= 2;
+				}
+				langTag = langTag.substring(0, truncatePos);
+			}
+			ByteBuffer langBytes = writeUncompressedString(langTag);
+			b = ensureCapacity(b, 1+1+langBytes.remaining());
+			b.put(LANGUAGE_LITERAL_TYPE);
+			int langBytesLen = langBytes.remaining();
+			assert langBytesLen <= Byte.MAX_VALUE;
+			b.put((byte) langBytesLen);
+			b.put(langBytes);
+		}
+		return b;
+	}
+
 	public Writer createStreamWriter() {
 		return createWriter(new StreamTripleWriter());
 	}
@@ -1085,61 +1146,33 @@ public class ValueIO {
 		}
 
 		private ByteBuffer writeLiteral(Literal l, ByteBuffer b) {
-			if(l.getLanguage().isPresent()) {
-				String langTag = l.getLanguage().get();
-				b = writeLanguagePrefix(langTag, b);
-				return writeString(l.getLabel(), b, langTag);
-			} else {
-				ByteWriter writer = byteWriters.get(l.getDatatype());
-				if (writer != null) {
-					final int failsafeMark = b.position();
-					try {
-						return writer.writeBytes(l, b);
-					} catch (Exception e) {
-						LOGGER.warn("Possibly invalid literal: {} ({})", l, e.toString());
-						LOGGER.debug("{} for {} failed", ByteWriter.class.getSimpleName(), l.getDatatype(), e);
-						// if the dedicated writer fails then fallback to the generic writer
-						b.position(failsafeMark);
-					}
+			ByteWriter writer = byteWriters.get(l.getDatatype());
+			if (writer != null) {
+				final int failsafeMark = b.position();
+				try {
+					return writer.writeBytes(l, b);
+				} catch (Exception e) {
+					LOGGER.warn("Possibly invalid literal: {} ({})", l, e.toString());
+					LOGGER.debug("{} for {} failed", ByteWriter.class.getSimpleName(), l.getDatatype(), e);
+					// if the dedicated writer fails then fallback to the generic writer
+					b.position(failsafeMark);
 				}
-				b = ensureCapacity(b, 1 + Short.BYTES);
-				b.put(DATATYPE_LITERAL_TYPE);
-				int sizePos = b.position();
-				int startPos = b.position()+2;
-				b.position(startPos);
-				b = writeIRI(l.getDatatype(), b);
-				int endPos = b.position();
-				b.position(sizePos);
-				b.putShort((short) (endPos-startPos));
-				b.position(endPos);
-				ByteBuffer labelBytes = writeUncompressedString(l.getLabel());
-				b = ensureCapacity(b, labelBytes.remaining());
-				b.put(labelBytes);
-				return b;
 			}
-		}
-
-		private ByteBuffer writeLanguagePrefix(String langTag, ByteBuffer b) {
-			Short hash = wellKnownLangs.inverse().get(langTag);
-			if (hash != null) {
-				b = ensureCapacity(b, 1+LANG_HASH_SIZE);
-				b.put(LANGUAGE_HASH_LITERAL_TYPE);
-				b.putShort(hash);
-			} else {
-				if (langTag.length() > Short.MAX_VALUE) {
-					int truncatePos = langTag.lastIndexOf('-', Short.MAX_VALUE-1);
-					// check for single tag
-					if (langTag.charAt(truncatePos-2) == '-') {
-						truncatePos -= 2;
-					}
-					langTag = langTag.substring(0, truncatePos);
-				}
-				ByteBuffer langBytes = writeUncompressedString(langTag);
-				b = ensureCapacity(b, 1+1+langBytes.remaining());
-				b.put(LANGUAGE_LITERAL_TYPE);
-				b.put((byte) langBytes.remaining());
-				b.put(langBytes);
-			}
+			b = ensureCapacity(b, 1 + Short.BYTES);
+			b.put(DATATYPE_LITERAL_TYPE);
+			int sizePos = b.position();
+			int startPos = b.position()+2;
+			b.position(startPos);
+			b = writeIRI(l.getDatatype(), b);
+			int endPos = b.position();
+			b.position(sizePos);
+			int datatypeLen = endPos - startPos;
+			assert datatypeLen <= Short.MAX_VALUE;
+			b.putShort((short) datatypeLen);
+			b.position(endPos);
+			ByteBuffer labelBytes = writeUncompressedString(l.getLabel());
+			b = ensureCapacity(b, labelBytes.remaining());
+			b.put(labelBytes);
 			return b;
 		}
 	}
@@ -1165,7 +1198,6 @@ public class ValueIO {
 		}
 
 		public Value readValue(ByteBuffer b) {
-			final int originalLimit = b.limit();
 			int type = b.get();
 			switch(type) {
 				case IRI_TYPE:
@@ -1230,29 +1262,13 @@ public class ValueIO {
 					return vf.createIRI(iriEncoder.getName()+iriEncoder.readBytes(b)+'/');
 				case BNODE_TYPE:
 					return bnodeTransformer.apply(readUncompressedString(b), vf);
-				case LANGUAGE_HASH_LITERAL_TYPE:
-					b.mark();
-					Short langHash = b.getShort(); // 16-bit hash
-					String label = readString(b);
-					String lang = wellKnownLangs.get(langHash);
-					if (lang == null) {
-						b.limit(b.position()).reset();
-						throw new IllegalStateException(String.format("Unknown language tag hash: %s (%d) (label %s)", Hashes.encode(b), langHash, label));
-					}
-					return vf.createLiteral(label, lang);
-				case LANGUAGE_LITERAL_TYPE:
-					int langSize = b.get();
-					b.limit(b.position()+langSize);
-					lang = readUncompressedString(b);
-					b.limit(originalLimit);
-					label = readString(b);
-					return vf.createLiteral(label, lang);
 				case DATATYPE_LITERAL_TYPE:
+					int originalLimit = b.limit();
 					int dtSize = b.getShort();
 					b.limit(b.position()+dtSize);
 					IRI datatype = (IRI) readValue(b);
 					b.limit(originalLimit);
-					label = readUncompressedString(b);
+					String label = readUncompressedString(b);
 					return vf.createLiteral(label, datatype);
 				case TRIPLE_TYPE:
 					if (tf == null) {
