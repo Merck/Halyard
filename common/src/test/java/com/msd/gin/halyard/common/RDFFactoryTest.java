@@ -33,7 +33,7 @@ public class RDFFactoryTest {
 	private static final Date NOW = new Date();
 
 	private static String longString(String s) {
-		String[] copies = new String[200/s.length()+1];
+		String[] copies = new String[1000/s.length()+1];
 		Arrays.fill(copies, s);
 		return String.join(" ", copies);
 	}

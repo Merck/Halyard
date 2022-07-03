@@ -139,13 +139,10 @@ public final class HalyardTableUtils {
 			admin.createTable(td, splits);
 		}
 		Table table = conn.getTable(htableName);
-		Configuration config = conn.getConfiguration();
-		Configuration halyardConf = new Configuration(false);
-		for (Map.Entry<String, String> entry : config.getPropsWithPrefix("halyard.").entrySet()) {
-			halyardConf.set("halyard." + entry.getKey(), entry.getValue());
-		}
+		Configuration conf = conn.getConfiguration();
+		HalyardConfiguration halyardConfig = new HalyardConfiguration(conf);
 		ByteArrayOutputStream bout = new ByteArrayOutputStream(1024);
-		halyardConf.writeXml(bout);
+		halyardConfig.writeXml(bout);
 		Put configPut = new Put(CONFIG_ROW_KEY)
 			.addColumn(CF_NAME, CONFIG_COL, bout.toByteArray());
 		table.put(configPut);

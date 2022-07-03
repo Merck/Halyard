@@ -100,30 +100,31 @@ public class RDFFactory {
 		return x;
 	}
 
-	private RDFFactory(Configuration config) {
+	private RDFFactory(Configuration conf) {
+		HalyardConfiguration halyardConfig = new HalyardConfiguration(conf);
 		valueIO = new ValueIO(
-			Config.getBoolean(config, Config.VOCAB, true),
-			Config.getBoolean(config, Config.LANG, true),
-			Config.getInteger(config, Config.STRING_COMPRESSION, 200)
+			halyardConfig.getBoolean(Config.VOCAB),
+			halyardConfig.getBoolean(Config.LANG),
+			halyardConfig.getInteger(Config.STRING_COMPRESSION)
 		);
-		String confIdAlgo = Config.getString(config, Config.ID_HASH, "SHA-1");
-		int confIdSize = Config.getInteger(config, Config.ID_SIZE, 0);
+		String confIdAlgo = halyardConfig.getString(Config.ID_HASH);
+		int confIdSize = halyardConfig.getInteger(Config.ID_SIZE);
 		int idSize = Hashes.getHash(confIdAlgo, confIdSize).size();
 		LOGGER.info("Identifier hash: {} {}-bit ({} bytes)", confIdAlgo, idSize*Byte.SIZE, idSize);
 
-		int typeIndex = lessThan(lessThanOrEqual(Config.getInteger(config, Config.ID_TYPE_INDEX, 0), Short.BYTES), idSize);
-		ValueIdentifier.TypeNibble typeNibble = Config.getBoolean(config, Config.ID_TYPE_NIBBLE, true) ? ValueIdentifier.TypeNibble.LITTLE_NIBBLE : ValueIdentifier.TypeNibble.BIG_NIBBLE;
+		int typeIndex = lessThan(lessThanOrEqual(halyardConfig.getInteger(Config.ID_TYPE_INDEX), Short.BYTES), idSize);
+		ValueIdentifier.TypeNibble typeNibble = halyardConfig.getBoolean(Config.ID_TYPE_NIBBLE) ? ValueIdentifier.TypeNibble.LITTLE_NIBBLE : ValueIdentifier.TypeNibble.BIG_NIBBLE;
 		idFormat = new ValueIdentifier.Format(confIdAlgo, idSize, typeIndex, typeNibble);
 		typeSaltSize = idFormat.getSaltSize();
 
-		int subjectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 4), MIN_KEY_SIZE), idSize);
-		int subjectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_SUBJECT, 3), MIN_KEY_SIZE), idSize);
-		int predicateKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_PREDICATE, 4), MIN_KEY_SIZE), idSize);
-		int predicateEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_PREDICATE, 3), MIN_KEY_SIZE), idSize);
-		int objectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_OBJECT, 4), MIN_KEY_SIZE), idSize);
-		int objectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_OBJECT, 3), MIN_KEY_SIZE), idSize);
-		int contextKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 3), MIN_KEY_SIZE), idSize);
-		int contextEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_CONTEXT, 0), 0), idSize);
+		int subjectKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.KEY_SIZE_SUBJECT), MIN_KEY_SIZE), idSize);
+		int subjectEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.END_KEY_SIZE_SUBJECT), MIN_KEY_SIZE), idSize);
+		int predicateKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.KEY_SIZE_PREDICATE), MIN_KEY_SIZE), idSize);
+		int predicateEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.END_KEY_SIZE_PREDICATE), MIN_KEY_SIZE), idSize);
+		int objectKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.KEY_SIZE_OBJECT), MIN_KEY_SIZE), idSize);
+		int objectEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.END_KEY_SIZE_OBJECT), MIN_KEY_SIZE), idSize);
+		int contextKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.KEY_SIZE_CONTEXT), MIN_KEY_SIZE), idSize);
+		int contextEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.END_KEY_SIZE_CONTEXT), 0), idSize);
 
 		idTripleWriter = valueIO.createWriter(new IdTripleWriter());
 		streamWriter = valueIO.createStreamWriter();
