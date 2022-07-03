@@ -116,11 +116,11 @@ public class RDFFactory {
 		idFormat = new ValueIdentifier.Format(confIdAlgo, idSize, typeIndex, typeNibble);
 		typeSaltSize = idFormat.getSaltSize();
 
-		int subjectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 5), MIN_KEY_SIZE), idSize);
+		int subjectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_SUBJECT, 4), MIN_KEY_SIZE), idSize);
 		int subjectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_SUBJECT, 3), MIN_KEY_SIZE), idSize);
-		int predicateKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_PREDICATE, 3), MIN_KEY_SIZE), idSize);
+		int predicateKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_PREDICATE, 4), MIN_KEY_SIZE), idSize);
 		int predicateEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_PREDICATE, 3), MIN_KEY_SIZE), idSize);
-		int objectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_OBJECT, 5), MIN_KEY_SIZE), idSize);
+		int objectKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_OBJECT, 4), MIN_KEY_SIZE), idSize);
 		int objectEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_OBJECT, 3), MIN_KEY_SIZE), idSize);
 		int contextKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.KEY_SIZE_CONTEXT, 3), MIN_KEY_SIZE), idSize);
 		int contextEndKeySize = lessThanOrEqual(greaterThanOrEqual(Config.getInteger(config, Config.END_KEY_SIZE_CONTEXT, 0), 0), idSize);
