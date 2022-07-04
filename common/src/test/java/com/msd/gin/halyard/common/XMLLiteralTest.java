@@ -1,7 +1,7 @@
 package com.msd.gin.halyard.common;
 
 import org.eclipse.rdf4j.model.Literal;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class XMLLiteralTest extends AbstractCustomLiteralTest {
 	@Override

@@ -2,9 +2,9 @@ package com.msd.gin.halyard.common;
 
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public abstract class AbstractCustomLiteralTest {
 	protected abstract Literal createLiteral() throws Exception;

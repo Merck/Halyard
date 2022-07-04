@@ -4,9 +4,9 @@ import com.google.common.collect.Sets;
 
 import java.util.Collections;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class LFUCacheTest {
 	@Test
@@ -35,9 +35,11 @@ public class LFUCacheTest {
 		assertEquals(Collections.emptySet(), cache.keySet());
 	}
 
-	@Test(expected = UnsupportedOperationException.class)
+	@Test
 	public void testNotImplemented() {
 		LFUCache<Integer,String> cache = new LFUCache<>(4, 0.1f);
-		cache.entrySet();
+		assertThrows(UnsupportedOperationException.class, () ->
+			cache.entrySet()
+		);
 	}
 }

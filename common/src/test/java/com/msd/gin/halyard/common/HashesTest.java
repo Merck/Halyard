@@ -5,8 +5,9 @@ import com.msd.gin.halyard.common.Hashes.HashFunction;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop.hbase.util.Bytes;
-import org.junit.Test;
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class HashesTest {
 	@Test
@@ -28,9 +29,11 @@ public class HashesTest {
 		assertEquals(8, h64.length);
 	}
 
-    @Test(expected = RuntimeException.class)
+    @Test
     public void testInvalidHadh() {
-        Hashes.getHash("invalid", 0);
+    	assertThrows(RuntimeException.class, () ->
+        	Hashes.getHash("invalid", 0)
+        );
     }
 
     @Test

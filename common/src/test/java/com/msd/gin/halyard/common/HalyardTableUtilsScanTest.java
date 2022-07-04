@@ -52,6 +52,7 @@ import static org.hamcrest.Matchers.*;
  * @author Adam Sotona (MSD)
  */
 @RunWith(Parameterized.class)
+@RunsLocalHBase
 public class HalyardTableUtilsScanTest {
 
 	private static final String SUBJ1 = "http://whatever/subj1";

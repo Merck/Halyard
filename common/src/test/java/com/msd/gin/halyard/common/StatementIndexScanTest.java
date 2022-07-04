@@ -35,6 +35,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.*;
 
+@RunsLocalHBase
 public class StatementIndexScanTest {
     private static final String SUBJ = "http://whatever/subj";
     private static final String CTX = "http://whatever/ctx";

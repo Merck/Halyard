@@ -35,16 +35,17 @@ import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  *
  * @author Adam Sotona (MSD)
  */
+@RunsLocalHBase
 public class HalyardTableUtilsTest {
 	private static final int ID_SIZE = 8;
 	private static final int OBJECT_KEY_SIZE = 5;
@@ -53,7 +54,7 @@ public class HalyardTableUtilsTest {
 	private static KeyspaceConnection keyspaceConn;
 	private static RDFFactory rdfFactory;
 
-    @BeforeClass
+    @BeforeAll
     public static void setup() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
 		conf.setInt(Config.ID_SIZE, ID_SIZE);
@@ -64,7 +65,7 @@ public class HalyardTableUtilsTest {
 		rdfFactory = RDFFactory.create(keyspaceConn);
     }
 
-    @AfterClass
+    @AfterAll
     public static void teardown() throws Exception {
         table.close();
 		conn.close();
@@ -190,14 +191,18 @@ public class HalyardTableUtilsTest {
         assertEquals(0, HalyardTableUtils.parseStatements(null, null, null, null, Result.EMPTY_RESULT, reader, rdfFactory).size());
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testNegativeSplitBits() {
-		HalyardTableUtils.calculateSplits(-1, true, rdfFactory);
+    	assertThrows(IllegalArgumentException.class, () ->
+    		HalyardTableUtils.calculateSplits(-1, true, rdfFactory)
+		);
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testTooBigSplitBits() {
-		HalyardTableUtils.calculateSplits(17, true, rdfFactory);
+    	assertThrows(IllegalArgumentException.class, () ->
+    		HalyardTableUtils.calculateSplits(17, true, rdfFactory)
+		);
     }
 
     @Test
