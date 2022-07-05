@@ -278,7 +278,7 @@ final class HalyardTupleExprEvaluation {
 					    			objConstraint = new ValueConstraint(ValueType.LITERAL);
 								}
 							} else if ((constraintFunc instanceof IsNumeric) && BooleanLiteral.TRUE.equals(v)) {
-				    			objConstraint = new LiteralConstraint(HALYARD.ANY_NUMERIC);
+				    			objConstraint = new LiteralConstraint(HALYARD.ANY_NUMERIC_TYPE);
 							}
 						}
 	    			} else {

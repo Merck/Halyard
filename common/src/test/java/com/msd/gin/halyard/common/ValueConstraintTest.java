@@ -59,7 +59,7 @@ public class ValueConstraintTest {
 	@Test
 	public void testOtherLiteral() {
 		ValueFactory vf = SimpleValueFactory.getInstance();
-		LiteralConstraint vc = new LiteralConstraint(HALYARD.NON_STRING);
+		LiteralConstraint vc = new LiteralConstraint(HALYARD.NON_STRING_TYPE);
 		assertTrue(vc.test(vf.createLiteral(1)));
 		assertTrue(vc.test(vf.createLiteral(new Date())));
 		assertFalse(vc.test(vf.createLiteral("foobar")));
@@ -69,7 +69,7 @@ public class ValueConstraintTest {
 	@Test
 	public void testAnyNumeric() {
 		ValueFactory vf = SimpleValueFactory.getInstance();
-		LiteralConstraint vc = new LiteralConstraint(HALYARD.ANY_NUMERIC);
+		LiteralConstraint vc = new LiteralConstraint(HALYARD.ANY_NUMERIC_TYPE);
 		assertTrue(vc.test(vf.createLiteral(1)));
 		assertTrue(vc.test(vf.createLiteral(1.8)));
 		assertFalse(vc.test(vf.createLiteral("foobar")));

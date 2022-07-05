@@ -1,5 +1,6 @@
 package com.msd.gin.halyard.common;
 
+import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.vocab.WIKIDATA;
 
 import java.math.BigDecimal;
@@ -79,6 +80,7 @@ public class RDFFactoryTest {
 			new Object[] {vf.createLiteral("0000-06-20T00:00:00Z", XSD.DATETIME), ValueIO.DATATYPE_LITERAL_TYPE},
 			new Object[] {vf.createLiteral(longString("The cat slept on the mat.")), ValueIO.COMPRESSED_STRING_TYPE},
 			new Object[] {vf.createLiteral(longString("¿Dónde está el gato?"), "es"), ValueIO.LANGUAGE_HASH_LITERAL_TYPE},
+			new Object[] {vf.createIRI(HALYARD.VALUE_ID_NS.getName(), "eRg5UlsxjZuh-4meqlYQe3-J8X8"), ValueIO.ENCODED_IRI_TYPE},
 			new Object[] {vf.createIRI(WIKIDATA.WDV_NAMESPACE, "400f9abd3fd761c62af23dbe8f8432158a6ce272"), ValueIO.ENCODED_IRI_TYPE},
 			new Object[] {vf.createIRI(WIKIDATA.WDV_NAMESPACE, "invalid"), ValueIO.NAMESPACE_HASH_TYPE},
 			new Object[] {vf.createIRI(WIKIDATA.WDV_NAMESPACE+"400f9abd3fd761c62af23dbe8f8432158a6ce272/"), ValueIO.END_SLASH_ENCODED_IRI_TYPE}

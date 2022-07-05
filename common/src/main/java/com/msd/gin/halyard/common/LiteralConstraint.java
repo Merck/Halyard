@@ -47,8 +47,8 @@ public final class LiteralConstraint extends ValueConstraint {
 		Literal l = (Literal) v;
 		IRI dt = l.getDatatype();
 		if (!dt.equals(datatype)
-			&& !(HALYARD.NON_STRING.equals(datatype) && !ValueIdentifier.isString(dt))
-			&& !(HALYARD.ANY_NUMERIC.equals(datatype) && XMLDatatypeUtil.isNumericDatatype(dt))) {
+			&& !(HALYARD.NON_STRING_TYPE.equals(datatype) && !ValueIdentifier.isString(dt))
+			&& !(HALYARD.ANY_NUMERIC_TYPE.equals(datatype) && XMLDatatypeUtil.isNumericDatatype(dt))) {
 			return false;
 		}
 		if (lang != null) {

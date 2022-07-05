@@ -92,7 +92,7 @@ public final class Hashes {
     /**
 	 * NB: this alters the buffer.
 	 */
-	static CharSequence encode(ByteBuffer b) {
+	public static CharSequence encode(ByteBuffer b) {
 		return StandardCharsets.UTF_8.decode(ENCODER.encode(b));
 	}
 

@@ -241,7 +241,7 @@ public class StatementIndexScanTest {
         RDFContext rdfCtx = rdfFactory.createContext(ctx);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = rdfFactory.getCSPOIndex().scanWithConstraint(rdfCtx, rdfSubj, rdfPred, new LiteralConstraint(HALYARD.NON_STRING));
+        Scan scan = rdfFactory.getCSPOIndex().scanWithConstraint(rdfCtx, rdfSubj, rdfPred, new LiteralConstraint(HALYARD.NON_STRING_TYPE));
         try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
@@ -299,7 +299,7 @@ public class StatementIndexScanTest {
         RDFContext rdfCtx = rdfFactory.createContext(ctx);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = rdfFactory.getCPOSIndex().scanWithConstraint(rdfCtx, rdfPred, new LiteralConstraint(HALYARD.NON_STRING));
+        Scan scan = rdfFactory.getCPOSIndex().scanWithConstraint(rdfCtx, rdfPred, new LiteralConstraint(HALYARD.NON_STRING_TYPE));
         try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
@@ -352,7 +352,7 @@ public class StatementIndexScanTest {
         RDFContext rdfCtx = rdfFactory.createContext(ctx);
 
         Set<Literal> actual = new HashSet<>();
-        Scan scan = rdfFactory.getCOSPIndex().scanWithConstraint(rdfCtx, new LiteralConstraint(HALYARD.NON_STRING));
+        Scan scan = rdfFactory.getCOSPIndex().scanWithConstraint(rdfCtx, new LiteralConstraint(HALYARD.NON_STRING_TYPE));
         try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {

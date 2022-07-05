@@ -77,11 +77,11 @@ public final class HALYARD implements Vocabulary {
 
 	public final static IRI XPATH_PROPERTY = SVF.createIRI(NAMESPACE, "xpath");
 
-	public final static IRI NON_STRING = SVF.createIRI(NAMESPACE, "nonString");
+	public final static IRI NON_STRING_TYPE = SVF.createIRI(NAMESPACE, "nonString");
 
-	public final static IRI ANY_NUMERIC = SVF.createIRI(NAMESPACE, "anyNumeric");
+	public final static IRI ANY_NUMERIC_TYPE = SVF.createIRI(NAMESPACE, "anyNumeric");
 
-    public static final Namespace VALUE_ID_NS = new SimpleNamespace("idv", "halyard:id:value:");
+    public static final Namespace VALUE_ID_NS = new Base64Namespace("idv", "halyard:id:value:");
 
-    public static final Namespace STATEMENT_ID_NS = new SimpleNamespace("id3", "halyard:id:statement:");
+    public static final Namespace STATEMENT_ID_NS = new Base64Namespace("id3", "halyard:id:statement:");
 }
