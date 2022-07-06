@@ -36,7 +36,7 @@ import org.xml.sax.SAXException;
 /**
  * Compact fast-infoset representation of XML literals.
  */
-public class XMLLiteral implements Literal {
+public class XMLLiteral implements ObjectLiteral<Document> {
 	private static final long serialVersionUID = 7055125328013989394L;
 	private final byte[] fiBytes;
 
@@ -99,7 +99,7 @@ public class XMLLiteral implements Literal {
 		return RDF.XMLLITERAL;
 	}
 
-	public Document documentValue() {
+	public Document objectValue() {
         DocumentBuilderFactory dbf = DOCUMENT_BUILDER_FACTORY.get();
         dbf.setNamespaceAware(true);
         try {

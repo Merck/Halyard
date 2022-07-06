@@ -76,7 +76,7 @@ public class XPathTupleFunction implements TupleFunction, InverseMagicProperty {
 		try {
 			Document doc;
 			if (args[1] instanceof XMLLiteral) {
-				doc = ((XMLLiteral) args[1]).documentValue();
+				doc = ((XMLLiteral) args[1]).objectValue();
 			} else {
 				String xml = ((Literal) args[1]).getLabel();
 				doc = XMLLiteral.parseXml(xml);

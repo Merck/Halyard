@@ -438,6 +438,9 @@ public class HBaseSail implements Sail {
 	}
 
 	public RDFFactory getRDFFactory() {
+		if (rdfFactory == null) {
+			throw new IllegalStateException("Sail is not initialized");
+		}
 		return rdfFactory;
 	}
 

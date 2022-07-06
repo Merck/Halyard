@@ -16,14 +16,14 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFObject;
 import com.msd.gin.halyard.common.ValueIO;
+import com.msd.gin.halyard.sail.search.SearchDocument;
+import com.msd.gin.halyard.sail.search.SearchClient;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
@@ -44,27 +44,22 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.sail.SailException;
 
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 
 public class HBaseSearchTripleSource extends HBaseTripleSource {
-	private static final int ELASTIC_RESULT_SIZE = 10000;
+	private final SearchClient searchClient;
 
-	private final ElasticsearchClient esClient;
-	private final String esIndex;
-
-	public HBaseSearchTripleSource(KeyspaceConnection table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, ElasticsearchClient esClient, String esIndex, HBaseSail.Ticker ticker) {
+	public HBaseSearchTripleSource(KeyspaceConnection table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, SearchClient searchClient, HBaseSail.Ticker ticker) {
 		super(table, vf, rdfFactory, timeoutSecs, settings, ticker);
-		this.esClient = esClient;
-		this.esIndex = esIndex;
+		this.searchClient = searchClient;
 	}
 
 	@Override
 	protected CloseableIteration<? extends Statement, IOException> createStatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contexts, ValueIO.Reader reader) throws QueryEvaluationException {
-		if (obj != null && obj.isLiteral() && (HALYARD.SEARCH_TYPE.equals(((Literal) obj).getDatatype()))) {
-			if (esClient == null) {
-				throw new QueryEvaluationException("Elasticsearch index not configured");
+		if (obj != null && obj.isLiteral() && (HALYARD.SEARCH.equals(((Literal) obj).getDatatype()))) {
+			if (searchClient == null) {
+				throw new QueryEvaluationException("Search index not configured");
 			}
 			return new LiteralSearchStatementScanner(subj, pred, obj.stringValue(), contexts, reader);
 		} else {
@@ -93,18 +88,10 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 						try {
 							List<RDFObject> objectList = SEARCH_CACHE.get(literalSearchQuery, () -> {
 								ArrayList<RDFObject> objList = new ArrayList<>();
-								SearchResponse<ObjectNode> response = esClient.search(s -> s.index(esIndex).query(q -> q.queryString(qs -> qs.query(literalSearchQuery))).size(ELASTIC_RESULT_SIZE), ObjectNode.class);
-								for (Hit<ObjectNode> hit : response.hits().hits()) {
-									ObjectNode source = hit.source();
-									JsonNode labelNode = source.get("label");
-									JsonNode langNode = source.get("lang");
-									Literal literal;
-									if (langNode != null) {
-										literal = vf.createLiteral(labelNode.asText(), langNode.asText());
-									} else {
-										JsonNode dtNode = source.get("datatype");
-										literal = vf.createLiteral(labelNode.asText(), vf.createIRI(dtNode.asText()));
-									}
+								SearchResponse<SearchDocument> response = searchClient.search(literalSearchQuery, SearchClient.MAX_RESULT_SIZE);
+								for (Hit<SearchDocument> hit : response.hits().hits()) {
+									SearchDocument source = hit.source();
+									Literal literal = source.createLiteral(vf);
 									objList.add(rdfFactory.createObject(literal));
 								}
 								objList.trimToSize();

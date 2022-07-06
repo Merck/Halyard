@@ -121,6 +121,12 @@ public class HBaseSailTest {
 		sail.getDataDir();
     }
 
+	@Test(expected = IllegalStateException.class)
+	public void testNotInitializedRDFFactory() throws Exception {
+		HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, usePushStrategy, 0, null, null);
+		sail.getRDFFactory();
+	}
+
     @Test
     public void testInitializeAndShutDown() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertable"), true, 0, usePushStrategy, 0, null, null);
@@ -711,7 +717,7 @@ public class HBaseSailTest {
         TupleExpr q1 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s a ?o}", "http://whatever/").getTupleExpr();
         TupleExpr q2 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {graph <http://whatevercontext> {?s a ?o}}", "http://whatever/").getTupleExpr();
         TupleExpr q3 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s <http://whatever/> ?o}", "http://whatever/").getTupleExpr();
-        TupleExpr q4 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s ?p \"whatever\"^^<" + HALYARD.SEARCH_TYPE.stringValue() + ">}", "http://whatever/").getTupleExpr();
+        TupleExpr q4 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s ?p \"whatever\"^^<" + HALYARD.SEARCH.stringValue() + ">}", "http://whatever/").getTupleExpr();
         assertEquals(100.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q2), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);

@@ -20,6 +20,6 @@ public class XMLLiteralTest extends AbstractCustomLiteralTest {
 	public void testDocument() throws Exception {
 		String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><test attr=\"foo\">bar</test>";
 		XMLLiteral l = new XMLLiteral(xml);
-		l.documentValue();
+		l.objectValue();
 	}
 }

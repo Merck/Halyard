@@ -20,6 +20,6 @@ public class WKTLiteralTest extends AbstractCustomLiteralTest {
 	public void testGeometry() throws Exception {
 		String wkt = "POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))";
 		WKTLiteral l = new WKTLiteral(wkt);
-		l.geometryValue();
+		l.objectValue();
 	}
 }

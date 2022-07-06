@@ -21,7 +21,7 @@ import org.locationtech.jts.io.WKTWriter;
 /**
  * Compact WKB representation of WKT literals.
  */
-public class WKTLiteral implements Literal {
+public class WKTLiteral implements ObjectLiteral<Geometry> {
 	private static final long serialVersionUID = 2499060372102054647L;
 	private final byte[] wkbBytes;
 
@@ -50,7 +50,7 @@ public class WKTLiteral implements Literal {
 
 	@Override
 	public String getLabel() {
-		Geometry g = geometryValue();
+		Geometry g = objectValue();
 		return new WKTWriter().write(g);
 	}
 
@@ -64,7 +64,7 @@ public class WKTLiteral implements Literal {
 		return GEO.WKT_LITERAL;
 	}
 
-	public Geometry geometryValue() {
+	public Geometry objectValue() {
 		try {
 			return new WKBReader().read(wkbBytes);
 		} catch (ParseException e) {

@@ -72,7 +72,14 @@ public final class HALYARD implements Vocabulary {
     public final static IRI ELASTIC_TRUSTSTORE_LOCATION_PROPERTY = SVF.createIRI(NAMESPACE, "elasticTruststoreLocation");
     public final static IRI ELASTIC_TRUSTSTORE_PASSWORD_PROPERTY = SVF.createIRI(NAMESPACE, "elasticTruststorePassword");
 
-    public final static IRI SEARCH_TYPE = SVF.createIRI(NAMESPACE, "search");
+    public final static IRI SEARCH = SVF.createIRI(NAMESPACE, "search");
+
+    public final static IRI QUERY_CLASS = SVF.createIRI(NAMESPACE, "Query");
+    public final static IRI QUERY_PROPERTY = SVF.createIRI(NAMESPACE, "query");
+    public final static IRI LIMIT_PROPERTY = SVF.createIRI(NAMESPACE, "limit");
+    public final static IRI MATCHES_PROPERTY = SVF.createIRI(NAMESPACE, "matches");
+    public final static IRI SCORE_PROPERTY = SVF.createIRI(NAMESPACE, "score");
+    public final static IRI INDEX_PROPERTY = SVF.createIRI(NAMESPACE, "index");
 
     public final static IRI PARALLEL_SPLIT_FUNCTION = SVF.createIRI(NAMESPACE, "forkAndFilterBy");
 
@@ -87,6 +94,8 @@ public final class HALYARD implements Vocabulary {
 	public final static IRI NON_STRING_TYPE = SVF.createIRI(NAMESPACE, "nonString");
 
 	public final static IRI ANY_NUMERIC_TYPE = SVF.createIRI(NAMESPACE, "anyNumeric");
+
+	public final static IRI JAVA_TYPE = SVF.createIRI(NAMESPACE, "javaObject");
 
     public static final Namespace VALUE_ID_NS = new Base64Namespace("idv", "halyard:id:value:");
 

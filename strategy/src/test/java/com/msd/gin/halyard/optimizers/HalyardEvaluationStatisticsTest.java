@@ -50,7 +50,7 @@ public class HalyardEvaluationStatisticsTest {
             {"select * where {?a a ?c; ?d ?e}",     1.0E3, new String[]{"d", "c"}, null},
             {"select * where {?a ?b ?c; a ?e}",     1.0E2, new String[]{"b", "e", "c"}, null},
             {"select * where {{?a a \"1\". optional {?a a ?b}} union {?a a \"2\"}}", 1010.0, null, null},
-            {"select * where {?s a \"1\"^^<" + HALYARD.SEARCH_TYPE + ">}",           1.0E-4,   new String[]{"s"}, null},
+            {"select * where {?s a \"1\"^^<" + HALYARD.SEARCH + ">}",           1.0E-4,   new String[]{"s"}, null},
             {"select * where {?a ?b ?c}",           1.0E-4, new String[]{"a"}, new String[]{"a"}},
             {"select * where {?a ?b ?c}",           1.0E-11, new String[]{"a", "b"}, new String[]{"a", "b"}},
             {"select * where {?a ?b ?c}",           1.0E-18, new String[]{"a", "b" , "c"}, new String[]{"a", "b", "c"}},

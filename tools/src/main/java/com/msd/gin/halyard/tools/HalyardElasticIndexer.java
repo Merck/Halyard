@@ -130,12 +130,11 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 		                JSONObject.quote(id, json);
 		                json.append(",\"label\":");
 		                JSONObject.quote(l.getLabel(), json);
+		                json.append(",\"datatype\":");
+		                JSONObject.quote(l.getDatatype().stringValue(), json);
 		                if(l.getLanguage().isPresent()) {
 			                json.append(",\"lang\":");
 			                JSONObject.quote(l.getLanguage().get(), json);
-		                } else {
-			                json.append(",\"datatype\":");
-			                JSONObject.quote(l.getDatatype().stringValue(), json);
 		                }
 		                json.append("}\n");
 		                outputJson.set(json.toString());

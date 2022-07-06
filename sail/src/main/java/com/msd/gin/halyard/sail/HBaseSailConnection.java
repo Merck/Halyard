@@ -24,6 +24,8 @@ import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.sail.HBaseSail.SailConnectionFactory;
+import com.msd.gin.halyard.sail.search.SearchClient;
+import com.msd.gin.halyard.sail.search.SearchInterpreter;
 import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
 import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
@@ -96,10 +98,12 @@ public class HBaseSailConnection implements SailConnection {
 	public static final String SOURCE_STRING_BINDING = "__source__";
 	public static final String QUERY_CONTEXT_KEYSPACE_ATTRIBUTE = KeyspaceConnection.class.getName();
 	public static final String QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE = RDFFactory.class.getName();
+	public static final String QUERY_CONTEXT_SEARCH_ATTRIBUTE = SearchClient.class.getName();
 
 	private final Cache<PreparedQueryKey, TupleExpr> queryCache = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(5000).expireAfterWrite(1L, TimeUnit.HOURS).build();
 
     private final HBaseSail sail;
+	private final SearchClient searchClient;
 	private KeyspaceConnection keyspaceConn;
 	private BufferedMutator mutator;
 	private boolean pendingUpdates;
@@ -111,6 +115,11 @@ public class HBaseSailConnection implements SailConnection {
 		// tables are lightweight but not thread-safe so get a new instance per sail
 		// connection
 		this.keyspaceConn = sail.keyspace.getConnection();
+		if (sail.esTransport != null) {
+			searchClient = new SearchClient(new ElasticsearchClient(sail.esTransport), sail.esSettings.indexName);
+		} else {
+			searchClient = null;
+		}
     }
 
     private BufferedMutator getBufferedMutator() {
@@ -153,9 +162,7 @@ public class HBaseSailConnection implements SailConnection {
     }
 
 	private RDFStarTripleSource createTripleSource() {
-		ElasticsearchClient esClient = (sail.esTransport != null) ? new ElasticsearchClient(sail.esTransport) : null;
-		String esIndex = (sail.esSettings != null) ? sail.esSettings.indexName : null;
-		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeout, sail.scanSettings, esClient, esIndex, sail.ticker);
+		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeout, sail.scanSettings, searchClient, sail.ticker);
 	}
 
 	private QueryContext createQueryContext(TripleSource source, boolean includeInferred) {
@@ -163,6 +170,7 @@ public class HBaseSailConnection implements SailConnection {
 		QueryContext queryContext = new QueryContext(queryPreparer);
 		queryContext.setAttribute(QUERY_CONTEXT_KEYSPACE_ATTRIBUTE, keyspaceConn);
 		queryContext.setAttribute(QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE, sail.getRDFFactory());
+		queryContext.setAttribute(QUERY_CONTEXT_SEARCH_ATTRIBUTE, searchClient);
 		return queryContext;
 	}
 
@@ -187,6 +195,7 @@ public class HBaseSailConnection implements SailConnection {
 			if (includeInferred) {
 				new SpinMagicPropertyInterpreter(sail.getSpinParser(), source, sail.getTupleFunctionRegistry(), null).optimize(optimizedTupleExpr, dataset, bindings);
 			}
+			new SearchInterpreter().optimize(optimizedTupleExpr, dataset, bindings);
 		}
 		strategy.optimize(optimizedTupleExpr, getStatistics(), bindings);
 		LOG.debug("Evaluated TupleExpr after optimization:\n{}", optimizedTupleExpr);
