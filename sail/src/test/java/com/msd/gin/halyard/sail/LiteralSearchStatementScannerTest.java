@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -24,9 +26,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.io.IOUtils;
@@ -51,6 +55,7 @@ import static org.junit.Assert.*;
  */
 public class LiteralSearchStatementScannerTest implements Runnable {
 
+	static final String INDEX = "myIndex";
     static HBaseSail hbaseSail;
     static ServerSocket server;
     static String response;
@@ -59,7 +64,7 @@ public class LiteralSearchStatementScannerTest implements Runnable {
     @BeforeClass
     public static void setup() throws Exception {
         server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
-        hbaseSail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "testLiteralSearch", true, 0, true, 0, "http://" + InetAddress.getLoopbackAddress().getHostAddress() + ":" + server.getLocalPort(), null);
+		hbaseSail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "testLiteralSearch", true, 0, true, 0, new URL("http", InetAddress.getLoopbackAddress().getHostAddress(), server.getLocalPort(), "/" + INDEX), null);
         hbaseSail.initialize();
     }
 
@@ -74,8 +79,33 @@ public class LiteralSearchStatementScannerTest implements Runnable {
 		ValueFactory vf = SimpleValueFactory.getInstance();
 		RDFFactory rdfFactory = hbaseSail.getRDFFactory();
 		Literal val = vf.createLiteral("Whatever Text");
-		response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: 30\n\r\n{\"hits\":{\"hits\":[{\"_id\":\"" + rdfFactory.id(val) + "\",\"_source\":{\"label\":\"" + val.getLabel() + "\",\"datatype\":\""
-				+ val.getDatatype() + "\"}}]}}";
+		StringWriter jsonBuf = new StringWriter();
+		JsonGenerator jsonGen = new JsonFactory().createGenerator(jsonBuf);
+		jsonGen.writeStartObject();
+		jsonGen.writeNumberField("took", 34);
+		jsonGen.writeBooleanField("timed_out", false);
+		jsonGen.writeObjectFieldStart("_shards");
+		jsonGen.writeNumberField("total", 5);
+		jsonGen.writeNumberField("successful", 5);
+		jsonGen.writeNumberField("skipped", 0);
+		jsonGen.writeNumberField("failed", 0);
+		jsonGen.writeEndObject();
+		jsonGen.writeObjectFieldStart("hits");
+		jsonGen.writeArrayFieldStart("hits");
+		jsonGen.writeStartObject();
+		jsonGen.writeStringField("_index", INDEX);
+		jsonGen.writeStringField("_id", rdfFactory.id(val).toString());
+		jsonGen.writeObjectFieldStart("_source");
+		jsonGen.writeStringField("label", val.getLabel());
+		jsonGen.writeStringField("datatype", val.getDatatype().stringValue());
+		jsonGen.writeEndObject();
+		jsonGen.writeEndObject();
+		jsonGen.writeEndArray();
+		jsonGen.writeEndObject();
+		jsonGen.writeEndObject();
+		jsonGen.close();
+		String json = jsonBuf.toString();
+		response = "HTTP/1.1 200 OK\ncontent-type: application/json; charset=UTF-8\ncontent-length: " + json.length() + "\nX-elastic-product: Elasticsearch\n\r\n" + json;
         Thread t = new Thread(this);
         t.setDaemon(true);
         t.start();

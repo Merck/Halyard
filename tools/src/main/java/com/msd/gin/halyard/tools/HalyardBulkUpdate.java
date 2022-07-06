@@ -16,15 +16,10 @@
  */
 package com.msd.gin.halyard.tools;
 
-import static com.msd.gin.halyard.tools.HalyardBulkLoad.*;
-
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.repository.HBaseUpdate;
-import com.msd.gin.halyard.sail.HBaseSail;
-import com.msd.gin.halyard.sail.HBaseSailConnection;
-import com.msd.gin.halyard.vocab.HALYARD;
+import static com.msd.gin.halyard.tools.HalyardBulkLoad.TIMESTAMP_PROPERTY;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.cli.CommandLine;
@@ -51,8 +46,6 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.Dataset;
-import org.eclipse.rdf4j.query.MalformedQueryException;
-import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.Update;
 import org.eclipse.rdf4j.query.algebra.UpdateExpr;
@@ -60,17 +53,21 @@ import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.parser.ParsedUpdate;
 import org.eclipse.rdf4j.query.parser.QueryParserUtil;
-import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.rio.RDFFormat;
-import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
+
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.repository.HBaseUpdate;
+import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.sail.HBaseSailConnection;
+import com.msd.gin.halyard.vocab.HALYARD;
 
 /**
  * Apache Hadoop MapReduce tool for performing SPARQL Graph construct queries and then bulk loading the results back into HBase. Essentially, batch process queries
@@ -139,7 +136,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                 Function fn = new ParallelSplitFunction(qis.getRepeatIndex());
                 FunctionRegistry.getInstance().add(fn);
                 try {
-					final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL, new HBaseSail.Ticker() {
+					final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, new HBaseSail.Ticker() {
                         @Override
                         public void tick() {
                             context.progress();

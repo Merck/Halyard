@@ -474,7 +474,7 @@ public final class HalyardExport extends AbstractHalyardTool {
      */
     public static void export(Configuration conf, StatusLog log, String source, String query, String targetUrl, String driverClass, String driverClasspath, String[] jdbcProperties, boolean trimTable, String elasticIndexURL) throws ExportException {
         try (QueryResultWriter writer = createWriter(conf, log, targetUrl, driverClass, driverClasspath, jdbcProperties, trimTable)) {
-            SailRepository rep = new SailRepository(new HBaseSail(conf, source, false, 0, true, 0, elasticIndexURL, null));
+            SailRepository rep = new SailRepository(new HBaseSail(conf, source, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null));
             rep.init();
             try {
                 writer.initTimer();

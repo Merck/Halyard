@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.KeyspaceConnection;
@@ -25,10 +27,6 @@ import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -45,26 +43,29 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.sail.SailException;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.json.JSONTokener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.search.Hit;
 
 public class HBaseSearchTripleSource extends HBaseTripleSource {
-	private static final Logger LOG = LoggerFactory.getLogger(HBaseSearchTripleSource.class);
 	private static final int ELASTIC_RESULT_SIZE = 10000;
 
-	private final String elasticSearchURL;
+	private final ElasticsearchClient esClient;
+	private final String esIndex;
 
-	public HBaseSearchTripleSource(KeyspaceConnection table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, String elasticSearchURL, HBaseSail.Ticker ticker) {
+	public HBaseSearchTripleSource(KeyspaceConnection table, ValueFactory vf, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, ElasticsearchClient esClient, String esIndex, HBaseSail.Ticker ticker) {
 		super(table, vf, rdfFactory, timeoutSecs, settings, ticker);
-		this.elasticSearchURL = elasticSearchURL;
+		this.esClient = esClient;
+		this.esIndex = esIndex;
 	}
 
 	@Override
 	protected CloseableIteration<? extends Statement, IOException> createStatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contexts, ValueIO.Reader reader) throws QueryEvaluationException {
 		if (obj != null && obj.isLiteral() && (HALYARD.SEARCH_TYPE.equals(((Literal) obj).getDatatype()))) {
+			if (esClient == null) {
+				throw new QueryEvaluationException("Elasticsearch index not configured");
+			}
 			return new LiteralSearchStatementScanner(subj, pred, obj.stringValue(), contexts, reader);
 		} else {
 			return super.createStatementScanner(subj, pred, obj, contexts, reader);
@@ -81,9 +82,6 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 
 		public LiteralSearchStatementScanner(Resource subj, IRI pred, String literalSearchQuery, List<Resource> contexts, ValueIO.Reader reader) throws SailException {
 			super(subj, pred, null, contexts, reader);
-			if (elasticSearchURL == null || elasticSearchURL.length() == 0) {
-				throw new SailException("ElasticSearch Index URL is not properly configured.");
-			}
 			this.literalSearchQuery = literalSearchQuery;
 		}
 
@@ -95,34 +93,19 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 						try {
 							List<RDFObject> objectList = SEARCH_CACHE.get(literalSearchQuery, () -> {
 								ArrayList<RDFObject> objList = new ArrayList<>();
-								HttpURLConnection http = (HttpURLConnection) (new URL(elasticSearchURL + "/_search").openConnection());
-								try {
-									http.setRequestMethod("POST");
-									http.setDoOutput(true);
-									http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-									http.connect();
-									try (PrintStream out = new PrintStream(http.getOutputStream(), true, "UTF-8")) {
-										out.print("{\"query\":{\"query_string\":{\"query\":" + JSONObject.quote(literalSearchQuery) + "}},\"size\":" + ELASTIC_RESULT_SIZE + "}");
-									}
-									int response = http.getResponseCode();
-									String msg = http.getResponseMessage();
-									if (response != 200) {
-										LOG.info("ElasticSearch error response: " + msg + " on query: " + literalSearchQuery);
+								SearchResponse<ObjectNode> response = esClient.search(s -> s.index(esIndex).query(q -> q.queryString(qs -> qs.query(literalSearchQuery))).size(ELASTIC_RESULT_SIZE), ObjectNode.class);
+								for (Hit<ObjectNode> hit : response.hits().hits()) {
+									ObjectNode source = hit.source();
+									JsonNode labelNode = source.get("label");
+									JsonNode langNode = source.get("lang");
+									Literal literal;
+									if (langNode != null) {
+										literal = vf.createLiteral(labelNode.asText(), langNode.asText());
 									} else {
-										try (InputStreamReader isr = new InputStreamReader(http.getInputStream(), "UTF-8")) {
-											JSONArray hits = new JSONObject(new JSONTokener(isr)).getJSONObject("hits").getJSONArray("hits");
-											for (int i = 0; i < hits.length(); i++) {
-												JSONObject source = hits.getJSONObject(i).getJSONObject("_source");
-												if (source.has("lang")) {
-													objList.add(rdfFactory.createObject(vf.createLiteral(source.getString("label"), source.getString("lang"))));
-												} else {
-													objList.add(rdfFactory.createObject(vf.createLiteral(source.getString("label"), vf.createIRI(source.getString("datatype")))));
-												}
-											}
-										}
+										JsonNode dtNode = source.get("datatype");
+										literal = vf.createLiteral(labelNode.asText(), vf.createIRI(dtNode.asText()));
 									}
-								} finally {
-									http.disconnect();
+									objList.add(rdfFactory.createObject(literal));
 								}
 								objList.trimToSize();
 								return objList;

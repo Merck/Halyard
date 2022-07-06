@@ -16,19 +16,9 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.IdValueFactory;
-import com.msd.gin.halyard.common.Keyspace;
-import com.msd.gin.halyard.common.KeyspaceConnection;
-import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.function.DynamicFunctionRegistry;
-import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
-import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
-import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
-import com.msd.gin.halyard.vocab.HALYARD;
-
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -39,6 +29,12 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.http.HttpHost;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.eclipse.rdf4j.IsolationLevel;
 import org.eclipse.rdf4j.IsolationLevels;
 import org.eclipse.rdf4j.model.Namespace;
@@ -55,6 +51,24 @@ import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.spin.SpinParser;
+import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestClientBuilder;
+import org.elasticsearch.client.RestClientBuilder.HttpClientConfigCallback;
+
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.IdValueFactory;
+import com.msd.gin.halyard.common.Keyspace;
+import com.msd.gin.halyard.common.KeyspaceConnection;
+import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.function.DynamicFunctionRegistry;
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
+import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
+import com.msd.gin.halyard.vocab.HALYARD;
+
+import co.elastic.clients.json.jackson.JacksonJsonpMapper;
+import co.elastic.clients.transport.ElasticsearchTransport;
+import co.elastic.clients.transport.rest_client.RestClientTransport;
 
 /**
  * HBaseSail is the RDF Storage And Inference Layer (SAIL) implementation on top of Apache HBase.
@@ -83,6 +97,27 @@ public class HBaseSail implements Sail {
 		SailConnection createConnection(HBaseSail sail) throws IOException;
 	}
 
+	static final class ElasticSettings {
+		String protocol;
+		String host;
+		int port;
+		String user;
+		String password;
+		String indexName;
+
+		static ElasticSettings from(URL esIndexUrl) {
+			if (esIndexUrl == null) {
+				return null;
+			}
+			ElasticSettings settings = new ElasticSettings();
+			settings.protocol = esIndexUrl.getProtocol();
+			settings.host = esIndexUrl.getHost();
+			settings.port = esIndexUrl.getPort();
+			settings.indexName = esIndexUrl.getPath();
+			return settings;
+		}
+	}
+
 	static final class ScanSettings {
 		long minTimestamp = 0;
 		long maxTimestamp = Long.MAX_VALUE;
@@ -103,7 +138,8 @@ public class HBaseSail implements Sail {
 	final int evaluationTimeout; // secs
 	private boolean readOnly = true;
 	private long readOnlyTimestamp = 0L;
-    final String elasticIndexURL;
+	final ElasticSettings esSettings;
+	ElasticsearchTransport esTransport;
 	boolean includeNamespaces = false;
     final Ticker ticker;
 	private FederatedServiceResolver federatedServiceResolver;
@@ -120,11 +156,11 @@ public class HBaseSail implements Sail {
 	Keyspace keyspace;
 
 
-	private HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
+	private HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
 		this(conn, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, connFactory, new HBaseFederatedServiceResolver(conn, config, tableName, evaluationTimeout, ticker));
     }
 
-	HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory,
+	HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory,
 			FederatedServiceResolver fsr) {
 		this.hConnection = conn;
 		this.hConnectionIsShared = (conn != null);
@@ -136,13 +172,13 @@ public class HBaseSail implements Sail {
 		this.snapshotRestorePath = null;
 		this.pushStrategy = pushStrategy;
 		this.evaluationTimeout = evaluationTimeout;
-		this.elasticIndexURL = elasticIndexURL;
+		this.esSettings = ElasticSettings.from(elasticIndexURL);
 		this.ticker = ticker;
 		this.connFactory = connFactory;
 		this.federatedServiceResolver = fsr;
 	}
 
-	HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory, FederatedServiceResolver fsr) {
+	HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory, FederatedServiceResolver fsr) {
 		this.hConnection = null;
 		this.hConnectionIsShared = false;
 		this.config = config;
@@ -153,7 +189,7 @@ public class HBaseSail implements Sail {
 		this.snapshotRestorePath = new Path(snapshotRestorePath);
 		this.pushStrategy = pushStrategy;
 		this.evaluationTimeout = evaluationTimeout;
-		this.elasticIndexURL = elasticIndexURL;
+		this.esSettings = ElasticSettings.from(elasticIndexURL);
 		this.ticker = ticker;
 		this.connFactory = connFactory;
 		this.federatedServiceResolver = fsr;
@@ -173,19 +209,19 @@ public class HBaseSail implements Sail {
 	 * @param ticker optional Ticker callback for keep-alive notifications
 	 * @param connFactory {@link SailConnectionFactory} for creating connections
 	 */
-    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
+    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
     	this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, connFactory);
     }
 
-    public HBaseSail(Connection conn, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker) {
+    public HBaseSail(Connection conn, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker) {
 		this(conn, conn.getConfiguration(), tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE);
 	}
 
-    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker) {
+    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker) {
 		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE);
 	}
 
-	public HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, String elasticIndexURL, Ticker ticker) {
+	public HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker) {
 		this(config, snapshotName, snapshotRestorePath, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE, null);
 	}
 
@@ -259,7 +295,24 @@ public class HBaseSail implements Sail {
 
 		SpinFunctionInterpreter.registerSpinParsingFunctions(spinParser, pushStrategy ? functionRegistry : FunctionRegistry.getInstance(), pushStrategy ? tupleFunctionRegistry : TupleFunctionRegistry.getInstance());
 		SpinMagicPropertyInterpreter.registerSpinParsingTupleFunctions(spinParser, pushStrategy ? tupleFunctionRegistry : TupleFunctionRegistry.getInstance());
-    }
+
+		if (esSettings != null) {
+			RestClientBuilder restClientBuilder = RestClient.builder(new HttpHost(esSettings.host, esSettings.port != -1 ? esSettings.port : 9200, esSettings.protocol));
+			if (esSettings.password != null) {
+				CredentialsProvider esCredentialsProvider = new BasicCredentialsProvider();
+				esCredentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(esSettings.user, esSettings.password));
+				restClientBuilder.setHttpClientConfigCallback(new HttpClientConfigCallback() {
+					@Override
+					public HttpAsyncClientBuilder customizeHttpClient(
+							HttpAsyncClientBuilder httpClientBuilder) {
+						return httpClientBuilder.setDefaultCredentialsProvider(esCredentialsProvider);
+					}
+				});
+			}
+			RestClient restClient = restClientBuilder.build();
+			esTransport = new RestClientTransport(restClient, new JacksonJsonpMapper());
+		}
+	}
 
 	private boolean isInitialized() {
 		return (keyspace != null) && (rdfFactory != null);
@@ -323,6 +376,13 @@ public class HBaseSail implements Sail {
 
     @Override
     public void shutDown() throws SailException { //release resources
+		if (esTransport != null) {
+			try {
+				esTransport.close();
+			} catch (IOException ignore) {
+			}
+			esTransport = null;
+		}
 		if (statsConnection != null) {
 			try {
 				statsConnection.close();

@@ -28,6 +28,9 @@ import org.eclipse.rdf4j.sail.config.SailConfigSchema;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+
 /**
  *
  * @author Adam Sotona (MSD)
@@ -88,10 +91,10 @@ public class HBaseSailConfigTest {
     }
 
     @Test
-    public void testElasticIndex() {
+    public void testElasticIndex() throws MalformedURLException {
         HBaseSailConfig cfg = new HBaseSailConfig();
-        cfg.setElasticIndexURL("http://localhost:12345/index");
-        assertEquals("http://localhost:12345/index", cfg.getElasticIndexURL());
+        cfg.setElasticIndexURL(new URL("http://localhost:12345/index"));
+        assertEquals("http://localhost:12345/index", cfg.getElasticIndexURL().toString());
     }
 
     @Test
@@ -101,7 +104,7 @@ public class HBaseSailConfigTest {
         cfg.setSplitBits(7);
         cfg.setCreate(false);
         cfg.setPush(false);
-        cfg.setElasticIndexURL("http://whateverURL/index");
+        cfg.setElasticIndexURL(new URL("http://whateverURL/index"));
         TreeModel g = new TreeModel();
         cfg.export(g);
         cfg = new HBaseSailConfig();
@@ -110,7 +113,7 @@ public class HBaseSailConfigTest {
         assertEquals(7, cfg.getSplitBits());
         assertFalse(cfg.isCreate());
         assertFalse(cfg.isPush());
-        assertEquals("http://whateverURL/index", cfg.getElasticIndexURL());
+        assertEquals("http://whateverURL/index", cfg.getElasticIndexURL().toString());
     }
 
     @Test
@@ -128,7 +131,7 @@ public class HBaseSailConfigTest {
         assertEquals(5, cfg.getSplitBits());
         assertTrue(cfg.isCreate());
         assertTrue(cfg.isPush());
-        assertEquals("", cfg.getElasticIndexURL());
+        assertNull(cfg.getElasticIndexURL());
     }
 
     @Test
@@ -145,7 +148,7 @@ public class HBaseSailConfigTest {
 		assertEquals("snapshot", cfg.getSnapshotName());
 		assertEquals("/path", cfg.getSnapshotRestorePath());
 		assertTrue(cfg.isPush());
-		assertEquals("", cfg.getElasticIndexURL());
+		assertNull(cfg.getElasticIndexURL());
 	}
 
 	@Test
@@ -157,7 +160,7 @@ public class HBaseSailConfigTest {
         assertEquals(0, cfg.getSplitBits());
         assertTrue(cfg.isCreate());
         assertTrue(cfg.isPush());
-        assertEquals("", cfg.getElasticIndexURL());
+        assertNull(cfg.getElasticIndexURL());
     }
 
     @Test

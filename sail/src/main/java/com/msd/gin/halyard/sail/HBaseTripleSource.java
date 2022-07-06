@@ -18,7 +18,6 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.KeyspaceConnection;
-import com.msd.gin.halyard.common.LiteralConstraint;
 import com.msd.gin.halyard.common.RDFContext;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.RDFObject;
@@ -66,7 +65,7 @@ import org.slf4j.LoggerFactory;
 public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTripleSourceFactory {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseTripleSource.class);
 
-	private final KeyspaceConnection table;
+	protected final KeyspaceConnection keyspaceConn;
 	protected final RDFFactory rdfFactory;
 	private final ValueIO.Reader valueReader;
 	private final long timeoutSecs;
@@ -82,7 +81,7 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 	}
 
 	private HBaseTripleSource(KeyspaceConnection table, ValueIO.Reader valueReader, RDFFactory rdfFactory, long timeoutSecs, HBaseSail.ScanSettings settings, HBaseSail.Ticker ticker) {
-		this.table = table;
+		this.keyspaceConn = table;
 		this.rdfFactory = rdfFactory;
 		this.valueReader = valueReader;
 		this.timeoutSecs = timeoutSecs;
@@ -101,13 +100,13 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 	}
 
 	public TripleSource getTimestampedTripleSource() {
-		ValueIO.Reader tsValueReader = rdfFactory.createTableReader(TimestampedValueFactory.INSTANCE, table);
-		return new HBaseTripleSource(table, tsValueReader, rdfFactory, timeoutSecs, settings, ticker);
+		ValueIO.Reader tsValueReader = rdfFactory.createTableReader(TimestampedValueFactory.INSTANCE, keyspaceConn);
+		return new HBaseTripleSource(keyspaceConn, tsValueReader, rdfFactory, timeoutSecs, settings, ticker);
 	}
 
 	@Override
 	public TripleSource getTripleSource(ValueConstraint subjConstraint, ValueConstraint objConstraints) {
-		return new HBaseTripleSource(table, valueReader, rdfFactory, timeoutSecs, settings, ticker) {
+		return new HBaseTripleSource(keyspaceConn, valueReader, rdfFactory, timeoutSecs, settings, ticker) {
 			protected Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, RDFFactory rdfFactory) {
 				return HalyardTableUtils.scanWithConstraints(subj, subjConstraint, pred, obj, objConstraints, ctx, rdfFactory);
 			}
@@ -186,7 +185,7 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 							scan.setTimeRange(settings.minTimestamp, settings.maxTimestamp);
 							scan.readVersions(settings.maxVersions);
 						}
-						rs = table.getScanner(scan);
+						rs = keyspaceConn.getScanner(scan);
 					} else {
 						return null;
 					}

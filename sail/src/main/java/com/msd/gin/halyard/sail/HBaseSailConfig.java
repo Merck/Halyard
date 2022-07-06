@@ -17,6 +17,9 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.vocab.HALYARD;
+
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -58,7 +61,7 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
 	private String snapshotRestorePath = null;
     private boolean push = true;
     private int evaluationTimeout = 180; //3 min
-    private String elasticIndexURL = "";
+    private URL elasticIndexURL;
 
     /**
      * Sets HBase table name
@@ -161,7 +164,7 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
      * Sets ElasticSearch index URL
      * @param elasticIndexURL String ElasticSearch index URL
      */
-    public void setElasticIndexURL(String elasticIndexURL) {
+    public void setElasticIndexURL(URL elasticIndexURL) {
         this.elasticIndexURL = elasticIndexURL;
     }
 
@@ -169,7 +172,7 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
      * Gets ElasticSearch index URL
      * @return String ElasticSearch index URL
      */
-    public String getElasticIndexURL() {
+    public URL getElasticIndexURL() {
         return elasticIndexURL;
     }
 
@@ -202,7 +205,9 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
 		}
         graph.add(implNode, HALYARD.PUSH_STRATEGY_PROPERTY, vf.createLiteral(push));
         graph.add(implNode, HALYARD.EVALUATION_TIMEOUT_PROPERTY, vf.createLiteral(evaluationTimeout));
-        graph.add(implNode, HALYARD.ELASTIC_INDEX_URL_PROPERTY, vf.createLiteral(elasticIndexURL));
+        if (elasticIndexURL != null) {
+        	graph.add(implNode, HALYARD.ELASTIC_INDEX_URL_PROPERTY, vf.createLiteral(elasticIndexURL.toString()));
+        }
         return implNode;
     }
 
@@ -244,14 +249,14 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
         } catch (IllegalArgumentException e) {
             throw new SailConfigException(e);
         }
-	Optional<Literal> snapshotNameValue = Models.objectLiteral(graph.filter(implNode, HALYARD.SNAPSHOT_NAME_PROPERTY, null));
-	if (snapshotNameValue.isPresent()) {
-		setSnapshotName(snapshotNameValue.get().getLabel());
-	}
-	Optional<Literal> snapshotRestorePathValue = Models.objectLiteral(graph.filter(implNode, HALYARD.SNAPSHOT_RESTORE_PATH_PROPERTY, null));
-	if (snapshotRestorePathValue.isPresent()) {
-		setSnapshotRestorePath(snapshotRestorePathValue.get().getLabel());
-	}
+		Optional<Literal> snapshotNameValue = Models.objectLiteral(graph.filter(implNode, HALYARD.SNAPSHOT_NAME_PROPERTY, null));
+		if (snapshotNameValue.isPresent()) {
+			setSnapshotName(snapshotNameValue.get().getLabel());
+		}
+		Optional<Literal> snapshotRestorePathValue = Models.objectLiteral(graph.filter(implNode, HALYARD.SNAPSHOT_RESTORE_PATH_PROPERTY, null));
+		if (snapshotRestorePathValue.isPresent()) {
+			setSnapshotRestorePath(snapshotRestorePathValue.get().getLabel());
+		}
         Optional<Literal> pushValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.PUSH_STRATEGY_PROPERTY);
         if (pushValue.isPresent()) try {
             setPush(pushValue.get().booleanValue());
@@ -266,12 +271,25 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
         }
         Optional<Literal> elasticIndexValue = backCompatibilityFilterObjectLiteral(graph, implNode, HALYARD.ELASTIC_INDEX_URL_PROPERTY);
         if (elasticIndexValue.isPresent()) {
-            setElasticIndexURL(elasticIndexValue.get().stringValue());
+            try {
+				setElasticIndexURL(new URL(elasticIndexValue.get().stringValue()));
+			} catch (MalformedURLException e) {
+				throw new SailConfigException(e);
+			}
         }
     }
 
     private static Optional<Literal> backCompatibilityFilterObjectLiteral(Model graph, Resource subject, IRI predicate) {
         Optional<Literal> value = Models.objectLiteral(graph.filter(subject, predicate, null));
-        return value.isPresent() ? value : Models.objectLiteral(graph.filter(subject, BACK_COMPATIBILITY_MAP.get(predicate), null));
+        if (value.isPresent()) {
+        	return value;
+        } else {
+        	IRI deprecatedIRI = BACK_COMPATIBILITY_MAP.get(predicate);
+        	if (deprecatedIRI != null) {
+        		return Models.objectLiteral(graph.filter(subject, deprecatedIRI, null));
+        	} else {
+        		return Optional.empty();
+        	}
+        }
     }
 }

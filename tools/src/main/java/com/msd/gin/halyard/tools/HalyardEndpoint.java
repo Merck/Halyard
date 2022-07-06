@@ -18,6 +18,7 @@ package com.msd.gin.halyard.tools;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -111,7 +112,7 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
             List<String> cmdArgs = Arrays.asList(cmd.getArgs());
 
             SailRepository rep = new SailRepository(
-                    new HBaseSail(getConf(), table, false, 0, true, timeout, elasticIndexURL, null));
+                    new HBaseSail(getConf(), table, false, 0, true, timeout, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null));
             rep.init();
             try {
                 Properties storedQueries = new Properties();

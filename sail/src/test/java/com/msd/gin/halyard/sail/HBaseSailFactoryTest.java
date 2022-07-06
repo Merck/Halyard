@@ -24,6 +24,8 @@ import org.eclipse.rdf4j.sail.config.SailImplConfig;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
+import java.net.URL;
+
 /**
  *
  * @author Adam Sotona (MSD)
@@ -48,7 +50,7 @@ public class HBaseSailFactoryTest {
         hbsc.setSplitBits(3);
         hbsc.setEvaluationTimeout(480);
         hbsc.setTableName("testtable");
-        hbsc.setElasticIndexURL("http://whatever/index");
+        hbsc.setElasticIndexURL(new URL("http://whatever/index"));
         Sail sail = new HBaseSailFactory().getSail(hbsc);
         assertTrue(sail instanceof HBaseSail);
         HBaseSail hbs = (HBaseSail)sail;
@@ -57,7 +59,9 @@ public class HBaseSailFactoryTest {
         assertEquals(3, hbs.splitBits);
 		assertEquals("testtable", hbs.tableName.getNameAsString());
         assertEquals(480, hbs.evaluationTimeout);
-        assertEquals("http://whatever/index", hbs.elasticIndexURL);
+        assertEquals("http", hbs.esSettings.protocol);
+        assertEquals("whatever", hbs.esSettings.host);
+        assertEquals("index", hbs.esSettings.indexName);
     }
 
 	@Test
@@ -68,7 +72,7 @@ public class HBaseSailFactoryTest {
 		hbsc.setEvaluationTimeout(480);
 		hbsc.setSnapshotName("snapshot");
 		hbsc.setSnapshotRestorePath("/path");
-		hbsc.setElasticIndexURL("http://whatever/index");
+		hbsc.setElasticIndexURL(new URL("http://whatever/index"));
 		Sail sail = new HBaseSailFactory().getSail(hbsc);
 		assertTrue(sail instanceof HBaseSail);
 		HBaseSail hbs = (HBaseSail) sail;
@@ -78,7 +82,9 @@ public class HBaseSailFactoryTest {
 		assertEquals("snapshot", hbs.snapshotName);
 		assertEquals("/path", hbs.snapshotRestorePath.toString());
 		assertEquals(480, hbs.evaluationTimeout);
-		assertEquals("http://whatever/index", hbs.elasticIndexURL);
+        assertEquals("http", hbs.esSettings.protocol);
+        assertEquals("whatever", hbs.esSettings.host);
+        assertEquals("index", hbs.esSettings.indexName);
 	}
 
     @Test(expected = SailConfigException.class)

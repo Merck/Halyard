@@ -69,6 +69,18 @@
 									<version>${icu4j.version}</version>
 									<type>jar</type>
 								</artifactItem>
+								<artifactItem>
+									<groupId>co.elastic.clients</groupId>
+									<artifactId>elasticsearch-java</artifactId>
+									<version>${elasticsearch.version}</version>
+									<type>jar</type>
+								</artifactItem>
+								<artifactItem>
+									<groupId>org.elasticsearch.client</groupId>
+									<artifactId>elasticsearch-rest-client</artifactId>
+									<version>${elasticsearch.version}</version>
+									<type>jar</type>
+								</artifactItem>
 							</artifactItems>
 							<outputDirectory>${project.build.directory}</outputDirectory>
 							<overWriteReleases>true</overWriteReleases>

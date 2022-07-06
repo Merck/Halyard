@@ -30,6 +30,8 @@ import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 import com.msd.gin.halyard.vocab.HALYARD;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
@@ -153,7 +155,9 @@ public class HBaseSailConnection implements SailConnection {
     }
 
 	private RDFStarTripleSource createTripleSource() {
-		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeout, sail.scanSettings, sail.elasticIndexURL, sail.ticker);
+		ElasticsearchClient esClient = (sail.esTransport != null) ? new ElasticsearchClient(sail.esTransport) : null;
+		String esIndex = (sail.esSettings != null) ? sail.esSettings.indexName : null;
+		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeout, sail.scanSettings, esClient, esIndex, sail.ticker);
 	}
 
 	private QueryContext createQueryContext(TripleSource source, boolean includeInferred) {

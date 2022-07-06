@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.tools;
 
+import java.net.URL;
+
 import org.apache.commons.cli.CommandLine;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.Update;
@@ -43,7 +45,8 @@ public final class HalyardUpdate extends AbstractHalyardTool {
 
 
     public int run(CommandLine cmd) throws Exception {
-		SailRepository rep = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('i'), null));
+    	String elasticIndexURL = cmd.getOptionValue('i');
+		SailRepository rep = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null));
         rep.init();
         try {
         	try(RepositoryConnection conn = rep.getConnection()) {

@@ -20,6 +20,7 @@ import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 
 import java.io.IOException;
+import java.net.URL;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.Collections;
@@ -61,11 +62,13 @@ public final class HalyardProfile extends AbstractHalyardTool {
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "query", "sparql_query", "SPARQL query to profile", true, true);
+        addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
     }
 
     @Override
     public int run(CommandLine cmd) throws Exception {
-		SailRepository repo = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, cmd.getOptionValue('e'), null, new HBaseSail.SailConnectionFactory() {
+    	String elasticIndexURL = cmd.getOptionValue('i');
+		SailRepository repo = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null, new HBaseSail.SailConnectionFactory() {
 			@Override
 			public SailConnection createConnection(HBaseSail sail) throws IOException {
 				return new HBaseSailConnection(sail) {
@@ -74,7 +77,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
 					@Override
 		            public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred) throws SailException {
 		                print("Original query:", tupleExpr);
-		                return super.evaluate(tupleExpr, dataset, bindings, includeInferred); //To change body of generated methods, choose Tools | Templates.
+		                return super.evaluate(tupleExpr, dataset, bindings, includeInferred);
 		            }
 		            @Override
 		            protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(EvaluationStrategy strategy, TupleExpr tupleExpr) {
