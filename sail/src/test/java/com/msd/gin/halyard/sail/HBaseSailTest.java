@@ -817,7 +817,7 @@ public class HBaseSailTest {
 		restorePath.delete();
 		restorePath.deleteOnExit();
 
-		sail = new HBaseSail(hconn.getConfiguration(), snapshot, restorePath.toURI().toURL().toString(), usePushStrategy, 0, null, null);
+		sail = new HBaseSail(hconn.getConfiguration(), snapshot, restorePath.toURI().toURL().toString(), usePushStrategy, 0, (HBaseSail.ElasticSettings) null);
 		sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
 			try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, false)) {

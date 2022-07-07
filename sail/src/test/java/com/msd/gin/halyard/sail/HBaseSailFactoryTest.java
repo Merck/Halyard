@@ -51,6 +51,7 @@ public class HBaseSailFactoryTest {
         hbsc.setEvaluationTimeout(480);
         hbsc.setTableName("testtable");
         hbsc.setElasticIndexURL(new URL("http://whatever/index"));
+		hbsc.setElasticKeystoreLocation("/home/keystore");
         Sail sail = new HBaseSailFactory().getSail(hbsc);
         assertTrue(sail instanceof HBaseSail);
         HBaseSail hbs = (HBaseSail)sail;
@@ -62,6 +63,7 @@ public class HBaseSailFactoryTest {
         assertEquals("http", hbs.esSettings.protocol);
         assertEquals("whatever", hbs.esSettings.host);
         assertEquals("index", hbs.esSettings.indexName);
+		assertEquals("/home/keystore", hbs.esSettings.sslSettings.keyStoreLocation);
     }
 
 	@Test
@@ -73,6 +75,7 @@ public class HBaseSailFactoryTest {
 		hbsc.setSnapshotName("snapshot");
 		hbsc.setSnapshotRestorePath("/path");
 		hbsc.setElasticIndexURL(new URL("http://whatever/index"));
+		hbsc.setElasticKeystoreLocation("/home/keystore");
 		Sail sail = new HBaseSailFactory().getSail(hbsc);
 		assertTrue(sail instanceof HBaseSail);
 		HBaseSail hbs = (HBaseSail) sail;
@@ -85,6 +88,7 @@ public class HBaseSailFactoryTest {
         assertEquals("http", hbs.esSettings.protocol);
         assertEquals("whatever", hbs.esSettings.host);
         assertEquals("index", hbs.esSettings.indexName);
+		assertEquals("/home/keystore", hbs.esSettings.sslSettings.keyStoreLocation);
 	}
 
     @Test(expected = SailConfigException.class)

@@ -16,12 +16,29 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.IdValueFactory;
+import com.msd.gin.halyard.common.Keyspace;
+import com.msd.gin.halyard.common.KeyspaceConnection;
+import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.SSLSettings;
+import com.msd.gin.halyard.function.DynamicFunctionRegistry;
+import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
+import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
+import com.msd.gin.halyard.vocab.HALYARD;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -54,17 +71,6 @@ import org.eclipse.rdf4j.spin.SpinParser;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestClientBuilder.HttpClientConfigCallback;
-
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.IdValueFactory;
-import com.msd.gin.halyard.common.Keyspace;
-import com.msd.gin.halyard.common.KeyspaceConnection;
-import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.function.DynamicFunctionRegistry;
-import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
-import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
-import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
-import com.msd.gin.halyard.vocab.HALYARD;
 
 import co.elastic.clients.json.jackson.JacksonJsonpMapper;
 import co.elastic.clients.transport.ElasticsearchTransport;
@@ -104,6 +110,7 @@ public class HBaseSail implements Sail {
 		String user;
 		String password;
 		String indexName;
+		SSLSettings sslSettings;
 
 		static ElasticSettings from(URL esIndexUrl) {
 			if (esIndexUrl == null) {
@@ -113,7 +120,7 @@ public class HBaseSail implements Sail {
 			settings.protocol = esIndexUrl.getProtocol();
 			settings.host = esIndexUrl.getHost();
 			settings.port = esIndexUrl.getPort();
-			settings.indexName = esIndexUrl.getPath();
+			settings.indexName = esIndexUrl.getPath().substring(1);
 			return settings;
 		}
 	}
@@ -156,11 +163,27 @@ public class HBaseSail implements Sail {
 	Keyspace keyspace;
 
 
-	private HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
-		this(conn, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, connFactory, new HBaseFederatedServiceResolver(conn, config, tableName, evaluationTimeout, ticker));
-    }
+	HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings) {
+		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, null, HBaseSailConnection.Factory.INSTANCE,
+				new HBaseFederatedServiceResolver(null, config, tableName, evaluationTimeout, null));
+	}
 
-	HBaseSail(Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory,
+	/**
+	 * Construct HBaseSail for a table.
+	 * 
+	 * @param conn
+	 * @param config
+	 * @param tableName
+	 * @param create
+	 * @param splitBits
+	 * @param pushStrategy
+	 * @param evaluationTimeout
+	 * @param elasticSettings
+	 * @param ticker
+	 * @param connFactory
+	 * @param fsr
+	 */
+	HBaseSail(@Nullable Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker, SailConnectionFactory connFactory,
 			FederatedServiceResolver fsr) {
 		this.hConnection = conn;
 		this.hConnectionIsShared = (conn != null);
@@ -172,13 +195,37 @@ public class HBaseSail implements Sail {
 		this.snapshotRestorePath = null;
 		this.pushStrategy = pushStrategy;
 		this.evaluationTimeout = evaluationTimeout;
-		this.esSettings = ElasticSettings.from(elasticIndexURL);
+		this.esSettings = elasticSettings;
 		this.ticker = ticker;
 		this.connFactory = connFactory;
 		this.federatedServiceResolver = fsr;
 	}
 
-	HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory, FederatedServiceResolver fsr) {
+	public HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL) {
+		this(config, snapshotName, snapshotRestorePath, pushStrategy, evaluationTimeout, ElasticSettings.from(elasticIndexURL));
+	}
+
+	HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings) {
+		this(config, snapshotName, snapshotRestorePath, pushStrategy, evaluationTimeout, elasticSettings, null, HBaseSailConnection.Factory.INSTANCE, new HBaseFederatedServiceResolver(null, config, null, evaluationTimeout, null));
+	}
+
+	/**
+	 * Construct HBaseSail for a snapshot.
+	 * 
+	 * @param conn
+	 * @param config
+	 * @param tableName
+	 * @param create
+	 * @param splitBits
+	 * @param pushStrategy
+	 * @param evaluationTimeout
+	 * @param elasticSettings
+	 * @param ticker
+	 * @param connFactory
+	 * @param fsr
+	 */
+	HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker, SailConnectionFactory connFactory,
+			FederatedServiceResolver fsr) {
 		this.hConnection = null;
 		this.hConnectionIsShared = false;
 		this.config = config;
@@ -189,10 +236,19 @@ public class HBaseSail implements Sail {
 		this.snapshotRestorePath = new Path(snapshotRestorePath);
 		this.pushStrategy = pushStrategy;
 		this.evaluationTimeout = evaluationTimeout;
-		this.esSettings = ElasticSettings.from(elasticIndexURL);
+		this.esSettings = elasticSettings;
 		this.ticker = ticker;
 		this.connFactory = connFactory;
 		this.federatedServiceResolver = fsr;
+	}
+
+	private HBaseSail(@Nullable Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
+		this(conn, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, ElasticSettings.from(elasticIndexURL), ticker, connFactory,
+				new HBaseFederatedServiceResolver(conn, config, tableName, evaluationTimeout, null));
+	}
+
+	public HBaseSail(@Nonnull Connection conn, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker) {
+		this(conn, conn.getConfiguration(), tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE);
 	}
 
     /**
@@ -210,19 +266,11 @@ public class HBaseSail implements Sail {
 	 * @param connFactory {@link SailConnectionFactory} for creating connections
 	 */
     public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
-    	this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, connFactory);
+		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, connFactory);
     }
 
-    public HBaseSail(Connection conn, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker) {
-		this(conn, conn.getConfiguration(), tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE);
-	}
-
-    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker) {
-		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE);
-	}
-
-	public HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker) {
-		this(config, snapshotName, snapshotRestorePath, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE, null);
+	public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker) {
+		this(config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE);
 	}
 
     /**
@@ -298,17 +346,36 @@ public class HBaseSail implements Sail {
 
 		if (esSettings != null) {
 			RestClientBuilder restClientBuilder = RestClient.builder(new HttpHost(esSettings.host, esSettings.port != -1 ? esSettings.port : 9200, esSettings.protocol));
+			CredentialsProvider esCredentialsProvider;
 			if (esSettings.password != null) {
-				CredentialsProvider esCredentialsProvider = new BasicCredentialsProvider();
+				esCredentialsProvider = new BasicCredentialsProvider();
 				esCredentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(esSettings.user, esSettings.password));
-				restClientBuilder.setHttpClientConfigCallback(new HttpClientConfigCallback() {
-					@Override
-					public HttpAsyncClientBuilder customizeHttpClient(
-							HttpAsyncClientBuilder httpClientBuilder) {
-						return httpClientBuilder.setDefaultCredentialsProvider(esCredentialsProvider);
-					}
-				});
+			} else {
+				esCredentialsProvider = null;
 			}
+			SSLContext sslContext;
+			if (esSettings.sslSettings != null) {
+				try {
+					sslContext = esSettings.sslSettings.createSSLContext();
+				} catch (IOException | GeneralSecurityException e) {
+					throw new SailException(e);
+				}
+			} else {
+				sslContext = null;
+			}
+			restClientBuilder.setHttpClientConfigCallback(new HttpClientConfigCallback() {
+				@Override
+				public HttpAsyncClientBuilder customizeHttpClient(
+						HttpAsyncClientBuilder httpClientBuilder) {
+					if (esCredentialsProvider != null) {
+						httpClientBuilder.setDefaultCredentialsProvider(esCredentialsProvider);
+					}
+					if (esSettings.sslSettings != null) {
+						httpClientBuilder.setSSLContext(sslContext);
+					}
+					return httpClientBuilder;
+				}
+			});
 			RestClient restClient = restClientBuilder.build();
 			esTransport = new RestClientTransport(restClient, new JacksonJsonpMapper());
 		}

@@ -132,12 +132,72 @@
 							Optional ElasticSearch Index URL
 						</th>
 						<td>
-							<input type="text" id="elastic" name="Optional ElasticSearch Index URL" size="48"
+							<input type="text" id="elasticIndex" name="ElasticSearch Index URL" size="48"
 								value="" />
 						</td>
 						<td></td>
 					</tr>
-                                        <tr>
+					<tr>
+						<th>
+							Optional ElasticSearch Username
+						</th>
+						<td>
+							<input type="text" id="elasticUser" name="ElasticSearch Username" size="48"
+								value="" />
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<th>
+							Optional ElasticSearch Password
+						</th>
+						<td>
+							<input type="password" id="elasticPass" name="ElasticSearch Password" size="48"
+								value="" />
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<th>
+							Optional ElasticSearch Keystore Location
+						</th>
+						<td>
+							<input type="text" id="elasticKeyLoc" name="ElasticSearch Keystore Location" size="48"
+								value="" />
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<th>
+							Optional ElasticSearch Keystore Password
+						</th>
+						<td>
+							<input type="password" id="elasticKeyPass" name="ElasticSearch Keystore Password" size="48"
+								value="" />
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<th>
+							Optional ElasticSearch Truststore Location
+						</th>
+						<td>
+							<input type="text" id="elasticTrustLoc" name="ElasticSearch Truststore Location" size="48"
+								value="" />
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<th>
+							Optional ElasticSearch Truststore Password
+						</th>
+						<td>
+							<input type="password" id="elasticTrustPass" name="ElasticSearch Truststore Password" size="48"
+								value="" />
+						</td>
+						<td></td>
+					</tr>
+					<tr>
 						<td></td>
 						<td>
 							<input type="button" value="{$cancel.label}" style="float:right"

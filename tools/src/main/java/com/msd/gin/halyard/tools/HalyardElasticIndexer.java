@@ -16,12 +16,6 @@
  */
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.common.Keyspace;
-import com.msd.gin.halyard.common.KeyspaceConnection;
-import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.StatementIndex;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -29,7 +23,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.KeyStore;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Base64;
@@ -37,11 +30,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.io.IOUtils;
@@ -75,6 +64,13 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
 import org.elasticsearch.hadoop.mr.EsOutputFormat;
 import org.json.JSONObject;
+
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.common.Keyspace;
+import com.msd.gin.halyard.common.KeyspaceConnection;
+import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.common.SSLSettings;
+import com.msd.gin.halyard.common.StatementIndex;
 
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
@@ -348,35 +344,14 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
     }
 
     private void configureSSL(HttpsURLConnection https) throws IOException, GeneralSecurityException {
-    	KeyManager[] keyManagers = null;
-    	String keyStoreLocation = getConf().get("es.net.ssl.keystore.location");
-    	if (keyStoreLocation != null) {
-    		String keyStoreType = getConf().get("es.net.ssl.keystore.type", "jks");
-    		char[] keyStorePass = getConf().get("es.net.ssl.keystore.pass").toCharArray();
-    		KeyStore keyStore = KeyStore.getInstance(keyStoreType);
-    		try (InputStream keyStoreIn = new URL(keyStoreLocation).openStream()) {
-    			keyStore.load(keyStoreIn, keyStorePass);
-    		}
-    		KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-    		keyManagerFactory.init(keyStore, keyStorePass);
-    		keyManagers = keyManagerFactory.getKeyManagers();
-    	}
-
-    	TrustManager[] trustManagers = null;
-    	String trustStoreLocation = getConf().get("es.net.ssl.truststore.location");
-    	if (trustStoreLocation != null) {
-    		char[] trustStorePass = getConf().get("es.net.ssl.truststore.pass").toCharArray();
-    		KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-    		try (InputStream trustStoreIn = new URL(keyStoreLocation).openStream()) {
-    			trustStore.load(trustStoreIn, trustStorePass);
-    		}
-    		TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-    		trustManagerFactory.init(trustStore);
-    		trustManagers = trustManagerFactory.getTrustManagers();
-    	}
-
-    	SSLContext sslContext = SSLContext.getInstance(getConf().get("es.net.ssl.protocol", "TLS"));
-    	sslContext.init(keyManagers, trustManagers, null);
+    	SSLSettings sslSettings = new SSLSettings();
+    	sslSettings.keyStoreLocation = getConf().get("es.net.ssl.keystore.location");
+    	sslSettings.keyStoreType = getConf().get("es.net.ssl.keystore.type", "jks");
+    	sslSettings.keyStorePassword = getConf().get("es.net.ssl.keystore.pass").toCharArray();
+    	sslSettings.trustStoreLocation = getConf().get("es.net.ssl.truststore.location");
+    	sslSettings.trustStorePassword = getConf().get("es.net.ssl.truststore.pass").toCharArray();
+    	sslSettings.sslProtocol = getConf().get("es.net.ssl.protocol", "TLS");
+    	SSLContext sslContext = sslSettings.createSSLContext();
     	https.setSSLSocketFactory(sslContext.getSocketFactory());
     }
 }

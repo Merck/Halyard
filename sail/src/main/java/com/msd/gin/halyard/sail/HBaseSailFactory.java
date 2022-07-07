@@ -16,6 +16,9 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.msd.gin.halyard.common.SSLSettings;
+import com.msd.gin.halyard.sail.HBaseSail.ElasticSettings;
+
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.config.SailConfigException;
@@ -58,10 +61,24 @@ public final class HBaseSailFactory implements SailFactory {
 			if (hasValue(hconfig.getTableName()) && (hasValue(hconfig.getSnapshotName()) || hasValue(hconfig.getSnapshotRestorePath()))) {
 				throw new SailConfigException("Invalid sail configuration: cannot specify both table and snapshot");
 			}
+			ElasticSettings elasticSettings = ElasticSettings.from(hconfig.getElasticIndexURL());
+			elasticSettings.user = hconfig.getElasticUsername();
+			elasticSettings.password = hconfig.getElasticPassword();
+			String elasticKeystoreLocation = hconfig.getElasticKeystoreLocation();
+			if (elasticKeystoreLocation != null && !elasticKeystoreLocation.isEmpty()) {
+				SSLSettings sslSettings = new SSLSettings();
+				sslSettings.keyStoreLocation = elasticKeystoreLocation;
+				String elasticKeystorePassword = hconfig.getElasticKeystorePassword();
+				sslSettings.keyStorePassword = (elasticKeystorePassword != null && !elasticKeystorePassword.isEmpty()) ? elasticKeystorePassword.toCharArray() : null;
+				sslSettings.trustStoreLocation = hconfig.getElasticTruststoreLocation();
+				String elasticTruststorePassword = hconfig.getElasticTruststorePassword();
+				sslSettings.trustStorePassword = (elasticTruststorePassword != null && !elasticTruststorePassword.isEmpty()) ? elasticTruststorePassword.toCharArray() : null;
+				elasticSettings.sslSettings = sslSettings;
+			}
 			if (hasValue(hconfig.getTableName())) {
-				sail = new HBaseSail(HBaseConfiguration.create(), hconfig.getTableName(), hconfig.isCreate(), hconfig.getSplitBits(), hconfig.isPush(), hconfig.getEvaluationTimeout(), hconfig.getElasticIndexURL(), null);
+				sail = new HBaseSail(HBaseConfiguration.create(), hconfig.getTableName(), hconfig.isCreate(), hconfig.getSplitBits(), hconfig.isPush(), hconfig.getEvaluationTimeout(), elasticSettings);
 			} else if (hasValue(hconfig.getSnapshotName()) && hasValue(hconfig.getSnapshotRestorePath())) {
-				sail = new HBaseSail(HBaseConfiguration.create(), hconfig.getSnapshotName(), hconfig.getSnapshotRestorePath(), hconfig.isPush(), hconfig.getEvaluationTimeout(), hconfig.getElasticIndexURL(), null);
+				sail = new HBaseSail(HBaseConfiguration.create(), hconfig.getSnapshotName(), hconfig.getSnapshotRestorePath(), hconfig.isPush(), hconfig.getEvaluationTimeout(), elasticSettings);
 			} else {
 				throw new SailConfigException("Invalid sail configuration: missing table name or snapshot");
 			}

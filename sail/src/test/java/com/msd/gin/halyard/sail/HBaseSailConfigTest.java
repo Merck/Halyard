@@ -25,8 +25,9 @@ import org.eclipse.rdf4j.repository.config.RepositoryConfigSchema;
 import org.eclipse.rdf4j.repository.sail.config.SailRepositorySchema;
 import org.eclipse.rdf4j.sail.config.SailConfigException;
 import org.eclipse.rdf4j.sail.config.SailConfigSchema;
-import org.junit.Test;
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -94,7 +95,19 @@ public class HBaseSailConfigTest {
     public void testElasticIndex() throws MalformedURLException {
         HBaseSailConfig cfg = new HBaseSailConfig();
         cfg.setElasticIndexURL(new URL("http://localhost:12345/index"));
+		cfg.setElasticUsername("elastic");
+		cfg.setElasticPassword("espass");
+		cfg.setElasticKeystoreLocation("/home/keystore");
+		cfg.setElasticKeystorePassword("keypass");
+		cfg.setElasticTruststoreLocation("/home/truststore");
+		cfg.setElasticTruststorePassword("trustpass");
         assertEquals("http://localhost:12345/index", cfg.getElasticIndexURL().toString());
+		assertEquals("elastic", cfg.getElasticUsername());
+		assertEquals("espass", cfg.getElasticPassword());
+		assertEquals("/home/keystore", cfg.getElasticKeystoreLocation());
+		assertEquals("keypass", cfg.getElasticKeystorePassword());
+		assertEquals("/home/truststore", cfg.getElasticTruststoreLocation());
+		assertEquals("trustpass", cfg.getElasticTruststorePassword());
     }
 
     @Test
@@ -208,35 +221,35 @@ public class HBaseSailConfigTest {
         assertNull(cfg.getTableName());
     }
 
-    @Test(expected = SailConfigException.class)
+	@Test
     public void testSplitbitsFail() throws Exception {
         TreeModel g = new TreeModel();
         g.add(SimpleValueFactory.getInstance().createIRI("http://node"), HALYARD.SPLITBITS_PROPERTY, SimpleValueFactory.getInstance().createLiteral("not a number"));
         HBaseSailConfig cfg = new HBaseSailConfig();
-        cfg.parse(g, null);
+		assertThrows(SailConfigException.class, () -> cfg.parse(g, null));
     }
 
-    @Test(expected = SailConfigException.class)
+	@Test
     public void testCreateTableFail() throws Exception {
         TreeModel g = new TreeModel();
         g.add(SimpleValueFactory.getInstance().createIRI("http://node"), HALYARD.CREATE_TABLE_PROPERTY, SimpleValueFactory.getInstance().createLiteral("not a boolean"));
         HBaseSailConfig cfg = new HBaseSailConfig();
-        cfg.parse(g, null);
+		assertThrows(SailConfigException.class, () -> cfg.parse(g, null));
     }
 
-    @Test(expected = SailConfigException.class)
+	@Test
     public void testPushStrategyFail() throws Exception {
         TreeModel g = new TreeModel();
         g.add(SimpleValueFactory.getInstance().createIRI("http://node"), HALYARD.PUSH_STRATEGY_PROPERTY, SimpleValueFactory.getInstance().createLiteral("not a boolean"));
         HBaseSailConfig cfg = new HBaseSailConfig();
-        cfg.parse(g, null);
+		assertThrows(SailConfigException.class, () -> cfg.parse(g, null));
     }
 
-    @Test(expected = SailConfigException.class)
+	@Test
     public void testTimeoutFail() throws Exception {
         TreeModel g = new TreeModel();
         g.add(SimpleValueFactory.getInstance().createIRI("http://node"), HALYARD.EVALUATION_TIMEOUT_PROPERTY, SimpleValueFactory.getInstance().createLiteral("not a number"));
         HBaseSailConfig cfg = new HBaseSailConfig();
-        cfg.parse(g, null);
+		assertThrows(SailConfigException.class, () -> cfg.parse(g, null));
     }
 }

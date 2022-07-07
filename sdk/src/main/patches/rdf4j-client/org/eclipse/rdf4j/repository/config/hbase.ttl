@@ -21,6 +21,12 @@
          halyard:snapshotRestorePath "{%HBase Snapshot restore path|%}" ;
          halyard:pushStrategy "{%Use Halyard Push Evaluation Strategy|true|false%}" ;
          halyard:evaluationTimeout "{%Query Evaluation Timeout|180%}" ;
-         halyard:elasticIndexURL "{%Optional ElasticSearch Index URL|%}" ;
+         halyard:elasticIndexURL "{%ElasticSearch Index URL|%}" ;
+         halyard:elasticUsername "{%ElasticSearch Username|%}" ;
+         halyard:elasticPassword "{%ElasticSearch Password|%}" ;
+         halyard:elasticKeystoreLocation "{%ElasticSearch Keystore Location|%}" ;
+         halyard:elasticKeystorePassword "{%ElasticSearch Keystore Password|%}" ;
+         halyard:elasticTruststoreLocation "{%ElasticSearch Truststore Location|%}" ;
+         halyard:elasticTruststorePassword "{%ElasticSearch Truststore Password|%}" ;
       ]
    ].

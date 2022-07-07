@@ -11,6 +11,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import javax.annotation.Nullable;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.http.NameValuePair;
@@ -33,7 +35,16 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 
 	private final Cache<String, SailFederatedService> federatedServices = CacheBuilder.newBuilder().maximumSize(10).removalListener((evt) -> ((SailFederatedService) evt.getValue()).shutdown()).build();
 
-	public HBaseFederatedServiceResolver(Connection conn, Configuration config, String defaultTableName, int evaluationTimeout, Ticker ticker) {
+	/**
+	 * Federated service resolver that supports querying other HBase tables.
+	 * 
+	 * @param conn
+	 * @param config
+	 * @param defaultTableName default table name to use (if any) if not specified in SERVICE URL.
+	 * @param evaluationTimeout
+	 * @param ticker
+	 */
+	public HBaseFederatedServiceResolver(@Nullable Connection conn, Configuration config, @Nullable String defaultTableName, int evaluationTimeout, @Nullable Ticker ticker) {
 		this.hConnection = conn;
 		this.config = config;
 		this.defaultTableName = defaultTableName;
@@ -56,6 +67,9 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 			}
 
 			final String federatedTable = !path.isEmpty() ? path : defaultTableName;
+			if (federatedTable == null) {
+				throw new QueryEvaluationException(String.format("Invalid SERVICE URL: %s", serviceUrl));
+			}
 
 			SailFederatedService federatedService;
 			try {
