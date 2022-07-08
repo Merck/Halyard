@@ -52,21 +52,21 @@
 									<destFileName>rdf4j-workbench.war</destFileName>
 								</artifactItem>
 								<artifactItem>
-									<groupId>org.json</groupId>
-									<artifactId>json</artifactId>
-									<version>20140107</version>
-									<type>jar</type>
-								</artifactItem>
-								<artifactItem>
 									<groupId>net.sf.saxon</groupId>
 									<artifactId>Saxon-HE</artifactId>
-									<version>9.9.1-6</version>
+									<version>${saxon.version}</version>
 									<type>jar</type>
 								</artifactItem>
 								<artifactItem>
 									<groupId>org.lz4</groupId>
 									<artifactId>lz4-java</artifactId>
-									<version>1.8.0</version>
+									<version>${lz4.version}</version>
+									<type>jar</type>
+								</artifactItem>
+								<artifactItem>
+									<groupId>com.ibm.icu</groupId>
+									<artifactId>icu4j</artifactId>
+									<version>${icu4j.version}</version>
 									<type>jar</type>
 								</artifactItem>
 							</artifactItems>

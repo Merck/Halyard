@@ -18,17 +18,17 @@
 		<dependency>
 			<groupId>net.sf.saxon</groupId>
 			<artifactId>Saxon-HE</artifactId>
-			<version>9.9.1-6</version>
+			<version>${saxon.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.lz4</groupId>
 			<artifactId>lz4-java</artifactId>
-			<version>1.8.0</version>
+			<version>${lz4.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.ibm.icu</groupId>
 			<artifactId>icu4j</artifactId>
-			<version>71.1</version>
+			<version>${icu4j.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.locationtech.jts</groupId>
