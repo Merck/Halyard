@@ -360,16 +360,16 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
 				setElasticKeystoreLocation(elasticKeystoreLocation.get().stringValue());
 				Optional<Literal> elasticKeystorePassword = Models.objectLiteral(graph.filter(implNode, HALYARD.ELASTIC_KEYSTORE_PASSWORD_PROPERTY, null));
 				if (elasticKeystorePassword.isPresent()) {
-					setElasticKeystoreLocation(elasticKeystorePassword.get().stringValue());
+					setElasticKeystorePassword(elasticKeystorePassword.get().stringValue());
 				}
 			}
 
 			Optional<Literal> elasticTruststoreLocation = Models.objectLiteral(graph.filter(implNode, HALYARD.ELASTIC_TRUSTSTORE_LOCATION_PROPERTY, null));
 			if (elasticTruststoreLocation.isPresent()) {
-				setElasticKeystoreLocation(elasticTruststoreLocation.get().stringValue());
+				setElasticTruststoreLocation(elasticTruststoreLocation.get().stringValue());
 				Optional<Literal> elasticTruststorePassword = Models.objectLiteral(graph.filter(implNode, HALYARD.ELASTIC_TRUSTSTORE_PASSWORD_PROPERTY, null));
 				if (elasticTruststorePassword.isPresent()) {
-					setElasticKeystoreLocation(elasticTruststorePassword.get().stringValue());
+					setElasticTruststorePassword(elasticTruststorePassword.get().stringValue());
 				}
 			}
         }

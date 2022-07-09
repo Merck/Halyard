@@ -50,6 +50,24 @@ public class HBaseSailFactoryTest {
         hbsc.setSplitBits(3);
         hbsc.setEvaluationTimeout(480);
         hbsc.setTableName("testtable");
+		Sail sail = new HBaseSailFactory().getSail(hbsc);
+		assertTrue(sail instanceof HBaseSail);
+		HBaseSail hbs = (HBaseSail) sail;
+		assertFalse(hbs.create);
+		assertFalse(hbs.pushStrategy);
+		assertEquals(3, hbs.splitBits);
+		assertEquals("testtable", hbs.tableName.getNameAsString());
+		assertEquals(480, hbs.evaluationTimeout);
+	}
+
+	@Test
+	public void testGetSail_tableWithSearch() throws Exception {
+		HBaseSailConfig hbsc = new HBaseSailConfig();
+		hbsc.setCreate(false);
+		hbsc.setPush(false);
+		hbsc.setSplitBits(3);
+		hbsc.setEvaluationTimeout(480);
+		hbsc.setTableName("testtable");
         hbsc.setElasticIndexURL(new URL("http://whatever/index"));
 		hbsc.setElasticKeystoreLocation("/home/keystore");
         Sail sail = new HBaseSailFactory().getSail(hbsc);
@@ -68,6 +86,25 @@ public class HBaseSailFactoryTest {
 
 	@Test
 	public void testGetSail_snapshot() throws Exception {
+		HBaseSailConfig hbsc = new HBaseSailConfig();
+		hbsc.setCreate(false);
+		hbsc.setPush(false);
+		hbsc.setEvaluationTimeout(480);
+		hbsc.setSnapshotName("snapshot");
+		hbsc.setSnapshotRestorePath("/path");
+		Sail sail = new HBaseSailFactory().getSail(hbsc);
+		assertTrue(sail instanceof HBaseSail);
+		HBaseSail hbs = (HBaseSail) sail;
+		assertFalse(hbs.create);
+		assertFalse(hbs.pushStrategy);
+		assertEquals(-1, hbs.splitBits);
+		assertEquals("snapshot", hbs.snapshotName);
+		assertEquals("/path", hbs.snapshotRestorePath.toString());
+		assertEquals(480, hbs.evaluationTimeout);
+	}
+
+	@Test
+	public void testGetSail_snapshotWithSearch() throws Exception {
 		HBaseSailConfig hbsc = new HBaseSailConfig();
 		hbsc.setCreate(false);
 		hbsc.setPush(false);

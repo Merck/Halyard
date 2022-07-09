@@ -78,7 +78,8 @@ public class LiteralSearchStatementScannerTest implements Runnable {
     public void statementLiteralSearchTest() throws Exception {
 		ValueFactory vf = SimpleValueFactory.getInstance();
 		RDFFactory rdfFactory = hbaseSail.getRDFFactory();
-		Literal val = vf.createLiteral("Whatever Text");
+		Literal val1 = vf.createLiteral("Whatever Text");
+		Literal val2 = vf.createLiteral("Whatever Text", "en");
 		StringWriter jsonBuf = new StringWriter();
 		JsonGenerator jsonGen = new JsonFactory().createGenerator(jsonBuf);
 		jsonGen.writeStartObject();
@@ -94,10 +95,18 @@ public class LiteralSearchStatementScannerTest implements Runnable {
 		jsonGen.writeArrayFieldStart("hits");
 		jsonGen.writeStartObject();
 		jsonGen.writeStringField("_index", INDEX);
-		jsonGen.writeStringField("_id", rdfFactory.id(val).toString());
+		jsonGen.writeStringField("_id", rdfFactory.id(val1).toString());
 		jsonGen.writeObjectFieldStart("_source");
-		jsonGen.writeStringField("label", val.getLabel());
-		jsonGen.writeStringField("datatype", val.getDatatype().stringValue());
+		jsonGen.writeStringField("label", val1.getLabel());
+		jsonGen.writeStringField("datatype", val1.getDatatype().stringValue());
+		jsonGen.writeEndObject();
+		jsonGen.writeEndObject();
+		jsonGen.writeStartObject();
+		jsonGen.writeStringField("_index", INDEX);
+		jsonGen.writeStringField("_id", rdfFactory.id(val2).toString());
+		jsonGen.writeObjectFieldStart("_source");
+		jsonGen.writeStringField("label", val2.getLabel());
+		jsonGen.writeStringField("lang", val2.getLanguage().get());
 		jsonGen.writeEndObject();
 		jsonGen.writeEndObject();
 		jsonGen.writeEndArray();
@@ -111,8 +120,10 @@ public class LiteralSearchStatementScannerTest implements Runnable {
         t.start();
 		IRI whatever = vf.createIRI("http://whatever");
 		try (SailConnection conn = hbaseSail.getConnection()) {
-			conn.addStatement(whatever, whatever, val);
+			conn.addStatement(whatever, whatever, val1);
+			conn.addStatement(whatever, whatever, val2);
 			try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, vf.createLiteral("what", HALYARD.SEARCH_TYPE), true)) {
+				assertTrue(iter.hasNext());
 				assertTrue(iter.hasNext());
 			}
 		}

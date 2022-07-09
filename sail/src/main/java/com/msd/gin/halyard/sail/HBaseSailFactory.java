@@ -62,18 +62,20 @@ public final class HBaseSailFactory implements SailFactory {
 				throw new SailConfigException("Invalid sail configuration: cannot specify both table and snapshot");
 			}
 			ElasticSettings elasticSettings = ElasticSettings.from(hconfig.getElasticIndexURL());
-			elasticSettings.user = hconfig.getElasticUsername();
-			elasticSettings.password = hconfig.getElasticPassword();
-			String elasticKeystoreLocation = hconfig.getElasticKeystoreLocation();
-			if (elasticKeystoreLocation != null && !elasticKeystoreLocation.isEmpty()) {
-				SSLSettings sslSettings = new SSLSettings();
-				sslSettings.keyStoreLocation = elasticKeystoreLocation;
-				String elasticKeystorePassword = hconfig.getElasticKeystorePassword();
-				sslSettings.keyStorePassword = (elasticKeystorePassword != null && !elasticKeystorePassword.isEmpty()) ? elasticKeystorePassword.toCharArray() : null;
-				sslSettings.trustStoreLocation = hconfig.getElasticTruststoreLocation();
-				String elasticTruststorePassword = hconfig.getElasticTruststorePassword();
-				sslSettings.trustStorePassword = (elasticTruststorePassword != null && !elasticTruststorePassword.isEmpty()) ? elasticTruststorePassword.toCharArray() : null;
-				elasticSettings.sslSettings = sslSettings;
+			if (elasticSettings != null) {
+				elasticSettings.username = hconfig.getElasticUsername();
+				elasticSettings.password = hconfig.getElasticPassword();
+				String elasticKeystoreLocation = hconfig.getElasticKeystoreLocation();
+				if (elasticKeystoreLocation != null && !elasticKeystoreLocation.isEmpty()) {
+					SSLSettings sslSettings = new SSLSettings();
+					sslSettings.keyStoreLocation = elasticKeystoreLocation;
+					String elasticKeystorePassword = hconfig.getElasticKeystorePassword();
+					sslSettings.keyStorePassword = (elasticKeystorePassword != null && !elasticKeystorePassword.isEmpty()) ? elasticKeystorePassword.toCharArray() : null;
+					sslSettings.trustStoreLocation = hconfig.getElasticTruststoreLocation();
+					String elasticTruststorePassword = hconfig.getElasticTruststorePassword();
+					sslSettings.trustStorePassword = (elasticTruststorePassword != null && !elasticTruststorePassword.isEmpty()) ? elasticTruststorePassword.toCharArray() : null;
+					elasticSettings.sslSettings = sslSettings;
+				}
 			}
 			if (hasValue(hconfig.getTableName())) {
 				sail = new HBaseSail(HBaseConfiguration.create(), hconfig.getTableName(), hconfig.isCreate(), hconfig.getSplitBits(), hconfig.isPush(), hconfig.getEvaluationTimeout(), elasticSettings);

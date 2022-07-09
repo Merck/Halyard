@@ -165,6 +165,29 @@ public class HBaseSailConfigTest {
 	}
 
 	@Test
+	public void testExportAndParse4() throws Exception {
+		HBaseSailConfig cfg = new HBaseSailConfig();
+		cfg.setElasticIndexURL(new URL("http://localhost:12345/index"));
+		cfg.setElasticUsername("elastic");
+		cfg.setElasticPassword("espass");
+		cfg.setElasticKeystoreLocation("/home/keystore");
+		cfg.setElasticKeystorePassword("keypass");
+		cfg.setElasticTruststoreLocation("/home/truststore");
+		cfg.setElasticTruststorePassword("trustpass");
+		TreeModel g = new TreeModel();
+		cfg.export(g);
+		cfg = new HBaseSailConfig();
+		cfg.parse(g, null);
+		assertEquals("http://localhost:12345/index", cfg.getElasticIndexURL().toString());
+		assertEquals("elastic", cfg.getElasticUsername());
+		assertEquals("espass", cfg.getElasticPassword());
+		assertEquals("/home/keystore", cfg.getElasticKeystoreLocation());
+		assertEquals("keypass", cfg.getElasticKeystorePassword());
+		assertEquals("/home/truststore", cfg.getElasticTruststoreLocation());
+		assertEquals("trustpass", cfg.getElasticTruststorePassword());
+	}
+
+	@Test
     public void testParseEmpty() throws Exception {
         TreeModel g = new TreeModel();
         HBaseSailConfig cfg = new HBaseSailConfig();

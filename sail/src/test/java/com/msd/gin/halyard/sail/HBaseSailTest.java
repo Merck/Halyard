@@ -23,6 +23,7 @@ import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.File;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -135,6 +136,16 @@ public class HBaseSailTest {
     }
 
     @Test
+	public void testInitializeAndShutDownWithElastic() throws Exception {
+		HBaseSail.ElasticSettings esSettings = HBaseSail.ElasticSettings.from(new URL("http://elastic:9200/index"));
+		esSettings.username = "elastic";
+		esSettings.password = "f00bar";
+		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), useTable("whatevertable"), true, 0, usePushStrategy, 0, esSettings);
+		sail.initialize();
+		sail.shutDown();
+	}
+
+	@Test
     public void testIsWritable() throws Exception {
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertableRW"), true, 0, usePushStrategy, 0, null, null);
 		sail.initialize();

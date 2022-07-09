@@ -107,7 +107,7 @@ public class HBaseSail implements Sail {
 		String protocol;
 		String host;
 		int port;
-		String user;
+		String username;
 		String password;
 		String indexName;
 		SSLSettings sslSettings;
@@ -349,7 +349,7 @@ public class HBaseSail implements Sail {
 			CredentialsProvider esCredentialsProvider;
 			if (esSettings.password != null) {
 				esCredentialsProvider = new BasicCredentialsProvider();
-				esCredentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(esSettings.user, esSettings.password));
+				esCredentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(esSettings.username, esSettings.password));
 			} else {
 				esCredentialsProvider = null;
 			}
@@ -370,7 +370,7 @@ public class HBaseSail implements Sail {
 					if (esCredentialsProvider != null) {
 						httpClientBuilder.setDefaultCredentialsProvider(esCredentialsProvider);
 					}
-					if (esSettings.sslSettings != null) {
+					if (sslContext != null) {
 						httpClientBuilder.setSSLContext(sslContext);
 					}
 					return httpClientBuilder;

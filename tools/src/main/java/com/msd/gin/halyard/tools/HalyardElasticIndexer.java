@@ -82,7 +82,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 	private static final String INDEX_URL_PROPERTY = confProperty(TOOL_NAME, "index.url");
 	private static final String CREATE_INDEX_PROPERTY = confProperty(TOOL_NAME, "index.create");
 	private static final String NAMED_GRAPH_PROPERTY = confProperty(TOOL_NAME, "named-graph");
-	private static final String MULTITABLE_PROPERTY = confProperty(TOOL_NAME, "multitable");
+	private static final String ALIAS_PROPERTY = confProperty(TOOL_NAME, "alias");
 
 	enum Counters {
 		INDEXED_LITERALS
@@ -92,7 +92,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
         final Text outputJson = new Text();
         String source;
-        boolean isMultitable;
         int objectKeySize;
         int contextKeySize;
         long counter = 0, exports = 0, statements = 0;
@@ -102,9 +101,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         @Override
         protected void setup(Context context) throws IOException {
             Configuration conf = context.getConfiguration();
-            source =  conf.get(SOURCE_NAME_PROPERTY);
-            isMultitable = conf.getBoolean(MULTITABLE_PROPERTY, false);
-            openKeyspace(conf, source, conf.get(SNAPSHOT_PATH_PROPERTY));
+            openKeyspace(conf, conf.get(SOURCE_NAME_PROPERTY), conf.get(SNAPSHOT_PATH_PROPERTY));
             objectKeySize = rdfFactory.getObjectRole().keyHashSize();
             contextKeySize = rdfFactory.getContextRole().keyHashSize();
             lastHash = new byte[objectKeySize];
@@ -130,9 +127,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             		try(StringBuilderWriter json = new StringBuilderWriter(128)) {
 		                json.append("{\"id\":");
 		                String id = rdfFactory.id(l).toString();
-		                if (isMultitable) {
-		                	id = source + ':' + id;
-		                }
 		                JSONObject.quote(id, json);
 		                json.append(",\"label\":");
 		                JSONObject.quote(l.getLabel(), json);
@@ -165,7 +159,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             "Halyard ElasticSearch Index is a MapReduce application that indexes all literals in the given dataset into a supplementary ElasticSearch server/cluster. "
                 + "A Halyard repository configured with such supplementary ElasticSearch index can then provide more advanced text search features over the indexed literals.",
             "Default index configuration is:\n"
-            + getMappingConfig("\u00A0", "2*<num_of_region_servers>", "1", "<table_name>")
+            + getMappingConfig("\u00A0", "2*<num_of_region_servers>", "1", null)
             + "Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index"
         );
         addOption("s", "source-dataset", "dataset_table", SOURCE_NAME_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
@@ -173,10 +167,10 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         addOption("c", "create-index", null, CREATE_INDEX_PROPERTY, "Optionally create Elasticsearch index", false, true);
         addOption("g", "named-graph", "named_graph", NAMED_GRAPH_PROPERTY, "Optionally restrict indexing to the given named graph only", false, true);
         addOption("u", "restore-dir", "restore_folder", SNAPSHOT_PATH_PROPERTY, "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
-        addOption("m", "multitable-index", null, MULTITABLE_PROPERTY, "Create a multitable index", false, true);
+        addOption("a", "alias", "alias", ALIAS_PROPERTY, "If creating an index, optionally add it to an alias", false, true);
     }
 
-    private static String getMappingConfig(String linePrefix, String shards, String replicas, String tableName) {
+    private static String getMappingConfig(String linePrefix, String shards, String replicas, String alias) {
         String config =
                   linePrefix + "{\n"
                 + linePrefix + "    \"mappings\" : {\n"
@@ -184,15 +178,15 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 + linePrefix + "            \"id\" : { \"type\" : \"keyword\", \"index\" : false },\n"
                 + linePrefix + "            \"label\" : { \"type\" : \"text\" },\n"
                 + linePrefix + "            \"datatype\" : { \"type\" : \"keyword\", \"index\" : false },\n"
-                + linePrefix + "            \"lang\" : { \"type\" : \"keyword\", \"index\" : false },\n";
-        if (tableName != null) {
-        config += linePrefix + "            \"table\" : { \"type\" : \"constant_keyword\", \"value\" : \"" + tableName + "\" }\n";
-        } else {
-        config += linePrefix + "            \"table\" : { \"type\" : \"keyword\", \"index\" : false }\n";
-        }
-        config += linePrefix + "        }\n"
-                + linePrefix + "    },\n"
-                + linePrefix + "   \"settings\": {\n"
+                + linePrefix + "            \"lang\" : { \"type\" : \"keyword\", \"index\" : false }\n"
+                + linePrefix + "        }\n"
+                + linePrefix + "    },\n";
+    if (alias != null) {
+        config += linePrefix + "    \"aliases\" : {\n"
+                + linePrefix + "         \""+alias+"\" : {}\n"
+                + linePrefix + "    },\n";
+    }
+        config += linePrefix + "   \"settings\": {\n"
                 + linePrefix + "       \"index.query.default_field\": \"label\",\n"
                 + linePrefix + "       \"refresh_interval\": \"1h\",\n"
                 + linePrefix + "       \"number_of_shards\": " + shards + ",\n"
@@ -208,7 +202,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         configureString(cmd, 't', null);
         configureString(cmd, 'u', null);
         configureBoolean(cmd, 'c');
-        configureBoolean(cmd, 'm');
+        configureString(cmd, 'a', null);
         configureString(cmd, 'g', null);
         String source = getConf().get(SOURCE_NAME_PROPERTY);
         String target = getConf().get(INDEX_URL_PROPERTY);
@@ -222,7 +216,6 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         	}
         }
         String namedGraph = getConf().get(NAMED_GRAPH_PROPERTY);
-        boolean isMultitable = getConf().getBoolean(MULTITABLE_PROPERTY, false);
 
         getConf().set("es.nodes", targetUrl.getHost()+":"+targetUrl.getPort());
         getConf().set("es.resource", targetUrl.getPath());
@@ -267,7 +260,8 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             	String basicAuth = "Basic " + Base64.getEncoder().encodeToString(userPass.getBytes(StandardCharsets.UTF_8));
             	http.setRequestProperty("Authorization", basicAuth);
             }
-            byte b[] = Bytes.toBytes(getMappingConfig("", Integer.toString(shards), Integer.toString(replicas), isMultitable ? null : source));
+            String alias = getConf().get(ALIAS_PROPERTY);
+            byte b[] = Bytes.toBytes(getMappingConfig("", Integer.toString(shards), Integer.toString(replicas), alias));
             http.setFixedLengthStreamingMode(b.length);
             http.connect();
             try {
