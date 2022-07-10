@@ -27,7 +27,7 @@
   </property>
   <property>
     <name>halyard.key.predicate.size</name>
-    <value>4</value>
+    <value>3</value>
   </property>
   <property>
     <name>halyard.endKey.predicate.size</name>
