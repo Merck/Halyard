@@ -204,7 +204,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             	// quad region
                 hashShift = 1 + contextKeySize;
                 if (!matchAndCopyKey(key.get(), key.getOffset() + 1, contextKeySize, lastCtxFragment) || index != lastIndex) {
-                    cleanup(output);
+                    reset(output);
 					graph = (IRI) stmts.get(0).getContext();
                 }
                 if (update && index == cspo) {
@@ -222,7 +222,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                             }
                         }
                         lastIndex = index;
-                        return; //do no count removed statements
+                        return;  //do no count removed statements
                     }
                 }
             }
@@ -250,7 +250,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             }
             boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, keyLen, lastKeyFragment) || index != lastIndex || lastGraph != graph;
             if (hashChange) {
-                cleanupSubset(output);
+                resetSubset(output);
 				Statement stmt = stmts.get(0);
                 switch (index.getName()) {
                     case SPO:
@@ -339,15 +339,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             }
         }
 
-        protected void cleanupSubset(Context output) throws IOException, InterruptedException {
-            if (subsetCounter >= threshold) {
-                report(output, subsetType, subsetId, subsetCounter);
-            }
-            subsetCounter = 0;
-        }
-
-        @Override
-        protected void cleanup(Context output) throws IOException, InterruptedException {
+		private void reset(Context output) throws IOException, InterruptedException {
             if (graph == HALYARD.STATS_ROOT_NODE || setCounter >= threshold) {
                 report(output, VOID.TRIPLES, null, triples);
                 report(output, VOID.DISTINCT_SUBJECTS, null, distinctSubjects);
@@ -373,10 +365,24 @@ public final class HalyardStats extends AbstractHalyardTool {
             distinctBlankNodeObjects = 0;
             distinctBlankNodeSubjects = 0;
             distinctLiterals = 0;
-            cleanupSubset(output);
-            if (sail != null) {
+            resetSubset(output);
+		}
+
+		private void resetSubset(Context output) throws IOException, InterruptedException {
+            if (subsetCounter >= threshold) {
+                report(output, subsetType, subsetId, subsetCounter);
+            }
+            subsetCounter = 0;
+        }
+
+        @Override
+        protected void cleanup(Context output) throws IOException, InterruptedException {
+        	reset(output);
+        	if (conn != null) {
 				conn.close();
 				conn = null;
+        	}
+            if (sail != null) {
 				sail.shutDown();
                 sail = null;
             }
@@ -521,11 +527,19 @@ public final class HalyardStats extends AbstractHalyardTool {
         protected void cleanup(Context context) throws IOException, InterruptedException {
             if (conn != null) {
 				conn.close();
+				conn = null;
+            }
+			if (sail != null) {
 				sail.shutDown();
+				sail = null;
             }
             if (writer != null) {
                 writer.endRDF();
+                writer = null;
+            }
+            if (out != null) {
                 out.close();
+                out = null;
             }
             closeKeyspace();
         }
@@ -590,7 +604,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 			keyspace.close();
 		}
         List<Scan> scans;
-        if (namedGraph != null) { //restricting stats to scan given graph context only
+        if (namedGraph != null) {  //restricting stats to scan given graph context only
             scans = new ArrayList<>(4);
             ValueFactory vf = IdValueFactory.INSTANCE;
             RDFContext rdfGraphCtx = rdfFactory.createContext(vf.createIRI(namedGraph));
