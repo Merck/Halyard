@@ -133,16 +133,13 @@ public final class RDFLoadStager implements Callable<Void> {
 						p.add(fi);
 						totalSizeQueue.add(p);
 					}
-	
-					for (Partition p : totalSizeQueue) {
-						LOGGER.info(p.toString());
-					}
 				} else {
 					Partition partition = new Partition(hdfsPath, 0, ext);
 					files.stream().forEach(fi -> partition.add(fi));
 					partitions.add(partition);
 				}
 				for (Partition p : partitions) {
+					LOGGER.info(p.toString());
 					completionService.submit(new FileMergeTask(p));
 					numTasks++;
 				}

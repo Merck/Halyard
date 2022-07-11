@@ -410,11 +410,11 @@ public class RDFFactory {
 					result = scanner.next();
 				}
 				if (result == null) {
-					throw new IOException("Triple not found");
+					throw new IOException("Triple not found (no result)");
 				}
 				Cell[] cells = result.rawCells();
 				if (cells == null || cells.length == 0) {
-					throw new IOException("Triple not found");
+					throw new IOException("Triple not found (no cells)");
 				}
 				Statement stmt = HalyardTableUtils.parseStatement(null, null, null, ckey, cells[0], valueReader, RDFFactory.this);
 				return valueReader.getValueFactory().createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());

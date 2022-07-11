@@ -383,7 +383,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
     }
 
     private Value parseLastRDFValue(RDFRole<?> role, @Nullable RDFValue<?,?> pattern, ByteBuffer key, ByteBuffer cq, ByteBuffer cv, int keySize, ValueIO.Reader reader) {
-    	byte marker = cv.hasRemaining() ? cv.get(cv.position()) : 0; // peek
+    	byte marker = cv.hasRemaining() ? cv.get(cv.position()) : 0;  // peek
     	int len;
     	if (marker == WELL_KNOWN_IRI_MARKER) {
     		len = cv.get();
@@ -405,7 +405,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 			ValueIdentifier id = parseId(role, key, cq, keySize);
 			IRI iri = rdfFactory.getWellKnownIRI(id);
 			if (iri == null) {
-				throw new IllegalStateException(String.format("Unknown IRI hash: %s", id));
+				throw new IllegalStateException(String.format("Unknown IRI hash: %s (index %s, role %s)", id, getName(), role.getName()));
 			}
 			return iri;
 		} else if(len > 0) {

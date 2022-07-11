@@ -25,13 +25,16 @@ import java.io.PrintStream;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.hadoop.util.ToolRunner;
+import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.sail.SailConnection;
+import org.eclipse.rdf4j.sail.SailException;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -139,6 +142,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         file1.delete();
         file2.delete();
         file3.delete();
+        file4.delete();
         root.delete();
         htableDir.delete();
     }
@@ -160,6 +164,30 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         sail.initialize();
 		try (SailConnection conn = sail.getConnection()) {
 			assertEquals(3, conn.size());
+		}
+        sail.shutDown();
+    }
+
+    @Test
+    public void testRDFStarLoad() throws Exception {
+        File file = File.createTempFile("rdfstar", ".ttl");
+        try (PrintStream ps = new PrintStream(new FileOutputStream(file))) {
+            ps.println("<< <http://whatever/s> <http://whatever/p> <http://whatever/o> >> <http://whatever/from> <http://whatever/source> .");
+        }
+        file.deleteOnExit();
+        File htableDir = getTempHTableDir("test_htable");
+
+        //load with override of the graph context, however with no default graph context
+        assertEquals(0, run(new String[]{"-s", file.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable3"}));
+
+        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable3", false, 0, true, 30, null, null);
+        sail.initialize();
+		try (SailConnection conn = sail.getConnection()) {
+			CloseableIteration<? extends Statement,? extends SailException> iter = conn.getStatements(null, null, null, false);
+			assertTrue(iter.hasNext());
+			Statement stmt = iter.next();
+			assertFalse(iter.hasNext());
+			assertTrue(stmt.getSubject().isTriple());
 		}
         sail.shutDown();
     }

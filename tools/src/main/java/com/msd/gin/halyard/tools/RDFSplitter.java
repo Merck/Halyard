@@ -154,6 +154,7 @@ public final class RDFSplitter implements RDFHandler, Callable<Long> {
 		parser.getParserConfig().set(BasicParserSettings.VERIFY_URI_SYNTAX, false);
 		parser.getParserConfig().set(BasicParserSettings.FAIL_ON_UNKNOWN_DATATYPES, false);
 		parser.getParserConfig().set(BasicParserSettings.FAIL_ON_UNKNOWN_LANGUAGES, false);
+		parser.getParserConfig().set(BasicParserSettings.PRESERVE_BNODE_IDS, true);
 		parser.setRDFHandler(this);
 
 		inputByteSize = Files.size(inputFile);
