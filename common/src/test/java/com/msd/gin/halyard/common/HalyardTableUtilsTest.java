@@ -161,7 +161,7 @@ public class HalyardTableUtilsTest {
     }
 
     @Test
-    public void testTruncateTable() throws Exception {
+    public void testClearTriples() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
         Resource subj = vf.createIRI("http://whatever/subj/");
         IRI pred = vf.createIRI("http://whatever/pred/");
@@ -177,7 +177,7 @@ public class HalyardTableUtilsTest {
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null, rdfFactory))) {
             assertNotNull(rs.next());
         }
-		HalyardTableUtils.truncateTable(conn, table.getName());
+		HalyardTableUtils.clearTriples(conn, table.getName());
         try (ResultScanner rs = table.getScanner(HalyardTableUtils.scan(s, p, o, null, rdfFactory))) {
             assertNull(rs.next());
         }

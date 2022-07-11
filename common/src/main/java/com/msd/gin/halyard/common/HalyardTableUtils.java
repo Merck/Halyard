@@ -43,10 +43,12 @@ import org.apache.hadoop.hbase.KeepDeletedCells;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.ColumnFamilyDescriptor;
 import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -156,16 +158,30 @@ public final class HalyardTableUtils {
 	}
 
 	/**
-	 * Truncates Table while preserving the region pre-splits
+	 * Truncates Table while preserving the region pre-splits and any config.
 	 * 
 	 * @param conn connection to cluster
-	 * @param table Table to truncate
+	 * @param tableName Table to truncate
 	 * @throws IOException throws IOException in case of any HBase IO problems
 	 */
-	public static void truncateTable(Connection conn, TableName table) throws IOException {
+	public static void clearTriples(Connection conn, TableName tableName) throws IOException {
+		Get getConfig = new Get(HalyardTableUtils.CONFIG_ROW_KEY);
+		Result config;
+		try (Table table = conn.getTable(tableName)) {
+			config = table.get(getConfig);
+		}
 		try (Admin admin = conn.getAdmin()) {
-			admin.disableTable(table);
-			admin.truncateTable(table, true);
+			admin.disableTable(tableName);
+			admin.truncateTable(tableName, true);
+		}
+		if (!config.isEmpty()) {
+			Put putConfig = new Put(HalyardTableUtils.CONFIG_ROW_KEY);
+			for (Cell cell : config.rawCells()) {
+				putConfig.add(cell);
+			}
+			try (Table table = conn.getTable(tableName)) {
+				table.put(putConfig);
+			}
 		}
     }
 

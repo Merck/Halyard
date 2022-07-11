@@ -44,6 +44,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.Table;
@@ -652,7 +653,8 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         job.setSpeculativeExecution(false);
 		Connection conn = HalyardTableUtils.getConnection(getConf());
 		try (Table hTable = HalyardTableUtils.getTable(conn, target, true, getConf().getInt(SPLIT_BITS_PROPERTY, DEFAULT_SPLIT_BITS))) {
-			RegionLocator regionLocator = conn.getRegionLocator(hTable.getName());
+			TableName tableName = hTable.getName();
+			RegionLocator regionLocator = conn.getRegionLocator(tableName);
 			HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), regionLocator);
             FileInputFormat.setInputDirRecursive(job, true);
             FileInputFormat.setInputPaths(job, sourcePaths);
@@ -661,10 +663,10 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
             TableMapReduceUtil.initCredentials(job);
             if (job.waitForCompletion(true)) {
                 if (getConf().getBoolean(TRUNCATE_PROPERTY, false)) {
-					HalyardTableUtils.truncateTable(conn, hTable.getName());
+					HalyardTableUtils.clearTriples(conn, tableName);
 					hTable.close();
                 }
-				BulkLoadHFiles.create(getConf()).bulkLoad(hTable.getName(), new Path(workdir));
+				BulkLoadHFiles.create(getConf()).bulkLoad(tableName, new Path(workdir));
                 LOG.info("Bulk Load completed.");
                 return 0;
             } else {

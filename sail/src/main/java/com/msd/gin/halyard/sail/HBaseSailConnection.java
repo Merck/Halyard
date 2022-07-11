@@ -30,8 +30,6 @@ import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 import com.msd.gin.halyard.vocab.HALYARD;
 
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
-
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
@@ -42,11 +40,9 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -91,6 +87,8 @@ import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.eclipse.rdf4j.sail.UpdateContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
 
 public class HBaseSailConnection implements SailConnection {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseSailConnection.class);
@@ -601,17 +599,7 @@ public class HBaseSailConnection implements SailConnection {
 
 	private void clearAllStatements() throws SailException {
         try {
-			Get getConfig = new Get(HalyardTableUtils.CONFIG_ROW_KEY);
-			Result config = keyspaceConn.get(getConfig);
-			HalyardTableUtils.truncateTable(sail.hConnection, sail.tableName); // delete all triples, the whole DB but retains splits!
-			// rewrite config
-			Put putConfig = new Put(HalyardTableUtils.CONFIG_ROW_KEY);
-			for (Cell cell : config.rawCells()) {
-				putConfig.add(cell);
-			}
-			BufferedMutator mutator = getBufferedMutator();
-			mutator.mutate(putConfig);
-			mutator.flush();
+			HalyardTableUtils.clearTriples(sail.hConnection, sail.tableName);
         } catch (IOException ex) {
             throw new SailException(ex);
         }
