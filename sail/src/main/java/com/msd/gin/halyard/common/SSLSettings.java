@@ -13,18 +13,18 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
 public final class SSLSettings {
-	public String keyStoreLocation;
+	public URL keyStoreLocation;
 	public String keyStoreType = "jks";
 	public char[] keyStorePassword;
-	public String trustStoreLocation;
+	public URL trustStoreLocation;
 	public char[] trustStorePassword;
 	public String sslProtocol = "TLS";
 
 	public SSLContext createSSLContext() throws IOException, GeneralSecurityException {
 		KeyManager[] keyManagers = null;
-		if (keyStoreLocation != null && !keyStoreLocation.isEmpty()) {
+		if (keyStoreLocation != null) {
 			KeyStore keyStore = KeyStore.getInstance(keyStoreType);
-			try (InputStream keyStoreIn = new URL(keyStoreLocation).openStream()) {
+			try (InputStream keyStoreIn = keyStoreLocation.openStream()) {
 				keyStore.load(keyStoreIn, (keyStorePassword != null && keyStorePassword.length > 0) ? keyStorePassword : null);
 			}
 			KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -33,9 +33,9 @@ public final class SSLSettings {
 		}
 	
 		TrustManager[] trustManagers = null;
-		if (trustStoreLocation != null && !trustStoreLocation.isEmpty()) {
+		if (trustStoreLocation != null) {
 			KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-			try (InputStream trustStoreIn = new URL(trustStoreLocation).openStream()) {
+			try (InputStream trustStoreIn = trustStoreLocation.openStream()) {
 				trustStore.load(trustStoreIn, (trustStorePassword != null && trustStorePassword.length > 0) ? trustStorePassword : null);
 			}
 			TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());

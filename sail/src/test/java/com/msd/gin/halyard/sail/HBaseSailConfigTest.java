@@ -97,16 +97,16 @@ public class HBaseSailConfigTest {
         cfg.setElasticIndexURL(new URL("http://localhost:12345/index"));
 		cfg.setElasticUsername("elastic");
 		cfg.setElasticPassword("espass");
-		cfg.setElasticKeystoreLocation("/home/keystore");
+		cfg.setElasticKeystoreLocation(new URL("file:/home/keystore"));
 		cfg.setElasticKeystorePassword("keypass");
-		cfg.setElasticTruststoreLocation("/home/truststore");
+		cfg.setElasticTruststoreLocation(new URL("file:/home/truststore"));
 		cfg.setElasticTruststorePassword("trustpass");
         assertEquals("http://localhost:12345/index", cfg.getElasticIndexURL().toString());
 		assertEquals("elastic", cfg.getElasticUsername());
 		assertEquals("espass", cfg.getElasticPassword());
-		assertEquals("/home/keystore", cfg.getElasticKeystoreLocation());
+		assertEquals("file:/home/keystore", cfg.getElasticKeystoreLocation().toString());
 		assertEquals("keypass", cfg.getElasticKeystorePassword());
-		assertEquals("/home/truststore", cfg.getElasticTruststoreLocation());
+		assertEquals("file:/home/truststore", cfg.getElasticTruststoreLocation().toString());
 		assertEquals("trustpass", cfg.getElasticTruststorePassword());
     }
 
@@ -170,9 +170,9 @@ public class HBaseSailConfigTest {
 		cfg.setElasticIndexURL(new URL("http://localhost:12345/index"));
 		cfg.setElasticUsername("elastic");
 		cfg.setElasticPassword("espass");
-		cfg.setElasticKeystoreLocation("/home/keystore");
+		cfg.setElasticKeystoreLocation(new URL("file:/home/keystore"));
 		cfg.setElasticKeystorePassword("keypass");
-		cfg.setElasticTruststoreLocation("/home/truststore");
+		cfg.setElasticTruststoreLocation(new URL("file:/home/truststore"));
 		cfg.setElasticTruststorePassword("trustpass");
 		TreeModel g = new TreeModel();
 		cfg.export(g);
@@ -181,9 +181,9 @@ public class HBaseSailConfigTest {
 		assertEquals("http://localhost:12345/index", cfg.getElasticIndexURL().toString());
 		assertEquals("elastic", cfg.getElasticUsername());
 		assertEquals("espass", cfg.getElasticPassword());
-		assertEquals("/home/keystore", cfg.getElasticKeystoreLocation());
+		assertEquals("file:/home/keystore", cfg.getElasticKeystoreLocation().toString());
 		assertEquals("keypass", cfg.getElasticKeystorePassword());
-		assertEquals("/home/truststore", cfg.getElasticTruststoreLocation());
+		assertEquals("file:/home/truststore", cfg.getElasticTruststoreLocation().toString());
 		assertEquals("trustpass", cfg.getElasticTruststorePassword());
 	}
 

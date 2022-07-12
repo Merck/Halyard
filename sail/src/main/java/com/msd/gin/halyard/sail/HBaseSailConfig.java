@@ -64,9 +64,9 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
 	private URL elasticIndexURL = null;
 	private String elasticUsername = null;
 	private String elasticPassword = null;
-	private String elasticKeystoreLocation = null;
+	private URL elasticKeystoreLocation = null;
 	private String elasticKeystorePassword = null;
-	private String elasticTruststoreLocation = null;
+	private URL elasticTruststoreLocation = null;
 	private String elasticTruststorePassword = null;
 
     /**
@@ -198,11 +198,11 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
 		this.elasticPassword = elasticPassword;
 	}
 
-	public String getElasticKeystoreLocation() {
+	public URL getElasticKeystoreLocation() {
 		return elasticKeystoreLocation;
 	}
 
-	public void setElasticKeystoreLocation(String elasticKeystoreLocation) {
+	public void setElasticKeystoreLocation(URL elasticKeystoreLocation) {
 		this.elasticKeystoreLocation = elasticKeystoreLocation;
 	}
 
@@ -214,11 +214,11 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
 		this.elasticKeystorePassword = elasticKeystorePassword;
 	}
 
-	public String getElasticTruststoreLocation() {
+	public URL getElasticTruststoreLocation() {
 		return elasticTruststoreLocation;
 	}
 
-	public void setElasticTruststoreLocation(String elasticTruststoreLocation) {
+	public void setElasticTruststoreLocation(URL elasticTruststoreLocation) {
 		this.elasticTruststoreLocation = elasticTruststoreLocation;
 	}
 
@@ -266,11 +266,11 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
 				graph.add(implNode, HALYARD.ELASTIC_PASSWORD_PROPERTY, vf.createLiteral(elasticPassword));
 			}
 			if (elasticKeystoreLocation != null) {
-				graph.add(implNode, HALYARD.ELASTIC_KEYSTORE_LOCATION_PROPERTY, vf.createLiteral(elasticKeystoreLocation));
+				graph.add(implNode, HALYARD.ELASTIC_KEYSTORE_LOCATION_PROPERTY, vf.createLiteral(elasticKeystoreLocation.toString()));
 				graph.add(implNode, HALYARD.ELASTIC_KEYSTORE_PASSWORD_PROPERTY, vf.createLiteral(elasticKeystorePassword));
 			}
 			if (elasticTruststoreLocation != null) {
-				graph.add(implNode, HALYARD.ELASTIC_TRUSTSTORE_LOCATION_PROPERTY, vf.createLiteral(elasticTruststoreLocation));
+				graph.add(implNode, HALYARD.ELASTIC_TRUSTSTORE_LOCATION_PROPERTY, vf.createLiteral(elasticTruststoreLocation.toString()));
 				graph.add(implNode, HALYARD.ELASTIC_TRUSTSTORE_PASSWORD_PROPERTY, vf.createLiteral(elasticTruststorePassword));
 			}
         }
@@ -357,19 +357,33 @@ public final class HBaseSailConfig extends AbstractSailImplConfig {
 
 			Optional<Literal> elasticKeystoreLocation = Models.objectLiteral(graph.filter(implNode, HALYARD.ELASTIC_KEYSTORE_LOCATION_PROPERTY, null));
 			if (elasticKeystoreLocation.isPresent()) {
-				setElasticKeystoreLocation(elasticKeystoreLocation.get().stringValue());
-				Optional<Literal> elasticKeystorePassword = Models.objectLiteral(graph.filter(implNode, HALYARD.ELASTIC_KEYSTORE_PASSWORD_PROPERTY, null));
-				if (elasticKeystorePassword.isPresent()) {
-					setElasticKeystorePassword(elasticKeystorePassword.get().stringValue());
+				String elasticKeystoreUrl = elasticKeystoreLocation.get().stringValue();
+				if (!elasticKeystoreUrl.isEmpty()) {
+					try {
+						setElasticKeystoreLocation(new URL(elasticKeystoreUrl));
+					} catch (MalformedURLException e) {
+						throw new SailConfigException(e);
+					}
+					Optional<Literal> elasticKeystorePassword = Models.objectLiteral(graph.filter(implNode, HALYARD.ELASTIC_KEYSTORE_PASSWORD_PROPERTY, null));
+					if (elasticKeystorePassword.isPresent()) {
+						setElasticKeystorePassword(elasticKeystorePassword.get().stringValue());
+					}
 				}
 			}
 
 			Optional<Literal> elasticTruststoreLocation = Models.objectLiteral(graph.filter(implNode, HALYARD.ELASTIC_TRUSTSTORE_LOCATION_PROPERTY, null));
 			if (elasticTruststoreLocation.isPresent()) {
-				setElasticTruststoreLocation(elasticTruststoreLocation.get().stringValue());
-				Optional<Literal> elasticTruststorePassword = Models.objectLiteral(graph.filter(implNode, HALYARD.ELASTIC_TRUSTSTORE_PASSWORD_PROPERTY, null));
-				if (elasticTruststorePassword.isPresent()) {
-					setElasticTruststorePassword(elasticTruststorePassword.get().stringValue());
+				String elasticTruststoreUrl = elasticTruststoreLocation.get().stringValue();
+				if (!elasticTruststoreUrl.isEmpty()) {
+					try {
+						setElasticTruststoreLocation(new URL(elasticTruststoreUrl));
+					} catch (MalformedURLException e) {
+						throw new SailConfigException(e);
+					}
+					Optional<Literal> elasticTruststorePassword = Models.objectLiteral(graph.filter(implNode, HALYARD.ELASTIC_TRUSTSTORE_PASSWORD_PROPERTY, null));
+					if (elasticTruststorePassword.isPresent()) {
+						setElasticTruststorePassword(elasticTruststorePassword.get().stringValue());
+					}
 				}
 			}
         }

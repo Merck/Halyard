@@ -19,6 +19,8 @@ package com.msd.gin.halyard.sail;
 import com.msd.gin.halyard.common.SSLSettings;
 import com.msd.gin.halyard.sail.HBaseSail.ElasticSettings;
 
+import java.net.URL;
+
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.config.SailConfigException;
@@ -65,8 +67,8 @@ public final class HBaseSailFactory implements SailFactory {
 			if (elasticSettings != null) {
 				elasticSettings.username = hconfig.getElasticUsername();
 				elasticSettings.password = hconfig.getElasticPassword();
-				String elasticKeystoreLocation = hconfig.getElasticKeystoreLocation();
-				if (elasticKeystoreLocation != null && !elasticKeystoreLocation.isEmpty()) {
+				URL elasticKeystoreLocation = hconfig.getElasticKeystoreLocation();
+				if (elasticKeystoreLocation != null) {
 					SSLSettings sslSettings = new SSLSettings();
 					sslSettings.keyStoreLocation = elasticKeystoreLocation;
 					String elasticKeystorePassword = hconfig.getElasticKeystorePassword();
