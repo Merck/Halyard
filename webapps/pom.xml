@@ -81,6 +81,30 @@
 									<version>${elasticsearch.version}</version>
 									<type>jar</type>
 								</artifactItem>
+								<artifactItem>
+									<groupId>org.apache.httpcomponents</groupId>
+									<artifactId>httpasyncclient</artifactId>
+									<version>4.1.4</version>
+									<type>jar</type>
+								</artifactItem>
+								<artifactItem>
+									<groupId>org.apache.httpcomponents</groupId>
+									<artifactId>httpcore-nio</artifactId>
+									<version>4.4.13</version>
+									<type>jar</type>
+								</artifactItem>
+								<artifactItem>
+									<groupId>org.eclipse.parsson</groupId>
+									<artifactId>parsson</artifactId>
+									<version>1.0.0</version>
+									<type>jar</type>
+								</artifactItem>
+								<artifactItem>
+									<groupId>jakarta.json</groupId>
+									<artifactId>jakarta.json-api</artifactId>
+									<version>2.0.1</version>
+									<type>jar</type>
+								</artifactItem>
 							</artifactItems>
 							<outputDirectory>${project.build.directory}</outputDirectory>
 							<overWriteReleases>true</overWriteReleases>
