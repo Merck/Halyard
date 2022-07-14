@@ -32,6 +32,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.BiFunction;
 
+import javax.annotation.concurrent.ThreadSafe;
 import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeConstants;
 import javax.xml.datatype.DatatypeFactory;
@@ -1004,6 +1005,7 @@ public class ValueIO {
 	}
 
 
+	@ThreadSafe
 	public final class Writer {
 		private final TripleWriter tw;
 
@@ -1178,6 +1180,7 @@ public class ValueIO {
 	}
 
 
+	@ThreadSafe
 	public class Reader {
 		private final ValueFactory vf;
 		private final TripleReader tf;

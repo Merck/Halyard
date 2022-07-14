@@ -2,6 +2,9 @@ package com.msd.gin.halyard.common;
 
 import java.nio.ByteBuffer;
 
+import javax.annotation.concurrent.ThreadSafe;
+
+@ThreadSafe
 public final class RDFRole<T extends SPOC<?>> {
 	enum Name {SUBJECT, PREDICATE, OBJECT, CONTEXT}
 	private final Name name;

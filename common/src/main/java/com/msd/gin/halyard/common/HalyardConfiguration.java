@@ -25,4 +25,21 @@ public class HalyardConfiguration extends Configuration {
 	public int getInteger(String key) {
 		return Config.getInteger(key, Integer.parseInt(Objects.requireNonNull(get(key), key)));
 	}
+
+	@Override
+	public int hashCode() {
+		return getProps().hashCode();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		if (this == other) {
+			return true;
+		}
+		if (this.getClass() != other.getClass()) {
+			return false;
+		}
+		HalyardConfiguration that = (HalyardConfiguration) other;
+		return this.getProps().equals(that.getProps());
+	}
 }

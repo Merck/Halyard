@@ -7,6 +7,7 @@ import java.time.temporal.TemporalAmount;
 import java.util.Date;
 import java.util.UUID;
 
+import javax.annotation.concurrent.ThreadSafe;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.eclipse.rdf4j.model.BNode;
@@ -19,6 +20,7 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.base.AbstractValueFactory;
 
+@ThreadSafe
 public class IdValueFactory implements ValueFactory {
 	private static final ValueFactory DELEGATE = new AbstractValueFactory() {};
 	private final Literal TRUE;

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Objects;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.ThreadSafe;
 
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.filter.ColumnPrefixFilter;
@@ -24,6 +25,7 @@ import org.eclipse.rdf4j.model.ValueFactory;
 /**
  * Triples/quads are stored in multiple indices as different permutations.
  */
+@ThreadSafe
 public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 extends SPOC<?>,T4 extends SPOC<?>> {
 	public enum Name {SPO, POS, OSP, CSPO, CPOS, COSP};
 	private static final byte WELL_KNOWN_IRI_MARKER = (byte) ('#' | 0x80);  // marker must be negative (msb set) so it is distinguishable from a length (>=0)

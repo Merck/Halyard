@@ -8,6 +8,11 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.annotation.concurrent.ThreadSafe;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
@@ -27,9 +32,11 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@ThreadSafe
 public class RDFFactory {
 	private static final Logger LOGGER = LoggerFactory.getLogger(RDFFactory.class);
 	private static final int MIN_KEY_SIZE = 1;
+	private static final Map<HalyardConfiguration,RDFFactory> FACTORIES = Collections.synchronizedMap(new HashMap<>());
 
 	public final ValueIO.Writer idTripleWriter;
 	public final ValueIO.Writer streamWriter;
@@ -58,7 +65,8 @@ public class RDFFactory {
 	}
 
 	public static RDFFactory create(Configuration config) {
-		return new RDFFactory(config);
+		HalyardConfiguration halyardConfig = new HalyardConfiguration(config);
+		return FACTORIES.computeIfAbsent(halyardConfig, c -> new RDFFactory(halyardConfig));
 	}
 
 	public static RDFFactory create(KeyspaceConnection conn) throws IOException {
@@ -100,8 +108,7 @@ public class RDFFactory {
 		return x;
 	}
 
-	private RDFFactory(Configuration conf) {
-		HalyardConfiguration halyardConfig = new HalyardConfiguration(conf);
+	private RDFFactory(HalyardConfiguration halyardConfig) {
 		valueIO = new ValueIO(
 			halyardConfig.getBoolean(Config.VOCAB),
 			halyardConfig.getBoolean(Config.LANG),

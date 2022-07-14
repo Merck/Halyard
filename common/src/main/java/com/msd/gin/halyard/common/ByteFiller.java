@@ -3,6 +3,9 @@ package com.msd.gin.halyard.common;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import javax.annotation.concurrent.ThreadSafe;
+
+@ThreadSafe
 public final class ByteFiller implements ByteSequence {
 	private final byte value;
 	private final int size;

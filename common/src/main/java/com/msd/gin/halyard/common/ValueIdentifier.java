@@ -8,6 +8,8 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
+import javax.annotation.concurrent.ThreadSafe;
+
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.XSD;
@@ -64,6 +66,7 @@ public final class ValueIdentifier implements ByteSequence, Serializable {
 		}
 	}
 
+	@ThreadSafe
 	static final class Format implements Serializable {
 		private static final long serialVersionUID = -7777885367792871664L;
 

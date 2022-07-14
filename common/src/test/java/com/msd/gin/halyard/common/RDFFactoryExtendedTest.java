@@ -47,9 +47,11 @@ public class RDFFactoryExtendedTest {
 		);
 	}
 
+	private final Configuration conf;
 	private final RDFFactory rdfFactory;
 
 	public RDFFactoryExtendedTest(Configuration conf) {
+		this.conf = conf;
 		this.rdfFactory = RDFFactory.create(conf);
 	}
 
@@ -128,5 +130,12 @@ public class RDFFactoryExtendedTest {
 		ValueIdentifier id = rdfFactory.id(RDF.TYPE);
 		IRI typeIri = rdfFactory.getWellKnownIRI(id);
 		assertEquals(RDF.TYPE, typeIri);
+	}
+
+	@Test
+	public void testIsSingleton() {
+		Configuration conf2 = new Configuration(conf);
+		RDFFactory rdfFactory2 = RDFFactory.create(conf2);
+		assertTrue(rdfFactory == rdfFactory2);
 	}
 }
