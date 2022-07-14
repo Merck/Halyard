@@ -3,48 +3,41 @@ package com.msd.gin.halyard.common;
 import java.io.ObjectStreamException;
 import java.nio.ByteBuffer;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.rdf4j.model.Triple;
 
 public final class IdentifiableTriple extends TripleWrapper implements IdentifiableValue, SerializableValue {
 	private static final long serialVersionUID = 228285959274911416L;
-	private RDFFactory rdfFactory;
-	private ValueIdentifier id;
-	private ByteBuffer ser;
+	private transient volatile Pair<ValueIdentifier,RDFFactory> cachedId = Pair.of(null, null);
+	private transient volatile Pair<ByteBuffer,RDFFactory> cachedSer = Pair.of(null, null);
 
 	IdentifiableTriple(Triple triple) {
 		super(triple);
 	}
 
-	private void validateCache(RDFFactory rdfFactory) {
-		if (this.rdfFactory != rdfFactory) {
-			this.id = null;
-			this.ser = null;
-			this.rdfFactory = rdfFactory;
-		}
-	}
-
 	@Override
 	public ValueIdentifier getId(RDFFactory rdfFactory) {
-		validateCache(rdfFactory);
-		if (id == null) {
-			id = rdfFactory.id(triple, getSerializedForm(rdfFactory));
+		Pair<ValueIdentifier,RDFFactory> current = cachedId;
+		if (current.getRight() != rdfFactory) {
+			current = Pair.of(rdfFactory.id(triple, getSerializedForm(rdfFactory)), rdfFactory);
+			cachedId = current;
 		}
-		return id;
+		return current.getLeft();
 	}
 
 	@Override
 	public void setId(RDFFactory rdfFactory, ValueIdentifier id) {
-		validateCache(rdfFactory);
-		this.id = id;
+		cachedId = Pair.of(id, rdfFactory);
 	}
 
 	@Override
 	public ByteBuffer getSerializedForm(RDFFactory rdfFactory) {
-		validateCache(rdfFactory);
-		if (ser == null) {
-			ser = rdfFactory.getSerializedForm(triple);
+		Pair<ByteBuffer,RDFFactory> current = cachedSer;
+		if (current.getRight() != rdfFactory) {
+			current = Pair.of(rdfFactory.getSerializedForm(triple), rdfFactory);
+			cachedSer = current;
 		}
-		return ser.duplicate();
+		return current.getLeft().duplicate();
 	}
 
 	private Object writeReplace() throws ObjectStreamException {

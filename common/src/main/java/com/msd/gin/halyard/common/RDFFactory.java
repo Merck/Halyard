@@ -292,18 +292,16 @@ public class RDFFactory {
 
 	public ValueIdentifier id(Value v) {
 		ValueIdentifier id = v.isIRI() ? wellKnownIriIds.inverse().get(v) : null;
-		if (v instanceof IdentifiableValue) {
-			IdentifiableValue idv = (IdentifiableValue) v;
-			if (id != null) {
-				idv.setId(this, id);
-			} else {
+		if (id == null) {
+			if (v instanceof IdentifiableValue) {
+				IdentifiableValue idv = (IdentifiableValue) v;
 				id = idv.getId(this);
+			} else {
+				ByteBuffer ser = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
+				ser = idTripleWriter.writeTo(v, ser);
+				ser.flip();
+				id = id(v, ser);
 			}
-		} else if (id == null) {
-			ByteBuffer ser = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
-			ser = idTripleWriter.writeTo(v, ser);
-			ser.flip();
-			id = id(v, ser);
 		}
 		return id;
 	}
