@@ -361,20 +361,27 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
     	enum Counters {
     		PARSE_QUEUE_EMPTY,
-    		PARSE_QUEUE_FULL
+    		PARSE_QUEUE_FULL,
+    		LRU_CACHE_HITS,
+    		LRU_CACHE_MISSES,
+    		LFU_CACHE_HITS,
+    		LFU_CACHE_MISSES,
+    		BOTH_CACHE_HITS,
+    		BOTH_CACHE_MISSES
     	}
 
+        private final BlockingQueue<Statement> queue = new LinkedBlockingQueue<>(500);
+        private final CachingIdValueFactory valueFactory = new CachingIdValueFactory();
         private final TaskAttemptContext context;
         private final Path paths[];
         private final long[] sizes, offsets;
         private final long size;
-        private final BlockingQueue<Statement> queue = new LinkedBlockingQueue<>(500);
         private final boolean skipInvalid, verifyDataTypeValues;
         private final String defaultRdfContextPattern;
         private final boolean overrideRdfContext;
         private final long maxSize;
         private volatile Exception ex = null;
-        private long finishedSize = 0;
+        private long finishedSize = 0L;
         private int offset, count;
 
         private String baseUri = "";
@@ -410,7 +417,8 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
         public synchronized float getProgress() {
             try {
-                return (float)(finishedSize + seek.getPos()) / (float)size;
+                long seekPos = (seek != null) ? seek.getPos() : 0L;
+                return (float)(finishedSize + seekPos) / (float)size;
             } catch (IOException e) {
                 return (float)finishedSize / (float)size;
             }
@@ -433,7 +441,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                         }
                     }
                     this.offset = (int)offsets[i];
-                    this.count = maxSize > 0 && sizes[i] > maxSize ? (int)Math.ceil((double)sizes[i] / (double)maxSize) : 1;
+                    this.count = (maxSize > 0 && sizes[i] > maxSize) ? (int)Math.ceil((double)sizes[i] / (double)maxSize) : 1;
                     close();
                     context.setStatus("Parsing " + localBaseUri);
                     FileSystem fs = file.getFileSystem(conf);
@@ -462,9 +470,10 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                     }
                     parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
                     if (defaultRdfContextPattern != null || overrideRdfContext) {
-                        final IRI defaultRdfContext = defaultRdfContextPattern == null ? null : VF.createIRI(MessageFormat.format(defaultRdfContextPattern, localBaseUri, file.toUri().getPath(), file.getName()));
-                        parser.setValueFactory(new CachingIdValueFactory(overrideRdfContext, defaultRdfContext));
+                        IRI defaultRdfContext = (defaultRdfContextPattern == null) ? null : valueFactory.createIRI(MessageFormat.format(defaultRdfContextPattern, localBaseUri, file.toUri().getPath(), file.getName()));
+                        valueFactory.setDefaultContext(defaultRdfContext, overrideRdfContext);
                     }
+                    parser.setValueFactory(valueFactory);
                     parser.parse(localIn, localBaseUri);
                 } catch (Exception e) {
                     if (skipInvalid) {
@@ -499,7 +508,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         @Override
         public void handleNamespace(String prefix, String uri) throws RDFHandlerException {
             if (prefix.length() > 0) {
-                handleStatement(VF.createStatement(VF.createIRI(uri), HALYARD.NAMESPACE_PREFIX_PROPERTY, VF.createLiteral(prefix)));
+                handleStatement(valueFactory.createStatement(valueFactory.createIRI(uri), HALYARD.NAMESPACE_PREFIX_PROPERTY, valueFactory.createLiteral(prefix), HALYARD.SYSTEM_GRAPH_CONTEXT));
             }
         }
 
@@ -509,6 +518,12 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                 in.close();
                 in = null;
             }
+            context.getCounter(Counters.LRU_CACHE_HITS).setValue(valueFactory.lruHits);
+            context.getCounter(Counters.LRU_CACHE_MISSES).setValue(valueFactory.lruMisses);
+            context.getCounter(Counters.LFU_CACHE_HITS).setValue(valueFactory.lfuHits);
+            context.getCounter(Counters.LFU_CACHE_MISSES).setValue(valueFactory.lfuMisses);
+            context.getCounter(Counters.BOTH_CACHE_HITS).setValue(valueFactory.bothHits);
+            context.getCounter(Counters.BOTH_CACHE_MISSES).setValue(valueFactory.bothMisses);
         }
 
         @Override
@@ -529,15 +544,21 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
     static final class CachingIdValueFactory extends IdValueFactory {
         // LRU cache as formats like Turtle tend to favour recently used identifiers as subjects
-        private final LRUCache<String,IRI> lruIriCache = new LRUCache<>(100);
+        private final LRUCache<String,IRI> lruIriCache = new LRUCache<>(200);
         // LFU cache as predicates tend to have a more global distribution
-        private final LFUCache<String,IRI> lfuIriCache = new LFUCache<>(500, 0.2f);
-    	private final boolean overrideRdfContext;
-    	private final IRI defaultRdfContext;
+        private final LFUCache<String,IRI> lfuIriCache = new LFUCache<>(600, 0.2f);
+        long lruHits;
+        long lruMisses;
+        long lfuHits;
+        long lfuMisses;
+        long bothHits;
+        long bothMisses;
+    	private IRI defaultContext;
+    	private boolean overrideContext;
 
-    	CachingIdValueFactory(boolean overrideRdfContext, IRI defaultRdfContext) {
-			this.overrideRdfContext = overrideRdfContext;
-			this.defaultRdfContext = defaultRdfContext;
+    	void setDefaultContext(IRI defaultContext, boolean overrideContext) {
+			this.defaultContext = defaultContext;
+			this.overrideContext = overrideContext;
 		}
 
     	private IRI getOrCreateIRI(String v) {
@@ -549,11 +570,22 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     		// ascertain a value
     		IRI iri = inLru ? lruIri : (inLfu ? lfuIri : super.createIRI(v));
     		// update caches
-    		if (!inLru) {
+    		if (inLru) {
+    			lruHits++;
+    		} else {
     			lruIriCache.put(v, iri);
+    			lruMisses++;
     		}
-    		if (!inLfu) {
+    		if (inLfu) {
+    			lfuHits++;
+    		} else {
     			lfuIriCache.put(v, iri);
+    			lfuMisses++;
+    		}
+    		if (inLru && inLfu) {
+    			bothHits++;
+    		} else if (!inLru && !inLfu) {
+    			bothMisses++;
     		}
     		return iri;
     	}
@@ -570,12 +602,20 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 
 		@Override
         public Statement createStatement(Resource subject, IRI predicate, Value object) {
-            return super.createStatement(subject, predicate, object, defaultRdfContext);
+			return createStatementInternal(subject, predicate, object, defaultContext);
         }
 
         @Override
         public Statement createStatement(Resource subject, IRI predicate, Value object, Resource context) {
-            return super.createStatement(subject, predicate, object, overrideRdfContext || context == null ? defaultRdfContext : context);
+            return createStatementInternal(subject, predicate, object, overrideContext || context == null ? defaultContext : context);
+        }
+
+        private Statement createStatementInternal(Resource subject, IRI predicate, Value object, Resource context) {
+			if (context != null) {
+				return super.createStatement(subject, predicate, object, context);
+			} else {
+				return super.createStatement(subject, predicate, object);
+			}
         }
     }
 
