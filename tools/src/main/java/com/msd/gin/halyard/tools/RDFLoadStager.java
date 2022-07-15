@@ -104,10 +104,8 @@ public final class RDFLoadStager implements Callable<Void> {
 					numPartitions = 1;
 				} else if (totalSize <= GB) {
 					numPartitions = Math.min((int) (totalSize/MIN_BLOCK_SIZE), MAX_SMALL_PARTITIONS);
-				} else if (totalSize <= 5*GB) {
-					numPartitions = 5;
 				} else {
-					numPartitions = (int) (totalSize/GB) + 1;
+					numPartitions = (int) (totalSize/defaultBlockSize) + 1;
 				}
 				LOGGER.info("Merging {} bytes of {} data...", totalSize, ext);
 
