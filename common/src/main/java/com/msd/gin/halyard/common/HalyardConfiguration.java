@@ -36,7 +36,7 @@ public class HalyardConfiguration extends Configuration {
 		if (this == other) {
 			return true;
 		}
-		if (this.getClass() != other.getClass()) {
+		if (other == null || this.getClass() != other.getClass()) {
 			return false;
 		}
 		HalyardConfiguration that = (HalyardConfiguration) other;
