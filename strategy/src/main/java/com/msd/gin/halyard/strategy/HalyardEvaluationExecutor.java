@@ -319,11 +319,14 @@ final class HalyardEvaluationExecutor {
     			try {
                     for (int retries = 0; bs == null && !isClosed(); retries++) {
     					bs = queue.poll(POLL_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
-    					if (exception instanceof RuntimeException) {
-    						throw (RuntimeException) exception;
-    					} else if (exception != null) {
-                        	throw new QueryEvaluationException(exception);
-                        }
+    					Throwable thr = exception;
+    					if (thr != null) {
+	    					if (thr instanceof RuntimeException) {
+	    						throw (RuntimeException) thr;
+	    					} else {
+	                        	throw new QueryEvaluationException(thr);
+	                        }
+    					}
 
 						if (bs == null) {
 							if(checkThreads(retries)) {
@@ -386,8 +389,9 @@ final class HalyardEvaluationExecutor {
 
             @Override
             protected boolean handleException(Throwable e) {
-                if (exception != null) {
-                	e.addSuppressed(exception);
+                Throwable lastEx = exception;
+                if (lastEx != null) {
+                	e.addSuppressed(lastEx);
                 }
                 exception = e;
                 isClosed = true;
