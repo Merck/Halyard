@@ -16,6 +16,6 @@ public final class SearchClient {
 	}
 
 	public SearchResponse<SearchDocument> search(String query, int limit) throws IOException {
-		return client.search(s -> s.index(index).query(q -> q.queryString(qs -> qs.query(query))).size(limit), SearchDocument.class);
+		return client.search(s -> s.index(index).query(q -> q.queryString(qs -> qs.query(query).defaultField(SearchDocument.LABEL_FIELD))).size(limit), SearchDocument.class);
 	}
 }

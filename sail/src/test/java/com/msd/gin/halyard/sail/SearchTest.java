@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.sail.search.SearchDocument;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.BufferedReader;
@@ -153,11 +154,11 @@ public class SearchTest {
 			jsonGen.writeStringField("_id", id);
 			jsonGen.writeNumberField("_score", values.length - i);
 			jsonGen.writeObjectFieldStart("_source");
-			jsonGen.writeStringField("id", id);
-			jsonGen.writeStringField("label", val.getLabel());
-			jsonGen.writeStringField("datatype", val.getDatatype().stringValue());
+			jsonGen.writeStringField(SearchDocument.ID_FIELD, id);
+			jsonGen.writeStringField(SearchDocument.LABEL_FIELD, val.getLabel());
+			jsonGen.writeStringField(SearchDocument.DATATYPE_FIELD, val.getDatatype().stringValue());
 			if (val.getLanguage().isPresent()) {
-				jsonGen.writeStringField("lang", val.getLanguage().get());
+				jsonGen.writeStringField(SearchDocument.LANG_FIELD, val.getLanguage().get());
 			}
 			jsonGen.writeEndObject();
 			jsonGen.writeEndObject();

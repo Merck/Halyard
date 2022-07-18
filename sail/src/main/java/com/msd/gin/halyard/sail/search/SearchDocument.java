@@ -7,6 +7,7 @@
  */
 package com.msd.gin.halyard.sail.search;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.msd.gin.halyard.common.IdentifiableValue;
 import com.msd.gin.halyard.common.RDFFactory;
 
@@ -14,9 +15,18 @@ import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.ValueFactory;
 
 public class SearchDocument {
+	public static final String ID_FIELD = "id";
+	public static final String LABEL_FIELD = "label";
+	public static final String LANG_FIELD = "lang";
+	public static final String DATATYPE_FIELD = "datatype";
+
+	@JsonProperty(ID_FIELD)
 	public String id;
+	@JsonProperty(LABEL_FIELD)
 	public String label;
+	@JsonProperty(LANG_FIELD)
 	public String lang;
+	@JsonProperty(DATATYPE_FIELD)
 	public String datatype;
 
 	@Override

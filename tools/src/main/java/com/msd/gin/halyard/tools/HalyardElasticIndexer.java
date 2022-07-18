@@ -53,10 +53,13 @@ import org.apache.hadoop.hbase.util.CommonFSUtils;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
+import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
+import org.eclipse.rdf4j.model.datatypes.XMLDatatypeUtil;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.model.vocabulary.GEO;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
@@ -71,6 +74,7 @@ import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.SSLSettings;
 import com.msd.gin.halyard.common.StatementIndex;
+import com.msd.gin.halyard.sail.search.SearchDocument;
 
 /**
  * MapReduce tool indexing all RDF literals in Elasticsearch
@@ -125,15 +129,28 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
             	Literal l = (Literal) st.getObject();
                 if (literals.add(l)) {
             		try(StringBuilderWriter json = new StringBuilderWriter(128)) {
-		                json.append("{\"id\":");
+		                json.append("{\"").append(SearchDocument.ID_FIELD).append("\":");
 		                String id = rdfFactory.id(l).toString();
 		                JSONObject.quote(id, json);
-		                json.append(",\"label\":");
-		                JSONObject.quote(l.getLabel(), json);
-		                json.append(",\"datatype\":");
-		                JSONObject.quote(l.getDatatype().stringValue(), json);
+		                json.append(",\"").append(SearchDocument.LABEL_FIELD).append("\":");
+		                IRI datatype = l.getDatatype();
+		    			if (XMLDatatypeUtil.isNumericDatatype(datatype)) {
+		    				if (XMLDatatypeUtil.isIntegerDatatype(datatype)) {
+		    					json.append(Long.toString(l.longValue()));
+		    				} else {
+		    					json.append(Double.toString(l.doubleValue()));
+		    				}
+		    			} else {
+			                JSONObject.quote(l.getLabel(), json);
+		    			}
+		    			if (GEO.WKT_LITERAL.equals(datatype)) {
+		    				json.append(",\"geometry\":");
+			                JSONObject.quote(l.getLabel(), json);
+		    			}
+		                json.append(",\"").append(SearchDocument.DATATYPE_FIELD).append("\":");
+		                JSONObject.quote(datatype.stringValue(), json);
 		                if(l.getLanguage().isPresent()) {
-			                json.append(",\"lang\":");
+			                json.append(",\"").append(SearchDocument.LANG_FIELD).append("\":");
 			                JSONObject.quote(l.getLanguage().get(), json);
 		                }
 		                json.append("}\n");
@@ -174,10 +191,16 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                   linePrefix + "{\n"
                 + linePrefix + "    \"mappings\" : {\n"
                 + linePrefix + "        \"properties\" : {\n"
-                + linePrefix + "            \"id\" : { \"type\" : \"keyword\", \"index\" : false },\n"
-                + linePrefix + "            \"label\" : { \"type\" : \"text\" },\n"
-                + linePrefix + "            \"datatype\" : { \"type\" : \"keyword\", \"index\" : false },\n"
-                + linePrefix + "            \"lang\" : { \"type\" : \"keyword\", \"index\" : false }\n"
+                + linePrefix + "            \"" + SearchDocument.ID_FIELD + "\" : { \"type\" : \"keyword\", \"index\" : false },\n"
+                + linePrefix + "            \"" + SearchDocument.LABEL_FIELD + "\" : { \"type\" : \"text\", \"fields\" : {"
+                + linePrefix + "                \"number\" : { \"type\" : \"double\", \"coerce\" : false, \"ignore_malformed\" : true },\n"
+                + linePrefix + "                \"integer\" : { \"type\" : \"long\", \"coerce\" : false, \"ignore_malformed\" : true },\n"
+                + linePrefix + "                \"point\" : { \"type\" : \"geo_point\", \"ignore_malformed\" : true }\n"
+                + linePrefix + "                }\n"
+                + linePrefix + "            },\n"
+                + linePrefix + "            \"geometry\" : { \"type\" : \"geo_shape\" },\n"
+                + linePrefix + "            \"" + SearchDocument.DATATYPE_FIELD + "\" : { \"type\" : \"keyword\", \"index\" : false },\n"
+                + linePrefix + "            \"" + SearchDocument.LANG_FIELD + "\" : { \"type\" : \"keyword\", \"index\" : false }\n"
                 + linePrefix + "        }\n"
                 + linePrefix + "    },\n";
     if (alias != null) {
