@@ -7,24 +7,33 @@
  */
 package com.msd.gin.halyard.sail.search;
 
+import com.msd.gin.halyard.common.IdentifiableValue;
+import com.msd.gin.halyard.common.RDFFactory;
+
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.ValueFactory;
 
 public class SearchDocument {
+	public String id;
 	public String label;
 	public String lang;
 	public String datatype;
 
 	@Override
 	public String toString() {
-		return String.format("label: %s, datatype: %s, lang: %s", label, datatype, lang);
+		return String.format("id: %s, label: %s, datatype: %s, lang: %s", id, label, datatype, lang);
 	}
 
-	public Literal createLiteral(ValueFactory vf) {
+	public Literal createLiteral(ValueFactory vf, RDFFactory rdfFactory) {
+		Literal l;
 		if (lang != null) {
-			return vf.createLiteral(label, lang);
+			l = vf.createLiteral(label, lang);
 		} else {
-			return vf.createLiteral(label, vf.createIRI(datatype));
+			l = vf.createLiteral(label, vf.createIRI(datatype));
 		}
+		if (l instanceof IdentifiableValue) {
+			((IdentifiableValue) l).setId(rdfFactory, rdfFactory.idFromString(id));
+		}
+		return l;
 	}
 }

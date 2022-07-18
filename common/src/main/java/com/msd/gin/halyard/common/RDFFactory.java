@@ -318,6 +318,10 @@ public class RDFFactory {
 		return idFormat.id(type, v.isLiteral() ? ((Literal)v).getDatatype() : null, ser);
 	}
 
+	public ValueIdentifier idFromString(String s) {
+		return new ValueIdentifier(Hashes.decode(s), idFormat);
+	}
+
 	ByteBuffer getSerializedForm(Value v) {
 		byte[] b = idTripleWriter.toBytes(v);
 		return ByteBuffer.wrap(b).asReadOnlyBuffer();

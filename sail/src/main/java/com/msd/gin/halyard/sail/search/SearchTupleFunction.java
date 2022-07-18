@@ -2,6 +2,7 @@ package com.msd.gin.halyard.sail.search;
 
 import com.google.common.collect.Lists;
 import com.msd.gin.halyard.common.ObjectLiteral;
+import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 import com.msd.gin.halyard.vocab.HALYARD;
 
@@ -45,6 +46,7 @@ public class SearchTupleFunction implements TupleFunction {
 		int queryHash = query.hashCode();
 		int limit = ((Literal) args[1]).intValue();
 		SearchInterpreter.SearchParams searchParams = ((ObjectLiteral<SearchInterpreter.SearchParams>) args[2]).objectValue();
+		RDFFactory rdfFactory = (RDFFactory) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE);
 		SearchClient searchClient = (SearchClient) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_SEARCH_ATTRIBUTE);
 		try {
 			SearchResponse<SearchDocument> searchResults = searchClient.search(query, limit);
@@ -69,7 +71,7 @@ public class SearchTupleFunction implements TupleFunction {
 							values.add(valueFactory.createBNode(bnodeId));
 						}
 						if (!matchParams.valueVars.isEmpty()) {
-							Literal value = matchValue.source().createLiteral(valueFactory);
+							Literal value = matchValue.source().createLiteral(valueFactory, rdfFactory);
 							for (int k = 0; k < matchParams.valueVars.size(); k++) {
 								values.add(value);
 							}

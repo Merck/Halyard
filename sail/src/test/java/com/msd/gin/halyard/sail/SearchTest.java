@@ -149,9 +149,11 @@ public class SearchTest {
 			Literal val = values[i];
 			jsonGen.writeStartObject();
 			jsonGen.writeStringField("_index", INDEX);
-			jsonGen.writeStringField("_id", rdfFactory.id(val).toString());
+			String id = rdfFactory.id(val).toString();
+			jsonGen.writeStringField("_id", id);
 			jsonGen.writeNumberField("_score", values.length - i);
 			jsonGen.writeObjectFieldStart("_source");
+			jsonGen.writeStringField("id", id);
 			jsonGen.writeStringField("label", val.getLabel());
 			jsonGen.writeStringField("datatype", val.getDatatype().stringValue());
 			if (val.getLanguage().isPresent()) {
