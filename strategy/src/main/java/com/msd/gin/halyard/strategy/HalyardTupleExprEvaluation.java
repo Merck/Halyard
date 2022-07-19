@@ -165,12 +165,15 @@ import org.eclipse.rdf4j.query.parser.sparql.aggregate.AggregateCollector;
 import org.eclipse.rdf4j.query.parser.sparql.aggregate.AggregateFunction;
 import org.eclipse.rdf4j.query.parser.sparql.aggregate.AggregateFunctionFactory;
 import org.eclipse.rdf4j.query.parser.sparql.aggregate.CustomAggregateFunctionRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Evaluates {@link TupleExpr}s and it's sub-interfaces and implementations.
  * @author Adam Sotona (MSD)
  */
 final class HalyardTupleExprEvaluation {
+	private static final Logger LOGGER = LoggerFactory.getLogger(HalyardTupleExprEvaluation.class);
 	private static final String ANON_SUBJECT_VAR = "__subj";
 	private static final String ANON_PREDICATE_VAR = "__pred";
 	private static final String ANON_OBJECT_VAR = "__obj";
@@ -2620,6 +2623,7 @@ final class HalyardTupleExprEvaluation {
 						}
 					} catch (ValueExprEvaluationException ignore) {
 						// can't evaluate arguments
+						LOGGER.trace("Failed to evaluate " + tfc.getURI(), ignore);
 					}
 					return true;
 				}

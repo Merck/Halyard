@@ -17,8 +17,11 @@ import org.eclipse.rdf4j.model.ValueFactory;
 public class SearchDocument {
 	public static final String ID_FIELD = "id";
 	public static final String LABEL_FIELD = "label";
+	public static final String POINT_SUBFIELD = "point";
+	public static final String LABEL_POINT_FIELD = LABEL_FIELD + "." + POINT_SUBFIELD;
 	public static final String LANG_FIELD = "lang";
 	public static final String DATATYPE_FIELD = "datatype";
+	public static final String GEOMETRY_FIELD = "geometry";
 
 	@JsonProperty(ID_FIELD)
 	public String id;
@@ -28,10 +31,12 @@ public class SearchDocument {
 	public String lang;
 	@JsonProperty(DATATYPE_FIELD)
 	public String datatype;
+	@JsonProperty(GEOMETRY_FIELD)
+	public String geometry;
 
 	@Override
 	public String toString() {
-		return String.format("id: %s, label: %s, datatype: %s, lang: %s", id, label, datatype, lang);
+		return String.format("id: %s, label: %s, datatype: %s, lang: %s, geometry: %s", id, label, datatype, lang, geometry);
 	}
 
 	public Literal createLiteral(ValueFactory vf, RDFFactory rdfFactory) {

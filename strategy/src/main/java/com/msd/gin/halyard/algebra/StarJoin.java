@@ -17,11 +17,13 @@
 package com.msd.gin.halyard.algebra;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+
+import javax.annotation.Nullable;
 
 import org.eclipse.rdf4j.query.algebra.AbstractQueryModelNode;
 import org.eclipse.rdf4j.query.algebra.Join;
@@ -37,9 +39,9 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 
 	private Var commonVar;
 	private Var contextVar;
-	private List<TupleExpr> args;
+	private TupleExpr[] args;
 
-	public StarJoin(Var commonVar, Var contextVar, List<StatementPattern> exprs) {
+	public StarJoin(Var commonVar, @Nullable Var contextVar, List<StatementPattern> exprs) {
 		assert exprs.size() > 1;
 		setCommonVar(commonVar);
 		setContextVar(contextVar);
@@ -47,8 +49,8 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	}
 
 	public void setCommonVar(Var var) {
+		var.setParentNode(this);
 		commonVar = var;
-		commonVar.setParentNode(this);
 	}
 
 	public Var getCommonVar() {
@@ -56,10 +58,10 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	}
 
 	public void setContextVar(Var var) {
-		contextVar = var;
-		if (contextVar != null) {
-			contextVar.setParentNode(this);
+		if (var != null) {
+			var.setParentNode(this);
 		}
+		contextVar = var;
 	}
 
 	public Var getContextVar() {
@@ -67,18 +69,24 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	}
 
 	public List<? extends TupleExpr> getArgs() {
-		return Collections.unmodifiableList(args);
+		return Arrays.asList(args);
 	}
 
 	public void setStatementPatterns(List<StatementPattern> exprs) {
-		this.args = new ArrayList<>(exprs);
-		for (StatementPattern sp : exprs) {
-			sp.setParentNode(this);
+		args = new TupleExpr[exprs.size()];
+		for (int i=0; i<exprs.size(); i++) {
+			StatementPattern sp = exprs.get(i);
+			setStatementPattern(i, sp);
 		}
 	}
 
+	private void setStatementPattern(int i, TupleExpr sp) {
+		sp.setParentNode(this);
+		args[i] = sp;
+	}
+
 	public List<Var> getVarList() {
-		return getVars(new ArrayList<>(4*args.size()));
+		return getVars(new ArrayList<>(4*args.length));
 	}
 
 	public <L extends Collection<Var>> L getVars(L varCollection) {
@@ -93,7 +101,7 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	}
 
 	public Join toJoins() {
-		return (Join) Algebra.join(args);
+		return (Join) Algebra.join(getArgs());
 	}
 
 	@Override
@@ -119,13 +127,13 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 		} else if (current == contextVar) {
 			setContextVar((Var) replacement);
 		} else {
-			final int index = args.indexOf(current);
-			if (index >= 0) {
-				args.set(index, (TupleExpr) replacement);
-				replacement.setParentNode(this);
-			} else {
-				super.replaceChildNode(current, replacement);
+			for (int i=0; i<args.length; i++) {
+				if (current == args[i]) {
+					setStatementPattern(i, (TupleExpr) replacement);
+					return;
+				}
 			}
+			super.replaceChildNode(current, replacement);
 		}
 	}
 
@@ -156,10 +164,9 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 			clone.setContextVar(contextVar.clone());
 		}
 
-		for (int i=0; i<args.size(); i++) {
-			TupleExpr exprClone = args.get(i).clone();
-			clone.args.set(i, exprClone);
-			exprClone.setParentNode(clone);
+		for (int i=0; i<args.length; i++) {
+			TupleExpr exprClone = args[i].clone();
+			clone.setStatementPattern(i, exprClone);
 		}
 		return clone;
 	}

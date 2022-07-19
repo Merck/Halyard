@@ -28,6 +28,7 @@ import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.sail.HBaseSail.SailConnectionFactory;
 import com.msd.gin.halyard.sail.connection.SailConnectionQueryPreparer;
+import com.msd.gin.halyard.sail.geosparql.WithinDistanceInterpreter;
 import com.msd.gin.halyard.sail.search.SearchClient;
 import com.msd.gin.halyard.sail.search.SearchInterpreter;
 import com.msd.gin.halyard.spin.SpinFunctionInterpreter;
@@ -223,6 +224,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Exten
 			new SpinMagicPropertyInterpreter(sail.getSpinParser(), source, sail.getTupleFunctionRegistry(), null).optimize(tupleExpr, dataset, bindings);
 		}
 		new SearchInterpreter().optimize(tupleExpr, dataset, bindings);
+		new WithinDistanceInterpreter().optimize(tupleExpr, dataset, bindings);
 		LOG.debug("Evaluated TupleExpr after interpretation:\n{}", tupleExpr);
 
 		strategy.optimize(tupleExpr, getStatistics(), bindings);

@@ -36,6 +36,23 @@ public class WKTLiteral implements ObjectLiteral<Geometry> {
 		return wkbWriter.write(geom);
 	}
 
+	public static Geometry geometryValue(Literal l) {
+		if (l instanceof WKTLiteral) {
+			return ((WKTLiteral)l).objectValue();
+		} else {
+			WKTReader wktReader = new WKTReader();
+			try {
+				Geometry geom = wktReader.read(l.getLabel());
+				if (geom == null) {
+					throw new ParseException(String.format("Failed to parse %s", l.getLabel()));
+				}
+				return geom;
+			} catch (ParseException e) {
+				throw new IllegalArgumentException("Invalid WKT content", e);
+			}
+		}
+	}
+
 	public WKTLiteral(String wkt) throws ParseException, IOException {
 		this.wkbBytes = writeWKB(wkt);
 	}
@@ -74,7 +91,7 @@ public class WKTLiteral implements ObjectLiteral<Geometry> {
 		try {
 			return new WKBReader().read(wkbBytes);
 		} catch (ParseException e) {
-			throw new IllegalArgumentException("Invalid WKT content");
+			throw new IllegalArgumentException("Invalid WKT content", e);
 		}
 	}
 

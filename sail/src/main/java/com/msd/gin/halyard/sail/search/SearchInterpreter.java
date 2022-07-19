@@ -25,7 +25,6 @@ import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
-import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
@@ -155,10 +154,10 @@ public class SearchInterpreter implements QueryOptimizer {
 	}
 
 	static final class SearchParams {
-		ValueExpr queryVar;
-		ValueExpr limitVar;
-		ValueExpr fuzzinessVar;
-		ValueExpr phraseSlopVar;
+		Var queryVar;
+		Var limitVar;
+		Var fuzzinessVar;
+		Var phraseSlopVar;
 		final List<MatchParams> matches = new ArrayList<>(1);
 		boolean invalid;
 

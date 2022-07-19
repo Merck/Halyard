@@ -74,6 +74,9 @@ public final class HALYARD implements Vocabulary {
 
     public final static IRI SEARCH = SVF.createIRI(NAMESPACE, "search");
 
+    public final static IRI DISTANCE = SVF.createIRI(NAMESPACE, "Distance");
+    public final static IRI WITHIN_DISTANCE = SVF.createIRI(NAMESPACE, "withinDistance");
+
     public final static IRI QUERY_CLASS = SVF.createIRI(NAMESPACE, "Query");
     public final static IRI QUERY_PROPERTY = SVF.createIRI(NAMESPACE, "query");
     public final static IRI LIMIT_PROPERTY = SVF.createIRI(NAMESPACE, "limit");
