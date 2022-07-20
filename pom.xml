@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.pulquero.halyard</groupId>
     <artifactId>halyard</artifactId>
-    <version>3.10</version>
+    <version>3.11-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Halyard-star</name>
     <description>A fork of Halyard with support for RDF-star</description>
@@ -29,7 +29,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <rdf4j.version>3.7.6</rdf4j.version>
+        <rdf4j.version>3.7.7</rdf4j.version>
         <hbase.version>2.4.12</hbase.version>
         <hadoop.version>3.2.2</hadoop.version>
         <jersey.version>2.25.1</jersey.version>
