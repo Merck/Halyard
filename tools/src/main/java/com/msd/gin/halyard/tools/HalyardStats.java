@@ -311,6 +311,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             setCounter += stmtCount;
             lastIndex = index;
             lastGraph = graph;
+            output.progress();
             if ((counter++ % 100000) == 0) {
                 output.setStatus(MessageFormat.format("reg:{0} {1} t:{2} s:{3} p:{4} o:{5} c:{6} r:{7}", index, counter, triples, distinctSubjects, properties, distinctObjects, classes, removed));
             }
