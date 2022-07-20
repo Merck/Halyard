@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -114,7 +115,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	/**
 	 * Performs a scan using any suitable index.
 	 */
-	public static final Scan scan(RDFIdentifier<? extends SPOC.S> s, RDFIdentifier<? extends SPOC.P> p, RDFIdentifier<? extends SPOC.O> o, RDFIdentifier<? extends SPOC.C> c, RDFFactory rdfFactory) {
+	public static final Scan scan(@Nonnull RDFIdentifier<? extends SPOC.S> s, @Nonnull RDFIdentifier<? extends SPOC.P> p, @Nonnull RDFIdentifier<? extends SPOC.O> o, @Nullable RDFIdentifier<? extends SPOC.C> c, @Nonnull RDFFactory rdfFactory) {
 		Scan scan;
 		if (c == null) {
 			int h = Math.floorMod(Objects.hash(s, p, o), 3);
@@ -146,6 +147,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 				default:
 					throw new AssertionError();
 			}
+			scan = HalyardTableUtils.scanSingle(scan);
 		}
 		return scan;
 	}

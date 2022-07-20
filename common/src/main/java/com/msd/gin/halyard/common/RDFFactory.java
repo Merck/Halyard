@@ -412,7 +412,7 @@ public class RDFFactory {
 			RDFIdentifier<SPOC.S> skey = createSubjectId(id(sid));
 			RDFIdentifier<SPOC.P> pkey = createPredicateId(id(pid));
 			RDFIdentifier<SPOC.O> okey = createObjectId(id(oid));
-			Scan scan = HalyardTableUtils.scanSingle(StatementIndex.scan(skey, pkey, okey, ckey, RDFFactory.this));
+			Scan scan = StatementIndex.scan(skey, pkey, okey, ckey, RDFFactory.this);
 			try {
 				Result result;
 				try (ResultScanner scanner = conn.getScanner(scan)) {
@@ -421,10 +421,10 @@ public class RDFFactory {
 				if (result == null) {
 					throw new IOException("Triple not found (no result)");
 				}
-				Cell[] cells = result.rawCells();
-				if (cells == null || cells.length == 0) {
+				if (result.isEmpty()) {
 					throw new IOException("Triple not found (no cells)");
 				}
+				Cell[] cells = result.rawCells();
 				Statement stmt = HalyardTableUtils.parseStatement(null, null, null, ckey, cells[0], valueReader, RDFFactory.this);
 				return valueReader.getValueFactory().createTriple(stmt.getSubject(), stmt.getPredicate(), stmt.getObject());
 			} catch (IOException ioe) {

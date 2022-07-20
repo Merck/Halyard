@@ -43,7 +43,6 @@ import org.apache.hadoop.hbase.KeepDeletedCells;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
-import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.ColumnFamilyDescriptor;
 import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Connection;
@@ -581,52 +580,20 @@ public final class HalyardTableUtils {
 
 	public static boolean hasSubject(KeyspaceConnection kc, Resource subj, RDFFactory rdfFactory) throws IOException {
 		Scan scan = scanSingle(rdfFactory.getSPOIndex().scan(rdfFactory.createSubject(subj)));
-		try (ResultScanner scanner = kc.getScanner(scan)) {
-			for (Result result : scanner) {
-				Cell[] cells = result.rawCells();
-				if(cells != null && cells.length > 0) {
-					return true;
-				}
-			}
-		}
-		return false;
+		return exists(kc, scan);
 	}
 	public static boolean hasSubject(KeyspaceConnection kc, Resource subj, Resource ctx, RDFFactory rdfFactory) throws IOException {
 		Scan scan = scanSingle(rdfFactory.getCSPOIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createSubject(subj)));
-		try (ResultScanner scanner = kc.getScanner(scan)) {
-			for (Result result : scanner) {
-				Cell[] cells = result.rawCells();
-				if(cells != null && cells.length > 0) {
-					return true;
-				}
-			}
-		}
-		return false;
+		return exists(kc, scan);
 	}
 
 	public static boolean hasObject(KeyspaceConnection kc, Value obj, RDFFactory rdfFactory) throws IOException {
 		Scan scan = scanSingle(rdfFactory.getOSPIndex().scan(rdfFactory.createObject(obj)));
-		try (ResultScanner scanner = kc.getScanner(scan)) {
-			for (Result result : scanner) {
-				Cell[] cells = result.rawCells();
-				if(cells != null && cells.length > 0) {
-					return true;
-				}
-			}
-		}
-		return false;
+		return exists(kc, scan);
 	}
 	public static boolean hasObject(KeyspaceConnection kc, Value obj, Resource ctx, RDFFactory rdfFactory) throws IOException {
 		Scan scan = scanSingle(rdfFactory.getCOSPIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createObject(obj)));
-		try (ResultScanner scanner = kc.getScanner(scan)) {
-			for (Result result : scanner) {
-				Cell[] cells = result.rawCells();
-				if(cells != null && cells.length > 0) {
-					return true;
-				}
-			}
-		}
-		return false;
+		return exists(kc, scan);
 	}
 
 	public static Resource getSubject(KeyspaceConnection kc, ValueIdentifier id, ValueFactory vf, RDFFactory rdfFactory) throws IOException {
@@ -634,8 +601,8 @@ public final class HalyardTableUtils {
 		Scan scan = scanSingle(rdfFactory.getSPOIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
-				Cell[] cells = result.rawCells();
-				if(cells != null && cells.length > 0) {
+				if(!result.isEmpty()) {
+					Cell[] cells = result.rawCells();
 					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, rdfFactory);
 					return stmt.getSubject();
 				}
@@ -649,8 +616,8 @@ public final class HalyardTableUtils {
 		Scan scan = scanSingle(rdfFactory.getPOSIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
-				Cell[] cells = result.rawCells();
-				if(cells != null && cells.length > 0) {
+				if(!result.isEmpty()) {
+					Cell[] cells = result.rawCells();
 					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, rdfFactory);
 					return stmt.getPredicate();
 				}
@@ -664,8 +631,8 @@ public final class HalyardTableUtils {
 		Scan scan = scanSingle(rdfFactory.getOSPIndex().scan(id));
 		try (ResultScanner scanner = kc.getScanner(scan)) {
 			for (Result result : scanner) {
-				Cell[] cells = result.rawCells();
-				if(cells != null && cells.length > 0) {
+				if(!result.isEmpty()) {
+					Cell[] cells = result.rawCells();
 					Statement stmt = parseStatement(null, null, null, null, cells[0], valueReader, rdfFactory);
 					return stmt.getObject();
 				}
@@ -678,6 +645,17 @@ public final class HalyardTableUtils {
 		return scan(scanAll.getStartRow(), scanAll.getStopRow(), 1, false)
 			.setFilter(new FilterList(scanAll.getFilter(), new FirstKeyOnlyFilter()))
 			.setOneRowLimit();
+	}
+
+	private static boolean exists(KeyspaceConnection kc, Scan scan) throws IOException {
+		try (ResultScanner scanner = kc.getScanner(scan)) {
+			for (Result result : scanner) {
+				if(!result.isEmpty()) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -694,8 +672,8 @@ public final class HalyardTableUtils {
     public static List<Statement> parseStatements(@Nullable RDFSubject subj, @Nullable RDFPredicate pred, @Nullable RDFObject obj, @Nullable RDFContext ctx, Result res, ValueIO.Reader valueReader, RDFFactory rdfFactory) {
     	// multiple triples may have the same hash (i.e. row key)
 		List<Statement> st;
-		Cell[] cells = res.rawCells();
-		if (cells != null && cells.length > 0) {
+		if (!res.isEmpty()) {
+			Cell[] cells = res.rawCells();
 			if (cells.length == 1) {
 				st = Collections.singletonList(parseStatement(subj, pred, obj, ctx, cells[0], valueReader, rdfFactory));
 			} else {
