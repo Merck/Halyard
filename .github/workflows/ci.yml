@@ -27,3 +27,11 @@ jobs:
 
     - name: Upload code coverage
       uses: codecov/codecov-action@v2
+
+    - name: Release zips
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          sdk/target/halyard-sdk-*.zip
+          webapps/target/rdf4j-*.war
