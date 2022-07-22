@@ -45,6 +45,7 @@ public final class HalyardMain {
                 new HalyardElasticIndexer(),
                 new HalyardUpdate(),
                 new HalyardBulkUpdate(),
+                new HalyardSingleBulkUpdate(),
                 new HalyardExport(),
                 new HalyardBulkExport(),
                 new HalyardBulkDelete(),
@@ -70,8 +71,11 @@ public final class HalyardMain {
                 HelpFormatter hf = new HelpFormatter();
                 hf.printWrapped(pw, 100, "usage: halyard [ -h | -v | <command> [<genericHadoopOptions>] [-h] ...]");
                 hf.printWrapped(pw, 100, "\ncommands are:\n----------------------------------------------------------------------------------------------------");
+                int spaceCount = 17;
+                char[] spaces = new char[spaceCount];
+                Arrays.fill(spaces, ' ');
                 for (AbstractHalyardTool tool : tools) {
-                    hf.printWrapped(pw, 100, 11, tool.name + "           ".substring(tool.name.length()) + tool.header);
+                    hf.printWrapped(pw, 100, spaceCount, tool.name + new String(spaces, tool.name.length(), spaces.length-tool.name.length()) + tool.header);
                 }
                 hf.printWrapped(pw, 100, 0, "\ngenericHadoopOptions are:\n----------------------------------------------------------------------------------------------------");
                 hf.printWrapped(pw, 100, 45, "-conf <configuration file>                   specify an application configuration file");

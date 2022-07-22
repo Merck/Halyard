@@ -45,12 +45,14 @@ public final class HalyardUpdate extends AbstractHalyardTool {
 
 
     public int run(CommandLine cmd) throws Exception {
+        String source = cmd.getOptionValue('s');
+        String query = cmd.getOptionValue('q');
     	String elasticIndexURL = cmd.getOptionValue('i');
-		SailRepository rep = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null));
+		SailRepository rep = new SailRepository(new HBaseSail(getConf(), source, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null));
         rep.init();
         try {
         	try(RepositoryConnection conn = rep.getConnection()) {
-	            Update u = conn.prepareUpdate(QueryLanguage.SPARQL, cmd.getOptionValue('q'));
+	            Update u = conn.prepareUpdate(QueryLanguage.SPARQL, query);
 	            LOG.info("Update execution started");
 	            u.execute();
 	            LOG.info("Update finished");

@@ -90,8 +90,8 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
      * Full URI of a custom SPARQL function to decimate parallel evaluation based on Mapper index
      */
     public static final String DECIMATE_FUNCTION_URI = HALYARD.NAMESPACE + DECIMATE_FUNCTION_NAME;
-    private static final String TABLE_NAME_PROPERTY = "halyard.table.name";
-    private static final String STAGE_PROPERTY = "halyard.update.stage";
+    static final String TABLE_NAME_PROPERTY = "halyard.table.name";
+    static final String STAGE_PROPERTY = "halyard.update.stage";
 
     enum Counters {
 		ADDED_KVS,
@@ -214,7 +214,8 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
             }
         }
     }
-   public HalyardBulkUpdate() {
+
+    public HalyardBulkUpdate() {
         super(
             "bulkupdate",
             "Halyard Bulk Update is a MapReduce application that executes multiple SPARQL Update operations in parallel in the Mapper phase. "
@@ -283,7 +284,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
     				BulkLoadHFiles.create(getConf()).bulkLoad(hTable.getName(), outPath);
                     LOG.info("Stage #{} of {} completed.", stage, stages);
                 } else {
-            		LOG.error("Stage #{} of {} failed to complete.");
+            		LOG.error("Stage #{} of {} failed to complete.", stage, stages);
                     return -1;
                 }
             }

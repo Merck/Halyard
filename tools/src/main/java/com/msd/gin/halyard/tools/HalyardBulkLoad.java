@@ -698,7 +698,8 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 			HFileOutputFormat2.configureIncrementalLoad(job, hTable.getDescriptor(), regionLocator);
             FileInputFormat.setInputDirRecursive(job, true);
             FileInputFormat.setInputPaths(job, sourcePaths);
-            FileOutputFormat.setOutputPath(job, new Path(workdir));
+            Path outPath = new Path(workdir);
+            FileOutputFormat.setOutputPath(job, outPath);
             TableMapReduceUtil.addDependencyJars(job);
             TableMapReduceUtil.initCredentials(job);
             if (job.waitForCompletion(true)) {
@@ -706,7 +707,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
 					HalyardTableUtils.clearTriples(conn, tableName);
 					hTable.close();
                 }
-				BulkLoadHFiles.create(getConf()).bulkLoad(tableName, new Path(workdir));
+				BulkLoadHFiles.create(getConf()).bulkLoad(tableName, outPath);
                 LOG.info("Bulk Load completed.");
                 return 0;
             } else {
