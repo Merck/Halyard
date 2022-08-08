@@ -34,6 +34,7 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.XSD;
@@ -150,9 +151,6 @@ public class HalyardSummaryTest extends AbstractHalyardToolTest {
 
         try (BufferedReader in = new BufferedReader(new FileReader(summary))) {
             Model model = Rio.parse(in, "http://whatever/", RDFFormat.TRIG);
-//            model.forEach((Statement t) -> {
-//                System.out.println(t);
-//            });
             model = model.filter(null, null, null, namedGraph);
             for (Map.Entry<IRI, Integer> me : classCardinalities.entrySet()) {
                 assertStatement(me.getKey(), RDF.TYPE, HalyardSummary.cardinalityIRI("Class", HalyardSummary.toCardinality(me.getValue())), model);
@@ -175,8 +173,12 @@ public class HalyardSummaryTest extends AbstractHalyardToolTest {
         }
     }
 
+    private String toString(Model model) {
+        return model.stream().map(Statement::toString).reduce((x, y) -> x+"\n"+y).get();
+    }
+
     private void assertStatement(Resource subj, IRI pred, IRI obj, Model model) {
-        assertTrue("required: <" + subj + "> <" + pred + "> <" + obj + ">", model.contains(subj, pred, obj));
+        assertTrue("required: <" + subj + "> <" + pred + "> <" + obj + ">, but has:\n"+toString(model), model.contains(subj, pred, obj));
     }
 
     private void assertJoins(IRI pred1, IRI obj1, IRI pred2, IRI obj2, IRI pred3, IRI obj3, Model model) {
@@ -185,6 +187,6 @@ public class HalyardSummaryTest extends AbstractHalyardToolTest {
                 return;
             }
         }
-        fail("required: [] <" + pred1 + "> <" + obj1 + ">; <" + pred2 + "> <" + obj2 + ">; <" + pred3 + "> <" + obj3 + ">");
+        fail("required: [] <" + pred1 + "> <" + obj1 + ">; <" + pred2 + "> <" + obj2 + ">; <" + pred3 + "> <" + obj3 + ">, but has:\n"+toString(model));
     }
 }

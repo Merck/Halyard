@@ -176,7 +176,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 + "A Halyard repository configured with such supplementary ElasticSearch index can then provide more advanced text search features over the indexed literals.",
             "Default index configuration is:\n"
             + getMappingConfig("\u00A0", "2*<num_of_region_servers>", "1", null)
-            + "Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index"
+            + "Example: halyard esindex -s my_dataset -t http://my_elastic.my.org:9200/my_index [-g 'http://whatever/graph']"
         );
         addOption("s", "source-dataset", "dataset_table", SOURCE_NAME_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-index", "target_url", INDEX_URL_PROPERTY, "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
@@ -225,7 +225,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         configureString(cmd, 'u', null);
         configureBoolean(cmd, 'c');
         configureString(cmd, 'a', null);
-        configureString(cmd, 'g', null);
+        configureIRI(cmd, 'g', null);
         String source = getConf().get(SOURCE_NAME_PROPERTY);
         String target = getConf().get(INDEX_URL_PROPERTY);
         URL targetUrl = new URL(target);
@@ -325,7 +325,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         Scan scan;
         if (namedGraph != null) {
             //scan only given named graph from COSP literal region(s)
-        	Resource graph = NTriplesUtil.parseResource(namedGraph, SimpleValueFactory.getInstance());
+        	Resource graph = SimpleValueFactory.getInstance().createIRI(namedGraph);
         	scan = StatementIndex.scanLiterals(graph, rdfFactory);
         } else {
             //scan OSP literal region(s)

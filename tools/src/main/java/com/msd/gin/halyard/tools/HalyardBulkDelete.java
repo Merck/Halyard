@@ -63,6 +63,7 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
@@ -75,6 +76,7 @@ import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
  */
 public final class HalyardBulkDelete extends AbstractHalyardTool {
 	static final String DEFAULT_GRAPH_KEYWORD = "DEFAULT";
+	private static final String TOOL_NAME = "bulkdelete";
     private static final String SOURCE = "halyard.delete.source";
     private static final String SNAPSHOT_PATH = "halyard.delete.snapshot";
     private static final String SUBJECT = "halyard.delete.subject";
@@ -108,7 +110,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
             htimestamp = HalyardTableUtils.toHalyardTimestamp(conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis()), false);
             String s = conf.get(SUBJECT);
             if (s != null) {
-                subj = NTriplesUtil.parseResource(s, vf);
+                subj = NTriplesUtil.parseURI(s, vf);
             }
             String p = conf.get(PREDICATE);
             if (p != null) {
@@ -125,7 +127,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
                     if (DEFAULT_GRAPH_KEYWORD.equals(c)) {
                         ctxs.add(null);
                     } else {
-                        ctxs.add(NTriplesUtil.parseResource(c, vf));
+                        ctxs.add(NTriplesUtil.parseURI(c, vf));
                     }
                 }
             }
@@ -183,7 +185,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
 
     public HalyardBulkDelete() {
         super(
-            "bulkdelete",
+            TOOL_NAME,
             "Halyard Bulk Delete is a MapReduce application that effectively deletes large set of triples or whole named graphs, based on specified statement pattern and/or named graph(s).",
             "Example: halyard bulkdelete -t my_data -w bulkdelete_temp1 -s <http://whatever/mysubj> -g <http://whatever/mygraph1> -g <http://whatever/mygraph2>"
         );
@@ -216,16 +218,16 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         	getConf().set(SNAPSHOT_PATH, cmd.getOptionValue('u'));
         }
         if (cmd.hasOption('s')) {
-        	getConf().set(SUBJECT, cmd.getOptionValue('s'));
+        	getConf().set(SUBJECT, validateSubject(cmd.getOptionValue('s')));
         }
         if (cmd.hasOption('p')) {
-        	getConf().set(PREDICATE, cmd.getOptionValue('p'));
+        	getConf().set(PREDICATE, validatePredicate(cmd.getOptionValue('p')));
         }
         if (cmd.hasOption('o')) {
-        	getConf().set(OBJECT, cmd.getOptionValue('o'));
+        	getConf().set(OBJECT, validateObject(cmd.getOptionValue('o')));
         }
         if (cmd.hasOption('g')) {
-        	getConf().setStrings(CONTEXTS, cmd.getOptionValues('g'));
+        	getConf().setStrings(CONTEXTS, validateContexts(cmd.getOptionValues('g')));
         }
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
             NTriplesUtil.class,
@@ -317,5 +319,32 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
         }
         LOG.info("Bulk Delete completed.");
         return 0;
+    }
+
+    private String validateIRI(String s) {
+		NTriplesUtil.parseURI(s, SimpleValueFactory.getInstance());
+		return s;
+    }
+
+    private String validateSubject(String s) {
+    	return validateIRI(s);
+    }
+
+    private String validatePredicate(String s) {
+    	return validateIRI(s);
+    }
+
+    private String validateObject(String s) {
+		NTriplesUtil.parseValue(s, SimpleValueFactory.getInstance());
+		return s;
+    }
+
+    private String[] validateContexts(String... s) {
+    	for (String c : s) {
+    		if (!DEFAULT_GRAPH_KEYWORD.equals(c)) {
+    			validateIRI(c);
+    		}
+    	}
+    	return s;
     }
 }

@@ -470,7 +470,14 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                     }
                     parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
                     if (defaultRdfContextPattern != null || overrideRdfContext) {
-                        IRI defaultRdfContext = (defaultRdfContextPattern == null) ? null : valueFactory.createIRI(MessageFormat.format(defaultRdfContextPattern, localBaseUri, file.toUri().getPath(), file.getName()));
+                        IRI defaultRdfContext;
+                        if (defaultRdfContextPattern != null) {
+                            String context = MessageFormat.format(defaultRdfContextPattern, localBaseUri, file.toUri().getPath(), file.getName());
+                            validateIRIs(context);
+                            defaultRdfContext = valueFactory.createIRI(context);
+                        } else {
+                            defaultRdfContext = null;
+                        }
                         valueFactory.setDefaultContext(defaultRdfContext, overrideRdfContext);
                     }
                     parser.setValueFactory(valueFactory);
@@ -648,7 +655,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                 + "* Bzip2 (.bz2)\n"
                 + "* LZO (.lzo)\n"
                 + "* Snappy (.snappy)\n"
-                + "Example: halyard bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t mydataset"
+                + "Example: halyard bulkload -s hdfs://my_RDF_files -w hdfs:///my_tmp_workdir -t mydataset [-g 'http://whatever/graph']"
         );
         addOption("s", "source", "source_paths", SOURCE_PATHS_PROPERTY, "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
@@ -672,7 +679,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         configureBoolean(cmd, 'd');
         configureBoolean(cmd, 'r');
         configureInt(cmd, 'b', DEFAULT_SPLIT_BITS);
-        configureString(cmd, 'g', null);
+        configureIRIPattern(cmd, 'g', null);
         configureBoolean(cmd, 'o');
         configureLong(cmd, 'e', System.currentTimeMillis());
         configureLong(cmd, 'm', DEFAULT_SPLIT_MAXSIZE);

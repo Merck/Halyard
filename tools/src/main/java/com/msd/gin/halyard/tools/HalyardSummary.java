@@ -89,7 +89,7 @@ import org.eclipse.rdf4j.sail.SailException;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardSummary extends AbstractHalyardTool {
-
+	private static final String TOOL_NAME = "summary";
 
     enum SummaryType {
         ClassSummary, PredicateSummary, DomainSummary, RangeSummary, DomainAndRangeSummary;
@@ -100,10 +100,8 @@ public final class HalyardSummary extends AbstractHalyardTool {
     private static final IRI CARDINALITY = SVF.createIRI(NAMESPACE, "cardinality");
 
     private static final String FILTER_NAMESPACE_PREFIX = "http://merck.github.io/Halyard/";
-    private static final String SOURCE = "halyard.summary.source";
-    private static final String SNAPSHOT_PATH = "halyard.summary.snapshot";
     private static final String TARGET = "halyard.summary.target";
-    private static final String TARGET_GRAPH = "halyard.summary.target.graph";
+	private static final String TARGET_GRAPH_PROPERTY = confProperty(TOOL_NAME, "target-graph");
     private static final String DECIMATION_FACTOR = "halyard.summary.decimation";
     private static final int DEFAULT_DECIMATION_FACTOR = 100;
 
@@ -126,7 +124,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
-            openKeyspace(conf, conf.get(SOURCE), conf.get(SNAPSHOT_PATH));
+            openKeyspace(conf, conf.get(SOURCE_NAME_PROPERTY), conf.get(SNAPSHOT_PATH_PROPERTY));
         }
 
         private Set<IRI> queryForClasses(Value instance) throws IOException {
@@ -304,10 +302,10 @@ public final class HalyardSummary extends AbstractHalyardTool {
             this.conf = context.getConfiguration();
             this.splitOutput = conf.get(TARGET).contains("{0}");
             this.outputLimit = conf.getLong("mapreduce.input.fileinputformat.split.maxsize", Long.MAX_VALUE);
-            String ng = conf.get(TARGET_GRAPH);
+            String ng = conf.get(TARGET_GRAPH_PROPERTY);
             this.namedGraph = ng == null ? null : SVF.createIRI(ng);
             this.decimationFactor = conf.getInt(DECIMATION_FACTOR, DEFAULT_DECIMATION_FACTOR);
-            sail = new HBaseSail(conf, conf.get(SOURCE), false, 0, true, 0, null, null);
+            sail = new HBaseSail(conf, conf.get(SOURCE_NAME_PROPERTY), false, 0, true, 0, null, null);
             sail.initialize();
 			conn = sail.getConnection();
             setupOutput();
@@ -472,20 +470,26 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
     public HalyardSummary() {
         super(
-            "summary",
+            TOOL_NAME,
             "Halyard Summary is an experimental MapReduce application that calculates dataset approximate summary in a form of self-described synthetic RDF schema and exports it into a file.",
-            "Example: halyard summary -s my_dataset -g http://my_dataset_summary -t hdfs:/my_folder/my_dataset_summary-{0}.nq.gz");
-        addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
-        addOption("t", "target-file", "target_url", "Target file to export the summary (instead of update) hdfs://<path>/<file_name>{0}.<RDF_ext>[.<compression>], usage of {0} pattern is optional and it will split output into multiple files for large summaries.", true, true);
-        addOption("g", "summary-named-graph", "target_graph", "Optional target named graph of the exported graph summary", false, true);
-        addOption("d", "decimation-factor", "decimation_factor", "Optionally overide summary random decimation factor (default is " + DEFAULT_DECIMATION_FACTOR + ")", false, true);
-        addOption("u", "restore-dir", "restore_folder", "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
+            "Example: halyard summary -s my_dataset [-g 'http://my_dataset_summary'] -t hdfs:/my_folder/my_dataset_summary-{0}.nq.gz");
+        addOption("s", "source-dataset", "dataset_table", SOURCE_NAME_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
+        addOption("t", "target-file", "target_url", TARGET, "Target file to export the summary, e.g. hdfs://<path>/<file_name>{0}.<RDF_ext>[.<compression>], usage of {0} pattern is optional and it will split output into multiple files for large summaries.", true, true);
+        addOption("g", "summary-named-graph", "target_graph", TARGET_GRAPH_PROPERTY, "Optional target named graph of the exported graph summary", false, true);
+        addOption("d", "decimation-factor", "decimation_factor", DECIMATION_FACTOR, "Optionally overide summary random decimation factor (default is " + DEFAULT_DECIMATION_FACTOR + ")", false, true);
+        addOption("u", "restore-dir", "restore_folder", SNAPSHOT_PATH_PROPERTY, "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
     }
 
     @Override
     public int run(CommandLine cmd) throws Exception {
-        String source = cmd.getOptionValue('s');
+        configureString(cmd, 's', null);
+        configureString(cmd, 't', null);
+        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
+        configureIRI(cmd, 'g', null);
+        configureString(cmd, 'u', null);
+        String source = getConf().get(SOURCE_NAME_PROPERTY);
         String target = cmd.getOptionValue('t');
+        String snapshotPath = getConf().get(SNAPSHOT_PATH_PROPERTY);
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                Rio.class,
                AbstractRDFHandler.class,
@@ -495,23 +499,12 @@ public final class HalyardSummary extends AbstractHalyardTool {
                HBaseConfiguration.class,
                AuthenticationProtos.class);
         HBaseConfiguration.addHbaseResources(getConf());
-        Job job = Job.getInstance(getConf(), "HalyardSummary " + source + (target == null ? " update" : " -> " + target));
-        job.getConfiguration().set(SOURCE, source);
-        if (cmd.hasOption('u')) {
+        Job job = Job.getInstance(getConf(), "HalyardSummary " + source + " -> " + target);
+        if (snapshotPath != null) {
 			FileSystem fs = CommonFSUtils.getRootDirFileSystem(getConf());
-        	if (fs.exists(new Path(cmd.getOptionValue('u')))) {
+        	if (fs.exists(new Path(snapshotPath))) {
         		throw new IOException("Snapshot restore directory already exists");
         	}
-            job.getConfiguration().set(SNAPSHOT_PATH, cmd.getOptionValue('u'));
-        }
-        if (target != null) {
-            job.getConfiguration().set(TARGET, target);
-        }
-        if (cmd.hasOption('g')) {
-            job.getConfiguration().set(TARGET_GRAPH, cmd.getOptionValue('g'));
-        }
-        if (cmd.hasOption('d')) {
-            job.getConfiguration().setInt(DECIMATION_FACTOR, Integer.parseInt(cmd.getOptionValue('d')));
         }
         job.setJarByClass(HalyardSummary.class);
         TableMapReduceUtil.initCredentials(job);

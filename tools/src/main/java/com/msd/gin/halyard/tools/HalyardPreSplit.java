@@ -176,7 +176,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
                 + "For very large datasets it is wise to calculate the pre-splits before the HBase table is created to allow more efficient following Bulk Load process of the data. "
                 + "Optional definition or override of the named graph should be specified exactly the same as for the following Bulk Load process so the region presplits estimations are precise.\n"
                 + "Halyard PreSplit consumes the same RDF data sources as Halyard Bulk Load.",
-            "Example: halyard presplit -s hdfs://my_RDF_files -t mydataset"
+            "Example: halyard presplit -s hdfs://my_RDF_files -t mydataset [-g 'http://whatever/graph']"
         );
         addOption("s", "source", "source_paths", SOURCE_PATHS_PROPERTY, "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, optional HBase namespace of the target table must already exist", true, true);
@@ -205,7 +205,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 	        }
         }
         configureBoolean(cmd, 'i');
-        configureString(cmd, 'g', null);
+        configureIRIPattern(cmd, 'g', null);
         configureBoolean(cmd, 'o');
         configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
         configureLong(cmd, 'l', DEFAULT_SPLIT_LIMIT);

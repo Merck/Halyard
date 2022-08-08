@@ -164,7 +164,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             update = conf.get(TARGET) == null;
             threshold = conf.getLong(THRESHOLD, DEFAULT_THRESHOLD);
             ValueFactory vf = IdValueFactory.INSTANCE;
-            statsContext = vf.createIRI(conf.get(STATS_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
+            statsContext = vf.createIRI(conf.get(STATS_GRAPH));
             String gc = conf.get(NAMED_GRAPH_PROPERTY);
             if (gc != null) {
             	graphContext = vf.createIRI(gc);
@@ -419,7 +419,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             Configuration conf = context.getConfiguration();
             openKeyspace(conf, conf.get(SOURCE_NAME_PROPERTY), conf.get(SNAPSHOT_PATH_PROPERTY));
             vf = IdValueFactory.INSTANCE;
-            statsGraphContext = vf.createIRI(conf.get(STATS_GRAPH, HALYARD.STATS_GRAPH_CONTEXT.stringValue()));
+            statsGraphContext = vf.createIRI(conf.get(STATS_GRAPH));
             String targetUrl = conf.get(TARGET);
             if (targetUrl == null) {
                 sail = new HBaseSail(conf, conf.get(SOURCE_NAME_PROPERTY), false, 0, true, 0, null, null);
@@ -566,8 +566,8 @@ public final class HalyardStats extends AbstractHalyardTool {
     	}
         configureString(cmd, 's', null);
         configureString(cmd, 't', null);
-        configureString(cmd, 'g', null);
-        configureString(cmd, 'o', null);
+        configureIRI(cmd, 'g', null);
+        configureIRI(cmd, 'o', HALYARD.STATS_GRAPH_CONTEXT.stringValue());
         configureString(cmd, 'u', null);
         configureLong(cmd, 'r', DEFAULT_THRESHOLD);
         String source = getConf().get(SOURCE_NAME_PROPERTY);

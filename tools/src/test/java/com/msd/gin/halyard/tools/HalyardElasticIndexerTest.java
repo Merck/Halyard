@@ -238,7 +238,7 @@ public class HalyardElasticIndexerTest extends AbstractHalyardToolTest {
             System.setProperty("exclude.es-hadoop", "true");
             int serverPort = server.getAddress().getPort();
             String indexUrl = "http://localhost:" + serverPort + INDEX_PATH;
-            String[] cmdLineArgs = namedGraphOnly ? new String[]{"-s", "elasticTable", "-t", indexUrl, "-c", "-g", "<http://whatever/graph#1>"}
+            String[] cmdLineArgs = namedGraphOnly ? new String[]{"-s", "elasticTable", "-t", indexUrl, "-c", "-g", "http://whatever/graph#1"}
             : new String[]{"-s", "elasticTable", "-t", indexUrl, "-c"};
             int rc = run(cmdLineArgs);
             assertEquals(0, rc);

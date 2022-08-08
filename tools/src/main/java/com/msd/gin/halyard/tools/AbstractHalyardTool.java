@@ -25,6 +25,8 @@ import com.msd.gin.halyard.common.ValueIO;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -104,6 +106,33 @@ public abstract class AbstractHalyardTool implements Tool {
     @Override
     public final void setConf(final Configuration c) {
         this.conf = c;
+    }
+
+    protected static String[] validateIRIs(String... iris) throws ParseException {
+    	for (String iri : iris) {
+    		try {
+				new URI(iri).isAbsolute();
+			} catch (URISyntaxException e) {
+				throw (ParseException) new ParseException("Invalid IRI: "+iri).initCause(e);
+			}
+    	}
+    	return iris;
+    }
+
+    protected void configureIRI(CommandLine cmd, char opt, String defaultValue) throws ParseException {
+    	OrderedOption option = (OrderedOption) options.getOption(Character.toString(opt));
+    	// command line args always override
+    	if (cmd.hasOption(opt)) {
+    		String value = cmd.getOptionValue(opt);
+    		validateIRIs(value);
+    		conf.set(option.confProperty, value);
+    	} else if (defaultValue != null) {
+    		conf.setIfUnset(option.confProperty, String.valueOf(defaultValue));
+    	}
+    }
+
+    protected void configureIRIPattern(CommandLine cmd, char opt, String defaultValue) throws ParseException {
+    	configureString(cmd, opt, defaultValue);
     }
 
     protected void configureString(CommandLine cmd, char opt, String defaultValue) {
