@@ -155,9 +155,12 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 									} catch (InterruptedException ex) {
 										throw new IOException(ex);
 									}
-									if (addedKvs.incrementAndGet() % 1000l == 0) {
-										context.setStatus(name + " - " + addedKvs.get() + " added " + removedKvs.get() + " removed");
-										LOG.info("{} KeyValues added and {} removed", addedKvs.get(), removedKvs.get());
+									long added = addedKvs.incrementAndGet();
+									if (added % 1000l == 0) {
+										context.getCounter(Counters.ADDED_KVS).setValue(added);
+										long removed = removedKvs.get();
+										context.setStatus(name + " - " + added + " added " + removed + " removed");
+										LOG.info("{} KeyValues added and {} removed", added, removed);
 									}
 								}
 
@@ -169,9 +172,12 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 									} catch (InterruptedException ex) {
 										throw new IOException(ex);
 									}
-									if (removedKvs.incrementAndGet() % 1000l == 0) {
-										context.setStatus(name + " - " + addedKvs.get() + " added " + removedKvs.get() + " removed");
-										LOG.info("{} KeyValues added and {} removed", addedKvs.get(), removedKvs.get());
+									long removed = removedKvs.incrementAndGet();
+									if (removed % 1000l == 0) {
+										context.getCounter(Counters.REMOVED_KVS).setValue(removed);
+										long added = addedKvs.get();
+										context.setStatus(name + " - " + added + " added " + removed + " removed");
+										LOG.info("{} KeyValues added and {} removed", added, removed);
 									}
 								}
 
@@ -208,8 +214,6 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                     FunctionRegistry.getInstance().remove(fn);
                 }
                 context.setStatus(name + " - " + addedKvs.get() + " added " + removedKvs.get() + " removed");
-                context.getCounter(Counters.ADDED_KVS).increment(addedKvs.get());
-                context.getCounter(Counters.REMOVED_KVS).increment(removedKvs.get());
                 LOG.info("Query finished with {} KeyValues added and {} removed", addedKvs.get(), removedKvs.get());
             }
         }
