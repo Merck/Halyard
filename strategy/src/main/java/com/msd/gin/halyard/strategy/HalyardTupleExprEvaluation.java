@@ -186,7 +186,7 @@ final class HalyardTupleExprEvaluation {
      * @return an iteration of binding sets
      */
     CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) {
-    	return HalyardEvaluationExecutor.pushAndPull(pipe -> evaluateTupleExpr(pipe, expr, bindings), expr);
+    	return HalyardEvaluationExecutor.pushAndPull(pipe -> evaluateTupleExpr(pipe, expr, bindings), expr, parentStrategy);
     }
 
     /**
@@ -470,7 +470,7 @@ final class HalyardTupleExprEvaluation {
 
                 return result;
             }
-		}, sp);
+		}, sp, parentStrategy);
     }
 
     private boolean isUnbound(Var var, BindingSet bindings) {
@@ -637,7 +637,7 @@ final class HalyardTupleExprEvaluation {
 
 			};
 		} // else standard reification iteration
-    	pullAndPushAsync(parent, results, ref);
+    	pullAndPushAsync(parent, results, ref, parentStrategy);
 	}
 
     /**
@@ -826,7 +826,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateDescribeOperator(BindingSetPipe parent, DescribeOperator operator, BindingSet bindings) {
 		pullAndPushAsync(parent, new DescribeIteration(evaluate(operator.getArg(), bindings), parentStrategy,
-				operator.getBindingNames(), bindings), operator);
+				operator.getBindingNames(), bindings), operator, parentStrategy);
     }
 
     /**
@@ -1312,7 +1312,7 @@ final class HalyardTupleExprEvaluation {
                 }
                 // otherwise: perform a SELECT query
                 CloseableIteration<BindingSet, QueryEvaluationException> result = fs.select(service, freeVars, bindings, baseUri);
-				pullAndPushAsync(parent, service.isSilent() ? new SilentIteration<>(result) : result, service);
+				pullAndPushAsync(parent, service.isSilent() ? new SilentIteration<>(result) : result, service, parentStrategy);
             } catch (QueryEvaluationException e) {
                 // suppress exceptions if silent
                 if (service.isSilent()) {
@@ -1369,7 +1369,7 @@ final class HalyardTupleExprEvaluation {
     	if (isOutOfScopeForLeftArgBindings(join.getRightArg())) {
             //re-writing this to push model is a bit more complex task
             try {
-    			pullAndPushAsync(topPipe, new HashJoinIteration(parentStrategy, join, bindings), join);
+    			pullAndPushAsync(topPipe, new HashJoinIteration(parentStrategy, join, bindings), join, parentStrategy);
             } catch (QueryEvaluationException e) {
             	topPipe.handleException(e);
             }
@@ -1426,7 +1426,7 @@ final class HalyardTupleExprEvaluation {
     	if (TupleExprs.containsSubquery(leftJoin.getRightArg())) {
             //re-writing this to push model is a bit more complex task
             try {
-    			pullAndPushAsync(parentPipe, new HashJoinIteration(parentStrategy, leftJoin, bindings), leftJoin);
+    			pullAndPushAsync(parentPipe, new HashJoinIteration(parentStrategy, leftJoin, bindings), leftJoin, parentStrategy);
             } catch (QueryEvaluationException e) {
             	parentPipe.handleException(e);
             }
@@ -1719,7 +1719,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateExternalSet(BindingSetPipe parent, ExternalSet externalSet, BindingSet bindings) {
         try {
-			pullAndPushAsync(parent, externalSet.evaluate(bindings), externalSet);
+			pullAndPushAsync(parent, externalSet.evaluate(bindings), externalSet, parentStrategy);
         } catch (QueryEvaluationException e) {
             parent.handleException(e);
         }
@@ -1746,7 +1746,7 @@ final class HalyardTupleExprEvaluation {
         //temporary solution using copy of the original iterator
         //re-writing this to push model is a bit more complex task
 		pullAndPushAsync(parent,
-				new ZeroLengthPathIteration(parentStrategy, subjectVar, objVar, subj, obj, contextVar, bindings), zlp);
+				new ZeroLengthPathIteration(parentStrategy, subjectVar, objVar, subj, obj, contextVar, bindings), zlp, parentStrategy);
     }
 
     /**
@@ -1776,7 +1776,7 @@ final class HalyardTupleExprEvaluation {
                     return parentStrategy.evaluate(expr, bindings);
                 }
 
-            }, scope, subjectVar, pathExpression, objVar, contextVar, minLength, bindings), alp);
+            }, scope, subjectVar, pathExpression, objVar, contextVar, minLength, bindings), alp, parentStrategy);
         } catch (QueryEvaluationException e) {
             parent.handleException(e);
         }
@@ -1791,7 +1791,7 @@ final class HalyardTupleExprEvaluation {
     private void evaluateBindingSetAssignment(BindingSetPipe parent, BindingSetAssignment bsa, BindingSet bindings) {
         final Iterator<BindingSet> iter = bsa.getBindingSets().iterator();
         if (bindings.size() == 0) { // empty binding set
-			pullAndPush(parent, new CloseableIteratorIteration<>(iter));
+			pullAndPush(parent, new CloseableIteratorIteration<>(iter), bsa, parentStrategy);
         } else {
             final QueryBindingSet b = new QueryBindingSet(bindings);
 			pullAndPush(parent, new LookAheadIteration<BindingSet, QueryEvaluationException>() {
@@ -1829,7 +1829,7 @@ final class HalyardTupleExprEvaluation {
                     }
                     return result;
                 }
-            });
+            }, bsa, parentStrategy);
         }
     }
 
@@ -1860,7 +1860,7 @@ final class HalyardTupleExprEvaluation {
 			} finally {
 				queryContext.end();
 			}
-			pullAndPushAsync(parent, new QueryContextIteration(iter, queryContext), tfc);
+			pullAndPushAsync(parent, new QueryContextIteration(iter, queryContext), tfc, parentStrategy);
 		} catch (ValueExprEvaluationException veee) {
 			// can't evaluate arguments
             parent.empty();

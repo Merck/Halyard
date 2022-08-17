@@ -21,6 +21,8 @@ import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.Config;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadFactory;
@@ -37,14 +39,19 @@ import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.Service;
+import org.eclipse.rdf4j.query.algebra.TupleExpr;
+import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 final class HalyardEvaluationExecutor {
+	private static final Logger LOGGER = LoggerFactory.getLogger(HalyardEvaluationExecutor.class);
 
     private static final int THREADS = Config.getInteger("halyard.evaluation.threads", 20);
     private static final int MAX_RETRIES = Config.getInteger("halyard.evaluation.maxRetries", 3);
-    private static final int THREAD_GAIN = Config.getInteger("halyard.evaluation.threadGain", 2);
+    private static final int THREAD_GAIN = Config.getInteger("halyard.evaluation.threadGain", 5);
     private static final int MAX_THREADS = Config.getInteger("halyard.evaluation.maxThreads", 100);
 
     private static ThreadPoolExecutor createExecutor(String groupName, String namePrefix) {
@@ -55,7 +62,39 @@ final class HalyardEvaluationExecutor {
         	thr.setDaemon(true);
         	return thr;
         };
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(THREADS, THREADS, 60L, TimeUnit.SECONDS, new PriorityBlockingQueue<>(64), tf);
+        // fixed-size thread pool that can wind down when idle
+		ThreadPoolExecutor executor = new ThreadPoolExecutor(THREADS, THREADS, 60L, TimeUnit.SECONDS, new PriorityBlockingQueue<>(64), tf) {
+			private final ConcurrentHashMap<Thread, Runnable> runningTasks = new ConcurrentHashMap<>(THREADS);
+
+			@Override
+			protected void beforeExecute(Thread t, Runnable r) {
+				runningTasks.put(t, r);
+			}
+
+			@Override
+			protected void afterExecute(Runnable r, Throwable t) {
+				runningTasks.remove(Thread.currentThread());
+			}
+
+			@Override
+			public String toString() {
+				String s = super.toString();
+				StringBuilder fullDetails = new StringBuilder(s);
+				fullDetails.append("\nThreads:\n");
+				for (Map.Entry<Thread, Runnable> entry : runningTasks.entrySet()) {
+					Thread t = entry.getKey();
+					Runnable r = entry.getValue();
+					fullDetails.append("  ").append(t.getName())
+						.append('[').append(t.getState()).append("]: ")
+						.append(r.toString()).append('\n');
+				}
+				fullDetails.append("\nQueue:\n");
+				for (Runnable r : getQueue()) {
+					fullDetails.append(r.toString()).append('\n');
+				}
+				return fullDetails.toString();
+			}
+        };
         executor.allowCoreThreadTimeOut(true);
         return executor;
     }
@@ -65,21 +104,30 @@ final class HalyardEvaluationExecutor {
 
     private static volatile long previousCompletedTaskCount;
 
-    private static boolean checkThreads(int retries) {
-    	boolean resetRetries;
+	private static boolean checkThreads(int retries) {
+		boolean resetRetries;
+		final int maxPoolSize = EXECUTOR.getMaximumPoolSize();
 		// if we've been consistently blocked and are at full capacity
-		if (retries > MAX_RETRIES && EXECUTOR.getActiveCount() == EXECUTOR.getMaximumPoolSize()) {
+		if (retries > MAX_RETRIES && EXECUTOR.getActiveCount() >= maxPoolSize) {
 			// if we are not blocked overall then don't worry about it - might just be taking a long time for results to bubble up the query tree to us
 			resetRetries = (EXECUTOR.getCompletedTaskCount() > previousCompletedTaskCount);
 			if (!resetRetries) {
 				// we are completely blocked, try adding some emergency threads
-				if(EXECUTOR.getMaximumPoolSize() < MAX_THREADS) {
-					EXECUTOR.setMaximumPoolSize(Math.min(EXECUTOR.getMaximumPoolSize()+THREAD_GAIN, MAX_THREADS));
-					EXECUTOR.setCorePoolSize(Math.min(EXECUTOR.getCorePoolSize()+THREAD_GAIN, MAX_THREADS));
-					resetRetries = true;
-				} else {
-					// out of options
-					throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", MAX_THREADS));
+				synchronized (HalyardEvaluationExecutor.class) {
+					// check thread pool hasn't been modified already in the meantime
+					if (maxPoolSize == EXECUTOR.getMaximumPoolSize()) {
+						if (maxPoolSize < MAX_THREADS) {
+							LOGGER.warn("All {} threads seem to be blocked - adding {} more\n{}", maxPoolSize, THREAD_GAIN, EXECUTOR.toString());
+							EXECUTOR.setMaximumPoolSize(Math.min(EXECUTOR.getMaximumPoolSize()+THREAD_GAIN, MAX_THREADS));
+							EXECUTOR.setCorePoolSize(Math.min(EXECUTOR.getCorePoolSize()+THREAD_GAIN, MAX_THREADS));
+							resetRetries = true;
+						} else {
+							// out of options
+							throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", MAX_THREADS));
+						}
+					} else {
+						resetRetries = true;
+					}
 				}
 			}
 		} else {
@@ -93,31 +141,29 @@ final class HalyardEvaluationExecutor {
      * Asynchronously pulls from an iteration of binding sets and pushes to a {@link BindingSetPipe}.
      * @param pipe the pipe that evaluation results are returned on
      * @param iter
-     * @param node an implementation of any {@QueryModelNode} sub-type, typically a {@code ValueExpression}, {@Code UpdateExpression} or {@TupleExpression}
+     * @param node an implementation of any {@TupleExpr} sub-type
      */
 	static void pullAndPushAsync(BindingSetPipe pipe,
 			CloseableIteration<BindingSet, QueryEvaluationException> iter,
-			QueryModelNode node) {
-        int priority = getPriorityForNode(node);
-		EXECUTOR.execute(new IterateAndPipeTask(pipe, iter, priority));
+			TupleExpr node, EvaluationStrategy strategy) {
+		EXECUTOR.execute(new IterateAndPipeTask(pipe, iter, node, strategy));
     }
 
 	static void pullAndPush(BindingSetPipe pipe,
-			CloseableIteration<BindingSet, QueryEvaluationException> iter) {
-		IterateAndPipeTask pai = new IterateAndPipeTask(pipe, iter, 0);
+			CloseableIteration<BindingSet, QueryEvaluationException> iter, TupleExpr node, EvaluationStrategy strategy) {
+		IterateAndPipeTask pai = new IterateAndPipeTask(pipe, iter, node, strategy);
 		while(pai.pushNext());
 	}
 
     /**
      * Asynchronously pushes to a pipe using the push action, and returns an iteration of binding sets to pull from.
      * @param pushAction action to push to the pipe
-     * @param node an implementation of any {@QueryModelNode} sub-type, typically a {@code ValueExpression}, {@Code UpdateExpression} or {@TupleExpression}
+     * @param node an implementation of any {@TupleExpr} sub-type
      * @return iteration of binding sets to pull from.
      */
-	static CloseableIteration<BindingSet, QueryEvaluationException> pushAndPull(Consumer<BindingSetPipe> pushAction, QueryModelNode node) {
-        int priority = getPriorityForNode(node);
+	static CloseableIteration<BindingSet, QueryEvaluationException> pushAndPull(Consumer<BindingSetPipe> pushAction, TupleExpr node, EvaluationStrategy strategy) {
         BindingSetPipeQueue queue = new BindingSetPipeQueue();
-        EXECUTOR.execute(new PipeAndQueueTask(queue.pipe, pushAction, priority));
+        EXECUTOR.execute(new PipeAndQueueTask(queue.pipe, pushAction, node, strategy));
         return queue.iteration;
 	}
 
@@ -126,7 +172,7 @@ final class HalyardEvaluationExecutor {
      * @param node the node that you want the priority for
      * @return the priority of the node, a count of the number of child nodes of {@code node}.
      */
-    private static int getPriorityForNode(final QueryModelNode node) {
+    private static int getPriorityForNode(final TupleExpr node) {
         Integer p = PRIORITY_MAP_CACHE.getIfPresent(node);
         if (p != null) {
             return p;
@@ -185,10 +231,18 @@ final class HalyardEvaluationExecutor {
     static abstract class PrioritizedTask implements Comparable<PrioritizedTask>, Runnable {
     	static final int MIN_SUB_PRIORITY = 0;
     	static final int MAX_SUB_PRIORITY = 999;
+    	final TupleExpr queryNode;
     	final int queryPriority;
+    	final EvaluationStrategy strategy;
 
-    	PrioritizedTask(int queryPriority) {
-    		this.queryPriority = queryPriority;
+    	PrioritizedTask(TupleExpr queryNode, EvaluationStrategy strategy) {
+    		this.queryNode = queryNode;
+    		this.queryPriority = getPriorityForNode(queryNode);
+    		this.strategy = strategy;
+    	}
+
+    	public final TupleExpr getQueryNode() {
+    		return queryNode;
     	}
 
     	public final int getTaskPriority() {
@@ -206,6 +260,11 @@ final class HalyardEvaluationExecutor {
     		// descending order
 			return o.getTaskPriority() - this.getTaskPriority();
 		}
+
+    	@Override
+    	public String toString() {
+    		return super.toString() + "[queryNode = " + getQueryNode().getSignature() + ", priority = " + getTaskPriority() + ", strategy = " + strategy + "]";
+    	}
     }
 
     /**
@@ -220,12 +279,11 @@ final class HalyardEvaluationExecutor {
          * Constructor for the class with the supplied variables
          * @param pipe The pipe to return evaluations to
          * @param iter The iterator over the evaluation tree
-         * @param priority the 'level' of the evaluation in the over-all tree
          */
 		IterateAndPipeTask(BindingSetPipe pipe,
 				CloseableIteration<BindingSet, QueryEvaluationException> iter,
-				int priority) {
-			super(priority);
+				TupleExpr expr, EvaluationStrategy strategy) {
+			super(expr, strategy);
             this.pipe = pipe;
             this.iter = iter;
         }
@@ -273,8 +331,8 @@ final class HalyardEvaluationExecutor {
         private final BindingSetPipe pipe;
         private final Consumer<BindingSetPipe> pushAction;
 
-		PipeAndQueueTask(BindingSetPipe pipe, Consumer<BindingSetPipe> pushAction, int priority) {
-			super(priority);
+		PipeAndQueueTask(BindingSetPipe pipe, Consumer<BindingSetPipe> pushAction, TupleExpr expr, EvaluationStrategy strategy) {
+			super(expr, strategy);
 			this.pipe = pipe;
 			this.pushAction = pushAction;
 		}
