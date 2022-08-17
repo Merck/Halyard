@@ -67,7 +67,10 @@ public final class HalyardProfile extends AbstractHalyardTool {
 
     @Override
     public int run(CommandLine cmd) throws Exception {
+    	String queryString = cmd.getOptionValue('q');
     	String elasticIndexURL = cmd.getOptionValue('i');
+    	System.out.println(queryString);
+    	System.out.println();
 		SailRepository repo = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null, new HBaseSail.SailConnectionFactory() {
 			@Override
 			public SailConnection createConnection(HBaseSail sail) throws IOException {
@@ -76,15 +79,15 @@ public final class HalyardProfile extends AbstractHalyardTool {
 
 					@Override
 		            public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred) throws SailException {
-		                print("Original query:", tupleExpr);
+		                System.out.println(toMessage("Original query:", tupleExpr));
 		                return super.evaluate(tupleExpr, dataset, bindings, includeInferred);
 		            }
 		            @Override
 		            protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(EvaluationStrategy strategy, TupleExpr tupleExpr) {
-		                print("Optimized query:", tupleExpr);
+		                System.out.println(toMessage("Optimized query:", tupleExpr));
 		                return new EmptyIteration<>();
 		            }
-		            private void print(String msg, TupleExpr expr) {
+		            private String toMessage(String msg, TupleExpr expr) {
 		                final Map<TupleExpr, Double> cardMap = new HashMap<>();
 		                if (expr instanceof QueryRoot) {
 		                    expr = ((QueryRoot)expr).getArg();
@@ -110,7 +113,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
 		                        indentLevel--;
 		                    }
 		                });
-		                System.out.println(buf.toString());
+		                return buf.toString();
 		            }
 				};
 			}
@@ -119,7 +122,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
         repo.init();
         try {
         	try(RepositoryConnection conn = repo.getConnection()) {
-	            Query q = conn.prepareQuery(QueryLanguage.SPARQL, cmd.getOptionValue('q'), null);
+	            Query q = conn.prepareQuery(QueryLanguage.SPARQL, queryString, null);
 	            if (q instanceof BooleanQuery) {
 	                ((BooleanQuery)q).evaluate();
 	            } else if (q instanceof TupleQuery) {
