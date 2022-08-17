@@ -48,6 +48,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardEvaluationStrategy implements EvaluationStrategy {
+	public static final String QUERY_CONTEXT_SOURCE_STRING_ATTRIBUTE = "SourceString";
 
     public static final class ServiceRoot extends QueryRoot {
         private static final long serialVersionUID = 7052207623408379003L;
@@ -65,6 +66,8 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 	 * Used to allow queries across more than one Halyard datasets
 	 */
     private final FederatedServiceResolver serviceResolver;
+    private final TripleSource tripleSource;
+    private final QueryContext queryContext;
     /**
      * Evaluates TupleExpressions and all implementations of that interface
      */
@@ -97,14 +100,16 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 			TupleFunctionRegistry tupleFunctionRegistry,
 			FunctionRegistry functionRegistry, Dataset dataset, FederatedServiceResolver serviceResolver,
 			HalyardEvaluationStatistics statistics) {
+		this.tripleSource = tripleSource;
+		this.queryContext = queryContext;
 		this.dataset = dataset;
-        this.serviceResolver = serviceResolver;
+		this.serviceResolver = serviceResolver;
 		this.tupleEval = new HalyardTupleExprEvaluation(this, queryContext, tupleFunctionRegistry, tripleSource,
 				dataset);
 		this.valueEval = new HalyardValueExprEvaluation(this, queryContext, functionRegistry, tripleSource);
 		this.pipeline = new HalyardQueryOptimizerPipeline(this, tripleSource.getValueFactory(), statistics);
-        EvaluationStrategies.register(this);
-    }
+		EvaluationStrategies.register(this);
+	}
 
 	public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset,
 			FederatedServiceResolver serviceResolver, HalyardEvaluationStatistics statistics) {
@@ -112,7 +117,11 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 				dataset, serviceResolver, statistics);
 	}
 
-    /**
+	String getSourceString() {
+		return queryContext.getAttribute(QUERY_CONTEXT_SOURCE_STRING_ATTRIBUTE);
+	}
+
+	/**
      * Get a service for a federated dataset.
      */
     @Override
@@ -168,5 +177,10 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
     @Override
     public boolean isTrue(ValueExpr expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         return valueEval.isTrue(expr, bindings);
+    }
+
+    @Override
+    public String toString() {
+        return super.toString() + "[sourceString = " + getSourceString() + ", tripleSource = " + tripleSource + "]";
     }
 }

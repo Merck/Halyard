@@ -104,5 +104,10 @@ final class TableKeyspace implements Keyspace {
 		public void close() throws IOException {
 			table.close();
 		}
+
+		@Override
+		public String toString() {
+			return super.toString() + "[table = " + table + "]";
+		}
 	}
 }

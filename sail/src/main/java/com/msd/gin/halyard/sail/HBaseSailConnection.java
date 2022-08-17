@@ -65,6 +65,7 @@ import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
+import org.eclipse.rdf4j.model.util.Literals;
 import org.eclipse.rdf4j.model.vocabulary.SD;
 import org.eclipse.rdf4j.model.vocabulary.VOID;
 import org.eclipse.rdf4j.query.Binding;
@@ -165,11 +166,12 @@ public class HBaseSailConnection implements SailConnection {
 		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeout, sail.scanSettings, searchClient, sail.ticker);
 	}
 
-	private QueryContext createQueryContext(TripleSource source, boolean includeInferred) {
+	private QueryContext createQueryContext(TripleSource source, boolean includeInferred, String sourceString) {
 		SailConnectionQueryPreparer queryPreparer = new SailConnectionQueryPreparer(this, includeInferred, source);
 		QueryContext queryContext = new QueryContext(queryPreparer);
 		queryContext.setAttribute(QUERY_CONTEXT_KEYSPACE_ATTRIBUTE, keyspaceConn);
 		queryContext.setAttribute(QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE, sail.getRDFFactory());
+		queryContext.setAttribute(HalyardEvaluationStrategy.QUERY_CONTEXT_SOURCE_STRING_ATTRIBUTE, sourceString);
 		queryContext.setAttribute(QUERY_CONTEXT_SEARCH_ATTRIBUTE, searchClient);
 		return queryContext;
 	}
@@ -207,8 +209,11 @@ public class HBaseSailConnection implements SailConnection {
 	public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(final TupleExpr tupleExpr, final Dataset dataset, final BindingSet bindings, final boolean includeInferred) throws SailException {
 		flush();
 
+		String sourceString = Literals.getLabel(bindings.getValue(SOURCE_STRING_BINDING), null);
+		BindingSet queryBindings = removeImplicitBindings(bindings);
+
 		RDFStarTripleSource tripleSource = createTripleSource();
-		QueryContext queryContext = createQueryContext(tripleSource, includeInferred);
+		QueryContext queryContext = createQueryContext(tripleSource, includeInferred, sourceString);
 		EvaluationStrategy strategy = createEvaluationStrategy(tripleSource, dataset, queryContext);
 
 		queryContext.begin();
@@ -216,10 +221,8 @@ public class HBaseSailConnection implements SailConnection {
 			initQueryContext(queryContext);
 
 			TupleExpr optimizedTupleExpr;
-			Literal sourceString = (Literal) bindings.getValue(SOURCE_STRING_BINDING);
-			BindingSet queryBindings = removeImplicitBindings(bindings);
 			if (sourceString != null) {
-				PreparedQueryKey pqkey = new PreparedQueryKey(sourceString.getLabel(), dataset, queryBindings, includeInferred);
+				PreparedQueryKey pqkey = new PreparedQueryKey(sourceString, dataset, queryBindings, includeInferred);
 				try {
 					optimizedTupleExpr = queryCache.get(pqkey, () -> optimize(tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy));
 				} catch (ExecutionException e) {

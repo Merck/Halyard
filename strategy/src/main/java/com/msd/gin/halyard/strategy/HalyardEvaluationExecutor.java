@@ -21,15 +21,21 @@ import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.Config;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.lang.management.ManagementFactory;
+import java.util.Hashtable;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+
+import javax.management.InstanceAlreadyExistsException;
+import javax.management.MBeanRegistrationException;
+import javax.management.MBeanServer;
+import javax.management.MalformedObjectNameException;
+import javax.management.NotCompliantMBeanException;
+import javax.management.ObjectName;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
@@ -40,7 +46,6 @@ import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
-import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.slf4j.Logger;
@@ -54,51 +59,20 @@ final class HalyardEvaluationExecutor {
     private static final int THREAD_GAIN = Config.getInteger("halyard.evaluation.threadGain", 5);
     private static final int MAX_THREADS = Config.getInteger("halyard.evaluation.maxThreads", 100);
 
-    private static ThreadPoolExecutor createExecutor(String groupName, String namePrefix) {
-        ThreadGroup tg = new ThreadGroup(groupName);
-        AtomicInteger threadSeq = new AtomicInteger();
-        ThreadFactory tf = (r) -> {
-        	Thread thr = new Thread(tg, r, namePrefix+threadSeq.incrementAndGet());
-        	thr.setDaemon(true);
-        	return thr;
-        };
-        // fixed-size thread pool that can wind down when idle
-		ThreadPoolExecutor executor = new ThreadPoolExecutor(THREADS, THREADS, 60L, TimeUnit.SECONDS, new PriorityBlockingQueue<>(64), tf) {
-			private final ConcurrentHashMap<Thread, Runnable> runningTasks = new ConcurrentHashMap<>(THREADS);
-
-			@Override
-			protected void beforeExecute(Thread t, Runnable r) {
-				runningTasks.put(t, r);
-			}
-
-			@Override
-			protected void afterExecute(Runnable r, Throwable t) {
-				runningTasks.remove(Thread.currentThread());
-			}
-
-			@Override
-			public String toString() {
-				String s = super.toString();
-				StringBuilder fullDetails = new StringBuilder(s);
-				fullDetails.append("\nThreads:\n");
-				for (Map.Entry<Thread, Runnable> entry : runningTasks.entrySet()) {
-					Thread t = entry.getKey();
-					Runnable r = entry.getValue();
-					fullDetails.append("  ").append(t.getName())
-						.append('[').append(t.getState()).append("]: ")
-						.append(r.toString()).append('\n');
-				}
-				fullDetails.append("\nQueue:\n");
-				for (Runnable r : getQueue()) {
-					fullDetails.append(r.toString()).append('\n');
-				}
-				return fullDetails.toString();
-			}
-        };
-        executor.allowCoreThreadTimeOut(true);
-        return executor;
-    }
-    private static final ThreadPoolExecutor EXECUTOR = createExecutor("Halyard Executors", "Halyard ");
+	private static TrackingThreadPoolExecutor createExecutor(String groupName, String namePrefix) {
+		ThreadGroup tg = new ThreadGroup(groupName);
+		AtomicInteger threadSeq = new AtomicInteger();
+		ThreadFactory tf = (r) -> {
+			Thread thr = new Thread(tg, r, namePrefix+threadSeq.incrementAndGet());
+			thr.setDaemon(true);
+			return thr;
+		};
+		// fixed-size thread pool that can wind down when idle
+		TrackingThreadPoolExecutor executor = new TrackingThreadPoolExecutor(THREADS, THREADS, 60L, TimeUnit.SECONDS, new PriorityBlockingQueue<>(64), tf);
+		executor.allowCoreThreadTimeOut(true);
+		return executor;
+	}
+    private static final TrackingThreadPoolExecutor EXECUTOR = createExecutor("Halyard Executors", "Halyard ");
     // a map of query model nodes and their priority
     private static final Cache<QueryModelNode, Integer> PRIORITY_MAP_CACHE = CacheBuilder.newBuilder().weakKeys().build();
     // high default priority for dynamically created query nodes
@@ -106,7 +80,19 @@ final class HalyardEvaluationExecutor {
 
     private static volatile long previousCompletedTaskCount;
 
-	private static boolean checkThreads(int retries) {
+	static {
+		MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+		try {
+			Hashtable<String,String> attrs = new Hashtable<>();
+			attrs.put("type", TrackingThreadPoolExecutor.class.getName());
+			attrs.put("id", Integer.toString(EXECUTOR.hashCode()));
+			mbs.registerMBean(EXECUTOR, ObjectName.getInstance("com.msd.gin.halyard", attrs));
+		} catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException | MalformedObjectNameException e) {
+			throw new AssertionError(e);
+		}
+	}
+
+    private static boolean checkThreads(int retries) {
 		boolean resetRetries;
 		final int maxPoolSize = EXECUTOR.getMaximumPoolSize();
 		// if we've been consistently blocked and are at full capacity
@@ -119,7 +105,7 @@ final class HalyardEvaluationExecutor {
 					// check thread pool hasn't been modified already in the meantime
 					if (maxPoolSize == EXECUTOR.getMaximumPoolSize()) {
 						if (maxPoolSize < MAX_THREADS) {
-							LOGGER.warn("All {} threads seem to be blocked - adding {} more\n{}", maxPoolSize, THREAD_GAIN, EXECUTOR.toString());
+							LOGGER.warn("All {} threads seem to be blocked - adding {} more\n{}", EXECUTOR.getPoolSize(), THREAD_GAIN, EXECUTOR.toString());
 							EXECUTOR.setMaximumPoolSize(Math.min(EXECUTOR.getMaximumPoolSize()+THREAD_GAIN, MAX_THREADS));
 							EXECUTOR.setCorePoolSize(Math.min(EXECUTOR.getCorePoolSize()+THREAD_GAIN, MAX_THREADS));
 							resetRetries = true;
@@ -147,12 +133,12 @@ final class HalyardEvaluationExecutor {
      */
 	static void pullAndPushAsync(BindingSetPipe pipe,
 			CloseableIteration<BindingSet, QueryEvaluationException> iter,
-			TupleExpr node, EvaluationStrategy strategy) {
+			TupleExpr node, HalyardEvaluationStrategy strategy) {
 		EXECUTOR.execute(new IterateAndPipeTask(pipe, iter, node, strategy));
     }
 
 	static void pullAndPush(BindingSetPipe pipe,
-			CloseableIteration<BindingSet, QueryEvaluationException> iter, TupleExpr node, EvaluationStrategy strategy) {
+			CloseableIteration<BindingSet, QueryEvaluationException> iter, TupleExpr node, HalyardEvaluationStrategy strategy) {
 		IterateAndPipeTask pai = new IterateAndPipeTask(pipe, iter, node, strategy);
 		while(pai.pushNext());
 	}
@@ -163,7 +149,7 @@ final class HalyardEvaluationExecutor {
      * @param node an implementation of any {@TupleExpr} sub-type
      * @return iteration of binding sets to pull from.
      */
-	static CloseableIteration<BindingSet, QueryEvaluationException> pushAndPull(Consumer<BindingSetPipe> pushAction, TupleExpr node, EvaluationStrategy strategy) {
+	static CloseableIteration<BindingSet, QueryEvaluationException> pushAndPull(Consumer<BindingSetPipe> pushAction, TupleExpr node, HalyardEvaluationStrategy strategy) {
         BindingSetPipeQueue queue = new BindingSetPipeQueue();
         EXECUTOR.execute(new PipeAndQueueTask(queue.pipe, pushAction, node, strategy));
         return queue.iteration;
@@ -232,14 +218,14 @@ final class HalyardEvaluationExecutor {
     }
 
 
-    static abstract class PrioritizedTask implements Comparable<PrioritizedTask>, Runnable {
+	static abstract class PrioritizedTask implements Comparable<PrioritizedTask>, Runnable {
     	static final int MIN_SUB_PRIORITY = 0;
     	static final int MAX_SUB_PRIORITY = 999;
     	final TupleExpr queryNode;
     	final int queryPriority;
-    	final EvaluationStrategy strategy;
+    	final HalyardEvaluationStrategy strategy;
 
-    	PrioritizedTask(TupleExpr queryNode, EvaluationStrategy strategy) {
+    	PrioritizedTask(TupleExpr queryNode, HalyardEvaluationStrategy strategy) {
     		this.queryNode = queryNode;
     		this.queryPriority = getPriorityForNode(queryNode);
     		this.strategy = strategy;
@@ -286,7 +272,7 @@ final class HalyardEvaluationExecutor {
          */
 		IterateAndPipeTask(BindingSetPipe pipe,
 				CloseableIteration<BindingSet, QueryEvaluationException> iter,
-				TupleExpr expr, EvaluationStrategy strategy) {
+				TupleExpr expr, HalyardEvaluationStrategy strategy) {
 			super(expr, strategy);
             this.pipe = pipe;
             this.iter = iter;
@@ -335,7 +321,7 @@ final class HalyardEvaluationExecutor {
         private final BindingSetPipe pipe;
         private final Consumer<BindingSetPipe> pushAction;
 
-		PipeAndQueueTask(BindingSetPipe pipe, Consumer<BindingSetPipe> pushAction, TupleExpr expr, EvaluationStrategy strategy) {
+		PipeAndQueueTask(BindingSetPipe pipe, Consumer<BindingSetPipe> pushAction, TupleExpr expr, HalyardEvaluationStrategy strategy) {
 			super(expr, strategy);
 			this.pipe = pipe;
 			this.pushAction = pushAction;

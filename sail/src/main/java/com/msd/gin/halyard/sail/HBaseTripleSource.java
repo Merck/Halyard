@@ -157,6 +157,11 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 		return valueReader.getValueFactory();
 	}
 
+	@Override
+	public String toString() {
+		return super.toString() + "[keyspace = " + keyspaceConn.toString() + "]";
+	}
+
 	protected class StatementScanner extends AbstractStatementScanner {
 
 		protected List<Resource> contextsList;

@@ -98,5 +98,10 @@ final class SnapshotKeyspace implements Keyspace {
 		@Override
 		public void close() throws IOException {
 		}
+
+		@Override
+		public String toString() {
+			return super.toString() + "[snapshot = " + snapshotName + ", path = " + restoreDir + "]";
+		}
 	}
 }
