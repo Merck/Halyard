@@ -132,7 +132,6 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 	@Override
 	public TupleExpr optimize(TupleExpr expr, EvaluationStatistics evaluationStatistics, BindingSet bindings) {
 		TupleExpr optimizedExpr = expr;
-
 		for (QueryOptimizer optimizer : pipeline.getOptimizers()) {
 			optimizer.optimize(optimizedExpr, dataset, bindings);
 		}

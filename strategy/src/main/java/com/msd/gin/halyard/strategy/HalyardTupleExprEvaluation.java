@@ -1768,11 +1768,13 @@ final class HalyardTupleExprEvaluation {
 			pullAndPushAsync(parent, new PathIteration(new StrictEvaluationStrategy(null, null) {
                 @Override
                 public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(ZeroLengthPath zlp, BindingSet bindings) throws QueryEvaluationException {
+                    zlp.setParentNode(alp);
                     return parentStrategy.evaluate(zlp, bindings);
                 }
 
                 @Override
                 public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) throws QueryEvaluationException {
+                    expr.setParentNode(alp);
                     return parentStrategy.evaluate(expr, bindings);
                 }
 

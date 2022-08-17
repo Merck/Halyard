@@ -99,8 +99,10 @@ final class HalyardEvaluationExecutor {
         return executor;
     }
     private static final ThreadPoolExecutor EXECUTOR = createExecutor("Halyard Executors", "Halyard ");
-    //a map of query model nodes and their priority
+    // a map of query model nodes and their priority
     private static final Cache<QueryModelNode, Integer> PRIORITY_MAP_CACHE = CacheBuilder.newBuilder().weakKeys().build();
+    // high default priority for dynamically created query nodes
+    private static final int DEFAULT_PRIORITY = 65535;
 
     private static volatile long previousCompletedTaskCount;
 
@@ -184,15 +186,17 @@ final class HalyardEvaluationExecutor {
             //starting priority for ServiceRoot must be evaluated from the original service args node
             int startingPriority = root instanceof ServiceRoot ? getPriorityForNode(((ServiceRoot)root).originalServiceArgs) : 0;
             final AtomicInteger counter = new AtomicInteger(startingPriority);
-            final AtomicInteger ret = new AtomicInteger();
+            final AtomicInteger ret = new AtomicInteger(DEFAULT_PRIORITY);
 
             new AbstractQueryModelVisitor<RuntimeException>() {
                 @Override
                 protected void meetNode(QueryModelNode n) throws RuntimeException {
                     int pp = counter.getAndIncrement();
                     PRIORITY_MAP_CACHE.put(n, pp);
-                    if (n == node || n == node.getParentNode()) {
+                    if (n == node) {
                     	ret.set(pp);
+                    } else if (n == node.getParentNode()) {
+                    	ret.set(pp+1);
                     }
                     super.meetNode(n);
                 }
