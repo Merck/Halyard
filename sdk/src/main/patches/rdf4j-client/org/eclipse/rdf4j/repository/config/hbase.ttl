@@ -11,7 +11,7 @@
    rep:repositoryID "{%Repository ID|%}" ;
    rdfs:label "{%Repository title|%}" ;
    rep:repositoryImpl [
-      rep:repositoryType "openrdf:SailRepository" ;
+      rep:repositoryType "openrdf:HBaseRepository" ;
       sr:sailImpl [
          sail:sailType "openrdf:HBaseStore" ;
          halyard:tableName "{%HBase Table Name|%}" ;
