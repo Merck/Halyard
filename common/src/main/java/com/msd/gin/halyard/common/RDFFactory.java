@@ -219,6 +219,10 @@ public class RDFFactory {
 		return idFormat.size;
 	}
 
+	public String getIdAlgorithm() {
+		return idFormat.algorithm;
+	}
+
 	ByteSequence writeSaltAndType(final int salt, ValueType type, IRI datatype, ByteSequence seq) {
 		if (salt >= typeSaltSize) {
 			throw new IllegalArgumentException(String.format("Salt must be between 0 (inclusive) and %d (exclusive): %d", typeSaltSize, salt));

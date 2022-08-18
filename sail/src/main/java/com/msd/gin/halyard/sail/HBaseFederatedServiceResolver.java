@@ -75,16 +75,17 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 			try {
 				federatedService = federatedServices.get(serviceUrl, () -> {
 					HBaseSail sail = new HBaseSail(hConnection, config, federatedTable, false, 0, true, evaluationTimeout, null, ticker, HBaseSailConnection.Factory.INSTANCE, this);
+					HBaseSail.ScanSettings scanSettings = sail.getScanSettings();
 					for (NameValuePair nvp : queryParams) {
 						switch (nvp.getName()) {
 							case MIN_TIMESTAMP_QUERY_PARAM:
-								sail.scanSettings.minTimestamp = HalyardTableUtils.toHalyardTimestamp(Long.parseLong(nvp.getValue()), false);
+								scanSettings.minTimestamp = HalyardTableUtils.toHalyardTimestamp(Long.parseLong(nvp.getValue()), false);
 								break;
 							case MAX_TIMESTAMP_QUERY_PARAM:
-								sail.scanSettings.maxTimestamp = HalyardTableUtils.toHalyardTimestamp(Long.parseLong(nvp.getValue()), false);
+								scanSettings.maxTimestamp = HalyardTableUtils.toHalyardTimestamp(Long.parseLong(nvp.getValue()), false);
 								break;
 							case MAX_VERSIONS_QUERY_PARAM:
-								sail.scanSettings.maxVersions = Integer.parseInt(nvp.getValue());
+								scanSettings.maxVersions = Integer.parseInt(nvp.getValue());
 								break;
 						}
 					}

@@ -22,7 +22,7 @@ public abstract class AbstractSailConnection implements SailConnection {
 	protected boolean cloneTupleExpression = true;
 
 	// Track the time used when evaluating a query, used by explain(...)
-	protected boolean trackTime;
+	protected boolean trackResultTime;
 
 	@Override
 	public Explanation explain(Explanation.Level level, TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred, int timeoutSeconds) {
@@ -32,7 +32,7 @@ public abstract class AbstractSailConnection implements SailConnection {
 
 			switch (level) {
 				case Timed:
-					this.trackTime = true;
+					this.trackResultTime = true;
 					this.trackResultSize = true;
 					this.cloneTupleExpression = false;
 
@@ -64,7 +64,7 @@ public abstract class AbstractSailConnection implements SailConnection {
 		} finally {
 			this.cloneTupleExpression = true;
 			this.trackResultSize = false;
-			this.trackTime = false;
+			this.trackResultTime = false;
 		}
 
 		QueryModelTreeToGenericPlanNode converter = new QueryModelTreeToGenericPlanNode(tupleExpr);

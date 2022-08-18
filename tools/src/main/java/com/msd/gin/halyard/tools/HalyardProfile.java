@@ -45,7 +45,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 
 /**
@@ -73,7 +72,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
     	System.out.println();
 		SailRepository repo = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null, new HBaseSail.SailConnectionFactory() {
 			@Override
-			public SailConnection createConnection(HBaseSail sail) throws IOException {
+			public HBaseSailConnection createConnection(HBaseSail sail) throws IOException {
 				return new HBaseSailConnection(sail) {
 					private final NumberFormat cardinalityFormatter = DecimalFormat.getNumberInstance();
 

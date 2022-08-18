@@ -30,14 +30,25 @@ import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Hashtable;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.management.InstanceAlreadyExistsException;
+import javax.management.InstanceNotFoundException;
+import javax.management.MBeanRegistrationException;
+import javax.management.MalformedObjectNameException;
+import javax.management.NotCompliantMBeanException;
+import javax.management.ObjectInstance;
+import javax.management.ObjectName;
 import javax.net.ssl.SSLContext;
 
 import org.apache.hadoop.conf.Configuration;
@@ -58,6 +69,7 @@ import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SD;
+import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContextInitializer;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.AbstractFederatedServiceResolver;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedService;
@@ -82,7 +94,7 @@ import co.elastic.clients.transport.rest_client.RestClientTransport;
  * only supported for queries across multiple graphs in one Halyard database.
  * @author Adam Sotona (MSD)
  */
-public class HBaseSail implements Sail {
+public class HBaseSail implements Sail, HBaseSailMXBean {
 
     /**
      * Ticker is a simple service interface that is notified when some data are processed.
@@ -100,10 +112,10 @@ public class HBaseSail implements Sail {
 	 * Interface to make it easy to change connection implementations.
 	 */
 	public interface SailConnectionFactory {
-		SailConnection createConnection(HBaseSail sail) throws IOException;
+		HBaseSailConnection createConnection(HBaseSail sail) throws IOException;
 	}
 
-	static final class ElasticSettings {
+	public static final class ElasticSettings {
 		String protocol;
 		String host;
 		int port;
@@ -111,6 +123,22 @@ public class HBaseSail implements Sail {
 		String password;
 		String indexName;
 		SSLSettings sslSettings;
+
+		public String getProtocol() {
+			return protocol;
+		}
+
+		public String getHost() {
+			return host;
+		}
+
+		public int getPort() {
+			return port;
+		}
+
+		public String getIndexName() {
+			return indexName;
+		}
 
 		static ElasticSettings from(URL esIndexUrl) {
 			if (esIndexUrl == null) {
@@ -125,10 +153,51 @@ public class HBaseSail implements Sail {
 		}
 	}
 
-	static final class ScanSettings {
+	public static final class ScanSettings {
 		long minTimestamp = 0;
 		long maxTimestamp = Long.MAX_VALUE;
 		int maxVersions = 1;
+
+		public long getMinTimestamp() {
+			return minTimestamp;
+		}
+
+		public long getMaxTimestamp() {
+			return maxTimestamp;
+		}
+
+		public int getMaxVersions() {
+			return maxVersions;
+		}
+	}
+
+	public static final class QueryInfo {
+		private final long timestamp = System.currentTimeMillis();
+		private final String queryString;
+		private final TupleExpr queryExpr;
+		private final TupleExpr optimizedExpr;
+
+		public QueryInfo(String queryString, TupleExpr queryExpr, TupleExpr optimizedExpr) {
+			this.queryString = queryString;
+			this.queryExpr = queryExpr;
+			this.optimizedExpr = optimizedExpr;
+		}
+
+		public long getTimestamp() {
+			return timestamp;
+		}
+
+		public String getQueryString() {
+			return queryString;
+		}
+
+		public String getQueryTree() {
+			return queryExpr.toString();
+		}
+
+		public String getOptimizedQueryTree() {
+			return optimizedExpr.toString();
+		}
 	}
 
 	private static final long STATUS_CACHING_TIMEOUT = 60000l;
@@ -148,6 +217,8 @@ public class HBaseSail implements Sail {
 	final ElasticSettings esSettings;
 	ElasticsearchTransport esTransport;
 	boolean includeNamespaces = false;
+	private boolean trackResultSize;
+	private boolean trackResultTime;
     final Ticker ticker;
 	private FederatedServiceResolver federatedServiceResolver;
 	private RDFFactory rdfFactory;
@@ -156,11 +227,13 @@ public class HBaseSail implements Sail {
 	private TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
 	private SpinParser spinParser = new SpinParser();
 	private final List<QueryContextInitializer> queryContextInitializers = new ArrayList<>();
-	ScanSettings scanSettings = new ScanSettings();
+	private final ScanSettings scanSettings = new ScanSettings();
 	final SailConnectionFactory connFactory;
 	Connection hConnection;
 	final boolean hConnectionIsShared; //whether a Connection is provided or we need to create our own
 	Keyspace keyspace;
+	ObjectInstance mxInst;
+	private final Queue<QueryInfo> queryHistory = new ArrayBlockingQueue<>(10, true);
 
 
 	HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings) {
@@ -273,20 +346,60 @@ public class HBaseSail implements Sail {
 		this(config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE);
 	}
 
-    /**
-     * Not used in Halyard
-     */
-    @Override
-    public void setDataDir(File dataDir) {
-    }
+	@Override
+	public boolean isPushStrategyEnabled() {
+		return pushStrategy;
+	}
 
-    /**
-     * Not used in Halyard
-     */
-    @Override
-    public File getDataDir() {
-        throw new UnsupportedOperationException();
-    }
+	@Override
+	public int getEvaluationTimeout() {
+		return evaluationTimeout;
+	}
+
+	@Override
+	public ElasticSettings getElasticSettings() {
+		return esSettings;
+	}
+
+	@Override
+	public int getValueIdentifierSize() {
+		return rdfFactory.getIdSize();
+	}
+
+	@Override
+	public String getValueIdentifierAlgorithm() {
+		return rdfFactory.getIdAlgorithm();
+	}
+
+	@Override
+	public ScanSettings getScanSettings() {
+		return scanSettings;
+	}
+
+	@Override
+	public boolean isTrackResultSize() {
+		return trackResultSize;
+	}
+
+	@Override
+	public void setTrackResultSize(boolean f) {
+		trackResultSize = f;
+	}
+
+	@Override
+	public boolean isTrackResultTime() {
+		return trackResultTime;
+	}
+
+	@Override
+	public void setTrackResultTime(boolean f) {
+		trackResultTime = f;
+	}
+
+	@Override
+	public QueryInfo[] getRecentQueries() {
+		return queryHistory.toArray(new QueryInfo[queryHistory.size()]);
+	}
 
 	BufferedMutator getBufferedMutator() {
 		if (hConnection == null) {
@@ -297,6 +410,28 @@ public class HBaseSail implements Sail {
 		} catch (IOException e) {
 			throw new SailException(e);
 		}
+	}
+
+	void trackQuery(String sourceString, TupleExpr rawExpr, TupleExpr optimizedExpr) {
+		QueryInfo query = new QueryInfo(sourceString, rawExpr, optimizedExpr);
+		while (!queryHistory.offer(query)) {
+			queryHistory.remove();
+		}
+	}
+
+	/**
+	 * Not used in Halyard
+	 */
+	@Override
+	public void setDataDir(File dataDir) {
+	}
+
+	/**
+	 * Not used in Halyard
+	 */
+	@Override
+	public File getDataDir() {
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
@@ -379,6 +514,20 @@ public class HBaseSail implements Sail {
 			RestClient restClient = restClientBuilder.build();
 			esTransport = new RestClientTransport(restClient, new JacksonJsonpMapper());
 		}
+
+		Hashtable<String, String> attrs = new Hashtable<>();
+		attrs.put("type", getClass().getName());
+		attrs.put("id", Integer.toString(hashCode()));
+		if (tableName != null) {
+			attrs.put("table", tableName.getNameAsString());
+		} else {
+			attrs.put("snapshot", snapshotName);
+		}
+		try {
+			mxInst = ManagementFactory.getPlatformMBeanServer().registerMBean(this, ObjectName.getInstance("com.msd.gin.halyard", attrs));
+		} catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException | MalformedObjectNameException e) {
+			throw new AssertionError(e);
+		}
 	}
 
 	private boolean isInitialized() {
@@ -446,6 +595,14 @@ public class HBaseSail implements Sail {
 
     @Override
     public void shutDown() throws SailException { //release resources
+		if (mxInst != null) {
+			try {
+				ManagementFactory.getPlatformMBeanServer().unregisterMBean(mxInst.getObjectName());
+			} catch (MBeanRegistrationException | InstanceNotFoundException e) {
+			}
+			mxInst = null;
+		}
+
 		if (esTransport != null) {
 			try {
 				esTransport.close();
@@ -503,11 +660,15 @@ public class HBaseSail implements Sail {
 		if (!isInitialized()) {
 			throw new IllegalStateException("Sail is not initialized or has been shut down");
 		}
+		HBaseSailConnection conn;
 		try {
-			return connFactory.createConnection(this);
+			conn = connFactory.createConnection(this);
 		} catch (IOException ioe) {
 			throw new SailException(ioe);
 		}
+		conn.trackResultSize = trackResultSize;
+		conn.trackResultTime = trackResultTime;
+		return conn;
     }
 
     @Override

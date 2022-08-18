@@ -16,7 +16,13 @@
  */
 package com.msd.gin.halyard.tools;
 
-import static com.msd.gin.halyard.tools.HalyardBulkLoad.TIMESTAMP_PROPERTY;
+import static com.msd.gin.halyard.tools.HalyardBulkLoad.*;
+
+import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.repository.HBaseUpdate;
+import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.sail.HBaseSailConnection;
+import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
 import java.net.URL;
@@ -60,14 +66,7 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
-import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
-
-import com.msd.gin.halyard.common.HalyardTableUtils;
-import com.msd.gin.halyard.repository.HBaseUpdate;
-import com.msd.gin.halyard.sail.HBaseSail;
-import com.msd.gin.halyard.sail.HBaseSailConnection;
-import com.msd.gin.halyard.vocab.HALYARD;
 
 /**
  * Apache Hadoop MapReduce tool for performing SPARQL Graph construct queries and then bulk loading the results back into HBase. Essentially, batch process queries
@@ -143,7 +142,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                         }
 					}, new HBaseSail.SailConnectionFactory() {
 						@Override
-						public SailConnection createConnection(HBaseSail sail) throws IOException {
+						public HBaseSailConnection createConnection(HBaseSail sail) throws IOException {
 							return new HBaseSailConnection(sail) {
 								private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
 

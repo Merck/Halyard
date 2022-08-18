@@ -83,7 +83,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExtendedEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
-import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailConnectionQueryPreparer;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
@@ -163,7 +162,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
     }
 
 	private RDFStarTripleSource createTripleSource() {
-		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeout, sail.scanSettings, searchClient, sail.ticker);
+		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeout, sail.getScanSettings(), searchClient, sail.ticker);
 	}
 
 	private QueryContext createQueryContext(TripleSource source, boolean includeInferred, String sourceString) {
@@ -221,13 +220,6 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		RDFStarTripleSource tripleSource = createTripleSource();
 		QueryContext queryContext = createQueryContext(tripleSource, includeInferred, sourceString);
 		EvaluationStrategy strategy = createEvaluationStrategy(tripleSource, dataset, queryContext);
-		if (trackResultSize) {
-			strategy.setTrackResultSize(trackResultSize);
-		}
-
-		if (trackTime) {
-			strategy.setTrackTime(trackTime);
-		}
 
 		queryContext.begin();
 		try {
@@ -253,6 +245,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 				// evaluate the expression against the TripleSource according to the
 				// EvaluationStrategy.
 				CloseableIteration<BindingSet, QueryEvaluationException> iter = evaluateInternal(strategy, optimizedTupleExpr);
+				sail.trackQuery(sourceString, tupleExpr, optimizedTupleExpr);
 				if (!sail.pushStrategy) {
 					// NB: Iteration methods may do on-demand evaluation hence need to wrap these too
 					iter = new QueryContextIteration(iter, queryContext);
@@ -300,9 +293,15 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		}
 	}
 
-    protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(EvaluationStrategy strategy, TupleExpr tupleExpr) {
-        return strategy.evaluate(tupleExpr, EmptyBindingSet.getInstance());
-    }
+	protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(EvaluationStrategy strategy, TupleExpr tupleExpr) {
+		if (trackResultSize) {
+			strategy.setTrackResultSize(trackResultSize);
+		}
+		if (trackResultTime) {
+			strategy.setTrackTime(trackResultTime);
+		}
+		return strategy.evaluate(tupleExpr, EmptyBindingSet.getInstance());
+	}
 
     @Override
     public CloseableIteration<? extends Resource, SailException> getContextIDs() throws SailException {
@@ -742,7 +741,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		public static final SailConnectionFactory INSTANCE = new Factory();
 
 		@Override
-		public SailConnection createConnection(HBaseSail sail) throws IOException {
+		public HBaseSailConnection createConnection(HBaseSail sail) throws IOException {
 			return new HBaseSailConnection(sail);
 		}
 	}
