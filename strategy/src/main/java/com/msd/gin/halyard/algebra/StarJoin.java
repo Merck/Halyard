@@ -148,4 +148,20 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	public StarJoin clone() {
 		return (StarJoin) super.clone();
 	}
+
+
+	public static final class TopJoin extends Join {
+		private static final long serialVersionUID = 8151800716831792753L;
+
+		public TopJoin(TupleExpr parent, TupleExpr left, TupleExpr right) {
+			super(left, right);
+			setParentNode(parent);
+		}
+
+		@Override
+		public void setResultSizeActual(long resultSizeActual) {
+			super.setResultSizeActual(resultSizeActual);
+			getParentNode().setResultSizeActual(resultSizeActual);
+		}
+	}
 }

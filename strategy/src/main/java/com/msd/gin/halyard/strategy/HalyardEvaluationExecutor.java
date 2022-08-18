@@ -288,7 +288,7 @@ final class HalyardEvaluationExecutor {
 				TupleExpr expr, HalyardEvaluationStrategy strategy) {
 			super(expr, strategy);
             this.pipe = pipe;
-            this.iter = iter;
+            this.iter = strategy.track(iter, expr);
         }
 
 		boolean pushNext() {

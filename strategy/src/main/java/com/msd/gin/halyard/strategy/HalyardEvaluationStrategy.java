@@ -83,10 +83,10 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
     private final HalyardValueExprEvaluation valueEval;
 
 	/** Track the results size that each node in the query plan produces during execution. */
-	private boolean trackResultSize;
+	boolean trackResultSize;
 
 	/** Track the exeution time of each node in the plan. */
-	private boolean trackTime;
+	boolean trackTime;
 
 	private QueryOptimizerPipeline pipeline;
 
@@ -181,22 +181,39 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 	@Override
 	public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) throws QueryEvaluationException {
 		CloseableIteration<BindingSet, QueryEvaluationException> iter = tupleEval.evaluate(expr, bindings);
+		return track(iter, expr);
+	}
 
+	CloseableIteration<BindingSet, QueryEvaluationException> track(CloseableIteration<BindingSet, QueryEvaluationException> iter, TupleExpr expr) {
 		if (trackTime) {
-			// set resultsSizeActual to at least be 0 so we can track iterations that don't procude anything
-			expr.setTotalTimeNanosActual(Math.max(0, expr.getTotalTimeNanosActual()));
 			iter = new TimedIterator(iter, expr);
 		}
 	
 		if (trackResultSize) {
-			// set resultsSizeActual to at least be 0 so we can track iterations that don't procude anything
-			expr.setResultSizeActual(Math.max(0, expr.getResultSizeActual()));
 			iter = new ResultSizeCountingIterator(iter, expr);
 		}
+
 		return iter;
 	}
 
-    /**
+	void initTracking(TupleExpr queryNode) {
+		if (trackResultSize) {
+			synchronized (queryNode) {
+				// set resultsSizeActual to at least be 0 so we can track iterations that don't procude anything
+				queryNode.setResultSizeActual(Math.max(0, queryNode.getResultSizeActual()));
+			}
+		}
+	}
+
+	void incrementResultSizeActual(TupleExpr queryNode) {
+		if (trackResultSize) {
+			synchronized (queryNode) {
+				queryNode.setResultSizeActual(queryNode.getResultSizeActual() + 1L);
+			}
+		}
+	}
+
+	/**
      * Called by RDF4J to evaluate a value expression
      */
     @Override
@@ -232,6 +249,8 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 			super(iterator);
 			this.iterator = iterator;
 			this.queryModelNode = queryModelNode;
+			// set resultsSizeActual to at least be 0 so we can track iterations that don't procude anything
+			queryModelNode.setResultSizeActual(Math.max(0, queryModelNode.getResultSizeActual()));
 		}
 
 		@Override
@@ -256,6 +275,8 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 			super(iterator);
 			this.iterator = iterator;
 			this.queryModelNode = queryModelNode;
+			// set resultsSizeActual to at least be 0 so we can track iterations that don't procude anything
+			queryModelNode.setTotalTimeNanosActual(Math.max(0, queryModelNode.getTotalTimeNanosActual()));
 		}
 
 		@Override

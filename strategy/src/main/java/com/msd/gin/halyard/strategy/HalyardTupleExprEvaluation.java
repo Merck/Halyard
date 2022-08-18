@@ -783,6 +783,7 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateFilter(BindingSetPipe parent, final Filter filter, final BindingSet bindings) {
+        parentStrategy.initTracking(filter);
         evaluateTupleExpr(new BindingSetPipe(parent) {
             final Set<String> scopeBindingNames = filter.getBindingNames();
 
@@ -790,6 +791,7 @@ final class HalyardTupleExprEvaluation {
             protected boolean next(BindingSet bs) throws InterruptedException {
                 try {
                     if (accept(bs)) {
+                        parentStrategy.incrementResultSizeActual(filter);
                         return parent.push(bs); //push results that pass the filter.
                     } else {
                         return true; //nothing passes the filter but processing continues.
@@ -894,52 +896,48 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateOrder(final BindingSetPipe parent, final Order order, BindingSet bindings) {
-//        try {
-            final Sorter<ComparableBindingSetWrapper> sorter = new Sorter<>(getLimit(order), isReducedOrDistinct(order));
-            evaluateTupleExpr(new BindingSetPipe(parent) {
-                final AtomicLong minorOrder = new AtomicLong();
+        final Sorter<ComparableBindingSetWrapper> sorter = new Sorter<>(getLimit(order), isReducedOrDistinct(order));
+        evaluateTupleExpr(new BindingSetPipe(parent) {
+            final AtomicLong minorOrder = new AtomicLong();
 
-                @Override
-                protected boolean handleException(Throwable e) {
-                    sorter.close();
-                    return parent.handleException(e);
+            @Override
+            protected boolean handleException(Throwable e) {
+                sorter.close();
+                return parent.handleException(e);
+            }
+
+            @Override
+            protected boolean next(BindingSet bs) throws InterruptedException {
+                try {
+                    ComparableBindingSetWrapper cbsw = new ComparableBindingSetWrapper(parentStrategy, bs, order.getElements(), minorOrder.getAndIncrement());
+                    sorter.add(cbsw);
+                    return true;
+                } catch (QueryEvaluationException | IOException e) {
+                    return handleException(e);
                 }
+            }
 
-                @Override
-                protected boolean next(BindingSet bs) throws InterruptedException {
-                    try {
-                        ComparableBindingSetWrapper cbsw = new ComparableBindingSetWrapper(parentStrategy, bs, order.getElements(), minorOrder.getAndIncrement());
-                        sorter.add(cbsw);
-                        return true;
-                    } catch (QueryEvaluationException | IOException e) {
-                        return handleException(e);
-                    }
-                }
-
-                @Override
-                public void close() throws InterruptedException {
-                    try {
-                        for (Map.Entry<ComparableBindingSetWrapper, Long> me : sorter) {
-                            for (long i = me.getValue(); i > 0; i--) {
-                                if (!parent.push(me.getKey().bs)) {
-                                    return;
-                                }
+            @Override
+            public void close() throws InterruptedException {
+                try {
+                    for (Map.Entry<ComparableBindingSetWrapper, Long> me : sorter) {
+                        for (long i = me.getValue(); i > 0; i--) {
+                            if (!parent.push(me.getKey().bs)) {
+                                return;
                             }
                         }
-                        parent.close();
-                    } finally {
-                        sorter.close();
                     }
+                    parent.close();
+                } finally {
+                    sorter.close();
                 }
+            }
 
-                @Override
-                public String toString() {
-                	return "OrderBindingSetPipe";
-                }
-            }, order.getArg(), bindings);
-//        } catch (IOException e) {
-//            throw new QueryEvaluationException(e);
-//        }
+            @Override
+            public String toString() {
+            	return "OrderBindingSetPipe";
+            }
+        }, order.getArg(), bindings);
     }
 
     /**
@@ -949,6 +947,7 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateGroup(BindingSetPipe parent, Group group, BindingSet bindings) {
+    	parentStrategy.initTracking(group);
     	if (group.getGroupBindingNames().isEmpty()) {
     		// no GROUP BY present
 			final GroupValue aggregators = createGroupValue(group, bindings);
@@ -962,6 +961,7 @@ final class HalyardTupleExprEvaluation {
 				public void close() throws InterruptedException {
 					QueryBindingSet result = new QueryBindingSet(bindings);
 					aggregators.bindResult(result);
+					parentStrategy.incrementResultSizeActual(group);
 					parent.pushLast(result);
 				}
 				@Override
@@ -989,6 +989,7 @@ final class HalyardTupleExprEvaluation {
 							}
 						}
 						aggEntry.getValue().bindResult(result);
+						parentStrategy.incrementResultSizeActual(group);
 						parent.push(result);
 					}
 					parent.close();
@@ -1128,6 +1129,7 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateReduced(BindingSetPipe parent, Reduced reduced, BindingSet bindings) {
+    	parentStrategy.initTracking(reduced);
         evaluateTupleExpr(new BindingSetPipe(parent) {
             private BindingSet previous = null;
 
@@ -1139,6 +1141,7 @@ final class HalyardTupleExprEvaluation {
                     }
                     previous = bs;
                 }
+				parentStrategy.incrementResultSizeActual(reduced);
                 return parent.push(bs);
             }
             @Override
@@ -1155,6 +1158,7 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateDistinct(BindingSetPipe parent, final Distinct distinct, BindingSet bindings) {
+    	parentStrategy.initTracking(distinct);
         evaluateTupleExpr(new BindingSetPipe(parent) {
             private final BigHashSet<BindingSet> set = BigHashSet.create();
             @Override
@@ -1171,6 +1175,7 @@ final class HalyardTupleExprEvaluation {
                 } catch (IOException e) {
                     return handleException(e);
                 }
+				parentStrategy.incrementResultSizeActual(distinct);
                 return parent.push(bs);
             }
             @Override
@@ -1379,6 +1384,7 @@ final class HalyardTupleExprEvaluation {
             return;
     	}
 
+        parentStrategy.initTracking(join);
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
         	final AtomicLong joinsInProgress = new AtomicLong();
         	final AtomicBoolean joinsFinished = new AtomicBoolean();
@@ -1387,6 +1393,11 @@ final class HalyardTupleExprEvaluation {
             protected boolean next(BindingSet bs) throws InterruptedException {
             	joinsInProgress.incrementAndGet();
                 evaluateTupleExpr(new BindingSetPipe(parent) {
+                	@Override
+                	protected boolean next(BindingSet bs) throws InterruptedException {
+                        parentStrategy.incrementResultSizeActual(join);
+                		return parent.push(bs);
+                	}
                     @Override
                     public void close() throws InterruptedException {
                     	joinsInProgress.decrementAndGet();
@@ -1551,8 +1562,14 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateUnion(BindingSetPipe parent, Union union, BindingSet bindings) {
+    	parentStrategy.initTracking(union);
         BindingSetPipe pipe = new BindingSetPipe(parent) {
             final AtomicInteger args = new AtomicInteger(2);
+        	@Override
+        	protected boolean next(BindingSet bs) throws InterruptedException {
+                parentStrategy.incrementResultSizeActual(union);
+        		return parent.push(bs);
+        	}
             @Override
             public void close() throws InterruptedException {
                 if (args.decrementAndGet() == 0) {
@@ -1687,7 +1704,9 @@ final class HalyardTupleExprEvaluation {
     }
 
     private void evaluateStarJoin(BindingSetPipe parent, StarJoin starJoin, BindingSet bindings) {
-    	evaluateTupleExpr(parent, starJoin.toJoins(), bindings);
+    	Join nestedJoins = starJoin.toJoins();
+    	Join topJoin = new StarJoin.TopJoin(starJoin, nestedJoins.getLeftArg(), nestedJoins.getRightArg());
+    	evaluateTupleExpr(parent, topJoin, bindings);
     }
 
     /**
@@ -1699,20 +1718,22 @@ final class HalyardTupleExprEvaluation {
     private void evaluateSingletonSet(BindingSetPipe parent, SingletonSet singletonSet, BindingSet bindings) {
         try {
             parent.pushLast(bindings);
+            parentStrategy.incrementResultSizeActual(singletonSet);
         } catch (InterruptedException e) {
             parent.handleException(e);
         }
     }
 
-    /**
-     * Evaluate {@link EmptySet} query model nodes
-     * @param parent
-     * @param emptySet
-     * @param bindings
-     */
-    private void evaluateEmptySet(BindingSetPipe parent, EmptySet emptySet, BindingSet bindings) {
-    	parent.empty();
-    }
+	/**
+	 * Evaluate {@link EmptySet} query model nodes
+	 * @param parent
+	 * @param emptySet
+	 * @param bindings
+	 */
+	private void evaluateEmptySet(BindingSetPipe parent, EmptySet emptySet, BindingSet bindings) {
+		parent.empty();
+		emptySet.setResultSizeActual(0L);
+	}
 
     /**
      * Evaluate {@link ExternalSet} query model nodes
