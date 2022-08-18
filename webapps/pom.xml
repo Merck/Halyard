@@ -6,7 +6,7 @@
 	<parent>
 		<groupId>io.github.pulquero.halyard</groupId>
 		<artifactId>halyard</artifactId>
-		<version>3.11</version>
+		<version>3.12-SNAPSHOT</version>
 	</parent>
 	<properties>
 		<restlet.version>2.4.3</restlet.version>
