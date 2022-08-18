@@ -110,6 +110,7 @@ import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.Slice;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
+import org.eclipse.rdf4j.query.algebra.StatementPattern.Scope;
 import org.eclipse.rdf4j.query.algebra.SubQueryValueOperator;
 import org.eclipse.rdf4j.query.algebra.Sum;
 import org.eclipse.rdf4j.query.algebra.TripleRef;
@@ -139,7 +140,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.iterator.HashJoinIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.PathIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ProjectionIterator;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
-import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ZeroLengthPathIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.TupleExprs;
@@ -153,6 +153,9 @@ import net.sf.saxon.expr.flwor.TupleExpression;
  * @author Adam Sotona (MSD)
  */
 final class HalyardTupleExprEvaluation {
+	private static final String ANON_SUBJECT_VAR = "__subj";
+	private static final String ANON_PREDICATE_VAR = "__pred";
+	private static final String ANON_OBJECT_VAR = "__obj";
 
     private final HalyardEvaluationStrategy parentStrategy;
 	private final TupleFunctionRegistry tupleFunctionRegistry;
@@ -337,7 +340,7 @@ final class HalyardTupleExprEvaluation {
 	                parent.empty(); //no results from this statement pattern
 	                return;
 	            } else if (graphs == null || graphs.isEmpty()) {
-	                // store default behaivour
+	                // store default behaviour
 	                if (contextValue != null) {
 						if (RDF4J.NIL.equals(contextValue) || SESAME.NIL.equals(contextValue)) {
 							contexts = new Resource[] { (Resource) null };
@@ -1499,7 +1502,7 @@ final class HalyardTupleExprEvaluation {
                             }
                         } catch (ValueExprEvaluationException ignore) {
                         } catch (QueryEvaluationException e) {
-                            parent.handleException(e);
+                            handleException(e);
                         }
                         return true;
                     }
@@ -1596,7 +1599,7 @@ final class HalyardTupleExprEvaluation {
                         try {
                             return secondSet.contains(bs) ? parent.push(bs) : true;
                         } catch (IOException e) {
-                            return parent.handleException(e);
+                            return handleException(e);
                         }
                     }
                     @Override
@@ -1725,29 +1728,90 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
-    /**
-     * Evaluate {@link ZeroLengthPath} query model nodes
-     * @param parent
-     * @param zlp
-     * @param bindings
-     */
-    private void evaluateZeroLengthPath(BindingSetPipe parent, ZeroLengthPath zlp, BindingSet bindings) {
-        final Var subjectVar = zlp.getSubjectVar();
-        final Var objVar = zlp.getObjectVar();
-        final Var contextVar = zlp.getContextVar();
-        Value subj = subjectVar.getValue() == null ? bindings.getValue(subjectVar.getName()) : subjectVar.getValue();
-        Value obj = objVar.getValue() == null ? bindings.getValue(objVar.getName()) : objVar.getValue();
-        if (subj != null && obj != null) {
-            if (!subj.equals(obj)) {
-            	parent.empty();
-                return;
-            }
-        }
-        //temporary solution using copy of the original iterator
-        //re-writing this to push model is a bit more complex task
-		pullAndPushAsync(parent,
-				new ZeroLengthPathIteration(parentStrategy, subjectVar, objVar, subj, obj, contextVar, bindings), zlp, parentStrategy);
-    }
+	/**
+	 * Evaluate {@link ZeroLengthPath} query model nodes
+	 * @param parent
+	 * @param zlp
+	 * @param bindings
+	 */
+	private void evaluateZeroLengthPath(BindingSetPipe parent, ZeroLengthPath zlp, BindingSet bindings) {
+		final Var subjVar = zlp.getSubjectVar();
+		final Var objVar = zlp.getObjectVar();
+		final Var contextVar = zlp.getContextVar();
+		Value subj = subjVar.getValue() == null ? bindings.getValue(subjVar.getName()) : subjVar.getValue();
+		Value obj = objVar.getValue() == null ? bindings.getValue(objVar.getName()) : objVar.getValue();
+		if (subj != null && obj != null) {
+			if (!subj.equals(obj)) {
+				parent.empty();
+				return;
+			}
+		}
+
+		if (subj == null && obj == null) {
+			Var allSubjVar = createAnonVar(ANON_SUBJECT_VAR);
+			Var allPredVar = createAnonVar(ANON_PREDICATE_VAR);
+			Var allObjVar = createAnonVar(ANON_OBJECT_VAR);
+			StatementPattern sp = new StatementPattern(allSubjVar, allPredVar, allObjVar);
+			if (contextVar != null) {
+				sp.setScope(Scope.NAMED_CONTEXTS);
+				sp.setContextVar(contextVar);
+			}
+			evaluateStatementPattern(new BindingSetPipe(parent) {
+				private final BigHashSet<Value> set = BigHashSet.create();
+				@Override
+				protected boolean next(BindingSet bs) throws InterruptedException {
+					Value ctx = (contextVar != null) ? bs.getValue(contextVar.getName()) : null;
+					Value v = bs.getValue(ANON_SUBJECT_VAR);
+					nextValue(v, ctx);
+					v = bs.getValue(ANON_OBJECT_VAR);
+					nextValue(v, ctx);
+					return true;
+				}
+				private void nextValue(Value v, Value ctx) throws InterruptedException {
+					try {
+						if (set.add(v)) {
+							QueryBindingSet result = new QueryBindingSet(bindings);
+							result.addBinding(subjVar.getName(), v);
+							result.addBinding(objVar.getName(), v);
+							if (ctx != null) {
+								result.addBinding(contextVar.getName(), ctx);
+							}
+							parent.push(result);
+						}
+					} catch (IOException ioe) {
+						handleException(ioe);
+					}
+				}
+			}, sp, bindings);
+		} else {
+			QueryBindingSet result = new QueryBindingSet(bindings);
+			if (obj == null && subj != null) {
+				result.addBinding(objVar.getName(), subj);
+			} else if (subj == null && obj != null) {
+				result.addBinding(subjVar.getName(), obj);
+			} else if (subj != null && subj.equals(obj)) {
+				// empty bindings
+				// (result but nothing to bind as subjectVar and objVar are both fixed)
+			} else {
+				result = null;
+			}
+			if (result != null) {
+				try {
+					parent.pushLast(result);
+				} catch (InterruptedException e) {
+					parent.handleException(e);
+				}
+			} else {
+				parent.empty();
+			}
+		}
+	}
+
+	private static Var createAnonVar(String varName) {
+		Var var = new Var(varName);
+		var.setAnonymous(true);
+		return var;
+	}
 
     /**
      * Evaluate {@link ArbitraryLengthPath} query model nodes
