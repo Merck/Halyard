@@ -93,7 +93,7 @@ import org.slf4j.LoggerFactory;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 
-public class HBaseSailConnection implements SailConnection {
+public class HBaseSailConnection extends AbstractSailConnection {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseSailConnection.class);
 
 	public static final String SOURCE_STRING_BINDING = "__source__";
@@ -183,25 +183,31 @@ public class HBaseSailConnection implements SailConnection {
 				: new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), 0L, stats);
 	}
 
-	private TupleExpr optimize(final TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred, TripleSource source, EvaluationStrategy strategy) {
+	private TupleExpr optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred, TripleSource source, EvaluationStrategy strategy) {
 		LOG.debug("Evaluated TupleExpr before optimizers:\n{}", tupleExpr);
-		TupleExpr optimizedTupleExpr = tupleExpr.clone();
-		if (!(optimizedTupleExpr instanceof QueryRoot)) {
+
+		if (cloneTupleExpression) {
+			tupleExpr = tupleExpr.clone();
+		}
+
+		if (!(tupleExpr instanceof QueryRoot)) {
 			// Add a dummy root node to the tuple expressions to allow the
 			// optimizers to modify the actual root node
-			optimizedTupleExpr = new QueryRoot(optimizedTupleExpr);
+			tupleExpr = new QueryRoot(tupleExpr);
 		}
-		if (!(optimizedTupleExpr instanceof ServiceRoot)) {
+
+		if (!(tupleExpr instanceof ServiceRoot)) {
 			// if this is a Halyard federated query then the full query has already passed through the optimizer so don't need to re-run these again
-			new SpinFunctionInterpreter(sail.getSpinParser(), source, sail.getFunctionRegistry()).optimize(optimizedTupleExpr, dataset, bindings);
+			new SpinFunctionInterpreter(sail.getSpinParser(), source, sail.getFunctionRegistry()).optimize(tupleExpr, dataset, bindings);
 			if (includeInferred) {
-				new SpinMagicPropertyInterpreter(sail.getSpinParser(), source, sail.getTupleFunctionRegistry(), null).optimize(optimizedTupleExpr, dataset, bindings);
+				new SpinMagicPropertyInterpreter(sail.getSpinParser(), source, sail.getTupleFunctionRegistry(), null).optimize(tupleExpr, dataset, bindings);
 			}
-			new SearchInterpreter().optimize(optimizedTupleExpr, dataset, bindings);
+			new SearchInterpreter().optimize(tupleExpr, dataset, bindings);
 		}
-		strategy.optimize(optimizedTupleExpr, getStatistics(), bindings);
-		LOG.debug("Evaluated TupleExpr after optimization:\n{}", optimizedTupleExpr);
-		return optimizedTupleExpr;
+
+		strategy.optimize(tupleExpr, getStatistics(), bindings);
+		LOG.debug("Evaluated TupleExpr after optimization:\n{}", tupleExpr);
+		return tupleExpr;
 	}
 
 	// evaluate queries/ subqueries
@@ -215,6 +221,13 @@ public class HBaseSailConnection implements SailConnection {
 		RDFStarTripleSource tripleSource = createTripleSource();
 		QueryContext queryContext = createQueryContext(tripleSource, includeInferred, sourceString);
 		EvaluationStrategy strategy = createEvaluationStrategy(tripleSource, dataset, queryContext);
+		if (trackResultSize) {
+			strategy.setTrackResultSize(trackResultSize);
+		}
+
+		if (trackTime) {
+			strategy.setTrackTime(trackTime);
+		}
 
 		queryContext.begin();
 		try {

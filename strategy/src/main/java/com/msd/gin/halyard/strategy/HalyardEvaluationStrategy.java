@@ -16,15 +16,19 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.google.common.base.Stopwatch;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
+import org.eclipse.rdf4j.common.iteration.IterationWrapper;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
+import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
@@ -78,6 +82,12 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
      */
     private final HalyardValueExprEvaluation valueEval;
 
+	/** Track the results size that each node in the query plan produces during execution. */
+	private boolean trackResultSize;
+
+	/** Track the exeution time of each node in the plan. */
+	private boolean trackTime;
+
 	private QueryOptimizerPipeline pipeline;
 
     /**
@@ -115,6 +125,16 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 			FederatedServiceResolver serviceResolver, HalyardEvaluationStatistics statistics) {
 		this(tripleSource, new QueryContext(), TupleFunctionRegistry.getInstance(), FunctionRegistry.getInstance(),
 				dataset, serviceResolver, statistics);
+	}
+
+	@Override
+	public void setTrackResultSize(boolean trackResultSize) {
+		this.trackResultSize = trackResultSize;
+	}
+
+	@Override
+	public void setTrackTime(boolean trackTime) {
+		this.trackTime = trackTime;
 	}
 
 	String getSourceString() {
@@ -155,13 +175,26 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
         throw new UnsupportedOperationException();
     }
 
-    /**
-     * Called by RDF4J to evaluate a tuple expression
-     */
-    @Override
-    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) throws QueryEvaluationException {
-        return tupleEval.evaluate(expr, bindings);
-    }
+	/**
+	 * Called by RDF4J to evaluate a tuple expression
+	 */
+	@Override
+	public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) throws QueryEvaluationException {
+		CloseableIteration<BindingSet, QueryEvaluationException> iter = tupleEval.evaluate(expr, bindings);
+
+		if (trackTime) {
+			// set resultsSizeActual to at least be 0 so we can track iterations that don't procude anything
+			expr.setTotalTimeNanosActual(Math.max(0, expr.getTotalTimeNanosActual()));
+			iter = new TimedIterator(iter, expr);
+		}
+	
+		if (trackResultSize) {
+			// set resultsSizeActual to at least be 0 so we can track iterations that don't procude anything
+			expr.setResultSizeActual(Math.max(0, expr.getResultSizeActual()));
+			iter = new ResultSizeCountingIterator(iter, expr);
+		}
+		return iter;
+	}
 
     /**
      * Called by RDF4J to evaluate a value expression
@@ -183,4 +216,68 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
     public String toString() {
         return super.toString() + "[sourceString = " + getSourceString() + ", tripleSource = " + tripleSource + "]";
     }
+
+
+	/**
+	 * This class wraps an iterator and increments the "resultSizeActual" of the query model node that the iterator
+	 * represents. This means we can track the number of tuples that have been retrieved from this node.
+	 */
+	private static final class ResultSizeCountingIterator extends IterationWrapper<BindingSet, QueryEvaluationException> {
+
+		private final CloseableIteration<BindingSet, QueryEvaluationException> iterator;
+		private final QueryModelNode queryModelNode;
+
+		public ResultSizeCountingIterator(CloseableIteration<BindingSet, QueryEvaluationException> iterator,
+				QueryModelNode queryModelNode) {
+			super(iterator);
+			this.iterator = iterator;
+			this.queryModelNode = queryModelNode;
+		}
+
+		@Override
+		public BindingSet next() throws QueryEvaluationException {
+			queryModelNode.setResultSizeActual(queryModelNode.getResultSizeActual() + 1);
+			return iterator.next();
+		}
+	}
+
+	/**
+	 * This class wraps an iterator and tracks the time used to execute next() and hasNext()
+	 */
+	private static final class TimedIterator extends IterationWrapper<BindingSet, QueryEvaluationException> {
+
+		private final CloseableIteration<BindingSet, QueryEvaluationException> iterator;
+		private final QueryModelNode queryModelNode;
+
+		private final Stopwatch stopwatch = Stopwatch.createUnstarted();
+
+		public TimedIterator(CloseableIteration<BindingSet, QueryEvaluationException> iterator,
+				QueryModelNode queryModelNode) {
+			super(iterator);
+			this.iterator = iterator;
+			this.queryModelNode = queryModelNode;
+		}
+
+		@Override
+		public BindingSet next() throws QueryEvaluationException {
+			stopwatch.reset();
+			stopwatch.start();
+			BindingSet next = iterator.next();
+			stopwatch.stop();
+			queryModelNode.setTotalTimeNanosActual(
+					queryModelNode.getTotalTimeNanosActual() + stopwatch.elapsed(TimeUnit.NANOSECONDS));
+			return next;
+		}
+
+		@Override
+		public boolean hasNext() throws QueryEvaluationException {
+			stopwatch.reset();
+			stopwatch.start();
+			boolean hasNext = super.hasNext();
+			stopwatch.stop();
+			queryModelNode.setTotalTimeNanosActual(
+					queryModelNode.getTotalTimeNanosActual() + stopwatch.elapsed(TimeUnit.NANOSECONDS));
+			return hasNext;
+		}
+	}
 }

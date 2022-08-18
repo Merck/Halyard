@@ -253,7 +253,7 @@ final class HalyardEvaluationExecutor {
 
     	@Override
     	public String toString() {
-    		return super.toString() + "[queryNode = " + getQueryNode().getSignature() + ", priority = " + getTaskPriority() + ", strategy = " + strategy + "]";
+    		return super.toString() + "[queryNode = " + queryNode.getSignature() + "[cost = " + queryNode.getCostEstimate() + ", cardinality = " + queryNode.getResultSizeEstimate() + ", count = " + queryNode.getResultSizeActual() + ", time = " + queryNode.getTotalTimeNanosActual() + "], priority = " + getTaskPriority() + ", strategy = " + strategy + "]";
     	}
     }
 
