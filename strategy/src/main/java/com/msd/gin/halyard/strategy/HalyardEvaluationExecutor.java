@@ -169,21 +169,18 @@ final class HalyardEvaluationExecutor {
             while (root.getParentNode() != null) {
             	root = root.getParentNode(); //traverse to the root of the query model
             }
+            // while we have a strong ref to the root node, none of the child node keys should be gc-ed
+
             //starting priority for ServiceRoot must be evaluated from the original service args node
             int startingPriority = root instanceof ServiceRoot ? getPriorityForNode(((ServiceRoot)root).originalServiceArgs) : 0;
             final AtomicInteger counter = new AtomicInteger(startingPriority);
-            final AtomicInteger ret = new AtomicInteger(DEFAULT_PRIORITY);
 
+            // populate the priority cache
             new AbstractQueryModelVisitor<RuntimeException>() {
                 @Override
                 protected void meetNode(QueryModelNode n) throws RuntimeException {
                     int pp = counter.getAndIncrement();
                     PRIORITY_MAP_CACHE.put(n, pp);
-                    if (n == node) {
-                    	ret.set(pp);
-                    } else if (n == node.getParentNode()) {
-                    	ret.set(pp+1);
-                    }
                     super.meetNode(n);
                 }
 
@@ -199,9 +196,6 @@ final class HalyardEvaluationExecutor {
                     n.visitChildren(this);
                     int pp = counter.getAndIncrement();
                     PRIORITY_MAP_CACHE.put(n, pp);
-                    if (n == node) {
-                    	ret.set(pp);
-                    }
                     counter.getAndUpdate((int count) -> 2 * count - checkpoint + 1); //at least double the distance to have a space for service optimizations
                 }
 
@@ -213,7 +207,26 @@ final class HalyardEvaluationExecutor {
                     }
                 }
             }.meetOther(root);
-            return ret.get();
+
+            Integer priority = PRIORITY_MAP_CACHE.getIfPresent(node);
+            if (priority == null) {
+                // else node is dynamically created, so climb the tree to find an ancestor with a priority
+                QueryModelNode parent = node.getParentNode();
+                int depth = 1;
+                while (parent != null && (priority = PRIORITY_MAP_CACHE.getIfPresent(parent)) == null) {
+                    parent = parent.getParentNode();
+                    depth++;
+                }
+                if (priority != null) {
+                    priority = priority + depth;
+                }
+            }
+            if (priority == null) {
+                LOGGER.warn("Failed to ascertain a priority for node\n{}\n with root\n{}\n - using default value {}", node, root, DEFAULT_PRIORITY);
+                // else fallback to a default value
+                priority = DEFAULT_PRIORITY;
+            }
+            return priority;
         }
     }
 
