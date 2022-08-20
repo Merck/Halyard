@@ -402,6 +402,10 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		return queryHistory.toArray(new QueryInfo[queryHistory.size()]);
 	}
 
+	String getFederatedServiceResolverName() {
+		return federatedServiceResolver.getClass().getSimpleName() + "@" + federatedServiceResolver.hashCode();
+	}
+
 	BufferedMutator getBufferedMutator() {
 		if (hConnection == null) {
 			throw new SailException("Snapshots are not modifiable");
@@ -529,7 +533,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		if (owner != null) {
 			attrs.put("owner", owner);
 		}
-		attrs.put("federatedServiceResolver", federatedServiceResolver.toString());
+		attrs.put("federatedServiceResolver", getFederatedServiceResolverName());
 		try {
 			mxInst = ManagementFactory.getPlatformMBeanServer().registerMBean(this, ObjectName.getInstance("com.msd.gin.halyard", attrs));
 		} catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException | MalformedObjectNameException e) {

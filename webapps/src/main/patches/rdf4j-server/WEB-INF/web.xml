@@ -66,6 +66,10 @@
 	<servlet>
 		<servlet-name>JmxMiniConsoleServlet</servlet-name>
 		<servlet-class>org.jminix.console.servlet.MiniConsoleServlet</servlet-class>
+		<init-param>
+			<param-name>attributeFilter</param-name>
+			<param-value>com.msd.gin.halyard.jmx.JMiniXAttributeRenderer</param-value>
+		</init-param>
 	</servlet>
 	<servlet-mapping>
 		<servlet-name>rdf4j-http-server</servlet-name>

@@ -77,7 +77,7 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 			try {
 				federatedService = federatedServices.get(serviceUrl, () -> {
 					HBaseSail sail = new HBaseSail(hConnection, config, federatedTable, false, 0, true, evaluationTimeout, null, ticker, HBaseSailConnection.Factory.INSTANCE, this);
-					sail.owner = toString();
+					sail.owner = sail.getFederatedServiceResolverName();
 					HBaseSail.ScanSettings scanSettings = sail.getScanSettings();
 					for (NameValuePair nvp : queryParams) {
 						switch (nvp.getName()) {
