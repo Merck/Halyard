@@ -31,6 +31,11 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
+		<dependency>
+			<groupId>commons-fileupload</groupId>
+			<artifactId>commons-fileupload</artifactId>
+			<version>1.3.3</version>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
@@ -203,11 +208,15 @@
 										<include name="transformations/create.xsl" />
 										<include name="locale/messages.xsl" />
 										<include name="WEB-INF/web.xml" />
+										<include name="WEB-INF/lib/rdf4j-http-workbench-${rdf4j.version}.jar" />
 									</patternset>
 								</unzip>
 								<replace file="target/rdf4j-workbench-patch/transformations/create.xsl" token="&lt;select id=&quot;type&quot; name=&quot;type&quot;&gt;" value="&lt;select id=&quot;type&quot; name=&quot;type&quot;&gt;&lt;option value=&quot;hbase&quot;&gt;Halyard HBase Store&lt;/option&gt;" />
 								<replace file="target/rdf4j-workbench-patch/locale/messages.xsl" token="&lt;variable name=&quot;limit200.label&quot;&gt;200&lt;/variable&gt;" value="&lt;variable name=&quot;limit200.label&quot;&gt;200&lt;/variable&gt; &lt;variable name=&quot;limit500.label&quot;&gt;500&lt;/variable&gt; &lt;variable name=&quot;limit1000.label&quot;&gt;1000&lt;/variable&gt;" />
 								<replace file="target/rdf4j-workbench-patch/WEB-INF/web.xml" token="100" value="200" />
+								<zip destfile="${project.build.directory}/rdf4j-workbench-patch/WEB-INF/lib/rdf4j-http-workbench-${rdf4j.version}.jar" update="true">
+									<fileset dir="target/classes" includes="org/eclipse/rdf4j/workbench/**" />
+								</zip>
 								<zip destfile="${project.build.directory}/rdf4j-workbench.war" update="true">
 									<fileset dir="src/main/patches/rdf4j-workbench" />
 									<fileset dir="target/rdf4j-workbench-patch" />
