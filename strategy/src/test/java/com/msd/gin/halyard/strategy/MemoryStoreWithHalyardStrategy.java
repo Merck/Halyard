@@ -19,6 +19,8 @@ package com.msd.gin.halyard.strategy;
 import com.msd.gin.halyard.optimizers.ExtendedEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 
+import java.util.LinkedList;
+
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -27,8 +29,10 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
+import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
+import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
@@ -43,13 +47,35 @@ import org.eclipse.rdf4j.sail.memory.MemoryStoreConnection;
  */
 class MemoryStoreWithHalyardStrategy extends MemoryStore {
 
-    @Override
+	private final LinkedList<TupleExpr> queryHistory = new LinkedList<>();
+	private final int hashJoinLimit;
+
+	MemoryStoreWithHalyardStrategy() {
+		this(0);
+	}
+
+	MemoryStoreWithHalyardStrategy(int hashJoinLimit) {
+		this.hashJoinLimit = hashJoinLimit;
+	}
+
+	LinkedList<TupleExpr> getQueryHistory() {
+		return queryHistory;
+	}
+
+	@Override
     protected NotifyingSailConnection getConnectionInternal() throws SailException {
         return new MemoryStoreConnection(this) {
 
             @Override
             protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, final TripleSource tripleSource) {
-                EvaluationStrategy es = new HalyardEvaluationStrategy(new MockTripleSource(tripleSource), dataset, null, new HalyardEvaluationStatistics(null, null));
+            	HalyardEvaluationStrategy es = new HalyardEvaluationStrategy(new MockTripleSource(tripleSource), dataset, null, new HalyardEvaluationStatistics(null, null)) {
+            		@Override
+            		public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) throws QueryEvaluationException {
+            			queryHistory.add(expr);
+            			return super.evaluate(expr, bindings);
+            		}
+            	};
+            	es.setHashJoinLimit(hashJoinLimit);
                 es.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(es, tripleSource.getValueFactory(), new ExtendedEvaluationStatistics()));
                 return es;
             }

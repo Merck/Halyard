@@ -51,7 +51,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
  * in Halyard. An alternative strategy is the {@code StrictEvaluationStrategy} from RDF4J.
  * @author Adam Sotona (MSD)
  */
-public final class HalyardEvaluationStrategy implements EvaluationStrategy {
+public class HalyardEvaluationStrategy implements EvaluationStrategy {
 	public static final String QUERY_CONTEXT_SOURCE_STRING_ATTRIBUTE = "SourceString";
 
     public static final class ServiceRoot extends QueryRoot {
@@ -87,6 +87,8 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 
 	/** Track the exeution time of each node in the plan. */
 	boolean trackTime;
+
+	int hashJoinLimit = 50000;
 
 	private QueryOptimizerPipeline pipeline;
 
@@ -135,6 +137,10 @@ public final class HalyardEvaluationStrategy implements EvaluationStrategy {
 	@Override
 	public void setTrackTime(boolean trackTime) {
 		this.trackTime = trackTime;
+	}
+
+	public void setHashJoinLimit(int n) {
+		this.hashJoinLimit = n;
 	}
 
 	String getSourceString() {

@@ -22,12 +22,12 @@ import com.msd.gin.halyard.optimizers.HalyardConstantOptimizer;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
 import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
+import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.optimizers.StarJoinOptimizer;
 
 import java.util.Arrays;
 
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizerPipeline;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.BindingAssigner;
@@ -51,10 +51,10 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.UnionScopeChangeOptimizer
 public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeline {
 
 	private final ExtendedEvaluationStatistics statistics;
-	private final EvaluationStrategy strategy;
+	private final HalyardEvaluationStrategy strategy;
 	private final ValueFactory valueFactory;
 
-	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory, ExtendedEvaluationStatistics statistics) {
+	public HalyardQueryOptimizerPipeline(HalyardEvaluationStrategy strategy, ValueFactory valueFactory, ExtendedEvaluationStatistics statistics) {
 		this.strategy = strategy;
 		this.valueFactory = valueFactory;
 		this.statistics = statistics;
@@ -80,7 +80,8 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 			new HalyardFilterOptimizer(), // apply filter optimizer twice (before and after Joins and Unions shaking)
 			new ConstrainedValueOptimizer(),
 			new OrderLimitOptimizer(),
-			new ParentReferenceCleaner()
+			new ParentReferenceCleaner(),
+			new JoinAlgorithmOptimizer()
 		);
 	}
 }

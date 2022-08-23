@@ -20,6 +20,8 @@ import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPush
 import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPushAsync;
 
 import com.msd.gin.halyard.algebra.ConstrainedStatementPattern;
+import com.msd.gin.halyard.algebra.HashJoin;
+import com.msd.gin.halyard.algebra.NestedLoops;
 import com.msd.gin.halyard.algebra.StarJoin;
 import com.msd.gin.halyard.common.LiteralConstraint;
 import com.msd.gin.halyard.common.ValueConstraint;
@@ -39,6 +41,9 @@ import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -135,6 +140,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.TupleFunctionEvaluationStrategy;
+import org.eclipse.rdf4j.query.algebra.evaluation.iterator.BindingSetHashKey;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.DescribeIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.HashJoinIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.PathIteration;
@@ -764,7 +770,9 @@ final class HalyardTupleExprEvaluation {
                         }
                     }
                     if (push) {
-                        if (!parent.push(nb)) return false;
+                        if (!parent.push(nb)) {
+                            return false;
+                        }
                     }
                 }
                 return true;
@@ -1384,7 +1392,32 @@ final class HalyardTupleExprEvaluation {
             return;
     	}
 
-        parentStrategy.initTracking(join);
+    	String algorithm = join.getAlgorithmName();
+    	if (algorithm == null) {
+        	double leftEstimate = join.getLeftArg().getResultSizeEstimate();
+        	double rightEstimate = join.getRightArg().getResultSizeEstimate();
+        	if (rightEstimate >= 0 && rightEstimate <= parentStrategy.hashJoinLimit && rightEstimate <= leftEstimate) {
+        		join.setAlgorithm(new HashJoin());
+        	} else {
+        		join.setAlgorithm(new NestedLoops());
+        	}
+        	algorithm = join.getAlgorithmName();
+    	}
+
+    	if (HashJoin.NAME.equals(algorithm)) {
+    		evaluateHashJoin(topPipe, join, bindings);
+    	} else {
+    		evaluateNestedLoopsJoin(topPipe, join, bindings);
+    	}
+    }
+
+    private static boolean isOutOfScopeForLeftArgBindings(TupleExpr expr) {
+		return (TupleExprs.isVariableScopeChange(expr) || TupleExprs.containsSubquery(expr));
+	}
+
+    private void evaluateNestedLoopsJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
+    	join.setAlgorithm(new NestedLoops());
+    	parentStrategy.initTracking(join);
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
         	final AtomicLong joinsInProgress = new AtomicLong();
         	final AtomicBoolean joinsFinished = new AtomicBoolean();
@@ -1426,9 +1459,100 @@ final class HalyardTupleExprEvaluation {
         }, join.getLeftArg(), bindings);
     }
 
-    private boolean isOutOfScopeForLeftArgBindings(TupleExpr expr) {
-		return (TupleExprs.isVariableScopeChange(expr) || TupleExprs.containsSubquery(expr));
-	}
+    private void evaluateHashJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
+    	join.setAlgorithm(new HashJoin());
+    	TupleExpr driver = join.getLeftArg();
+    	TupleExpr probe = join.getRightArg();
+    	Set<String> joinAttributeNames = probe.getBindingNames();
+		joinAttributeNames.retainAll(driver.getBindingNames());
+		final String[] joinAttributes = joinAttributeNames.toArray(new String[joinAttributeNames.size()]);
+
+		final Map<BindingSetHashKey, List<BindingSet>> hashTable;
+		int initialSize = (int) probe.getResultSizeEstimate();
+		if (joinAttributes.length > 0) {
+			hashTable = new HashMap<>(initialSize);
+		} else {
+			List<BindingSet> l = (initialSize > 0) ? new ArrayList<>(initialSize) : null;
+			hashTable = Collections.<BindingSetHashKey, List<BindingSet>>singletonMap(BindingSetHashKey.EMPTY, l);
+		}
+
+		evaluateTupleExpr(new BindingSetPipe(topPipe) {
+			int keyCount;
+			long bsCount;
+            @Override
+            protected boolean next(BindingSet bs) throws InterruptedException {
+    			BindingSetHashKey hashKey = BindingSetHashKey.create(joinAttributes, bs);
+    			synchronized (hashTable) {
+    				List<BindingSet> hashValue = hashTable.get(hashKey);
+    				boolean newEntry = (hashValue == null);
+    				if (newEntry) {
+    					int averageSize = (keyCount > 0) ? (int) (bsCount/keyCount) : 0;
+    					hashValue = new ArrayList<>(averageSize + 1);
+    					hashTable.put(hashKey, hashValue);
+    					keyCount++;
+    				}
+    				hashValue.add(bs);
+    				bsCount++;
+    			}
+            	return true;
+            }
+            @Override
+            public void close() throws InterruptedException {
+                evaluateTupleExpr(new BindingSetPipe(topPipe) {
+                	@Override
+                	protected boolean next(BindingSet driverBs) throws InterruptedException {
+                		if (driverBs.size() == 0) {
+        					// the empty bindingset should be merged with all bindingsets in the hash table
+        					Collection<List<BindingSet>> hashValues = hashTable.values();
+        					for (List<BindingSet> hashValue : hashValues) {
+        						for (BindingSet b : hashValue) {
+        							if (!parent.push(join(b, driverBs))) {
+        								return false;
+        							}
+        						}
+        					}
+                		} else {
+        					BindingSetHashKey key = BindingSetHashKey.create(joinAttributes, driverBs);
+        					List<BindingSet> hashValue = hashTable.get(key);
+        					if (hashValue != null) {
+	        					for (BindingSet b : hashValue) {
+	    							if (!parent.push(join(b, driverBs))) {
+	    								return false;
+	    							}
+	        					}
+        					}
+                		}
+                		return true;
+                	}
+                    @Override
+                    public void close() throws InterruptedException {
+                    	parent.close();
+                    }
+                    @Override
+                    public String toString() {
+                    	return "HashJoinBindingSetPipe(driver)";
+                    }
+                }, driver, bindings);
+            }
+            @Override
+            public String toString() {
+            	return "HashJoinBindingSetPipe(probe)";
+            }
+    	}, probe, bindings);
+    }
+
+    private static BindingSet join(BindingSet b1, BindingSet b2) {
+		QueryBindingSet result = new QueryBindingSet(b1);
+		for (String name : b2.getBindingNames()) {
+			if (!result.hasBinding(name)) {
+				Value v = b2.getValue(name);
+				if (v != null) {
+					result.addBinding(name, v);
+				}
+			}
+		}
+		return result;
+    }
 
     /**
      * Evaluate {@link LeftJoin} query model nodes
