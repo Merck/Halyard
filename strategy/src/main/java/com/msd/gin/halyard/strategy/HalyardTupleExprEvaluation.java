@@ -988,17 +988,33 @@ final class HalyardTupleExprEvaluation {
 				}
 				@Override
 				public void close() throws InterruptedException {
-					for(Map.Entry<GroupKey,GroupValue> aggEntry : groupByMap.entrySet()) {
+					if (!groupByMap.isEmpty()) {
+						for(Map.Entry<GroupKey,GroupValue> aggEntry : groupByMap.entrySet()) {
+							QueryBindingSet result = new QueryBindingSet(bindings);
+							for (String name : group.getGroupBindingNames()) {
+								Value v = aggEntry.getKey().bindingSet.getValue(name);
+								if (v != null) {
+									result.setBinding(name, v);
+								}
+							}
+							aggEntry.getValue().bindResult(result);
+							parentStrategy.incrementResultSizeActual(group);
+							parent.push(result);
+						}
+					} else {
 						QueryBindingSet result = new QueryBindingSet(bindings);
-						for (String name : group.getGroupBindingNames()) {
-							Value v = aggEntry.getKey().bindingSet.getValue(name);
-							if (v != null) {
-								result.setBinding(name, v);
+						for (GroupElem ge : group.getGroupElements()) {
+							Aggregator agg = createAggregator(ge.getOperator(), bindings);
+							if (agg != null) {
+								Value v = agg.getValue();
+								if (v != null) {
+									result.setBinding(ge.getName(), v);
+								}
 							}
 						}
-						aggEntry.getValue().bindResult(result);
-						parentStrategy.incrementResultSizeActual(group);
-						parent.push(result);
+						if (result.size() > 0) {
+							parent.push(result);
+						}
 					}
 					parent.close();
 				}

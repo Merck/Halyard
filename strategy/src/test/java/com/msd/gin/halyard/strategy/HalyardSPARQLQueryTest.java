@@ -41,14 +41,18 @@ import org.junit.runners.Parameterized;
 public class HalyardSPARQLQueryTest extends SPARQLQueryComplianceTest {
 
 	private static final String[] defaultIgnoredTests = {
+		// currently very slow
 		"BSBM BI use case query 5",
+		// working draft property path syntax not supported
 		"sparql11-sequence-04",
+		// working draft property path syntax not supported
 		"sparql11-sequence-05",
+		// working draft property path syntax not supported
 		"sparql11-sequence-06",
 		"sparql11-wildcard-cycles-04",
 		"sparql11-not-in-02",
-		"sparql11-subquery-05",
-		"sparql11-sum-02"
+		// incompatible with non-sequential retrieval
+		"sparql11-subquery-05"
 	};
 
 	private static final List<String> excludedSubdirs = Arrays.asList("service");
