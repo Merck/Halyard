@@ -114,7 +114,7 @@ public class SearchTest {
 				conn.add(whatever, whatever, val2);
 				conn.add(whatever, whatever, val3);
 				TupleQuery q = conn.prepareTupleQuery(
-						"PREFIX halyard: <http://merck.github.io/Halyard/ns#> select * { [] a halyard:Query; halyard:query 'what'; halyard:limit 5; halyard:matches [rdf:value ?v; halyard:score ?score; halyard:index ?index ] }");
+						"PREFIX halyard: <http://merck.github.io/Halyard/ns#> select * { [] a halyard:Query; halyard:query 'what'; halyard:limit 5; halyard:fuzziness 1; halyard:phraseSlop 0; halyard:matches [rdf:value ?v; halyard:score ?score; halyard:index ?index ] }");
 				try (TupleQueryResult iter = q.evaluate()) {
 					assertTrue(iter.hasNext());
 					BindingSet bs = iter.next();

@@ -88,7 +88,7 @@ public class HBaseSearchTripleSource extends HBaseTripleSource {
 						try {
 							List<RDFObject> objectList = SEARCH_CACHE.get(literalSearchQuery, () -> {
 								ArrayList<RDFObject> objList = new ArrayList<>();
-								SearchResponse<SearchDocument> response = searchClient.search(literalSearchQuery, SearchClient.MAX_RESULT_SIZE);
+								SearchResponse<SearchDocument> response = searchClient.search(literalSearchQuery, SearchClient.DEFAULT_RESULT_SIZE, SearchClient.DEFAULT_FUZZINESS, SearchClient.DEFAULT_PHRASE_SLOP);
 								for (Hit<SearchDocument> hit : response.hits().hits()) {
 									SearchDocument source = hit.source();
 									Literal literal = source.createLiteral(vf, rdfFactory);

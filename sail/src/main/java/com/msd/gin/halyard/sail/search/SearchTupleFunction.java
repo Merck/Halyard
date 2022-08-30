@@ -35,23 +35,26 @@ public class SearchTupleFunction implements TupleFunction {
 
 	@Override
 	public CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> evaluate(ValueFactory valueFactory, Value... args) throws QueryEvaluationException {
-		if (args.length != 3) {
+		if (args.length != 5) {
 			throw new QueryEvaluationException("Missing arguments");
 		}
 
 		if (!args[0].isLiteral()) {
 			throw new QueryEvaluationException("Invalid query value");
 		}
-		String query = ((Literal) args[0]).getLabel();
+		int argPos = 0;
+		String query = ((Literal) args[argPos++]).getLabel();
 		int queryHash = query.hashCode();
-		int limit = ((Literal) args[1]).intValue();
-		SearchInterpreter.SearchParams searchParams = ((ObjectLiteral<SearchInterpreter.SearchParams>) args[2]).objectValue();
+		int limit = ((Literal) args[argPos++]).intValue();
+		int fuzziness = ((Literal) args[argPos++]).intValue();
+		int phraseSlop = ((Literal) args[argPos++]).intValue();
+		List<SearchInterpreter.SearchParams.MatchParams> matches = ((ObjectLiteral<List<SearchInterpreter.SearchParams.MatchParams>>) args[argPos++]).objectValue();
 		RDFFactory rdfFactory = (RDFFactory) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_RDFFACTORY_ATTRIBUTE);
 		SearchClient searchClient = (SearchClient) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_SEARCH_ATTRIBUTE);
 		try {
-			SearchResponse<SearchDocument> searchResults = searchClient.search(query, limit);
+			SearchResponse<SearchDocument> searchResults = searchClient.search(query, limit, fuzziness, phraseSlop);
 			List<List<Hit<SearchDocument>>> results;
-			final int numMatchValues = searchParams.matches.size();
+			final int numMatchValues = matches.size();
 			if (numMatchValues == 1) {
 				results = Lists.transform(searchResults.hits().hits(), doc -> Collections.singletonList(doc));
 			} else {
@@ -65,7 +68,7 @@ public class SearchTupleFunction implements TupleFunction {
 					List<Value> values = new ArrayList<>(outputSize);
 					for (int i = 0; i < numMatchValues; i++) {
 						Hit<SearchDocument> matchValue = matchValues.get(i);
-						SearchInterpreter.SearchParams.MatchParams matchParams = searchParams.matches.get(i);
+						SearchInterpreter.SearchParams.MatchParams matchParams = matches.get(i);
 						if (matchParams.matchVar != null) {
 							String bnodeId = "es" + queryHash + "_" + matchValue.index() + "_" + matchValue.id();
 							values.add(valueFactory.createBNode(bnodeId));

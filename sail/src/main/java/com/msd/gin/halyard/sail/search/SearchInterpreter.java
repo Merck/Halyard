@@ -70,6 +70,12 @@ public class SearchInterpreter implements QueryOptimizer {
 						} else if (HALYARD.LIMIT_PROPERTY.equals(queryPred)) {
 							searchCall.params.setLimitVar(queryObjVar);
 							querySP.replaceWith(new SingletonSet());
+						} else if (HALYARD.FUZZINESS_PROPERTY.equals(queryPred)) {
+							searchCall.params.setFuzzinessVar(queryObjVar);
+							querySP.replaceWith(new SingletonSet());
+						} else if (HALYARD.PHRASE_SLOP_PROPERTY.equals(queryPred)) {
+							searchCall.params.setPhraseSlopVar(queryObjVar);
+							querySP.replaceWith(new SingletonSet());
 						} else if (HALYARD.MATCHES_PROPERTY.equals(queryPred)) {
 							SearchParams.MatchParams matchParams = searchCall.params.newMatchParams(!queryObjVar.isAnonymous() ? queryObjVar : null);
 							querySP.replaceWith(new SingletonSet());
@@ -124,8 +130,10 @@ public class SearchInterpreter implements QueryOptimizer {
 				return false;
 			}
 			tfc.addArg(params.queryVar != null ? params.queryVar : new ValueConstant(VF.createLiteral("")));
-			tfc.addArg(params.limitVar != null ? params.limitVar : new ValueConstant(VF.createLiteral(SearchClient.MAX_RESULT_SIZE)));
-			tfc.addArg(new ValueConstant(new InternalObjectLiteral<>(params)));
+			tfc.addArg(params.limitVar != null ? params.limitVar : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_RESULT_SIZE)));
+			tfc.addArg(params.fuzzinessVar != null ? params.fuzzinessVar : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_FUZZINESS)));
+			tfc.addArg(params.phraseSlopVar != null ? params.phraseSlopVar : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_PHRASE_SLOP)));
+			tfc.addArg(new ValueConstant(new InternalObjectLiteral<>(params.matches)));
 			for (SearchParams.MatchParams matchParams : params.matches) {
 				if (matchParams.matchVar != null) {
 					tfc.addResultVar(matchParams.matchVar);
@@ -147,6 +155,8 @@ public class SearchInterpreter implements QueryOptimizer {
 	static final class SearchParams {
 		ValueExpr queryVar;
 		ValueExpr limitVar;
+		ValueExpr fuzzinessVar;
+		ValueExpr phraseSlopVar;
 		final List<MatchParams> matches = new ArrayList<>(1);
 		boolean invalid;
 
@@ -161,6 +171,22 @@ public class SearchInterpreter implements QueryOptimizer {
 		void setLimitVar(Var var) {
 			if (limitVar == null) {
 				limitVar = var;
+			} else {
+				invalid = true;
+			}
+		}
+
+		void setFuzzinessVar(Var var) {
+			if (fuzzinessVar == null) {
+				fuzzinessVar = var;
+			} else {
+				invalid = true;
+			}
+		}
+
+		void setPhraseSlopVar(Var var) {
+			if (phraseSlopVar == null) {
+				phraseSlopVar = var;
 			} else {
 				invalid = true;
 			}
