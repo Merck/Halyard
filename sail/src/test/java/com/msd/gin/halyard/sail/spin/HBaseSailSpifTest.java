@@ -209,7 +209,7 @@ public class HBaseSailSpifTest {
 		List<BindingSet> resultList = Iterations.asList(tqr);
 		List<String> resultStringList = Lists.transform(resultList, (BindingSet input) -> input.getValue("text").stringValue());
 
-		Assert.assertArrayEquals(new String[] { "very", "sour", "berry" }, resultStringList.toArray(new String[] {}));
+		Assert.assertArrayEquals(new String[] { "very", "sour", "berry" }, resultStringList.toArray(new String[resultStringList.size()]));
 
 	}
 }

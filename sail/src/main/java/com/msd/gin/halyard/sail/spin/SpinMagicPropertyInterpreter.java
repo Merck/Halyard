@@ -7,6 +7,9 @@
  *******************************************************************************/
 package com.msd.gin.halyard.sail.spin;
 
+import com.msd.gin.halyard.algebra.Algebra;
+import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -15,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.rdf4j.RDF4JException;
+import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
@@ -26,12 +30,12 @@ import org.eclipse.rdf4j.model.vocabulary.SPL;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.MalformedQueryException;
+import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
-import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.Union;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
@@ -66,9 +70,11 @@ public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 
 	private final TupleFunctionRegistry tupleFunctionRegistry;
 
-	private AbstractFederatedServiceResolver serviceResolver;
+	private final AbstractFederatedServiceResolver serviceResolver;
 
 	private final IRI spinServiceUri;
+
+	private final boolean includeMatchingTriples;
 
 	public static void registerSpinParsingTupleFunctions(SpinParser parser, TupleFunctionRegistry tupleFunctionRegistry) {
 		if (!tupleFunctionRegistry.has(SPIN.CONSTRUCT_PROPERTY.stringValue())) {
@@ -81,11 +87,16 @@ public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 
 	public SpinMagicPropertyInterpreter(SpinParser parser, TripleSource tripleSource,
 			TupleFunctionRegistry tupleFunctionRegistry, AbstractFederatedServiceResolver serviceResolver) {
+		this(parser, tripleSource, tupleFunctionRegistry, serviceResolver, true);
+	}
+
+	public SpinMagicPropertyInterpreter(SpinParser parser, TripleSource tripleSource, TupleFunctionRegistry tupleFunctionRegistry, AbstractFederatedServiceResolver serviceResolver, boolean includeTriples) {
 		this.parser = parser;
 		this.tripleSource = tripleSource;
 		this.tupleFunctionRegistry = tupleFunctionRegistry;
 		this.serviceResolver = serviceResolver;
 		this.spinServiceUri = tripleSource.getValueFactory().createIRI(SPIN_SERVICE);
+		this.includeMatchingTriples = includeTriples;
 	}
 
 	@Override
@@ -99,7 +110,7 @@ public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 
 	private class PropertyScanner extends AbstractQueryModelVisitor<RDF4JException> {
 
-		private void processGraphPattern(List<StatementPattern> sps) throws RDF4JException {
+		private void processGraphPattern(List<StatementPattern> sps) {
 			Map<StatementPattern, TupleFunction> magicProperties = new LinkedHashMap<>();
 			Map<String, Map<IRI, List<StatementPattern>>> spIndex = new HashMap<>();
 
@@ -137,14 +148,12 @@ public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 
 			if (!magicProperties.isEmpty()) {
 				for (Map.Entry<StatementPattern, TupleFunction> entry : magicProperties.entrySet()) {
-					StatementPattern sp = entry.getKey();
-					TupleFunction func = entry.getValue();
-					Union union = new Union();
-					sp.replaceWith(union);
-					TupleExpr stmts = sp;
+					final StatementPattern sp = entry.getKey();
+					final TupleFunction func = entry.getValue();
+					TupleExpr stmts = sp.clone();
 
 					List<? super Var> subjList = new ArrayList<ValueExpr>(4);
-					TupleExpr subjNodes = addList(subjList, sp.getSubjectVar(), spIndex);
+					TupleExpr subjNodes = addVarsFromRdfList(subjList, sp.getSubjectVar(), spIndex);
 					if (subjNodes != null) {
 						stmts = new Join(stmts, subjNodes);
 					} else {
@@ -152,16 +161,14 @@ public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 					}
 
 					List<? super Var> objList = new ArrayList<ValueExpr>(4);
-					TupleExpr objNodes = addList(objList, sp.getObjectVar(), spIndex);
+					TupleExpr objNodes = addVarsFromRdfList(objList, sp.getObjectVar(), spIndex);
 					if (objNodes != null) {
 						stmts = new Join(stmts, objNodes);
 					} else {
 						objList = Collections.<ValueExpr>singletonList(sp.getObjectVar());
 					}
-					union.setLeftArg(stmts);
 
-					TupleFunctionCall funcCall = new TupleFunctionCall();
-					funcCall.setURI(sp.getPredicateVar().getValue().stringValue());
+					ExtendedTupleFunctionCall funcCall = new ExtendedTupleFunctionCall(func.getURI());
 					if (func instanceof InverseMagicProperty) {
 						funcCall.setArgs((List<ValueExpr>) objList);
 						funcCall.setResultVars((List<Var>) subjList);
@@ -195,13 +202,27 @@ public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 						magicPropertyNode = funcCall;
 					}
 
-					union.setRightArg(magicPropertyNode);
+					if (includeMatchingTriples && hasTriplesWithMagicProperty(func.getURI())) {
+						Union union = new Union();
+						sp.replaceWith(union);
+						union.setLeftArg(stmts);
+						union.setRightArg(magicPropertyNode);
+					} else {
+						// don't need to worry about union-ing existing triples with the magic property
+						sp.replaceWith(magicPropertyNode);
+					}
 				}
 			}
 		}
 
+		private boolean hasTriplesWithMagicProperty(String property) {
+			try (CloseableIteration<? extends Statement, QueryEvaluationException> iter = tripleSource.getStatements(null, tripleSource.getValueFactory().createIRI(property), null)) {
+				return iter.hasNext();
+			}
+		}
+
 		private TupleExpr join(TupleExpr node, TupleExpr toMove) {
-			toMove.replaceWith(new SingletonSet());
+			Algebra.remove(toMove);
 			if (node != null) {
 				node = new Join(node, toMove);
 			} else {
@@ -210,7 +231,7 @@ public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 			return node;
 		}
 
-		private TupleExpr addList(List<? super Var> list, Var subj,
+		private TupleExpr addVarsFromRdfList(List<? super Var> list, Var subj,
 				Map<String, Map<IRI, List<StatementPattern>>> spIndex) {
 			TupleExpr node = null;
 			do {
@@ -257,15 +278,20 @@ public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 		}
 
 		@Override
-		public void meet(Join node) throws RDF4JException {
+		public void meet(Join node) {
 			BGPCollector<RDF4JException> collector = new BGPCollector<>(this);
 			node.visit(collector);
 			processGraphPattern(collector.getStatementPatterns());
 		}
 
 		@Override
-		public void meet(StatementPattern node) throws RDF4JException {
+		public void meet(StatementPattern node) {
 			processGraphPattern(Collections.singletonList(node));
+		}
+
+		@Override
+		public void meet(Service node) {
+			// leave for the remote endpoint to interpret
 		}
 	}
 }

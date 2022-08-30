@@ -35,15 +35,6 @@ import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
 public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	private static final long serialVersionUID = -4523270958311045771L;
 
-	public static TupleExpr join(List<? extends TupleExpr> exprs) {
-		int i = exprs.size()-1;
-		TupleExpr te = exprs.get(i);
-		for (i--; i>=0; i--) {
-			te = new Join(exprs.get(i), te);
-		}
-		return te;
-	}
-
 	private Var commonVar;
 	private Var contextVar;
 	private List<TupleExpr> args;
@@ -102,7 +93,7 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	}
 
 	public Join toJoins() {
-		return (Join) join(args);
+		return (Join) Algebra.join(args);
 	}
 
 	@Override

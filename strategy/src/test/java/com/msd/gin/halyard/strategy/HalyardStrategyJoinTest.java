@@ -9,12 +9,10 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.query.algebra.Join;
-import org.eclipse.rdf4j.query.algebra.QueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.resultio.QueryResultIO;
@@ -94,7 +92,6 @@ public class HalyardStrategyJoinTest {
     @Test
     public void testJoin_empty_0var() throws Exception {
         String q ="prefix : <http://example/> select * where {:x1 :q \"a\". ?x :p ?y}";
-        // will always be nested loops as driver is a single statement
         joinTest(q, "/test-cases/join-results-empty-0.srx", 1, NestedLoops.NAME);
     }
 

@@ -19,6 +19,7 @@ package com.msd.gin.halyard.optimizers;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimaps;
+import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.StarJoin;
 
 import java.util.ArrayList;
@@ -84,7 +85,7 @@ public class StarJoinOptimizer implements QueryOptimizer {
 			if (!starJoins.isEmpty()) {
 				Join combined = new Join();
 				parent.replaceWith(combined);
-				TupleExpr starJoinTree = StarJoin.join(starJoins);
+				TupleExpr starJoinTree = Algebra.join(starJoins);
 				combined.setLeftArg(parent);
 				combined.setRightArg(starJoinTree);
 			}

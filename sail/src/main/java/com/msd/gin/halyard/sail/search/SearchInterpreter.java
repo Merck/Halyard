@@ -2,6 +2,7 @@ package com.msd.gin.halyard.sail.search;
 
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimaps;
+import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
 import com.msd.gin.halyard.common.InternalObjectLiteral;
 import com.msd.gin.halyard.vocab.HALYARD;
 
@@ -18,10 +19,10 @@ import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.algebra.EmptySet;
 import org.eclipse.rdf4j.query.algebra.Join;
+import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
-import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
@@ -113,17 +114,18 @@ public class SearchInterpreter implements QueryOptimizer {
 			join.visit(collector);
 			processGraphPattern(collector);
 		}
+
+		@Override
+		public void meet(Service node) {
+			// leave for the remote endpoint to interpret
+		}
 	}
 
 
 	static final class SearchCall {
 		static final ValueFactory VF = SimpleValueFactory.getInstance();
-		final TupleFunctionCall tfc = new TupleFunctionCall();
+		final ExtendedTupleFunctionCall tfc = new ExtendedTupleFunctionCall(HALYARD.SEARCH.stringValue());
 		final SearchParams params = new SearchParams();
-
-		SearchCall() {
-			tfc.setURI(HALYARD.SEARCH.stringValue());
-		}
 
 		boolean initCall() {
 			if (params.invalid) {

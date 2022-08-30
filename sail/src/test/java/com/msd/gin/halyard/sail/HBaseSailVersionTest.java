@@ -48,23 +48,22 @@ import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class HBaseSailVersionTest {
 
 	private Connection hconn;
 
-    @Before
+	@BeforeEach
     public void setup() throws Exception {
 		hconn = HalyardTableUtils.getConnection(HBaseServerTestInstance.getInstanceConfig());
     }
 
-    @After
+	@AfterEach
     public void teardown() throws Exception {
 		hconn.close();
     }
@@ -89,8 +88,8 @@ public class HBaseSailVersionTest {
 				assertTrue(res.hasNext());
 				BindingSet bs = res.next();
 				Literal t = (Literal) bs.getValue("t");
-				assertNotNull("Missing binding", t);
-				assertTrue(String.format("Expected %s > %s", t, startDate), t.calendarValue().compare(startDate.calendarValue()) > 0);
+				assertNotNull(t, "Missing binding");
+				assertTrue(t.calendarValue().compare(startDate.calendarValue()) > 0, String.format("Expected %s > %s", t, startDate));
 			}
 		}
         rep.shutDown();
@@ -338,7 +337,7 @@ public class HBaseSailVersionTest {
             for (String line : fail.values()) {
                 sb.append(line).append('\n');
             }
-            Assert.fail(sb.toString());
+			fail(sb.toString());
         }
     }
 

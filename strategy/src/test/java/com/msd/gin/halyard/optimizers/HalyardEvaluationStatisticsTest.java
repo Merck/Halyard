@@ -81,7 +81,7 @@ public class HalyardEvaluationStatisticsTest {
     }
 
 	private HalyardEvaluationStatistics createStatistics() {
-		return new HalyardEvaluationStatistics(() -> new SimpleStatementPatternCardinalityCalculator(), null);
+		return new HalyardEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY, null);
 	}
 
     @Test

@@ -1,8 +1,8 @@
 package com.msd.gin.halyard.strategy;
 
 import com.msd.gin.halyard.common.ValueConstraint;
-import com.msd.gin.halyard.optimizers.ExtendedEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.SimpleStatementPatternCardinalityCalculator;
 import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -32,9 +32,10 @@ class MemoryStoreWithConstraintsStrategy extends MemoryStore {
 
             @Override
             protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, final TripleSource tripleSource) {
-                HalyardEvaluationStrategy es = new HalyardEvaluationStrategy(new MockTripleSource(tripleSource), dataset, null, new HalyardEvaluationStatistics(null, null));
-                es.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(es, tripleSource.getValueFactory(), new ExtendedEvaluationStatistics()));
-                return es;
+            	HalyardEvaluationStatistics stats = new HalyardEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY, null);
+                HalyardEvaluationStrategy evalStrat = new HalyardEvaluationStrategy(new MockTripleSource(tripleSource), dataset, null, stats);
+                evalStrat.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(evalStrat, tripleSource.getValueFactory(), stats));
+                return evalStrat;
             }
 
         };

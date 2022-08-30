@@ -16,6 +16,7 @@ import org.eclipse.rdf4j.model.vocabulary.SPIN;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.algebra.FunctionCall;
+import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
@@ -82,7 +83,7 @@ public class SpinFunctionInterpreter implements QueryOptimizer {
 		ValueFactory vf = tripleSource.getValueFactory();
 
 		@Override
-		public void meet(FunctionCall node) throws RDF4JException {
+		public void meet(FunctionCall node) {
 			String name = node.getURI();
 			if (!functionRegistry.has(name)) {
 				IRI funcUri = vf.createIRI(name);
@@ -90,6 +91,11 @@ public class SpinFunctionInterpreter implements QueryOptimizer {
 				functionRegistry.add(f);
 			}
 			super.meet(node);
+		}
+
+		@Override
+		public void meet(Service node) {
+			// leave for the remote endpoint to interpret
 		}
 	}
 }

@@ -20,6 +20,7 @@ import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPush
 import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPushAsync;
 
 import com.msd.gin.halyard.algebra.ConstrainedStatementPattern;
+import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
 import com.msd.gin.halyard.algebra.HashJoin;
 import com.msd.gin.halyard.algebra.NestedLoops;
 import com.msd.gin.halyard.algebra.StarJoin;
@@ -227,7 +228,8 @@ final class HalyardTupleExprEvaluation {
         } else if (expr instanceof TripleRef) {
         	evaluateTripleRef(parent, (TripleRef) expr, bindings);
 		} else if (expr instanceof TupleFunctionCall) {
-			evaluateTupleFunctionCall(parent, (TupleFunctionCall) expr, bindings);
+			// all TupleFunctionCalls are expected to be ExtendedTupleFunctionCalls
+			evaluateTupleFunctionCall(parent, (ExtendedTupleFunctionCall) expr, bindings);
         } else if (expr instanceof ExternalSet) {
             evaluateExternalSet(parent, (ExternalSet) expr, bindings);
         } else if (expr == null) {
@@ -1413,12 +1415,12 @@ final class HalyardTupleExprEvaluation {
 
     	String algorithm = join.getAlgorithmName();
     	if (algorithm == null) {
-        	double leftEstimate = join.getLeftArg().getResultSizeEstimate();
-        	double rightEstimate = join.getRightArg().getResultSizeEstimate();
-        	if (rightEstimate >= 0 && rightEstimate <= parentStrategy.hashJoinLimit && rightEstimate <= leftEstimate) {
-        		join.setAlgorithm(new HashJoin());
+        	double probeEstimate = join.getLeftArg().getResultSizeEstimate();
+        	double buildEstimate = join.getRightArg().getResultSizeEstimate();
+        	if (buildEstimate >= 0 && buildEstimate <= parentStrategy.hashJoinLimit && buildEstimate <= probeEstimate) {
+        		join.setAlgorithm(HashJoin.INSTANCE);
         	} else {
-        		join.setAlgorithm(new NestedLoops());
+        		join.setAlgorithm(NestedLoops.INSTANCE);
         	}
         	algorithm = join.getAlgorithmName();
     	}
@@ -1435,7 +1437,9 @@ final class HalyardTupleExprEvaluation {
 	}
 
     private void evaluateNestedLoopsJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
-    	join.setAlgorithm(new NestedLoops());
+    	join.setAlgorithm(NestedLoops.INSTANCE);
+    	TupleExpr outerExpr = join.getLeftArg();
+    	TupleExpr innerExpr = join.getRightArg();
     	parentStrategy.initTracking(join);
         evaluateTupleExpr(new BindingSetPipe(topPipe) {
         	final AtomicLong joinsInProgress = new AtomicLong();
@@ -1459,9 +1463,9 @@ final class HalyardTupleExprEvaluation {
                     }
                     @Override
                     public String toString() {
-                    	return "JoinBindingSetPipe(right)";
+                    	return "JoinBindingSetPipe(inner)";
                     }
-                }, join.getRightArg(), bs);
+                }, innerExpr, bs);
                 return true;
             }
             @Override
@@ -1473,21 +1477,21 @@ final class HalyardTupleExprEvaluation {
             }
             @Override
             public String toString() {
-            	return "JoinBindingSetPipe(left)";
+            	return "JoinBindingSetPipe(outer)";
             }
-        }, join.getLeftArg(), bindings);
+        }, outerExpr, bindings);
     }
 
     private void evaluateHashJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
-    	join.setAlgorithm(new HashJoin());
-    	TupleExpr driver = join.getLeftArg();
-    	TupleExpr probe = join.getRightArg();
-    	Set<String> joinAttributeNames = probe.getBindingNames();
-		joinAttributeNames.retainAll(driver.getBindingNames());
+    	join.setAlgorithm(HashJoin.INSTANCE);
+    	TupleExpr probeExpr = join.getLeftArg();
+    	TupleExpr buildExpr = join.getRightArg();
+    	Set<String> joinAttributeNames = buildExpr.getBindingNames();
+		joinAttributeNames.retainAll(probeExpr.getBindingNames());
 		final String[] joinAttributes = joinAttributeNames.toArray(new String[joinAttributeNames.size()]);
 
 		final Map<BindingSetHashKey, List<BindingSet>> hashTable;
-		int initialSize = (int) probe.getResultSizeEstimate();
+		int initialSize = (int) buildExpr.getResultSizeEstimate();
 		if (joinAttributes.length > 0) {
 			hashTable = new HashMap<>(initialSize);
 		} else {
@@ -1549,15 +1553,15 @@ final class HalyardTupleExprEvaluation {
                     }
                     @Override
                     public String toString() {
-                    	return "HashJoinBindingSetPipe(driver)";
+                    	return "HashJoinBindingSetPipe(probe)";
                     }
-                }, driver, bindings);
+                }, probeExpr, bindings);
             }
             @Override
             public String toString() {
-            	return "HashJoinBindingSetPipe(probe)";
+            	return "HashJoinBindingSetPipe(build)";
             }
-    	}, probe, bindings);
+    	}, buildExpr, bindings);
     }
 
     private static BindingSet join(BindingSet b1, BindingSet b2) {
@@ -1859,6 +1863,7 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateSingletonSet(BindingSetPipe parent, SingletonSet singletonSet, BindingSet bindings) {
+		parentStrategy.initTracking(singletonSet);
         try {
             parent.pushLast(bindings);
             parentStrategy.incrementResultSizeActual(singletonSet);
@@ -1874,8 +1879,8 @@ final class HalyardTupleExprEvaluation {
 	 * @param bindings
 	 */
 	private void evaluateEmptySet(BindingSetPipe parent, EmptySet emptySet, BindingSet bindings) {
+		parentStrategy.initTracking(emptySet);
 		parent.empty();
-		emptySet.setResultSizeActual(0L);
 	}
 
     /**
@@ -2066,35 +2071,52 @@ final class HalyardTupleExprEvaluation {
     /**
 	 * Evaluate {@link TupleFunctionCall} query model nodes
 	 * 
-	 * @param parent
+	 * @param topPipe
 	 * @param tfc
 	 * @param bindings
 	 */
-	private void evaluateTupleFunctionCall(BindingSetPipe parent, TupleFunctionCall tfc, BindingSet bindings)
+	private void evaluateTupleFunctionCall(BindingSetPipe topPipe, ExtendedTupleFunctionCall tfc, BindingSet bindings)
 			throws QueryEvaluationException {
 		TupleFunction func = tupleFunctionRegistry.get(tfc.getURI())
 				.orElseThrow(() -> new QueryEvaluationException("Unknown tuple function '" + tfc.getURI() + "'"));
 
-		List<ValueExpr> args = tfc.getArgs();
+		evaluateTupleExpr(new BindingSetPipe(topPipe) {
+			@Override
+			protected boolean next(BindingSet bs) throws InterruptedException {
+				try {
+					List<ValueExpr> args = tfc.getArgs();
+					Value[] argValues = new Value[args.size()];
+					for (int i = 0; i < args.size(); i++) {
+						argValues[i] = parentStrategy.evaluate(args.get(i), bs);
+					}
 
-		try {
-			Value[] argValues = new Value[args.size()];
-			for (int i = 0; i < args.size(); i++) {
-				argValues[i] = parentStrategy.evaluate(args.get(i), bindings);
+					CloseableIteration<BindingSet, QueryEvaluationException> iter;
+					queryContext.begin();
+					try {
+						iter = TupleFunctionEvaluationStrategy.evaluate(func, tfc.getResultVars(), bs, tripleSource.getValueFactory(), argValues);
+					} finally {
+						queryContext.end();
+					}
+					iter = new QueryContextIteration(iter, queryContext);
+					try {
+						while (iter.hasNext()) {
+							if(!parent.push(iter.next())) {
+								return false;
+							}
+						}
+					} finally {
+						iter.close();
+					}
+				} catch (ValueExprEvaluationException ignore) {
+					// can't evaluate arguments
+				}
+				return true;
 			}
-
-			CloseableIteration<BindingSet, QueryEvaluationException> iter;
-			queryContext.begin();
-			try {
-				iter = TupleFunctionEvaluationStrategy.evaluate(func, tfc.getResultVars(), bindings, tripleSource.getValueFactory(), argValues);
-			} finally {
-				queryContext.end();
+			@Override
+			public String toString() {
+				return "TupleFunctionCallBindingSetPipe";
 			}
-			pullAndPushAsync(parent, new QueryContextIteration(iter, queryContext), tfc, parentStrategy);
-		} catch (ValueExprEvaluationException veee) {
-			// can't evaluate arguments
-            parent.empty();
-		}
+		}, tfc.getDependentExpression(), bindings);
 	}
 
 	/**

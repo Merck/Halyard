@@ -16,8 +16,8 @@
  */
 package com.msd.gin.halyard.strategy;
 
-import com.msd.gin.halyard.optimizers.ExtendedEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.SimpleStatementPatternCardinalityCalculator;
 
 import java.util.LinkedList;
 
@@ -68,16 +68,17 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
 
             @Override
             protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, final TripleSource tripleSource) {
-            	HalyardEvaluationStrategy es = new HalyardEvaluationStrategy(new MockTripleSource(tripleSource), dataset, null, new HalyardEvaluationStatistics(null, null)) {
+            	HalyardEvaluationStatistics stats = new HalyardEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY, null);
+            	HalyardEvaluationStrategy evalStrat = new HalyardEvaluationStrategy(new MockTripleSource(tripleSource), dataset, null, stats) {
             		@Override
             		public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) throws QueryEvaluationException {
             			queryHistory.add(expr);
             			return super.evaluate(expr, bindings);
             		}
             	};
-            	es.setHashJoinLimit(hashJoinLimit);
-                es.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(es, tripleSource.getValueFactory(), new ExtendedEvaluationStatistics()));
-                return es;
+            	evalStrat.setHashJoinLimit(hashJoinLimit);
+                evalStrat.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(evalStrat, tripleSource.getValueFactory(), stats));
+                return evalStrat;
             }
 
         };

@@ -1,17 +1,18 @@
 package com.msd.gin.halyard.optimizers;
 
-import com.msd.gin.halyard.algebra.StarJoin;
-
 import java.util.HashSet;
 import java.util.Set;
 
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
+import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
+
+import com.msd.gin.halyard.algebra.StarJoin;
 
 public class ExtendedEvaluationStatistics extends EvaluationStatistics {
 
@@ -38,7 +39,6 @@ public class ExtendedEvaluationStatistics extends EvaluationStatistics {
         }
 
         protected void meetStarJoin(StarJoin node) {
-        	// cardinality is dominated by the largest argument
         	double card = Double.POSITIVE_INFINITY;
         	for (TupleExpr sp : node.getArgs()) {
         		sp.visit(this);
@@ -51,17 +51,22 @@ public class ExtendedEvaluationStatistics extends EvaluationStatistics {
             cardinality = card*Math.pow(VAR_CARDINALITY*VAR_CARDINALITY, (double)(vars.size()-constCount)/vars.size());
         }
 
+        private static final double TFC_COST_FACTOR = 0.1;
+
         protected void meetTupleFunctionCall(TupleFunctionCall node) {
 			// must have all arguments bound to be able to evaluate
 			double argCard = 1.0;
 			for (ValueExpr expr : node.getArgs()) {
 				if (expr instanceof Var) {
-					argCard *= getCardinality(1000.0, (Var) expr);
+					argCard *= getCardinality(VAR_CARDINALITY, (Var) expr);
+				} else if (expr instanceof ValueConstant) {
+					argCard *= 1;
 				} else {
-					argCard *= 1000.0;
+					argCard *= VAR_CARDINALITY;
 				}
 			}
-			cardinality = argCard * getCardinality(VAR_CARDINALITY, ((TupleFunctionCall) node).getResultVars());
+			// output cardinality tends to be independent of number of result vars
+			cardinality = TFC_COST_FACTOR * argCard * VAR_CARDINALITY;
 		}
     }
 }

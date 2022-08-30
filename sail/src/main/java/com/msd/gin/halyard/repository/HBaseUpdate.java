@@ -1,7 +1,10 @@
 package com.msd.gin.halyard.repository;
 
+import com.msd.gin.halyard.algebra.Algebra;
+import com.msd.gin.halyard.query.EmptyTripleSource;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.TimestampedUpdateContext;
+import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
@@ -14,7 +17,6 @@ import java.util.Set;
 import org.eclipse.rdf4j.RDF4JException;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
-import org.eclipse.rdf4j.common.iteration.EmptyIteration;
 import org.eclipse.rdf4j.common.iteration.TimeLimitIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -33,6 +35,7 @@ import org.eclipse.rdf4j.query.QueryInterruptedException;
 import org.eclipse.rdf4j.query.UpdateExecutionException;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.Modify;
+import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
@@ -57,11 +60,13 @@ import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UpdateContext;
-import org.eclipse.rdf4j.sail.spin.SpinMagicPropertyInterpreter;
 import org.eclipse.rdf4j.spin.SpinParser;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HBaseUpdate extends SailUpdate {
+	private static final Logger LOGGER = LoggerFactory.getLogger(HBaseUpdate.class);
+
 	private final HBaseSail sail;
 
 	public HBaseUpdate(ParsedUpdate parsedUpdate, HBaseSail sail, SailRepositoryConnection con) {
@@ -91,7 +96,7 @@ public class HBaseUpdate extends SailUpdate {
 				try {
 					executor.executeUpdate(updateExpr, activeDataset, getBindings(), getIncludeInferred(), getMaxExecutionTime());
 				} catch (RDF4JException | IOException e) {
-					LoggerFactory.getLogger(getClass()).warn("exception during update execution: ", e);
+					LOGGER.warn("exception during update execution: ", e);
 					if (!updateExpr.isSilent()) {
 						throw new UpdateExecutionException(e);
 					}
@@ -141,21 +146,23 @@ public class HBaseUpdate extends SailUpdate {
 				TupleExpr insertClause = modify.getInsertExpr();
 				if (insertClause != null) {
 					// for inserts, TupleFunctions are expected in the insert clause
-					insertClause = optimize(insertClause, uc.getDataset(), uc.getBindingSet());
+					if (!(insertClause instanceof QueryRoot)) {
+						insertClause = new QueryRoot(insertClause);
+					}
+					insertClause = optimize(insertClause, uc.getDataset(), uc.getBindingSet(), false);
 					insertInfo = InsertCollector.process(insertClause);
 				}
 
 				ModifyInfo deleteInfo = null;
 				TupleExpr deleteClause = modify.getDeleteExpr();
 				TupleExpr whereClause = modify.getWhereExpr();
-				if (deleteClause != null) {
-					// for deletes, TupleFunctions are expected in the where clause
-					whereClause = optimize(whereClause, uc.getDataset(), uc.getBindingSet());
-					deleteInfo = new ModifyInfo(StatementPatternCollector.process(deleteClause), WhereCollector.process(whereClause));
-				}
-
 				if (!(whereClause instanceof QueryRoot)) {
 					whereClause = new QueryRoot(whereClause);
+				}
+				if (deleteClause != null) {
+					// for deletes, TupleFunctions are expected in the where clause
+					whereClause = optimize(whereClause, uc.getDataset(), uc.getBindingSet(), true);
+					deleteInfo = new ModifyInfo(StatementPatternCollector.process(deleteClause), WhereCollector.process(whereClause));
 				}
 
 				CloseableIteration<? extends BindingSet, QueryEvaluationException> sourceBindings = null;
@@ -193,21 +200,13 @@ public class HBaseUpdate extends SailUpdate {
 			return set.toArray(new IRI[set.size()]);
 		}
 
-		private TupleExpr optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
+		private TupleExpr optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeMatchingTriples) {
+			LOGGER.debug("Update TupleExpr before interpretation:\n{}", tupleExpr);
 			SpinParser spinParser = sail.getSpinParser();
-			TripleSource source = new TripleSource() {
-				@Override
-				public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
-					return new EmptyIteration<>();
-				}
-
-				@Override
-				public ValueFactory getValueFactory() {
-					return vf;
-				}
-			};
+			TripleSource source = new EmptyTripleSource(vf);
 			TupleFunctionRegistry tupleFunctionRegistry = sail.getTupleFunctionRegistry();
-			new SpinMagicPropertyInterpreter(spinParser, source, tupleFunctionRegistry, null).optimize(tupleExpr, dataset, bindings);
+			new SpinMagicPropertyInterpreter(spinParser, source, tupleFunctionRegistry, null, includeMatchingTriples).optimize(tupleExpr, dataset, bindings);
+			LOGGER.debug("Update TupleExpr after interpretation:\n{}", tupleExpr);
 			return tupleExpr;
 		}
 
@@ -526,10 +525,17 @@ public class HBaseUpdate extends SailUpdate {
 			return tupleFunctionCalls;
 		}
 
-		public void meet(Union node) {
-			if (node.getRightArg() instanceof TupleFunctionCall) {
-				tupleFunctionCalls.add((TupleFunctionCall) node.getRightArg());
+		@Override
+		public void meetOther(QueryModelNode node) {
+			if (node instanceof TupleFunctionCall) {
+				meet((TupleFunctionCall) node);
+			} else {
+				super.meetOther(node);
 			}
+		}
+
+		public void meet(TupleFunctionCall tfc) {
+			tupleFunctionCalls.add(tfc);
 		}
 	}
 
@@ -557,13 +563,19 @@ public class HBaseUpdate extends SailUpdate {
 			// skip
 		}
 
-		public void meet(Union node) {
-			if (node.getRightArg() instanceof TupleFunctionCall) {
-				TupleFunctionCall tfc = (TupleFunctionCall) node.getRightArg();
-				tupleFunctionCalls.add(tfc);
-				if (HALYARD.TIMESTAMP_PROPERTY.stringValue().equals(tfc.getURI())) {
-					node.replaceWith(new SingletonSet());
-				}
+		@Override
+		public void meetOther(QueryModelNode node) {
+			if (node instanceof TupleFunctionCall) {
+				meet((TupleFunctionCall) node);
+			} else {
+				super.meetOther(node);
+			}
+		}
+
+		public void meet(TupleFunctionCall tfc) {
+			tupleFunctionCalls.add(tfc);
+			if (HALYARD.TIMESTAMP_PROPERTY.stringValue().equals(tfc.getURI())) {
+				Algebra.remove(tfc);
 			}
 		}
 	}

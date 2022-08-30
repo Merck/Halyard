@@ -9,6 +9,8 @@ import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.Var;
 
 public class SimpleStatementPatternCardinalityCalculator implements StatementPatternCardinalityCalculator {
+	public static final StatementPatternCardinalityCalculator.Factory FACTORY = () -> new SimpleStatementPatternCardinalityCalculator();
+
 	private static double VAR_CARDINALITY = 10.0;
 
 	@Override
@@ -31,5 +33,4 @@ public class SimpleStatementPatternCardinalityCalculator implements StatementPat
 	@Override
 	public void close() throws IOException {
 	}
-
 }

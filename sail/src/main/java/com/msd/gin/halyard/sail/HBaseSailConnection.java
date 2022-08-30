@@ -28,8 +28,8 @@ import com.msd.gin.halyard.sail.search.SearchClient;
 import com.msd.gin.halyard.sail.search.SearchInterpreter;
 import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
 import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
+import com.msd.gin.halyard.strategy.ExtendedQueryOptimizerPipeline;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
-import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
@@ -176,10 +176,15 @@ public class HBaseSailConnection extends AbstractSailConnection {
 	}
 
 	private EvaluationStrategy createEvaluationStrategy(TripleSource source, Dataset dataset, QueryContext queryContext) {
+		EvaluationStrategy strategy;
 		HalyardEvaluationStatistics stats = getStatistics();
-		return sail.pushStrategy
-				? new HalyardEvaluationStrategy(source, queryContext, sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), dataset, sail.getFederatedServiceResolver(), stats)
-				: new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), 0L, stats);
+		if (sail.pushStrategy) {
+			strategy = new HalyardEvaluationStrategy(source, queryContext, sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), dataset, sail.getFederatedServiceResolver(), stats);
+		} else {
+			strategy = new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), 0L, stats);
+			strategy.setOptimizerPipeline(new ExtendedQueryOptimizerPipeline(strategy, source.getValueFactory(), stats));
+		}
+		return strategy;
 	}
 
 	private TupleExpr optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred, TripleSource source, EvaluationStrategy strategy) {
@@ -195,14 +200,12 @@ public class HBaseSailConnection extends AbstractSailConnection {
 			tupleExpr = new QueryRoot(tupleExpr);
 		}
 
-		if (!(tupleExpr instanceof ServiceRoot)) {
-			// if this is a Halyard federated query then the full query has already passed through the optimizer so don't need to re-run these again
-			new SpinFunctionInterpreter(sail.getSpinParser(), source, sail.getFunctionRegistry()).optimize(tupleExpr, dataset, bindings);
-			if (includeInferred) {
-				new SpinMagicPropertyInterpreter(sail.getSpinParser(), source, sail.getTupleFunctionRegistry(), null).optimize(tupleExpr, dataset, bindings);
-			}
-			new SearchInterpreter().optimize(tupleExpr, dataset, bindings);
+		new SpinFunctionInterpreter(sail.getSpinParser(), source, sail.getFunctionRegistry()).optimize(tupleExpr, dataset, bindings);
+		if (includeInferred) {
+			new SpinMagicPropertyInterpreter(sail.getSpinParser(), source, sail.getTupleFunctionRegistry(), null).optimize(tupleExpr, dataset, bindings);
 		}
+		new SearchInterpreter().optimize(tupleExpr, dataset, bindings);
+		LOG.debug("Evaluated TupleExpr after interpretation:\n{}", tupleExpr);
 
 		strategy.optimize(tupleExpr, getStatistics(), bindings);
 		LOG.debug("Evaluated TupleExpr after optimization:\n{}", tupleExpr);
