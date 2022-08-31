@@ -412,46 +412,49 @@ final class HalyardTupleExprEvaluation {
 
         // The same variable might have been used multiple times in this
         // StatementPattern, verify value equality in those cases.
-        // TODO: skip this filter if not necessary
-        stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
-
-            @Override
-            protected boolean accept(Statement st) {
-                Resource subj = st.getSubject();
-                IRI pred = st.getPredicate();
-                Value obj = st.getObject();
-                Resource context = st.getContext();
-
-                if (subjVar != null && subjValue == null) {
-                    if (subjVar.equals(predVar) && !subj.equals(pred)) {
-                        return false;
-                    }
-                    if (subjVar.equals(objVar) && !subj.equals(obj)) {
-                        return false;
-                    }
-                    if (subjVar.equals(conVar) && !subj.equals(context)) {
-                        return false;
-                    }
-                }
-
-                if (predVar != null && predValue == null) {
-                    if (predVar.equals(objVar) && !pred.equals(obj)) {
-                        return false;
-                    }
-                    if (predVar.equals(conVar) && !pred.equals(context)) {
-                        return false;
-                    }
-                }
-
-                if (objVar != null && objValue == null) {
-                    if (objVar.equals(conVar) && !obj.equals(context)) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-        };
+        int distinctVarCount = sp.getBindingNames().size();
+        boolean allVarsDistinct = (conVar != null && distinctVarCount == 4) || (conVar == null && distinctVarCount == 3);
+        if (!allVarsDistinct) {
+	        stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
+	
+	            @Override
+	            protected boolean accept(Statement st) {
+	                Resource subj = st.getSubject();
+	                IRI pred = st.getPredicate();
+	                Value obj = st.getObject();
+	                Resource context = st.getContext();
+	
+	                if (subjVar != null && subjValue == null) {
+	                    if (subjVar.equals(predVar) && !subj.equals(pred)) {
+	                        return false;
+	                    }
+	                    if (subjVar.equals(objVar) && !subj.equals(obj)) {
+	                        return false;
+	                    }
+	                    if (subjVar.equals(conVar) && !subj.equals(context)) {
+	                        return false;
+	                    }
+	                }
+	
+	                if (predVar != null && predValue == null) {
+	                    if (predVar.equals(objVar) && !pred.equals(obj)) {
+	                        return false;
+	                    }
+	                    if (predVar.equals(conVar) && !pred.equals(context)) {
+	                        return false;
+	                    }
+	                }
+	
+	                if (objVar != null && objValue == null) {
+	                    if (objVar.equals(conVar) && !obj.equals(context)) {
+	                        return false;
+	                    }
+	                }
+	
+	                return true;
+	            }
+	        };
+        }
 
         // Return an iterator that converts the RDF statements (triples) to var bindings
         pullAndPushAsync(parent, new ConvertingIteration<Statement, BindingSet, QueryEvaluationException>(stIter) {

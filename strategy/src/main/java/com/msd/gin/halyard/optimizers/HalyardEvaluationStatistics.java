@@ -254,7 +254,7 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
 
         @Override
         public void meet(Service node) {
-            EvaluationStatistics srvStats = srvProvider != null && node.getServiceRef().hasValue() ? srvProvider.getStatsForService(node.getServiceRef().getValue().stringValue()) : null;
+            EvaluationStatistics srvStats = (srvProvider != null && node.getServiceRef().hasValue()) ? srvProvider.getStatsForService(node.getServiceRef().getValue().stringValue()) : null;
             //try to calculate cardinality also for (Halyard-internally) federated service expressions
             if (srvStats != null) {
                 Double servCard = null;
@@ -262,7 +262,7 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
                 	node.getServiceExpr().visit(this);
                     servCard = mapToUpdate.get(node.getServiceExpr());
                 }
-                cardinality = servCard != null ? servCard : srvStats.getCardinality(node.getServiceExpr());
+                cardinality = (servCard != null) ? servCard : srvStats.getCardinality(node.getServiceExpr());
             } else {
                 super.meet(node);
             }
