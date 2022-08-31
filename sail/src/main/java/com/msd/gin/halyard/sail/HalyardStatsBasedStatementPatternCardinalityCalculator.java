@@ -24,6 +24,8 @@ import com.msd.gin.halyard.vocab.VOID_EXT;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -47,6 +49,7 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator extend
 
 	private final TripleSource statsSource;
 	private final RDFFactory rdfFactory;
+	private final Map<IRI, Long> tripleCountCache = new HashMap<>(64);
 
 	public HalyardStatsBasedStatementPatternCardinalityCalculator(TripleSource statsSource, RDFFactory rdfFactory) {
 		this.statsSource = statsSource;
@@ -97,22 +100,25 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator extend
 
     //get the Triples count for a giving subject from VOID statistics or return the default value
     private long getTriplesCount(IRI subjectNode, long defaultValue) {
-		try (CloseableIteration<? extends Statement, QueryEvaluationException> ci = statsSource.getStatements(subjectNode, VOID.TRIPLES, null, HALYARD.STATS_GRAPH_CONTEXT)) {
-            if (ci.hasNext()) {
-                Value v = ci.next().getObject();
-				if (v.isLiteral()) {
-                    try {
-                        long l = ((Literal) v).longValue();
-						LOG.trace("triple stats for {} = {}", subjectNode, l);
-                        return l;
-                    } catch (NumberFormatException ignore) {
-                    }
-                }
-				LOG.warn("Invalid statistics for: {}", subjectNode);
-            }
-        }
-		LOG.trace("triple stats for {} are not available", subjectNode);
-        return defaultValue;
+		return tripleCountCache.computeIfAbsent(subjectNode, node -> {
+			try (CloseableIteration<? extends Statement, QueryEvaluationException> ci = statsSource.getStatements(node, VOID.TRIPLES, null, HALYARD.STATS_GRAPH_CONTEXT)) {
+				if (ci.hasNext()) {
+					Value v = ci.next().getObject();
+					if (v.isLiteral()) {
+						try {
+							long l = ((Literal) v).longValue();
+							LOG.trace("triple stats for {} = {}", node, l);
+							return l;
+						} catch (NumberFormatException ignore) {
+							LOG.warn("Invalid statistics for {}: {}", node, v, ignore);
+						}
+					}
+					LOG.warn("Invalid statistics for {}: {}", node, v);
+				}
+			}
+			LOG.trace("triple stats for {} are not available", node);
+			return defaultValue;
+		});
     }
 
     //calculate a multiplier for the triple count for this sub-part of the graph
@@ -120,7 +126,7 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator extend
         if (partitionVar == null || !partitionVar.hasValue()) {
             return defaultCardinality;
         }
-		return getTriplesCount(statsSource.getValueFactory().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + rdfFactory.id(partitionVar.getValue())), 100l);
+		return getTriplesCount(statsSource.getValueFactory().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + rdfFactory.id(partitionVar.getValue())), defaultCardinality);
     }
 
 	@Override
