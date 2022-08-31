@@ -29,6 +29,7 @@ import com.msd.gin.halyard.common.ValueIO;
 import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
 import com.msd.gin.halyard.vocab.HALYARD;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -62,7 +63,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTripleSourceFactory {
+public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTripleSourceFactory, Closeable {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseTripleSource.class);
 
 	protected final KeyspaceConnection keyspaceConn;
@@ -155,6 +156,11 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 	@Override
 	public final ValueFactory getValueFactory() {
 		return valueReader.getValueFactory();
+	}
+
+	@Override
+	public final void close() throws IOException {
+		keyspaceConn.close();
 	}
 
 	@Override

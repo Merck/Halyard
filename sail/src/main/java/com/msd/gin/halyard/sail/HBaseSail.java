@@ -209,9 +209,8 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	final boolean create;
     final boolean pushStrategy;
 	final int splitBits;
-	private SailConnection statsConnection;
 	protected HalyardEvaluationStatistics statistics;
-	final int evaluationTimeout; // secs
+	final int evaluationTimeoutSecs;
 	private boolean readOnly = true;
 	private long readOnlyTimestamp = 0L;
 	final ElasticSettings esSettings;
@@ -267,7 +266,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		this.snapshotName = null;
 		this.snapshotRestorePath = null;
 		this.pushStrategy = pushStrategy;
-		this.evaluationTimeout = evaluationTimeout;
+		this.evaluationTimeoutSecs = evaluationTimeout;
 		this.esSettings = elasticSettings;
 		this.ticker = ticker;
 		this.connFactory = connFactory;
@@ -308,7 +307,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		this.snapshotName = snapshotName;
 		this.snapshotRestorePath = new Path(snapshotRestorePath);
 		this.pushStrategy = pushStrategy;
-		this.evaluationTimeout = evaluationTimeout;
+		this.evaluationTimeoutSecs = evaluationTimeout;
 		this.esSettings = elasticSettings;
 		this.ticker = ticker;
 		this.connFactory = connFactory;
@@ -353,7 +352,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 
 	@Override
 	public int getEvaluationTimeout() {
-		return evaluationTimeout;
+		return evaluationTimeoutSecs;
 	}
 
 	@Override
@@ -463,8 +462,9 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 			addNamespaces();
 		}
 
-		statsConnection = getConnection();
-		statistics = new HalyardEvaluationStatistics(new HalyardStatsBasedStatementPatternCardinalityCalculator(new SailConnectionTripleSource(statsConnection, false, valueFactory), rdfFactory), service -> {
+		HalyardEvaluationStatistics.StatementPatternCardinalityCalculator.Factory spcalcFactory = () -> new HalyardStatsBasedStatementPatternCardinalityCalculator(
+				new HBaseTripleSource(keyspace.getConnection(), valueFactory, rdfFactory, evaluationTimeoutSecs), rdfFactory);
+		HalyardEvaluationStatistics.ServiceStatsProvider srvStatsProvider = service -> {
 			HalyardEvaluationStatistics fedStats = null;
 			FederatedService fedServ = federatedServiceResolver.getService(service);
 			if (fedServ instanceof SailFederatedService) {
@@ -474,7 +474,8 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 				}
 			}
 			return fedStats;
-		});
+		};
+		statistics = new HalyardEvaluationStatistics(spcalcFactory, srvStatsProvider);
 
 		SpinFunctionInterpreter.registerSpinParsingFunctions(spinParser, pushStrategy ? functionRegistry : FunctionRegistry.getInstance(), pushStrategy ? tupleFunctionRegistry : TupleFunctionRegistry.getInstance());
 		SpinMagicPropertyInterpreter.registerSpinParsingTupleFunctions(spinParser, pushStrategy ? tupleFunctionRegistry : TupleFunctionRegistry.getInstance());
@@ -609,13 +610,6 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 			} catch (IOException ignore) {
 			}
 			esTransport = null;
-		}
-		if (statsConnection != null) {
-			try {
-				statsConnection.close();
-			} catch (SailException ignore) {
-			}
-			statsConnection = null;
 		}
 		if (!hConnectionIsShared) {
 			if (federatedServiceResolver instanceof AbstractFederatedServiceResolver) {

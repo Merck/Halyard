@@ -19,13 +19,18 @@ package com.msd.gin.halyard.optimizers;
 import com.msd.gin.halyard.algebra.StarJoin;
 import com.msd.gin.halyard.vocab.HALYARD;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import javax.annotation.Nonnull;
+
 import org.eclipse.rdf4j.model.Literal;
+import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
@@ -49,32 +54,45 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
  */
 public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatistics {
 
-    public static interface StatementPatternCardinalityCalculator {
+	public static interface StatementPatternCardinalityCalculator extends Closeable {
+	
+		public static interface Factory {
+			StatementPatternCardinalityCalculator create() throws IOException;
+		}
 
-        public Double getCardinality(StatementPattern sp, Collection<String> boundVars);
-    }
+		double getCardinality(StatementPattern sp, Collection<String> boundVars);
+	}
 
-    public static interface ServiceStatsProvider {
+	public static interface ServiceStatsProvider {
+	
+		HalyardEvaluationStatistics getStatsForService(String service);
+	}
 
-        public HalyardEvaluationStatistics getStatsForService(String service);
-    }
-
-    private final StatementPatternCardinalityCalculator spcalc;
+    private final StatementPatternCardinalityCalculator.Factory spcalcFactory;
     private final ServiceStatsProvider srvProvider;
 
-    public HalyardEvaluationStatistics(StatementPatternCardinalityCalculator spcalc, ServiceStatsProvider srvProvider) {
-        this.spcalc = spcalc;
+    public HalyardEvaluationStatistics(@Nonnull StatementPatternCardinalityCalculator.Factory spcalcFactory, ServiceStatsProvider srvProvider) {
+        this.spcalcFactory = spcalcFactory;
         this.srvProvider = srvProvider;
     }
 
-    public void updateCardinalityMap(TupleExpr expr, Set<String> boundVars, Set<String> priorityVars, Map<TupleExpr, Double> mapToUpdate) {
-        expr.visit(new HalyardCardinalityCalculator(spcalc, srvProvider, boundVars, priorityVars, mapToUpdate));
-    }
+	public void updateCardinalityMap(TupleExpr expr, Set<String> boundVars, Set<String> priorityVars, Map<TupleExpr, Double> mapToUpdate) {
+		try (StatementPatternCardinalityCalculator spcalc = spcalcFactory.create()) {
+			HalyardCardinalityCalculator cc = new HalyardCardinalityCalculator(spcalc, srvProvider, boundVars, priorityVars, mapToUpdate);
+			expr.visit(cc);
+		} catch(IOException ioe) {
+			throw new QueryEvaluationException(ioe);
+		}
+	}
 
 	public double getCardinality(TupleExpr expr, final Set<String> boundVariables, final Set<String> priorityVariables) {
-		HalyardCardinalityCalculator cc = new HalyardCardinalityCalculator(spcalc, srvProvider, boundVariables, priorityVariables, null);
-		expr.visit(cc);
-		return cc.getCardinality();
+		try (StatementPatternCardinalityCalculator spcalc = spcalcFactory.create()) {
+			HalyardCardinalityCalculator cc = new HalyardCardinalityCalculator(spcalc, srvProvider, boundVariables, priorityVariables, null);
+			expr.visit(cc);
+			return cc.getCardinality();
+		} catch(IOException ioe) {
+			throw new QueryEvaluationException(ioe);
+		}
 	}
 
 	@Override
@@ -84,18 +102,19 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
 
 	@Override
 	protected CardinalityCalculator createCardinalityCalculator() {
-		return new HalyardCardinalityCalculator(spcalc, srvProvider, Collections.emptySet(), Collections.emptySet(), null);
+		// should never be called
+		throw new AssertionError();
 	}
 
     private static class HalyardCardinalityCalculator extends ExtendedCardinalityCalculator {
 
-    	private StatementPatternCardinalityCalculator spcalc;
+    	private final StatementPatternCardinalityCalculator spcalc;
         private final ServiceStatsProvider srvProvider;
         private final Set<String> boundVars;
         private final Set<String> priorityVariables;
         private final Map<TupleExpr, Double> mapToUpdate;
 
-        public HalyardCardinalityCalculator(StatementPatternCardinalityCalculator spcalc, ServiceStatsProvider srvProvider, Set<String> boundVariables, Set<String> priorityVariables, Map<TupleExpr, Double> mapToUpdate) {
+        public HalyardCardinalityCalculator(@Nonnull StatementPatternCardinalityCalculator spcalc, ServiceStatsProvider srvProvider, Set<String> boundVariables, Set<String> priorityVariables, Map<TupleExpr, Double> mapToUpdate) {
         	this.spcalc = spcalc;
         	this.srvProvider = srvProvider;
             this.boundVars = boundVariables;
@@ -110,35 +129,30 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
             if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH.equals(((Literal) objectVar.getValue()).getDatatype())) {
                 return 0.0001;
             }
-            Double card = spcalc == null ? null : spcalc.getCardinality(sp, boundVars);
-            if (card == null) { //fallback to default cardinality calculation
-                card = super.getCardinality(sp);
-            }
+            double card = spcalc.getCardinality(sp, boundVars);
             for (Var v : sp.getVarList()) {
                 //decrease cardinality for each priority variable present
-                if (v != null && priorityVariables.contains(v.getName())) card /= 1000000.0;
+                if (v != null && priorityVariables.contains(v.getName())) {
+                	card /= 1000000.0;
+                }
             }
             return card;
         }
 
         @Override
 		protected double getCardinality(double varCardinality, Var var) {
-			return hasValue(var, boundVars) ? 1.0 : varCardinality;
+			return SimpleStatementPatternCardinalityCalculator.getCardinality(var, boundVars, varCardinality);
 		}
 
         @Override
         protected int countConstantVars(Iterable<Var> vars) {
         	int constantVarCount = 0;
         	for(Var var : vars) {
-        		if(hasValue(var, boundVars)) {
+        		if(SimpleStatementPatternCardinalityCalculator.hasValue(var, boundVars)) {
         			constantVarCount++;
         		}
         	}
         	return constantVarCount;
-        }
-
-        private boolean hasValue(Var partitionVar, Collection<String> boundVars) {
-            return partitionVar == null || partitionVar.hasValue() || boundVars.contains(partitionVar.getName());
         }
 
         @Override

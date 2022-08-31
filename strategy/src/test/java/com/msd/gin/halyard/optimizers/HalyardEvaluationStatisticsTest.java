@@ -80,8 +80,12 @@ public class HalyardEvaluationStatisticsTest {
         }
     }
 
+	private HalyardEvaluationStatistics createStatistics() {
+		return new HalyardEvaluationStatistics(() -> new SimpleStatementPatternCardinalityCalculator(), null);
+	}
+
     @Test
     public void testCardinality() {
-        Assert.assertEquals(query, cardinality, new HalyardEvaluationStatistics(null, null).getCardinality(new SPARQLParser().parseQuery(query, "http://baseuri/").getTupleExpr(), boundVars, priorityVars), cardinality/1000000.0);
+        Assert.assertEquals(query, cardinality, createStatistics().getCardinality(new SPARQLParser().parseQuery(query, "http://baseuri/").getTupleExpr(), boundVars, priorityVars), cardinality/1000000.0);
     }
 }

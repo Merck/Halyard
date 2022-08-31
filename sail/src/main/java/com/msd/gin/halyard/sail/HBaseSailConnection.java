@@ -162,7 +162,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
     }
 
 	private RDFStarTripleSource createTripleSource() {
-		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeout, sail.getScanSettings(), searchClient, sail.ticker);
+		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getRDFFactory(), sail.evaluationTimeoutSecs, sail.getScanSettings(), searchClient, sail.ticker);
 	}
 
 	private QueryContext createQueryContext(TripleSource source, boolean includeInferred, String sourceString) {
@@ -250,12 +250,12 @@ public class HBaseSailConnection extends AbstractSailConnection {
 					// NB: Iteration methods may do on-demand evaluation hence need to wrap these too
 					iter = new QueryContextIteration(iter, queryContext);
 				}
-				return sail.evaluationTimeout <= 0 ? iter
-						: new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter, TimeUnit.SECONDS.toMillis(sail.evaluationTimeout)) {
+				return sail.evaluationTimeoutSecs <= 0 ? iter
+						: new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter, TimeUnit.SECONDS.toMillis(sail.evaluationTimeoutSecs)) {
 							@Override
 							protected void throwInterruptedException() {
 								throw new QueryEvaluationException(
-										String.format("Query evaluation exceeded specified timeout %ds", sail.evaluationTimeout));
+										String.format("Query evaluation exceeded specified timeout %ds", sail.evaluationTimeoutSecs));
 							}
 						};
 			} catch (QueryEvaluationException ex) {
@@ -320,7 +320,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		} else {
 			scanner.close();
 
-			if (sail.evaluationTimeout > 0) {
+			if (sail.evaluationTimeoutSecs > 0) {
 				// try to find them manually if there are no stats and there is a specific timeout
 				class StatementScanner extends AbstractStatementScanner {
 					final ResultScanner rs;
@@ -353,10 +353,10 @@ public class HBaseSailConnection extends AbstractSailConnection {
 								protected Resource convert(Statement stmt) {
 									return stmt.getContext();
 								}
-							}), TimeUnit.SECONDS.toMillis(sail.evaluationTimeout)) {
+							}), TimeUnit.SECONDS.toMillis(sail.evaluationTimeoutSecs)) {
 						@Override
 						protected void throwInterruptedException() {
-							throw new SailException(String.format("Evaluation exceeded specified timeout %ds", sail.evaluationTimeout));
+							throw new SailException(String.format("Evaluation exceeded specified timeout %ds", sail.evaluationTimeoutSecs));
 						}
 					};
 				} catch (IOException ioe) {
@@ -406,7 +406,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
             }
         }
         // try to count it manually if there are no stats and there is a specific timeout
-		if (size == 0 && sail.evaluationTimeout > 0) {
+		if (size == 0 && sail.evaluationTimeoutSecs > 0) {
 			try (CloseableIteration<? extends Statement, SailException> scanner = getStatements(null, null, null, true, contexts)) {
 				while (scanner.hasNext()) {
 					scanner.next();

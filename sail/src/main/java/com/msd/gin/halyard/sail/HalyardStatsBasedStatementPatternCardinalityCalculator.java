@@ -17,10 +17,12 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.SimpleStatementPatternCardinalityCalculator;
 import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.vocab.VOID_EXT;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Collection;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -40,24 +42,24 @@ import org.slf4j.LoggerFactory;
  *
  * @author Adam Sotona (MSD)
  */
-public final class HalyardStatsBasedStatementPatternCardinalityCalculator implements HalyardEvaluationStatistics.StatementPatternCardinalityCalculator {
+public final class HalyardStatsBasedStatementPatternCardinalityCalculator extends SimpleStatementPatternCardinalityCalculator {
 	private static final Logger LOG = LoggerFactory.getLogger(HalyardStatsBasedStatementPatternCardinalityCalculator.class);
 
 	private final TripleSource statsSource;
 	private final RDFFactory rdfFactory;
 
-	public HalyardStatsBasedStatementPatternCardinalityCalculator(TripleSource statsSource, RDFFactory valueIO) {
+	public HalyardStatsBasedStatementPatternCardinalityCalculator(TripleSource statsSource, RDFFactory rdfFactory) {
 		this.statsSource = statsSource;
-		this.rdfFactory = valueIO;
+		this.rdfFactory = rdfFactory;
     }
 
     @Override
-    public Double getCardinality(StatementPattern sp, Collection<String> boundVars) { //get the cardinality of the Statement form VOID statistics
+	public double getCardinality(StatementPattern sp, Collection<String> boundVars) { // get the cardinality of the Statement form VOID statistics
+		final double card;
         final Var contextVar = sp.getContextVar();
         final IRI graphNode = contextVar == null || !contextVar.hasValue() ? HALYARD.STATS_ROOT_NODE : (IRI) contextVar.getValue();
         final long triples = getTriplesCount(graphNode, -1l);
         if (triples > 0) { //stats are present
-            final double card;
             boolean sv = hasValue(sp.getSubjectVar(), boundVars);
             boolean pv = hasValue(sp.getPredicateVar(), boundVars);
             boolean ov = hasValue(sp.getObjectVar(), boundVars);
@@ -85,11 +87,12 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
             } else {
                 card = triples;
             }
-			LOG.debug("cardinality of {} = {}", sp, card);
-            return card;
+			LOG.debug("cardinality of {} = {} (sampled)", sp, card);
         } else { // stats are not present
-            return null;
+			card = super.getCardinality(sp, boundVars);
+			LOG.debug("cardinality of {} = {} (preset)", sp, card);
         }
+		return card;
     }
 
     //get the Triples count for a giving subject from VOID statistics or return the default value
@@ -112,10 +115,6 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
         return defaultValue;
     }
 
-    private boolean hasValue(Var partitionVar, Collection<String> boundVars) {
-        return partitionVar == null || partitionVar.hasValue() || boundVars.contains(partitionVar.getName());
-    }
-
     //calculate a multiplier for the triple count for this sub-part of the graph
     private long subsetTriplesPart(IRI graph, IRI partitionType, Var partitionVar, long defaultCardinality) {
         if (partitionVar == null || !partitionVar.hasValue()) {
@@ -123,4 +122,11 @@ public final class HalyardStatsBasedStatementPatternCardinalityCalculator implem
         }
 		return getTriplesCount(statsSource.getValueFactory().createIRI(graph.stringValue() + "_" + partitionType.getLocalName() + "_" + rdfFactory.id(partitionVar.getValue())), 100l);
     }
+
+	@Override
+	public void close() throws IOException {
+		if (statsSource instanceof Closeable) {
+			((Closeable) statsSource).close();
+		}
+	}
 }

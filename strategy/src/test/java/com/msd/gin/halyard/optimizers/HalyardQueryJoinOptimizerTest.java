@@ -31,10 +31,14 @@ import static org.junit.Assert.*;
  */
 public class HalyardQueryJoinOptimizerTest {
 
-    @Test
+	private HalyardEvaluationStatistics createStatistics() {
+		return new HalyardEvaluationStatistics(() -> new SimpleStatementPatternCardinalityCalculator(), null);
+	}
+
+	@Test
     public void testQueryJoinOptimizer() {
         final TupleExpr expr = new SPARQLParser().parseQuery("select * where {?a ?b ?c, \"1\".}", "http://baseuri/").getTupleExpr();
-        new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(null, null)).optimize(expr, null, null);
+        new HalyardQueryJoinOptimizer(createStatistics()).optimize(expr, null, null);
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(Join node) throws RuntimeException {
@@ -47,7 +51,7 @@ public class HalyardQueryJoinOptimizerTest {
     @Test
     public void testQueryJoinOptimizerWithSplitFunction() {
         final TupleExpr expr = new SPARQLParser().parseQuery("select * where {?a a \"1\";?b ?d. filter (<" + HALYARD.PARALLEL_SPLIT_FUNCTION + ">(10, ?d))}", "http://baseuri/").getTupleExpr();
-        new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(null, null)).optimize(expr, null, null);
+        new HalyardQueryJoinOptimizer(createStatistics()).optimize(expr, null, null);
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(Join node) throws RuntimeException {
@@ -60,7 +64,7 @@ public class HalyardQueryJoinOptimizerTest {
     @Test
     public void testQueryJoinOptimizarWithBind() {
         final TupleExpr expr = new SPARQLParser().parseQuery("SELECT * WHERE { BIND (<http://whatever/> AS ?b)  ?a <http://whatever/> ?b , \"whatever\".}", "http://baseuri/").getTupleExpr();
-        new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(null, null)).optimize(expr, null, null);
+        new HalyardQueryJoinOptimizer(createStatistics()).optimize(expr, null, null);
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(Join node) throws RuntimeException {

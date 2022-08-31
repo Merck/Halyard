@@ -57,7 +57,7 @@ public class HBaseSailFactoryTest {
 		assertFalse(hbs.pushStrategy);
 		assertEquals(3, hbs.splitBits);
 		assertEquals("testtable", hbs.tableName.getNameAsString());
-		assertEquals(480, hbs.evaluationTimeout);
+		assertEquals(480, hbs.evaluationTimeoutSecs);
 	}
 
 	@Test
@@ -77,7 +77,7 @@ public class HBaseSailFactoryTest {
         assertFalse(hbs.pushStrategy);
         assertEquals(3, hbs.splitBits);
 		assertEquals("testtable", hbs.tableName.getNameAsString());
-        assertEquals(480, hbs.evaluationTimeout);
+        assertEquals(480, hbs.evaluationTimeoutSecs);
         assertEquals("http", hbs.esSettings.protocol);
         assertEquals("whatever", hbs.esSettings.host);
         assertEquals("index", hbs.esSettings.indexName);
@@ -100,7 +100,7 @@ public class HBaseSailFactoryTest {
 		assertEquals(-1, hbs.splitBits);
 		assertEquals("snapshot", hbs.snapshotName);
 		assertEquals("/path", hbs.snapshotRestorePath.toString());
-		assertEquals(480, hbs.evaluationTimeout);
+		assertEquals(480, hbs.evaluationTimeoutSecs);
 	}
 
 	@Test
@@ -121,7 +121,7 @@ public class HBaseSailFactoryTest {
 		assertEquals(-1, hbs.splitBits);
 		assertEquals("snapshot", hbs.snapshotName);
 		assertEquals("/path", hbs.snapshotRestorePath.toString());
-		assertEquals(480, hbs.evaluationTimeout);
+		assertEquals(480, hbs.evaluationTimeoutSecs);
         assertEquals("http", hbs.esSettings.protocol);
         assertEquals("whatever", hbs.esSettings.host);
         assertEquals("index", hbs.esSettings.indexName);
