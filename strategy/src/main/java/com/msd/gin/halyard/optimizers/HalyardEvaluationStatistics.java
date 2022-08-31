@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
@@ -46,7 +47,6 @@ import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 
 /**
  * Must be thread-safe.
@@ -114,7 +114,7 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
         private final Set<String> priorityVariables;
         private final Map<TupleExpr, Double> mapToUpdate;
 
-        public HalyardCardinalityCalculator(@Nonnull StatementPatternCardinalityCalculator spcalc, ServiceStatsProvider srvProvider, Set<String> boundVariables, Set<String> priorityVariables, Map<TupleExpr, Double> mapToUpdate) {
+        public HalyardCardinalityCalculator(@Nonnull StatementPatternCardinalityCalculator spcalc, ServiceStatsProvider srvProvider, Set<String> boundVariables, Set<String> priorityVariables, @Nullable Map<TupleExpr, Double> mapToUpdate) {
         	this.spcalc = spcalc;
         	this.srvProvider = srvProvider;
             this.boundVars = boundVariables;
@@ -254,15 +254,16 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
 
         @Override
         public void meet(Service node) {
-            EvaluationStatistics srvStats = (srvProvider != null && node.getServiceRef().hasValue()) ? srvProvider.getStatsForService(node.getServiceRef().getValue().stringValue()) : null;
+            HalyardEvaluationStatistics srvStats = (srvProvider != null && node.getServiceRef().hasValue()) ? srvProvider.getStatsForService(node.getServiceRef().getValue().stringValue()) : null;
             //try to calculate cardinality also for (Halyard-internally) federated service expressions
             if (srvStats != null) {
-                Double servCard = null;
+                TupleExpr remoteExpr = node.getServiceExpr();
                 if (mapToUpdate != null) {
-                	node.getServiceExpr().visit(this);
-                    servCard = mapToUpdate.get(node.getServiceExpr());
+                    srvStats.updateCardinalityMap(remoteExpr, boundVars, priorityVariables, mapToUpdate);
+                    cardinality = mapToUpdate.get(remoteExpr);
+                } else {
+                	cardinality = srvStats.getCardinality(remoteExpr, boundVars, priorityVariables);
                 }
-                cardinality = (servCard != null) ? servCard : srvStats.getCardinality(node.getServiceExpr());
             } else {
                 super.meet(node);
             }
