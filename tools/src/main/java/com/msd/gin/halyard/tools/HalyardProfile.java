@@ -38,6 +38,7 @@ import org.eclipse.rdf4j.query.Query;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
+import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
@@ -68,8 +69,6 @@ public final class HalyardProfile extends AbstractHalyardTool {
     public int run(CommandLine cmd) throws Exception {
     	String queryString = cmd.getOptionValue('q');
     	String elasticIndexURL = cmd.getOptionValue('i');
-    	System.out.println(queryString);
-    	System.out.println();
 		SailRepository repo = new SailRepository(new HBaseSail(getConf(), cmd.getOptionValue('s'), false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null, new HBaseSail.SailConnectionFactory() {
 			@Override
 			public HBaseSailConnection createConnection(HBaseSail sail) throws IOException {
@@ -93,7 +92,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
 		                }
 						getStatistics().updateCardinalityMap(expr, Collections.emptySet(), Collections.emptySet(), cardMap);
 		                final StringBuilder buf = new StringBuilder(256);
-		                buf.append(msg).append('\n');
+		                buf.append(msg).append(System.lineSeparator());
 		                expr.visit(new AbstractQueryModelVisitor<RuntimeException>() {
 		                    private int indentLevel = 0;
 		                    @Override
@@ -102,11 +101,32 @@ public final class HalyardProfile extends AbstractHalyardTool {
 		                                buf.append("    ");
 		                        }
 		                        buf.append(node.getSignature());
+		                        StringBuilder statsBuf = new StringBuilder(100);
 		                        Double card = cardMap.get(node);
+		                        String sep = "";
 		                        if (card != null) {
-		                            buf.append(" [").append(cardinalityFormatter.format(card)).append(']');
+		                            statsBuf.append(sep).append("cardinality = ").append(cardinalityFormatter.format(card));
+		                            sep = ", ";
 		                        }
-		                        buf.append('\n');
+		                        double sizeEstimate = node.getResultSizeEstimate();
+		                        if (sizeEstimate >= 0.0) {
+		                        	statsBuf.append(sep).append("size = ").append(cardinalityFormatter.format(sizeEstimate));
+		                            sep = ", ";
+		                        }
+		                        double costEstimate = node.getCostEstimate();
+		                        if (costEstimate >= 0.0) {
+		                        	statsBuf.append(sep).append("cost = ").append(cardinalityFormatter.format(costEstimate));
+		                            sep = ", ";
+		                        }
+		                        String algorithm = (node instanceof BinaryTupleOperator) ? ((BinaryTupleOperator)node).getAlgorithmName() : null;
+		                        if (algorithm != null) {
+		                        	statsBuf.append(sep).append("algorithm = ").append(algorithm);
+		                            sep = ", ";
+		                        }
+		                        if (statsBuf.length() > 0) {
+		                            buf.append(" [").append(statsBuf).append("]");
+		                        }
+	                            buf.append(System.lineSeparator());
 		                        indentLevel++;
 		                        super.meetNode(node);
 		                        indentLevel--;
@@ -122,6 +142,8 @@ public final class HalyardProfile extends AbstractHalyardTool {
         try {
         	try(RepositoryConnection conn = repo.getConnection()) {
 	            Query q = conn.prepareQuery(QueryLanguage.SPARQL, queryString, null);
+	        	System.out.println(queryString);
+	        	System.out.println();
 	            if (q instanceof BooleanQuery) {
 	                ((BooleanQuery)q).evaluate();
 	            } else if (q instanceof TupleQuery) {
