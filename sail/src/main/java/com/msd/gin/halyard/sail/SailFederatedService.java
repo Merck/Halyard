@@ -22,7 +22,6 @@ import org.eclipse.rdf4j.sail.SailConnection;
 public class SailFederatedService implements FederatedService {
 	private final Sail sail;
 	private boolean initialized;
-	private SailConnection conn;
 
 	public SailFederatedService(Sail sail) {
 		this.sail = sail;
@@ -47,30 +46,29 @@ public class SailFederatedService implements FederatedService {
 
 	@Override
 	public void shutdown() throws QueryEvaluationException {
-		if (conn != null) {
-			conn.close();
-			conn = null;
-		}
 		sail.shutDown();
 	}
 
 	@Override
 	public boolean ask(Service service, BindingSet bindings, String baseUri) throws QueryEvaluationException {
-		try (CloseableIteration<? extends BindingSet, QueryEvaluationException> res = getConnection()
-				.evaluate(new ServiceRoot(service.getArg()), null, bindings, true)) {
-			return res.hasNext();
+		try (SailConnection conn = sail.getConnection()) {
+			try (CloseableIteration<? extends BindingSet, QueryEvaluationException> res = conn.evaluate(new ServiceRoot(service.getArg()), null, bindings, true)) {
+				return res.hasNext();
+			}
 		}
 	}
 
 	@Override
 	public CloseableIteration<BindingSet, QueryEvaluationException> select(Service service, Set<String> projectionVars,
 			BindingSet bindings, String baseUri) throws QueryEvaluationException {
-		CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = getConnection().evaluate(new ServiceRoot(service.getArg()), null, bindings, true);
-		CloseableIteration<BindingSet, QueryEvaluationException> result = new InsertBindingSetCursor((CloseableIteration<BindingSet, QueryEvaluationException>) iter, bindings);
-		if (service.isSilent()) {
-			return new SilentIteration<>(result);
-		} else {
-			return result;
+		try (SailConnection conn = sail.getConnection()) {
+			CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = conn.evaluate(new ServiceRoot(service.getArg()), null, bindings, true);
+			CloseableIteration<BindingSet, QueryEvaluationException> result = new InsertBindingSetCursor((CloseableIteration<BindingSet, QueryEvaluationException>) iter, bindings);
+			if (service.isSilent()) {
+				return new SilentIteration<>(result);
+			} else {
+				return result;
+			}
 		}
 	}
 
@@ -94,13 +92,6 @@ public class SailFederatedService implements FederatedService {
 		} else {
 			return result;
 		}
-	}
-
-	protected SailConnection getConnection() {
-		if (conn == null) {
-			conn = sail.getConnection();
-		}
-		return conn;
 	}
 
 
