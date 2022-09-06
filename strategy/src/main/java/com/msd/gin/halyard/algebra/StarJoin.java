@@ -50,13 +50,25 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 
 	public StarJoin(Var commonVar, Var contextVar, List<StatementPattern> exprs) {
 		assert exprs.size() > 1;
-		this.commonVar = commonVar;
-		this.contextVar = contextVar;
+		setCommonVar(commonVar);
+		setContextVar(contextVar);
 		setStatementPatterns(exprs);
+	}
+
+	public void setCommonVar(Var var) {
+		commonVar = var;
+		commonVar.setParentNode(this);
 	}
 
 	public Var getCommonVar() {
 		return commonVar;
+	}
+
+	public void setContextVar(Var var) {
+		contextVar = var;
+		if (contextVar != null) {
+			contextVar.setParentNode(this);
+		}
 	}
 
 	public Var getContextVar() {

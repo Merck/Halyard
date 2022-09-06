@@ -66,7 +66,9 @@ public class StarJoinOptimizer implements QueryOptimizer {
 		private void processJoins(Join parent, List<StatementPattern> sps) {
 			ListMultimap<Pair<Var,Var>, StatementPattern> spByCtxSubj = ArrayListMultimap.create(sps.size(), 4);
 			for(StatementPattern sp : sps) {
-				spByCtxSubj.put(Pair.of(sp.getContextVar(), sp.getSubjectVar()), sp);
+				Var ctxVar = sp.getContextVar();
+				Var subjVar = sp.getSubjectVar();
+				spByCtxSubj.put(Pair.of(ctxVar != null ? ctxVar.clone() : null, subjVar.clone()), sp);
 			}
 			List<StarJoin> starJoins = new ArrayList<>(sps.size());
 			for(Map.Entry<Pair<Var,Var>, Collection<StatementPattern>> entry : spByCtxSubj.asMap().entrySet()) {
