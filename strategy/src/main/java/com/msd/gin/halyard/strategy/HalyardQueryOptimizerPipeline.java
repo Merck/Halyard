@@ -22,8 +22,9 @@ import com.msd.gin.halyard.optimizers.HalyardConstantOptimizer;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
 import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
+import com.msd.gin.halyard.optimizers.QueryJoinOptimizer;
 import com.msd.gin.halyard.optimizers.StarJoinOptimizer;
-import com.msd.gin.halyard.optimizers.TupleFunctionOptimizer;
+import com.msd.gin.halyard.optimizers.TupleFunctionCallOptimizer;
 
 import java.util.Arrays;
 
@@ -39,7 +40,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.DisjunctiveConstraintOpti
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.OrderLimitOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ParentReferenceCleaner;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.RegexAsStringFunctionOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
@@ -81,7 +81,7 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 			new HalyardFilterOptimizer(),
 			new ConstrainedValueOptimizer(),
 			new OrderLimitOptimizer(),
-			new TupleFunctionOptimizer(),
+			new TupleFunctionCallOptimizer(),
 			new ParentReferenceCleaner()
 		);
 	}

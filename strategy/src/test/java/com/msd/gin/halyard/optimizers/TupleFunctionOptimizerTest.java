@@ -1,5 +1,6 @@
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
 
 import java.util.ArrayList;
@@ -12,7 +13,6 @@ import org.eclipse.rdf4j.model.impl.BooleanLiteral;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.Join;
-import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
@@ -45,13 +45,13 @@ public class TupleFunctionOptimizerTest {
 	}
 
 	private void optimize(TupleExpr root) {
-		new TupleFunctionOptimizer().optimize(root, null, null);
+		new TupleFunctionCallOptimizer().optimize(root, null, null);
 		new QueryModelNormalizer().optimize(root, null, null);
 	}
 
 	@Test
 	public void testTupleFunction() {
-        optimize(new QueryRoot(createTupleFunctionCall("in", "out")));
+        optimize(Algebra.ensureRooted(createTupleFunctionCall("in", "out")));
 	}
 
 	@Test
@@ -59,7 +59,7 @@ public class TupleFunctionOptimizerTest {
 		ExtendedTupleFunctionCall tfc = createTupleFunctionCall("o", "out");
 		StatementPattern sp = createStatementPattern("s", "p", "o");
 		Join join = new Join(tfc, sp);
-		TupleExpr root = new QueryRoot(join);
+		TupleExpr root = Algebra.ensureRooted(join);
 		optimize(root);
         assertEquals(sp, tfc.getDependentExpression(), root.toString());
 	}
@@ -69,7 +69,7 @@ public class TupleFunctionOptimizerTest {
 		ExtendedTupleFunctionCall tfc = createTupleFunctionCall("o", "out");
 		StatementPattern sp = createStatementPattern("s", "p", "o");
 		Join join = new Join(sp, tfc);
-		TupleExpr root = new QueryRoot(join);
+		TupleExpr root = Algebra.ensureRooted(join);
 		optimize(root);
         assertEquals(sp, tfc.getDependentExpression(), root.toString());
 	}
@@ -81,7 +81,7 @@ public class TupleFunctionOptimizerTest {
 		StatementPattern sp2 = createStatementPattern("s", "p2", "o2");
 		Join join = new Join(sp2, new Filter(tfc, new ValueConstant(BooleanLiteral.TRUE)));
 		Join topJoin = new Join(sp1, join);
-		TupleExpr root = new QueryRoot(topJoin);
+		TupleExpr root = Algebra.ensureRooted(topJoin);
 		optimize(root);
         List<Join> joins = getJoins(root);
         assertEquals(tfc, joins.get(0).getRightArg(), root.toString());
@@ -101,7 +101,7 @@ public class TupleFunctionOptimizerTest {
 		Join join3 = new Join(tfc2, tfc3);
 		Join join2 = new Join(tfc1, join3);
 		Join join1 = new Join(tfcx, join2);
-		TupleExpr root = new QueryRoot(join1);
+		TupleExpr root = Algebra.ensureRooted(join1);
 		optimize(root);
 		assertEquals(tfc2, tfc3.getDependentExpression(), root.toString());
 		assertEquals(tfc1, tfc2.getDependentExpression(), root.toString());

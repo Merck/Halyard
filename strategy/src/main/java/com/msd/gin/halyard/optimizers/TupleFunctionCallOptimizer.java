@@ -18,7 +18,7 @@ import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 
-public class TupleFunctionOptimizer implements QueryOptimizer {
+public class TupleFunctionCallOptimizer implements QueryOptimizer {
 
 	@Override
 	public void optimize(TupleExpr root, Dataset dataset, BindingSet bindings) {

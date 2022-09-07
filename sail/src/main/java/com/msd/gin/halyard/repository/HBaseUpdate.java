@@ -36,12 +36,10 @@ import org.eclipse.rdf4j.query.UpdateExecutionException;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.Modify;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
-import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
-import org.eclipse.rdf4j.query.algebra.Union;
 import org.eclipse.rdf4j.query.algebra.UpdateExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
@@ -146,9 +144,7 @@ public class HBaseUpdate extends SailUpdate {
 				TupleExpr insertClause = modify.getInsertExpr();
 				if (insertClause != null) {
 					// for inserts, TupleFunctions are expected in the insert clause
-					if (!(insertClause instanceof QueryRoot)) {
-						insertClause = new QueryRoot(insertClause);
-					}
+					insertClause = Algebra.ensureRooted(insertClause);
 					insertClause = optimize(insertClause, uc.getDataset(), uc.getBindingSet(), false);
 					insertInfo = InsertCollector.process(insertClause);
 				}
@@ -156,9 +152,7 @@ public class HBaseUpdate extends SailUpdate {
 				ModifyInfo deleteInfo = null;
 				TupleExpr deleteClause = modify.getDeleteExpr();
 				TupleExpr whereClause = modify.getWhereExpr();
-				if (!(whereClause instanceof QueryRoot)) {
-					whereClause = new QueryRoot(whereClause);
-				}
+				whereClause = Algebra.ensureRooted(whereClause);
 				if (deleteClause != null) {
 					// for deletes, TupleFunctions are expected in the where clause
 					whereClause = optimize(whereClause, uc.getDataset(), uc.getBindingSet(), true);

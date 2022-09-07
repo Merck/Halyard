@@ -1521,7 +1521,7 @@ final class HalyardTupleExprEvaluation {
             }
             @Override
             public void close() throws InterruptedException {
-                evaluateTupleExpr(new BindingSetPipe(topPipe) {
+                evaluateTupleExpr(new BindingSetPipe(parent) {
                 	@Override
                 	protected boolean next(BindingSet driverBs) throws InterruptedException {
                 		if (driverBs.size() == 0) {
@@ -1809,7 +1809,7 @@ final class HalyardTupleExprEvaluation {
             }
             @Override
             public void close() throws InterruptedException {
-                evaluateTupleExpr(new BindingSetPipe(topPipe) {
+                evaluateTupleExpr(new BindingSetPipe(parent) {
                     @Override
                     protected boolean next(BindingSet bs) throws InterruptedException {
                         for (BindingSet excluded : excludeSet) {

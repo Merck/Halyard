@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.strategy.aggregators;
 
+import com.msd.gin.halyard.strategy.ExtendedEvaluationStrategy;
 import com.msd.gin.halyard.strategy.collections.BigHashSet;
 
 import java.io.IOException;
@@ -30,7 +31,6 @@ import org.eclipse.rdf4j.query.algebra.AbstractAggregateOperator;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExtendedEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
 
 public abstract class Aggregator implements AutoCloseable {
@@ -46,7 +46,7 @@ public abstract class Aggregator implements AutoCloseable {
 		this.isDistinct = op.isDistinct();
 		this.strategy = strategy;
 		if (strategy instanceof ExtendedEvaluationStrategy) {
-			comparator.setStrict(false);
+			comparator.setStrict(((ExtendedEvaluationStrategy)strategy).isStrict());
 		}
 	}
 

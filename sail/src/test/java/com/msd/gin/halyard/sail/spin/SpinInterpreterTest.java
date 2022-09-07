@@ -1,5 +1,7 @@
 package com.msd.gin.halyard.sail.spin;
 
+import com.msd.gin.halyard.algebra.Algebra;
+
 import java.io.IOException;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -8,7 +10,6 @@ import org.eclipse.rdf4j.model.vocabulary.SPIF;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
-import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
@@ -43,7 +44,7 @@ public class SpinInterpreterTest {
 		TripleSource tripleSource = new SailTripleSource(repoConn.getSailConnection(), true, vf);
 		SpinMagicPropertyInterpreter interpreter = new SpinMagicPropertyInterpreter(new SpinParser(), tripleSource, new TupleFunctionRegistry(), null);
 		ParsedTupleQuery q = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "prefix spif: <http://spinrdf.org/spif#> " + "select ?str {?str spif:split (\"Hello World\" \" \")}", null);
-		TupleExpr expr = new QueryRoot(q.getTupleExpr());
+		TupleExpr expr = Algebra.ensureRooted(q.getTupleExpr());
 		interpreter.optimize(expr, null, null);
 		try (CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = repoConn.getSailConnection().evaluate(expr, null, new QueryBindingSet(), true)) {
 			assertEquals("Hello", iter.next().getValue("str").stringValue());
@@ -63,7 +64,7 @@ public class SpinInterpreterTest {
 		TripleSource tripleSource = new SailTripleSource(repoConn.getSailConnection(), true, vf);
 		SpinMagicPropertyInterpreter interpreter = new SpinMagicPropertyInterpreter(new SpinParser(), tripleSource, new TupleFunctionRegistry(), (AbstractFederatedServiceResolver) sail.getFederatedServiceResolver());
 		ParsedTupleQuery q = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "prefix spif: <http://spinrdf.org/spif#> " + "select ?str {?str spif:split (\"Hello World\" \" \")}", null);
-		TupleExpr expr = new QueryRoot(q.getTupleExpr());
+		TupleExpr expr = Algebra.ensureRooted(q.getTupleExpr());
 		interpreter.optimize(expr, null, null);
 		try (CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = repoConn.getSailConnection().evaluate(expr, null, new QueryBindingSet(), true)) {
 			assertEquals("Hello", iter.next().getValue("str").stringValue());
@@ -85,7 +86,7 @@ public class SpinInterpreterTest {
 		TripleSource tripleSource = new SailTripleSource(repoConn.getSailConnection(), true, vf);
 		SpinMagicPropertyInterpreter interpreter = new SpinMagicPropertyInterpreter(new SpinParser(), tripleSource, new TupleFunctionRegistry(), null);
 		ParsedTupleQuery q = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "prefix spif: <http://spinrdf.org/spif#> " + "select ?str {?str spif:split (\"Hello World\" \" \")}", null);
-		TupleExpr expr = new QueryRoot(q.getTupleExpr());
+		TupleExpr expr = Algebra.ensureRooted(q.getTupleExpr());
 		interpreter.optimize(expr, null, null);
 		try (CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = repoConn.getSailConnection().evaluate(expr, null, new QueryBindingSet(), true)) {
 			assertEquals("Hello", iter.next().getValue("str").stringValue());
@@ -106,7 +107,7 @@ public class SpinInterpreterTest {
 		TripleSource tripleSource = new SailTripleSource(repoConn.getSailConnection(), true, vf);
 		SpinMagicPropertyInterpreter interpreter = new SpinMagicPropertyInterpreter(new SpinParser(), tripleSource, new TupleFunctionRegistry(), (AbstractFederatedServiceResolver) sail.getFederatedServiceResolver());
 		ParsedTupleQuery q = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "prefix spif: <http://spinrdf.org/spif#> " + "select ?str {?str spif:split (\"Hello World\" \" \")}", null);
-		TupleExpr expr = new QueryRoot(q.getTupleExpr());
+		TupleExpr expr = Algebra.ensureRooted(q.getTupleExpr());
 		interpreter.optimize(expr, null, null);
 		try (CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = repoConn.getSailConnection().evaluate(expr, null, new QueryBindingSet(), true)) {
 			assertEquals("Hello", iter.next().getValue("str").stringValue());

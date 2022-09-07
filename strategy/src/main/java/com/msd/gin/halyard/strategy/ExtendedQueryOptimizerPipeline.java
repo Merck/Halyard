@@ -2,7 +2,8 @@ package com.msd.gin.halyard.strategy;
 
 import com.msd.gin.halyard.optimizers.ConstrainedValueOptimizer;
 import com.msd.gin.halyard.optimizers.ExtendedEvaluationStatistics;
-import com.msd.gin.halyard.optimizers.TupleFunctionOptimizer;
+import com.msd.gin.halyard.optimizers.QueryJoinOptimizer;
+import com.msd.gin.halyard.optimizers.TupleFunctionCallOptimizer;
 
 import java.util.Arrays;
 
@@ -20,7 +21,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.FilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.OrderLimitOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ParentReferenceCleaner;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.RegexAsStringFunctionOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
@@ -56,7 +56,7 @@ public class ExtendedQueryOptimizerPipeline implements QueryOptimizerPipeline {
 			new FilterOptimizer(),
 			new ConstrainedValueOptimizer(),
 			new OrderLimitOptimizer(),
-			new TupleFunctionOptimizer(),
+			new TupleFunctionCallOptimizer(),
 			new ParentReferenceCleaner()
 		);
 	}

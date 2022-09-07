@@ -18,6 +18,7 @@ package com.msd.gin.halyard.sail;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
@@ -28,6 +29,7 @@ import com.msd.gin.halyard.sail.search.SearchClient;
 import com.msd.gin.halyard.sail.search.SearchInterpreter;
 import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
 import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
+import com.msd.gin.halyard.strategy.ExtendedEvaluationStrategy;
 import com.msd.gin.halyard.strategy.ExtendedQueryOptimizerPipeline;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -72,7 +74,6 @@ import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
@@ -80,7 +81,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContextInitializer;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExtendedEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.sail.SailConnectionQueryPreparer;
@@ -181,7 +181,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		if (sail.pushStrategy) {
 			strategy = new HalyardEvaluationStrategy(source, queryContext, sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), dataset, sail.getFederatedServiceResolver(), stats);
 		} else {
-			strategy = new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), 0L, stats);
+			strategy = new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), sail.getTupleFunctionRegistry(), 0L, stats);
 			strategy.setOptimizerPipeline(new ExtendedQueryOptimizerPipeline(strategy, source.getValueFactory(), stats));
 		}
 		return strategy;
@@ -194,11 +194,9 @@ public class HBaseSailConnection extends AbstractSailConnection {
 			tupleExpr = tupleExpr.clone();
 		}
 
-		if (!(tupleExpr instanceof QueryRoot)) {
-			// Add a dummy root node to the tuple expressions to allow the
-			// optimizers to modify the actual root node
-			tupleExpr = new QueryRoot(tupleExpr);
-		}
+		// Add a dummy root node to the tuple expressions to allow the
+		// optimizers to modify the actual root node
+		tupleExpr = Algebra.ensureRooted(tupleExpr);
 
 		new SpinFunctionInterpreter(sail.getSpinParser(), source, sail.getFunctionRegistry()).optimize(tupleExpr, dataset, bindings);
 		if (includeInferred) {

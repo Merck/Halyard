@@ -5,11 +5,19 @@ import java.util.List;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
+import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Union;
 
 public final class Algebra {
 	private Algebra() {}
+
+	public static TupleExpr ensureRooted(TupleExpr tupleExpr) {
+		if (!(tupleExpr instanceof QueryRoot)) {
+			tupleExpr = new QueryRoot(tupleExpr);
+		}
+		return tupleExpr;
+	}
 
 	public static void remove(TupleExpr expr) {
 		QueryModelNode parent = expr.getParentNode();
