@@ -1,7 +1,5 @@
 package com.msd.gin.halyard.optimizers;
 
-import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics.StatementPatternCardinalityCalculator;
-
 import java.io.IOException;
 import java.util.Collection;
 

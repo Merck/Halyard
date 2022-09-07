@@ -25,7 +25,6 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
 import org.eclipse.rdf4j.query.algebra.helpers.TupleExprs;
@@ -38,9 +37,9 @@ import org.eclipse.rdf4j.query.algebra.helpers.TupleExprs;
  */
 public class QueryJoinOptimizer implements QueryOptimizer {
 
-	protected final EvaluationStatistics statistics;
+	protected final ExtendedEvaluationStatistics statistics;
 
-	public QueryJoinOptimizer(EvaluationStatistics statistics) {
+	public QueryJoinOptimizer(ExtendedEvaluationStatistics statistics) {
 		this.statistics = statistics;
 	}
 
@@ -76,7 +75,7 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 		@Override
 		public void meet(StatementPattern node) throws RuntimeException {
 			super.meet(node);
-			node.setResultSizeEstimate(Math.max(statistics.getCardinality(node), node.getResultSizeEstimate()));
+			node.setResultSizeEstimate(Math.max(statistics.getCardinality(node, boundVars), node.getResultSizeEstimate()));
 		}
 
 		private void optimizePriorityJoin(Set<String> origBoundVars, TupleExpr join) {
@@ -95,7 +94,7 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 
 			Set<String> origBoundVars = boundVars;
 			try {
-				boundVars = new HashSet<>(boundVars);
+				boundVars = new HashSet<>(origBoundVars);
 
 				// Recursively get the join arguments
 				List<TupleExpr> joinArgs = getJoinArgs(node, new ArrayList<>());
@@ -124,7 +123,7 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 					Map<TupleExpr, List<Var>> varsMap = new HashMap<>();
 
 					for (TupleExpr tupleExpr : joinArgs) {
-						double cardinality = statistics.getCardinality(tupleExpr);
+						double cardinality = statistics.getCardinality(tupleExpr, boundVars);
 						tupleExpr.setResultSizeEstimate(Math.max(cardinality, tupleExpr.getResultSizeEstimate()));
 						cardinalityMap.put(tupleExpr, cardinality);
 						if (tupleExpr instanceof ZeroLengthPath) {

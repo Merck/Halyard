@@ -9,6 +9,7 @@ package com.msd.gin.halyard.function.spif;
 
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.optimizers.ExtendedEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.SimpleStatementPatternCardinalityCalculator;
 import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
 import com.msd.gin.halyard.sail.spin.SpinInferencing;
 import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
@@ -174,7 +175,7 @@ public class CanInvoke extends AbstractSpinFunction implements Function {
 					new SpinMagicPropertyInterpreter(parser, getTripleSource(), tupleFunctionRegistry, serviceResolver)
 							.optimize(tupleExpr, dataset, bindings);
 
-					EvaluationStatistics stats = new ExtendedEvaluationStatistics();
+					EvaluationStatistics stats = new ExtendedEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY);
 					EvaluationStrategy strategy = new ExtendedEvaluationStrategy(getTripleSource(), dataset,
 							serviceResolver, tupleFunctionRegistry, 0L, stats);
 					strategy.optimize(tupleExpr, stats, bindings);

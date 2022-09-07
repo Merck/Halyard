@@ -19,9 +19,7 @@ package com.msd.gin.halyard.optimizers;
 import com.msd.gin.halyard.algebra.StarJoin;
 import com.msd.gin.halyard.vocab.HALYARD;
 
-import java.io.Closeable;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -54,25 +52,15 @@ import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
  */
 public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatistics {
 
-	public static interface StatementPatternCardinalityCalculator extends Closeable {
-	
-		public static interface Factory {
-			StatementPatternCardinalityCalculator create() throws IOException;
-		}
-
-		double getCardinality(StatementPattern sp, Collection<String> boundVars);
-	}
-
 	public static interface ServiceStatsProvider {
 	
 		HalyardEvaluationStatistics getStatsForService(String service);
 	}
 
-    private final StatementPatternCardinalityCalculator.Factory spcalcFactory;
     private final ServiceStatsProvider srvProvider;
 
     public HalyardEvaluationStatistics(@Nonnull StatementPatternCardinalityCalculator.Factory spcalcFactory, ServiceStatsProvider srvProvider) {
-        this.spcalcFactory = spcalcFactory;
+        super(spcalcFactory);
         this.srvProvider = srvProvider;
     }
 
@@ -96,28 +84,20 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
 	}
 
 	@Override
-	public double getCardinality(TupleExpr expr) {
-		return getCardinality(expr, Collections.emptySet(), Collections.emptySet());
+	public double getCardinality(TupleExpr expr, final Set<String> boundVariables) {
+		return getCardinality(expr, boundVariables, Collections.emptySet());
 	}
 
-	@Override
-	protected CardinalityCalculator createCardinalityCalculator() {
-		// should never be called
-		throw new AssertionError();
-	}
 
     private static class HalyardCardinalityCalculator extends ExtendedCardinalityCalculator {
 
-    	private final StatementPatternCardinalityCalculator spcalc;
         private final ServiceStatsProvider srvProvider;
-        private final Set<String> boundVars;
         private final Set<String> priorityVariables;
         private final Map<TupleExpr, Double> mapToUpdate;
 
         public HalyardCardinalityCalculator(@Nonnull StatementPatternCardinalityCalculator spcalc, ServiceStatsProvider srvProvider, Set<String> boundVariables, Set<String> priorityVariables, @Nullable Map<TupleExpr, Double> mapToUpdate) {
-        	this.spcalc = spcalc;
+        	super(spcalc, boundVariables);
         	this.srvProvider = srvProvider;
-            this.boundVars = boundVariables;
             this.priorityVariables = priorityVariables;
             this.mapToUpdate = mapToUpdate;
         }
@@ -129,7 +109,7 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
             if (objectVar.hasValue() && (objectVar.getValue() instanceof Literal) && HALYARD.SEARCH.equals(((Literal) objectVar.getValue()).getDatatype())) {
                 return 0.0001;
             }
-            double card = spcalc.getCardinality(sp, boundVars);
+            double card = super.getCardinality(sp);
             for (Var v : sp.getVarList()) {
                 //decrease cardinality for each priority variable present
                 if (v != null && priorityVariables.contains(v.getName())) {
@@ -137,22 +117,6 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
                 }
             }
             return card;
-        }
-
-        @Override
-		protected double getCardinality(double varCardinality, Var var) {
-			return SimpleStatementPatternCardinalityCalculator.getCardinality(var, boundVars, varCardinality);
-		}
-
-        @Override
-        protected int countConstantVars(Iterable<Var> vars) {
-        	int constantVarCount = 0;
-        	for(Var var : vars) {
-        		if(SimpleStatementPatternCardinalityCalculator.hasValue(var, boundVars)) {
-        			constantVarCount++;
-        		}
-        	}
-        	return constantVarCount;
         }
 
         @Override
@@ -192,11 +156,7 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
 
         @Override
         public void meet(Filter node) throws RuntimeException {
-            super.meetUnaryTupleOperator(node);
-            double subCost = cardinality;
-            cardinality = 1;
-            node.getCondition().visit(this);
-            cardinality *= subCost;
+        	super.meet(node);
             updateMap(node);
         }
 

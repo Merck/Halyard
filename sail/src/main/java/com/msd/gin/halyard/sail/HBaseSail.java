@@ -24,6 +24,7 @@ import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.SSLSettings;
 import com.msd.gin.halyard.function.DynamicFunctionRegistry;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.StatementPatternCardinalityCalculator;
 import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
 import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -462,7 +463,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 			addNamespaces();
 		}
 
-		HalyardEvaluationStatistics.StatementPatternCardinalityCalculator.Factory spcalcFactory = () -> new HalyardStatsBasedStatementPatternCardinalityCalculator(
+		StatementPatternCardinalityCalculator.Factory spcalcFactory = () -> new HalyardStatsBasedStatementPatternCardinalityCalculator(
 				new HBaseTripleSource(keyspace.getConnection(), valueFactory, rdfFactory, evaluationTimeoutSecs), rdfFactory);
 		HalyardEvaluationStatistics.ServiceStatsProvider srvStatsProvider = service -> {
 			HalyardEvaluationStatistics fedStats = null;
