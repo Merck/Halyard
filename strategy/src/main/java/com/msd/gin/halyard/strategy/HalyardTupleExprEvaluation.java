@@ -1403,26 +1403,9 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
-    	if (isOutOfScopeForLeftArgBindings(join.getRightArg())) {
-            //re-writing this to push model is a bit more complex task
-            try {
-    			pullAndPushAsync(topPipe, new HashJoinIteration(parentStrategy, join, bindings), join, parentStrategy);
-            } catch (QueryEvaluationException e) {
-            	topPipe.handleException(e);
-            }
-            return;
-    	}
-
     	String algorithm = join.getAlgorithmName();
-    	if (algorithm == null) {
-        	double probeEstimate = join.getLeftArg().getResultSizeEstimate();
-        	double buildEstimate = join.getRightArg().getResultSizeEstimate();
-        	if (buildEstimate >= 0 && buildEstimate <= parentStrategy.hashJoinLimit && buildEstimate <= probeEstimate) {
-        		join.setAlgorithm(HashJoin.INSTANCE);
-        	} else {
-        		join.setAlgorithm(NestedLoops.INSTANCE);
-        	}
-        	algorithm = join.getAlgorithmName();
+    	if (isOutOfScopeForLeftArgBindings(join.getRightArg())) {
+    		algorithm = HashJoin.NAME;
     	}
 
     	if (HashJoin.NAME.equals(algorithm)) {
@@ -1486,25 +1469,24 @@ final class HalyardTupleExprEvaluation {
     	join.setAlgorithm(HashJoin.INSTANCE);
     	TupleExpr probeExpr = join.getLeftArg();
     	TupleExpr buildExpr = join.getRightArg();
-    	Set<String> joinAttributeNames = buildExpr.getBindingNames();
-		joinAttributeNames.retainAll(probeExpr.getBindingNames());
+    	Set<String> joinAttributeNames = probeExpr.getBindingNames();
+		joinAttributeNames.retainAll(buildExpr.getBindingNames());
 		final String[] joinAttributes = joinAttributeNames.toArray(new String[joinAttributeNames.size()]);
 
 		final Map<BindingSetHashKey, List<BindingSet>> hashTable;
-		int initialSize = (int) buildExpr.getResultSizeEstimate();
+		int initialSize = (int) Math.max(0, buildExpr.getResultSizeEstimate());
 		if (joinAttributes.length > 0) {
 			hashTable = new HashMap<>(initialSize);
 		} else {
-			List<BindingSet> l = (initialSize > 0) ? new ArrayList<>(initialSize) : null;
-			hashTable = Collections.<BindingSetHashKey, List<BindingSet>>singletonMap(BindingSetHashKey.EMPTY, l);
+			hashTable = Collections.<BindingSetHashKey, List<BindingSet>>singletonMap(BindingSetHashKey.EMPTY, new ArrayList<>(initialSize));
 		}
 
 		evaluateTupleExpr(new BindingSetPipe(topPipe) {
 			int keyCount;
 			long bsCount;
             @Override
-            protected boolean next(BindingSet bs) throws InterruptedException {
-    			BindingSetHashKey hashKey = BindingSetHashKey.create(joinAttributes, bs);
+            protected boolean next(BindingSet buildBs) throws InterruptedException {
+    			BindingSetHashKey hashKey = BindingSetHashKey.create(joinAttributes, buildBs);
     			synchronized (hashTable) {
     				List<BindingSet> hashValue = hashTable.get(hashKey);
     				boolean newEntry = (hashValue == null);
@@ -1514,7 +1496,7 @@ final class HalyardTupleExprEvaluation {
     					hashTable.put(hashKey, hashValue);
     					keyCount++;
     				}
-    				hashValue.add(bs);
+    				hashValue.add(buildBs);
     				bsCount++;
     			}
             	return true;
@@ -1523,23 +1505,23 @@ final class HalyardTupleExprEvaluation {
             public void close() throws InterruptedException {
                 evaluateTupleExpr(new BindingSetPipe(parent) {
                 	@Override
-                	protected boolean next(BindingSet driverBs) throws InterruptedException {
-                		if (driverBs.size() == 0) {
-        					// the empty bindingset should be merged with all bindingsets in the hash table
+                	protected boolean next(BindingSet probeBs) throws InterruptedException {
+                		if (probeBs.size() == 0) {
+        					// the empty bindingset should be merged with all binding sets in the hash table
         					Collection<List<BindingSet>> hashValues = hashTable.values();
         					for (List<BindingSet> hashValue : hashValues) {
         						for (BindingSet b : hashValue) {
-        							if (!parent.push(join(b, driverBs))) {
+        							if (!parent.push(join(probeBs, b))) {
         								return false;
         							}
         						}
         					}
                 		} else {
-        					BindingSetHashKey key = BindingSetHashKey.create(joinAttributes, driverBs);
+        					BindingSetHashKey key = BindingSetHashKey.create(joinAttributes, probeBs);
         					List<BindingSet> hashValue = hashTable.get(key);
         					if (hashValue != null) {
 	        					for (BindingSet b : hashValue) {
-	    							if (!parent.push(join(b, driverBs))) {
+	    							if (!parent.push(join(probeBs, b))) {
 	    								return false;
 	    							}
 	        					}

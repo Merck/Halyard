@@ -88,8 +88,6 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 	/** Track the exeution time of each node in the plan. */
 	boolean trackTime;
 
-	int hashJoinLimit = 50000;
-
 	private QueryOptimizerPipeline pipeline;
 
     /**
@@ -137,10 +135,6 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 	@Override
 	public void setTrackTime(boolean trackTime) {
 		this.trackTime = trackTime;
-	}
-
-	public void setHashJoinLimit(int n) {
-		this.hashJoinLimit = n;
 	}
 
 	String getSourceString() {

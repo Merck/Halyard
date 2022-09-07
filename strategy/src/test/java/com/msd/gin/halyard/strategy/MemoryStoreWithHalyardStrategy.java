@@ -19,7 +19,10 @@ package com.msd.gin.halyard.strategy;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.SimpleStatementPatternCardinalityCalculator;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedList;
+import java.util.Map;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
@@ -32,6 +35,7 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
+import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
@@ -45,16 +49,18 @@ import org.eclipse.rdf4j.sail.memory.MemoryStoreConnection;
  *
  * @author Adam Sotona (MSD)
  */
-class MemoryStoreWithHalyardStrategy extends MemoryStore {
+public class MemoryStoreWithHalyardStrategy extends MemoryStore {
 
 	private final LinkedList<TupleExpr> queryHistory = new LinkedList<>();
+	private final Map<IRI, Double> predicateStats;
 	private final int hashJoinLimit;
 
 	MemoryStoreWithHalyardStrategy() {
-		this(0);
+		this(Collections.emptyMap(), 0);
 	}
 
-	MemoryStoreWithHalyardStrategy(int hashJoinLimit) {
+	MemoryStoreWithHalyardStrategy(Map<IRI, Double> predicateStats, int hashJoinLimit) {
+		this.predicateStats = predicateStats;
 		this.hashJoinLimit = hashJoinLimit;
 	}
 
@@ -68,7 +74,7 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
 
             @Override
             protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, final TripleSource tripleSource) {
-            	HalyardEvaluationStatistics stats = new HalyardEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY, null);
+            	HalyardEvaluationStatistics stats = new HalyardEvaluationStatistics(() -> new MockStatementPatternCardinalityCalculator(predicateStats), null);
             	HalyardEvaluationStrategy evalStrat = new HalyardEvaluationStrategy(new MockTripleSource(tripleSource), dataset, null, stats) {
             		@Override
             		public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) throws QueryEvaluationException {
@@ -76,8 +82,7 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
             			return super.evaluate(expr, bindings);
             		}
             	};
-            	evalStrat.setHashJoinLimit(hashJoinLimit);
-                evalStrat.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(evalStrat, tripleSource.getValueFactory(), stats));
+                evalStrat.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(evalStrat, tripleSource.getValueFactory(), stats, hashJoinLimit));
                 return evalStrat;
             }
 
@@ -128,4 +133,19 @@ class MemoryStoreWithHalyardStrategy extends MemoryStore {
 			return ((RDFStarTripleSource)tripleSource).getRdfStarTriples(subj, pred, obj);
 		}
     }
+
+
+	public static class MockStatementPatternCardinalityCalculator extends SimpleStatementPatternCardinalityCalculator {
+		final Map<IRI, Double> predicateStats;
+	
+		public MockStatementPatternCardinalityCalculator(Map<IRI, Double> predicateStats) {
+			this.predicateStats = predicateStats;
+		}
+	
+		@Override
+		public double getCardinality(StatementPattern sp, Collection<String> boundVars) {
+			IRI predicate = (IRI) sp.getPredicateVar().getValue();
+			return predicateStats.getOrDefault(predicate, super.getCardinality(sp, boundVars));
+		}
+	}
 }

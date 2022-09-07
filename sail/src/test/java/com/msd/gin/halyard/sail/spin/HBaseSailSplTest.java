@@ -50,7 +50,7 @@ public class HBaseSailSplTest {
 
 	@Before
 	public void setup() throws Exception {
-		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "spifTestTable", true, 0, usePushStrategy, 0, null, null);
+		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "spifTestTable", true, 10, usePushStrategy, 0, null, null);
 		repo = new SailRepository(sail);
 		repo.init();
 		conn = repo.getConnection();

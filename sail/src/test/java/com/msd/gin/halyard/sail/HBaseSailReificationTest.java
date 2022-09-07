@@ -51,7 +51,7 @@ public class HBaseSailReificationTest {
 
     @Test
     public void testModify() throws Exception {
-		HBaseSail sail = new HBaseSail(hconn, "reiftable", true, 0, true, 0, null, null);
+		HBaseSail sail = new HBaseSail(hconn, "reiftable", true, 0, true, 10, null, null);
 		HBaseRepository rep = new HBaseRepository(sail);
         rep.init();
         try(SailRepositoryConnection con = rep.getConnection()) {

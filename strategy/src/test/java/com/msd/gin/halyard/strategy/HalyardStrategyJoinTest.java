@@ -6,10 +6,13 @@ import com.msd.gin.halyard.algebra.NestedLoops;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.query.algebra.Join;
@@ -39,6 +42,7 @@ public class HalyardStrategyJoinTest {
 		return testValues;
 	}
 
+	private final Map<IRI, Double> predicateStats = new HashMap<>();
     private final int hashJoinLimit;
     private Repository repo;
     private RepositoryConnection con;
@@ -50,7 +54,7 @@ public class HalyardStrategyJoinTest {
 
     @Before
     public void setUp() throws Exception {
-    	strategy = new MemoryStoreWithHalyardStrategy(hashJoinLimit);
+    	strategy = new MemoryStoreWithHalyardStrategy(predicateStats, hashJoinLimit);
         repo = new SailRepository(strategy);
         repo.init();
         con = repo.getConnection();
@@ -73,6 +77,7 @@ public class HalyardStrategyJoinTest {
     @Test
     public void testJoin_1var() throws Exception {
         String q ="prefix : <http://example/> select ?s ?t where {?s :r/:s ?t}";
+        predicateStats.put(repo.getValueFactory().createIRI("http://example/r"), 25.0);
         joinTest(q, "/test-cases/join-results-1.srx", 1, expectedAlgo());
     }
 
@@ -86,16 +91,20 @@ public class HalyardStrategyJoinTest {
     @Test
     public void testJoin_0var() throws Exception {
         String q ="prefix : <http://example/> select * where {?s :r ?t. ?x :s ?y}";
+        predicateStats.put(repo.getValueFactory().createIRI("http://example/r"), 25.0);
         joinTest(q, "/test-cases/join-results-0.srx", 1, expectedAlgo());
     }
 
     @Test
     public void testJoin_empty_0var() throws Exception {
         String q ="prefix : <http://example/> select * where {:x1 :q \"a\". ?x :p ?y}";
-        joinTest(q, "/test-cases/join-results-empty-0.srx", 1, NestedLoops.NAME);
+        joinTest(q, "/test-cases/join-results-empty-0.srx", 1, expectedAlgo());
     }
 
     private void joinTest(String q, String expectedOutput, int expectedJoins, String expectedAlgo) throws Exception {
+    	if (expectedJoins == 0 && expectedAlgo != null) {
+    		throw new IllegalArgumentException("No join expected");
+    	}
         con.add(getClass().getResource("/test-cases/join-data.ttl"));
         Set<BindingSet> results;
         try (TupleQueryResult res = con.prepareTupleQuery(q).evaluate()) {

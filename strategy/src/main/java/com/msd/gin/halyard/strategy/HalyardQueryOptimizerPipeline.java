@@ -22,6 +22,7 @@ import com.msd.gin.halyard.optimizers.HalyardConstantOptimizer;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
 import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
+import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.optimizers.QueryJoinOptimizer;
 import com.msd.gin.halyard.optimizers.StarJoinOptimizer;
 import com.msd.gin.halyard.optimizers.TupleFunctionCallOptimizer;
@@ -54,11 +55,17 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 	private final ExtendedEvaluationStatistics statistics;
 	private final EvaluationStrategy strategy;
 	private final ValueFactory valueFactory;
+	private final int hashJoinLimit;
 
 	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory, ExtendedEvaluationStatistics statistics) {
+		this(strategy, valueFactory, statistics, 0);
+	}
+
+	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory, ExtendedEvaluationStatistics statistics, int hashJoinLimit) {
 		this.strategy = strategy;
 		this.valueFactory = valueFactory;
 		this.statistics = statistics;
+		this.hashJoinLimit = hashJoinLimit;
 	}
 
 	@Override
@@ -82,7 +89,8 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 			new ConstrainedValueOptimizer(),
 			new OrderLimitOptimizer(),
 			new TupleFunctionCallOptimizer(),
-			new ParentReferenceCleaner()
+			new ParentReferenceCleaner(),
+			new JoinAlgorithmOptimizer(statistics, hashJoinLimit)
 		);
 	}
 }

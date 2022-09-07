@@ -159,19 +159,13 @@ public class HBaseUpdate extends SailUpdate {
 					deleteInfo = new ModifyInfo(StatementPatternCollector.process(deleteClause), WhereCollector.process(whereClause));
 				}
 
-				CloseableIteration<? extends BindingSet, QueryEvaluationException> sourceBindings = null;
-				try {
-					sourceBindings = evaluateWhereClause(whereClause, uc, maxExecutionTime);
-					TimestampedUpdateContext tsUc = new TimestampedUpdateContext(uc.getUpdateExpr(), uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
+				TimestampedUpdateContext tsUc = new TimestampedUpdateContext(uc.getUpdateExpr(), uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
+				try (CloseableIteration<? extends BindingSet, QueryEvaluationException> sourceBindings = evaluateWhereClause(whereClause, uc, maxExecutionTime)) {
 					while (sourceBindings.hasNext()) {
 						BindingSet sourceBinding = sourceBindings.next();
 						deleteBoundTriples(sourceBinding, deleteInfo, tsUc);
 
 						insertBoundTriples(sourceBinding, insertInfo, tsUc);
-					}
-				} finally {
-					if (sourceBindings != null) {
-						sourceBindings.close();
 					}
 				}
 			} catch (QueryEvaluationException e) {

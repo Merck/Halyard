@@ -38,7 +38,7 @@ public class SES2154SubselectOptionalTest {
 
     @Test
     public void testSES2154SubselectOptional() throws Exception {
-        HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "SES2154SubselectOptionaltable", true, 0, true, 0, null, null);
+		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "SES2154SubselectOptionaltable", true, 0, true, 10, null, null);
         SailRepository rep = new SailRepository(sail);
         rep.init();
         SimpleValueFactory vf = SimpleValueFactory.getInstance();

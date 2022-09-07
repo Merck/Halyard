@@ -109,7 +109,7 @@ public class HBaseSailHashConflictTest {
 			}
 		}
 
-		sail = new HBaseSail(conf, "testConflictingHash", false, 0, true, 0, null, null);
+		sail = new HBaseSail(conf, "testConflictingHash", false, 0, true, 10, null, null);
 		sail.initialize();
     }
 

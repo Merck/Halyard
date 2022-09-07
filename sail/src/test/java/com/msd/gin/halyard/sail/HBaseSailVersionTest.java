@@ -75,7 +75,7 @@ public class HBaseSailVersionTest {
         Resource subj = vf.createIRI("http://whatever/subj/");
         IRI pred = vf.createIRI("http://whatever/pred/");
         Value obj = vf.createLiteral("whatever");
-        HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
+		HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 10, null, null);
         SailRepository rep = new SailRepository(sail);
         rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
@@ -102,7 +102,7 @@ public class HBaseSailVersionTest {
         Resource subj = vf.createIRI("http://whatever/subj/");
         IRI pred = vf.createIRI("http://whatever/pred/");
         Value obj = vf.createLiteral("whatever");
-        HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 0, null, null);
+		HBaseSail sail = new HBaseSail(hconn, "whatevertable", true, 0, true, 10, null, null);
         SailRepository rep = new SailRepository(sail);
         rep.init();
 		try (RepositoryConnection conn = rep.getConnection()) {
@@ -125,7 +125,7 @@ public class HBaseSailVersionTest {
 		TableName htableName = TableName.valueOf("timestamptable");
 		HalyardTableUtils.createTable(hconn, htableName, null, 5);
 
-		HBaseSail sail = new HBaseSail(hconn, "timestamptable", false, 0, true, 0, null, null);
+		HBaseSail sail = new HBaseSail(hconn, "timestamptable", false, 0, true, 10, null, null);
 		HBaseRepository rep = new HBaseRepository(sail);
         rep.init();
         try(SailRepositoryConnection con = rep.getConnection()) {
@@ -236,7 +236,7 @@ public class HBaseSailVersionTest {
 
         //fill the change graph with change events
         Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-        HBaseSail sail = new HBaseSail(conf, "timebulkupdatetesttable", true, -1, true, 0, null, null);
+		HBaseSail sail = new HBaseSail(conf, "timebulkupdatetesttable", true, -1, true, 10, null, null);
 		HBaseRepository rep = new HBaseRepository(sail);
         rep.init();
         int i=0;
