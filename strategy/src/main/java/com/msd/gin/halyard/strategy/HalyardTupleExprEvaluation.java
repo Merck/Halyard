@@ -1495,6 +1495,7 @@ final class HalyardTupleExprEvaluation {
 
     private void evaluateNestedLoopsLeftJoin(BindingSetPipe parentPipe, final LeftJoin leftJoin, final BindingSet bindings) {
     	leftJoin.setAlgorithm(NestedLoops.INSTANCE);
+    	parentStrategy.initTracking(leftJoin);
     	// Check whether optional join is "well designed" as defined in section
         // 4.2 of "Semantics and Complexity of SPARQL", 2006, Jorge Pérez et al.
         VarNameCollector optionalVarCollector = new VarNameCollector();
@@ -1548,7 +1549,7 @@ final class HalyardTupleExprEvaluation {
                     	try {
                             if (leftJoin.getCondition() == null) {
                                 failed = false;
-                                return parent.push(rightBindings);
+                                return pushToParent(rightBindings);
                             } else {
                                 // Limit the bindings to the ones that are in scope for
                                 // this filter
@@ -1556,7 +1557,7 @@ final class HalyardTupleExprEvaluation {
                                 scopeBindings.retainAll(scopeBindingNames);
                                 if (parentStrategy.isTrue(leftJoin.getCondition(), scopeBindings)) {
                                     failed = false;
-                                    return parent.push(rightBindings);
+                                    return pushToParent(rightBindings);
                                 }
                             }
                         } catch (ValueExprEvaluationException ignore) {
@@ -1565,11 +1566,15 @@ final class HalyardTupleExprEvaluation {
                         }
                         return true;
                     }
+                	private boolean pushToParent(BindingSet bs) throws InterruptedException {
+                		parentStrategy.incrementResultSizeActual(leftJoin);
+                		return parent.push(bs);
+                	}
                     @Override
                     public void close() throws InterruptedException {
                         if (failed) {
                             // Join failed, return left arg's bindings
-                            parent.push(leftBindings);
+                        	pushToParent(leftBindings);
                         }
                     	joinsInProgress.decrementAndGet();
                     	if (joinsFinished.get() && joinsInProgress.compareAndSet(0L, -1L)) {
@@ -1605,6 +1610,7 @@ final class HalyardTupleExprEvaluation {
     	join.setAlgorithm(HashJoin.INSTANCE);
     	TupleExpr probeExpr = join.getLeftArg();
     	TupleExpr buildExpr = join.getRightArg();
+    	parentStrategy.initTracking(join);
     	Set<String> joinAttributeNames = probeExpr.getBindingNames();
 		joinAttributeNames.retainAll(buildExpr.getBindingNames());
 		final String[] joinAttributes = joinAttributeNames.toArray(new String[joinAttributeNames.size()]);
@@ -1649,7 +1655,7 @@ final class HalyardTupleExprEvaluation {
         					Collection<List<BindingSet>> hashValues = hashTable.values();
         					for (List<BindingSet> hashValue : hashValues) {
         						for (BindingSet b : hashValue) {
-        							if (!parent.push(join(probeBs, b))) {
+        							if (!pushToParent(join(probeBs, b))) {
         								return false;
         							}
         						}
@@ -1659,17 +1665,21 @@ final class HalyardTupleExprEvaluation {
         					List<BindingSet> hashValue = hashTable.get(key);
         					if (hashValue != null && !hashValue.isEmpty()) {
 	        					for (BindingSet b : hashValue) {
-	    							if (!parent.push(join(probeBs, b))) {
+	    							if (!pushToParent(join(probeBs, b))) {
 	    								return false;
 	    							}
 	        					}
         					} else if (isLeftJoin) {
-    							if (!parent.push(probeBs)) {
+    							if (!pushToParent(probeBs)) {
     								return false;
     							}
         					}
                 		}
                 		return true;
+                	}
+                	private boolean pushToParent(BindingSet bs) throws InterruptedException {
+                		parentStrategy.incrementResultSizeActual(join);
+                		return parent.push(bs);
                 	}
                     @Override
                     public void close() throws InterruptedException {

@@ -15,6 +15,7 @@ import java.util.Set;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.TupleQueryResult;
+import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
@@ -154,23 +155,26 @@ public class HalyardStrategyJoinTest {
             }
         }
         assertEquals(expectedResults, results);
-        List<String> joinAlgos = new ArrayList<>();
+        List<BinaryTupleOperator> joins = new ArrayList<>();
         TupleExpr expr = strategy.getQueryHistory().getLast();
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>() {
 			@Override
-			public void meet(Join node) throws RuntimeException {
-				joinAlgos.add(node.getAlgorithmName());
+			public void meet(Join node) {
+				joins.add(node);
 				super.meet(node);
 			}
 			@Override
-			public void meet(LeftJoin node) throws RuntimeException {
-				joinAlgos.add(node.getAlgorithmName());
+			public void meet(LeftJoin node) {
+				joins.add(node);
 				super.meet(node);
 			}
         });
-        assertEquals(expectedJoins, joinAlgos.size());
-        for (String algo : joinAlgos) {
-        	assertEquals(expr.toString(), expectedAlgo, algo);
+        assertEquals(expectedJoins, joins.size());
+        if (!joins.isEmpty()) {
+	        for (BinaryTupleOperator join : joins) {
+	        	assertEquals(expr.toString(), expectedAlgo, join.getAlgorithmName());
+	        }
+	        assertEquals(expectedResults.size(), joins.get(0).getResultSizeActual());
         }
     }
 
