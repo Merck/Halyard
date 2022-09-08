@@ -16,6 +16,7 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.query.algebra.Join;
+import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.resultio.QueryResultIO;
@@ -101,6 +102,42 @@ public class HalyardStrategyJoinTest {
         joinTest(q, "/test-cases/join-results-empty-0.srx", 1, expectedAlgo());
     }
 
+
+    @Test
+    public void testLeftJoin_1var() throws Exception {
+        String q ="prefix : <http://example/> select ?s ?t where {?s :r ?k. optional {?k :s ?t} }";
+        predicateStats.put(repo.getValueFactory().createIRI("http://example/r"), 250.0);
+        joinTest(q, "/test-cases/left-join-results-1.srx", 1, expectedAlgo());
+    }
+
+    @Test
+    public void testLeftJoin_2var() throws Exception {
+        // star join
+        String q ="prefix : <http://example/> select ?x ?y where {?x :p ?y. optional {?x :t ?y} }";
+        predicateStats.put(repo.getValueFactory().createIRI("http://example/p"), 250.0);
+        joinTest(q, "/test-cases/left-join-results-2.srx", 1, expectedAlgo());
+    }
+
+    @Test
+    public void testLeftJoin_0var() throws Exception {
+        String q ="prefix : <http://example/> select * where {?s :r ?t. optional {?x :s ?y} }";
+        predicateStats.put(repo.getValueFactory().createIRI("http://example/r"), 250.0);
+        joinTest(q, "/test-cases/left-join-results-0.srx", 1, expectedAlgo());
+    }
+
+    @Test
+    public void testLeftJoin_empty_0var() throws Exception {
+        String q ="prefix : <http://example/> select * where {:x1 :q \"a\". optional {?x :p ?y} }";
+        joinTest(q, "/test-cases/left-join-results-empty-0.srx", 1, NestedLoops.NAME);
+    }
+
+    @Test
+    public void testLeftJoin_empty_0var_swapped() throws Exception {
+        String q ="prefix : <http://example/> select * where {?x :p ?y. optional {:x1 :q \"a\"} }";
+        joinTest(q, "/test-cases/left-join-results-empty-0.srx", 1, expectedAlgo());
+    }
+
+
     private void joinTest(String q, String expectedOutput, int expectedJoins, String expectedAlgo) throws Exception {
     	if (expectedJoins == 0 && expectedAlgo != null) {
     		throw new IllegalArgumentException("No join expected");
@@ -122,6 +159,11 @@ public class HalyardStrategyJoinTest {
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>() {
 			@Override
 			public void meet(Join node) throws RuntimeException {
+				joinAlgos.add(node.getAlgorithmName());
+				super.meet(node);
+			}
+			@Override
+			public void meet(LeftJoin node) throws RuntimeException {
 				joinAlgos.add(node.getAlgorithmName());
 				super.meet(node);
 			}

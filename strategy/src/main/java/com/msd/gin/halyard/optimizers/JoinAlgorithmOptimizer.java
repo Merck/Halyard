@@ -5,6 +5,7 @@ import com.msd.gin.halyard.algebra.HashJoin;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.algebra.Join;
+import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
@@ -30,7 +31,13 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 				// get cardinalities assuming no bound variables as nothing additionally will be bound with a hash join
 				double leftCard = statistics.getCardinality(left);
 				double rightCard = statistics.getCardinality(right);
-				if (leftCard <= hashJoinLimit && rightCard >= 2*leftCard) {
+				if (rightCard <= hashJoinLimit && leftCard >= 2*rightCard) {
+					// hash right
+					join.setAlgorithm(HashJoin.INSTANCE);
+					join.setCostEstimate(0.1);
+					left.setResultSizeEstimate(leftCard);
+					right.setResultSizeEstimate(rightCard);
+				} else if (leftCard <= hashJoinLimit && rightCard >= 2*leftCard) {
 					// hash left
 					join.setAlgorithm(HashJoin.INSTANCE);
 					join.setCostEstimate(0.1);
@@ -39,14 +46,25 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 					// need to swap args
 					join.setLeftArg(right);
 					join.setRightArg(left);
-				} else if (rightCard <= hashJoinLimit && leftCard >= 2*rightCard) {
+				}
+				super.meet(join);
+			}
+
+			@Override
+			public void meet(LeftJoin leftJoin) throws RuntimeException {
+				TupleExpr left = leftJoin.getLeftArg();
+				TupleExpr right = leftJoin.getRightArg();
+				// get cardinalities assuming no bound variables as nothing additionally will be bound with a hash join
+				double leftCard = statistics.getCardinality(left);
+				double rightCard = statistics.getCardinality(right);
+				if (rightCard <= hashJoinLimit && leftCard >= 2*rightCard) {
 					// hash right
-					join.setAlgorithm(HashJoin.INSTANCE);
-					join.setCostEstimate(0.1);
+					leftJoin.setAlgorithm(HashJoin.INSTANCE);
+					leftJoin.setCostEstimate(0.1);
 					left.setResultSizeEstimate(leftCard);
 					right.setResultSizeEstimate(rightCard);
 				}
-				super.meet(join);
+				super.meet(leftJoin);
 			}
 		});
 	}
