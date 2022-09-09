@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.ConstrainedStatementPattern;
 import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
 import com.msd.gin.halyard.algebra.HashJoin;
@@ -44,7 +45,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,7 +54,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
-import org.eclipse.rdf4j.common.iteration.CloseableIteratorIteration;
 import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
@@ -1246,7 +1245,7 @@ final class HalyardTupleExprEvaluation {
                             // use null as place holder for unbound variables that must remain so
                             targetBindings.setBinding(extElem.getName(), null);
                         } catch (QueryEvaluationException e) {
-                            handleException(e);
+                            return handleException(e);
                         }
                     }
                 }
@@ -1560,7 +1559,7 @@ final class HalyardTupleExprEvaluation {
                             }
                         } catch (ValueExprEvaluationException ignore) {
                         } catch (QueryEvaluationException e) {
-                            handleException(e);
+                            return handleException(e);
                         }
                         return true;
                     }
@@ -1920,9 +1919,9 @@ final class HalyardTupleExprEvaluation {
 		}
 
 		if (subj == null && obj == null) {
-			Var allSubjVar = createAnonVar(ANON_SUBJECT_VAR);
-			Var allPredVar = createAnonVar(ANON_PREDICATE_VAR);
-			Var allObjVar = createAnonVar(ANON_OBJECT_VAR);
+			Var allSubjVar = Algebra.createAnonVar(ANON_SUBJECT_VAR);
+			Var allPredVar = Algebra.createAnonVar(ANON_PREDICATE_VAR);
+			Var allObjVar = Algebra.createAnonVar(ANON_OBJECT_VAR);
 			StatementPattern sp = new StatementPattern(allSubjVar, allPredVar, allObjVar);
 			if (contextVar != null) {
 				sp.setScope(Scope.NAMED_CONTEXTS);
@@ -1934,12 +1933,16 @@ final class HalyardTupleExprEvaluation {
 				protected boolean next(BindingSet bs) throws InterruptedException {
 					Value ctx = (contextVar != null) ? bs.getValue(contextVar.getName()) : null;
 					Value v = bs.getValue(ANON_SUBJECT_VAR);
-					nextValue(v, ctx);
+					if (!nextValue(v, ctx)) {
+						return false;
+					}
 					v = bs.getValue(ANON_OBJECT_VAR);
-					nextValue(v, ctx);
+					if (!nextValue(v, ctx)) {
+						return false;
+					}
 					return true;
 				}
-				private void nextValue(Value v, Value ctx) throws InterruptedException {
+				private boolean nextValue(Value v, Value ctx) throws InterruptedException {
 					try {
 						if (set.add(v)) {
 							QueryBindingSet result = new QueryBindingSet(bindings);
@@ -1948,10 +1951,12 @@ final class HalyardTupleExprEvaluation {
 							if (ctx != null) {
 								result.addBinding(contextVar.getName(), ctx);
 							}
-							parent.push(result);
+							return parent.push(result);
+						} else {
+							return true;
 						}
 					} catch (IOException ioe) {
-						handleException(ioe);
+						return handleException(ioe);
 					}
 				}
 			}, sp, bindings);
@@ -1979,13 +1984,7 @@ final class HalyardTupleExprEvaluation {
 		}
 	}
 
-	private static Var createAnonVar(String varName) {
-		Var var = new Var(varName);
-		var.setAnonymous(true);
-		return var;
-	}
-
-    /**
+	/**
      * Evaluate {@link ArbitraryLengthPath} query model nodes
      * @param parent
      * @param alp
@@ -2027,47 +2026,66 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateBindingSetAssignment(BindingSetPipe parent, BindingSetAssignment bsa, BindingSet bindings) {
-        final Iterator<BindingSet> iter = bsa.getBindingSets().iterator();
         if (bindings.size() == 0) { // empty binding set
-        	executor.pullAndPush(parent, new CloseableIteratorIteration<>(iter), bsa, parentStrategy);
-        } else {
-            final QueryBindingSet b = new QueryBindingSet(bindings);
-            executor.pullAndPush(parent, new LookAheadIteration<BindingSet, QueryEvaluationException>() {
-                @Override
-                protected BindingSet getNextElement() throws QueryEvaluationException {
-                    QueryBindingSet result = null;
-                    while (result == null && iter.hasNext()) {
-                        final BindingSet assignedBindings = iter.next();
-                        if (assignedBindings.size() == 0) {
-                            result = new QueryBindingSet(b);
-                        } else {
-	                        for (String name : assignedBindings.getBindingNames()) {
-	                            final Value assignedValue = assignedBindings.getValue(name);
-	                            if (assignedValue != null) { // can be null if set to UNDEF
-	                                // check that the binding assignment does not overwrite
-	                                // existing bindings.
-	                                Value bValue = b.getValue(name);
-	                                if (bValue == null || assignedValue.equals(bValue)) {
-	                                    if (result == null) {
-	                                        result = new QueryBindingSet(b);
-	                                    }
-	                                    if (bValue == null) {
-	                                        // we are not overwriting an existing binding.
-	                                        result.addBinding(name, assignedValue);
-	                                    }
-	                                } else {
-	                                    // if values are not equal there is no compatible
-	                                    // merge and we should return no next element.
-	                                    result = null;
-	                                    break;
-	                                }
-	                            }
-	                        }
-                        }
-                    }
-                    return result;
+        	try {
+        		try {
+		        	for (BindingSet b : bsa.getBindingSets()) {
+		        		if (!parent.push(b)) {
+		        			return;
+		        		}
+		        	}
+                } finally {
+                	parent.close();
                 }
-            }, bsa, parentStrategy);
+            } catch (InterruptedException e) {
+                parent.handleException(e);
+            }
+        } else {
+        	try {
+        		try {
+		        	for (BindingSet assignedBindings : bsa.getBindingSets()) {
+	                    QueryBindingSet result;
+	                    if (assignedBindings.size() == 0) {
+	                    	result = new QueryBindingSet(bindings);
+	                    } else {
+	                    	result = null;
+		                    for (String name : assignedBindings.getBindingNames()) {
+		                        final Value assignedValue = assignedBindings.getValue(name);
+		                        if (assignedValue != null) { // can be null if set to UNDEF
+		                            // check that the binding assignment does not overwrite
+		                            // existing bindings.
+		                            Value bValue = bindings.getValue(name);
+		                            if (bValue == null || assignedValue.equals(bValue)) {
+		                            	// values are compatible - create a result if it doesn't already exist
+	                                    if (result == null) {
+	                                        result = new QueryBindingSet(bindings);
+	                                    }
+		                                if (bValue == null) {
+		                                    // we are not overwriting an existing binding.
+		                                    result.addBinding(name, assignedValue);
+		                                }
+		                            } else {
+		                                // if values are not equal there is no compatible
+		                                // merge and we should return no next element.
+		                                result = null;
+		                                break;
+		                            }
+		                        }
+		                    }
+	                    }
+	
+	                    if (result != null) {
+			        		if (!parent.push(result)) {
+			        			return;
+			        		}
+		        		}
+		        	}
+	            } finally {
+	            	parent.close();
+	            }
+            } catch (InterruptedException e) {
+                parent.handleException(e);
+            }
         }
     }
 

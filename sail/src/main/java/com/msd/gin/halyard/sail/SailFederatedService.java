@@ -1,6 +1,6 @@
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
+import com.msd.gin.halyard.algebra.ServiceRoot;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -52,7 +52,7 @@ public class SailFederatedService implements FederatedService {
 	@Override
 	public boolean ask(Service service, BindingSet bindings, String baseUri) throws QueryEvaluationException {
 		try (SailConnection conn = sail.getConnection()) {
-			try (CloseableIteration<? extends BindingSet, QueryEvaluationException> res = conn.evaluate(new ServiceRoot(service.getArg()), null, bindings, true)) {
+			try (CloseableIteration<? extends BindingSet, QueryEvaluationException> res = conn.evaluate(ServiceRoot.create(service), null, bindings, true)) {
 				return res.hasNext();
 			}
 		}
@@ -62,7 +62,7 @@ public class SailFederatedService implements FederatedService {
 	public CloseableIteration<BindingSet, QueryEvaluationException> select(Service service, Set<String> projectionVars,
 			BindingSet bindings, String baseUri) throws QueryEvaluationException {
 		try (SailConnection conn = sail.getConnection()) {
-			CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = conn.evaluate(new ServiceRoot(service.getArg()), null, bindings, true);
+			CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = conn.evaluate(ServiceRoot.create(service), null, bindings, true);
 			CloseableIteration<BindingSet, QueryEvaluationException> result = new InsertBindingSetCursor((CloseableIteration<BindingSet, QueryEvaluationException>) iter, bindings);
 			if (service.isSilent()) {
 				return new SilentIteration<>(result);

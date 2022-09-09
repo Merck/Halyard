@@ -18,8 +18,8 @@ package com.msd.gin.halyard.strategy;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.algebra.ServiceRoot;
 import com.msd.gin.halyard.common.Config;
-import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy.ServiceRoot;
 
 import java.lang.management.ManagementFactory;
 import java.util.Hashtable;
@@ -53,11 +53,11 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     private static final BindingSet END_OF_QUEUE = new EmptyBindingSet();
     // high default priority for dynamically created query nodes
     private static final int DEFAULT_PRIORITY = 65535;
+    private static final int RETRY_LIMIT = 50;
 
-    private static final int DEFAULT_THREADS = Config.getInteger("halyard.evaluation.threads", 20);
 	static final HalyardEvaluationExecutor INSTANCE = new HalyardEvaluationExecutor();
 
-	private TrackingThreadPoolExecutor createExecutor(String groupName, String namePrefix, int threads) {
+	private static TrackingThreadPoolExecutor createExecutor(String groupName, String namePrefix, int threads) {
 		ThreadGroup tg = new ThreadGroup(groupName);
 		AtomicInteger threadSeq = new AtomicInteger();
 		ThreadFactory tf = (r) -> {
@@ -70,13 +70,15 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 		executor.allowCoreThreadTimeOut(true);
 		return executor;
 	}
-    private final TrackingThreadPoolExecutor executor = createExecutor("Halyard Executors", "Halyard ", DEFAULT_THREADS);
-    // a map of query model nodes and their priority
-    private final Cache<QueryModelNode, Integer> priorityMapCache = CacheBuilder.newBuilder().weakKeys().build();
 
+    private int threads = Config.getInteger("halyard.evaluation.threads", 20);
     private int maxRetries = Config.getInteger("halyard.evaluation.maxRetries", 3);
     private int threadGain = Config.getInteger("halyard.evaluation.threadGain", 5);
     private int maxThreads = Config.getInteger("halyard.evaluation.maxThreads", 100);
+
+	private final TrackingThreadPoolExecutor executor = createExecutor("Halyard Executors", "Halyard ", threads);
+    // a map of query model nodes and their priority
+    private final Cache<QueryModelNode, Integer> priorityMapCache = CacheBuilder.newBuilder().weakKeys().build();
 
     private int maxQueueSize = Config.getInteger("halyard.evaluation.maxQueueSize", 5000);
 	private int pollTimeoutMillis = Config.getInteger("halyard.evaluation.pollTimeoutMillis", 1000);
@@ -158,6 +160,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 					}
 				}
 			}
+		} else if (retries > RETRY_LIMIT) {
+			throw new QueryEvaluationException(String.format("Maximum retries exceeded: %d", retries));
 		} else {
 			resetRetries = false;
 		}
@@ -165,7 +169,16 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 		return resetRetries;
     }
 
-    /**
+	private void resetThreads() {
+		if (executor.getCorePoolSize() > threads) {
+			executor.setCorePoolSize(threads);
+		}
+		if (executor.getMaximumPoolSize() > threads) {
+			executor.setMaximumPoolSize(threads);
+		}
+	}
+
+	/**
      * Asynchronously pulls from an iteration of binding sets and pushes to a {@link BindingSetPipe}.
      * @param pipe the pipe that evaluation results are returned on
      * @param iter
@@ -176,12 +189,6 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 			TupleExpr node, HalyardEvaluationStrategy strategy) {
 		executor.execute(new IterateAndPipeTask(pipe, iter, node, strategy));
     }
-
-	void pullAndPush(BindingSetPipe pipe,
-			CloseableIteration<BindingSet, QueryEvaluationException> iter, TupleExpr node, HalyardEvaluationStrategy strategy) {
-		IterateAndPipeTask pai = new IterateAndPipeTask(pipe, iter, node, strategy);
-		while(pai.pushNext());
-	}
 
     /**
      * Asynchronously pushes to a pipe using the push action, and returns an iteration of binding sets to pull from.
@@ -198,9 +205,9 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 	/**
      * Get the priority of this node from the PRIORITY_MAP_CACHE or determine the priority and then cache it. Also caches priority for sub-nodes of {@code node}
      * @param node the node that you want the priority for
-     * @return the priority of the node, a count of the number of child nodes of {@code node}.
+     * @return the priority of the node.
      */
-    private int getPriorityForNode(final TupleExpr node) {
+    int getPriorityForNode(final TupleExpr node) {
         Integer p = priorityMapCache.getIfPresent(node);
         if (p != null) {
             return p;
@@ -429,6 +436,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 							if(checkThreads(retries)) {
 								retries = 0;
 							}
+						} else {
+							resetThreads();
 						}
                     }
                 } catch (InterruptedException ex) {
@@ -466,6 +475,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 						if(checkThreads(retries)) {
 							retries = 0;
 						}
+					} else {
+						resetThreads();
 					}
             	}
             	return added;

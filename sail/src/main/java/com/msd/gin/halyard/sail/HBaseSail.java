@@ -199,6 +199,11 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		public String getOptimizedQueryTree() {
 			return optimizedExpr.toString();
 		}
+
+		@Override
+		public String toString() {
+			return "Query: " + queryString + "\nTree:\n" + queryExpr + "\nOptimized:\n" + optimizedExpr;
+		}
 	}
 
 	private static final long STATUS_CACHING_TIMEOUT = 60000l;

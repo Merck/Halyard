@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class TupleFunctionOptimizerTest {
+public class TupleFunctionCallOptimizerTest {
 	private StatementPattern createStatementPattern(String s, String p, String o) {
 		return new StatementPattern(new Var(s), new Var(p), new Var(o));
 	}

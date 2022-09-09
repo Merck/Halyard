@@ -8,6 +8,7 @@ import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Union;
+import org.eclipse.rdf4j.query.algebra.Var;
 
 public final class Algebra {
 	private Algebra() {}
@@ -56,6 +57,12 @@ public final class Algebra {
 			te = new Join(exprs.get(i), te);
 		}
 		return te;
+	}
+
+	public static Var createAnonVar(String varName) {
+		Var var = new Var(varName);
+		var.setAnonymous(true);
+		return var;
 	}
 
 }
