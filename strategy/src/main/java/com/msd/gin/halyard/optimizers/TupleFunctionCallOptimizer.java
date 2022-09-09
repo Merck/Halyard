@@ -91,7 +91,7 @@ public class TupleFunctionCallOptimizer implements QueryOptimizer {
 
 		private void checkForDependency(TupleExpr expr) {
 			if (!ancestors.contains(expr)) {
-				Set<String> bnames = expr.getAssuredBindingNames();
+				Set<String> bnames = expr.getBindingNames();
 				if (bnames.containsAll(tfc.getRequiredBindingNames()) && Sets.intersection(bnames, tfc.getResultBindingNames()).isEmpty()) {
 					Algebra.remove(expr);
 					tfc.setDependentExpression(expr);

@@ -11,6 +11,8 @@ import java.util.stream.Collectors;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.BooleanLiteral;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
+import org.eclipse.rdf4j.query.algebra.Extension;
+import org.eclipse.rdf4j.query.algebra.ExtensionElem;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
@@ -86,6 +88,18 @@ public class TupleFunctionOptimizerTest {
         List<Join> joins = getJoins(root);
         assertEquals(tfc, joins.get(0).getRightArg(), root.toString());
 		assertEquals(sp2, tfc.getDependentExpression(), root.toString());
+	}
+
+	@Test
+	public void testExtensionWithTupleFunction() {
+		ValueFactory vf = SimpleValueFactory.getInstance();
+		ExtendedTupleFunctionCall tfc = createTupleFunctionCall("o2", "out");
+		StatementPattern sp = createStatementPattern("s", "p1", "o1");
+		Extension ext = new Extension(sp, new ExtensionElem(new ValueConstant(vf.createLiteral("inValue")), "o2"));
+		Join join = new Join(tfc, ext);
+		TupleExpr root = Algebra.ensureRooted(join);
+		optimize(root);
+        assertEquals(ext, tfc.getDependentExpression(), root.toString());
 	}
 
 	@Test
