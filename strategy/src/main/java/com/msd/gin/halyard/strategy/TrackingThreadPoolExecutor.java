@@ -1,5 +1,6 @@
 package com.msd.gin.halyard.strategy;
 
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,26 +31,33 @@ public final class TrackingThreadPoolExecutor extends ThreadPoolExecutor impleme
 	}
 
 	@Override
-	public String getState() {
-		return toString();
+	public String getThreadDump() {
+		StringBuilder buf = new StringBuilder(1024);
+		buf.append("Threads:\n");
+		for (Map.Entry<Thread, Runnable> entry : getActiveTasks().entrySet()) {
+			Thread t = entry.getKey();
+			Runnable r = entry.getValue();
+			buf.append("  ").append(t.getName())
+				.append('[').append(t.getState()).append("]: ")
+				.append(r).append('\n');
+		}
+		return buf.toString();
+	}
+
+	@Override
+	public String getQueueDump() {
+		int n = 10;
+		StringBuilder buf = new StringBuilder(1024);
+		buf.append("Queue (first " + n + "):\n");
+		Iterator<Runnable> iter = getQueue().iterator();
+		for (int i = 0; i < n && iter.hasNext(); ) {
+			buf.append("  ").append(++i).append(": ").append(iter.next()).append('\n');
+		}
+		return buf.toString();
 	}
 
 	@Override
 	public String toString() {
-		String s = super.toString();
-		StringBuilder fullDetails = new StringBuilder(s);
-		fullDetails.append("\nThreads:\n");
-		for (Map.Entry<Thread, Runnable> entry : getActiveTasks().entrySet()) {
-			Thread t = entry.getKey();
-			Runnable r = entry.getValue();
-			fullDetails.append("  ").append(t.getName())
-				.append('[').append(t.getState()).append("]: ")
-				.append(r.toString()).append('\n');
-		}
-		fullDetails.append("\nQueue:\n");
-		for (Runnable r : getQueue()) {
-			fullDetails.append(r.toString()).append('\n');
-		}
-		return fullDetails.toString();
+		return super.toString() + "\n" + getThreadDump() + "\n" + getQueueDump();
 	}
 }

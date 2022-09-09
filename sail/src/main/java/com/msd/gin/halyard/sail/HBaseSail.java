@@ -232,6 +232,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	Connection hConnection;
 	final boolean hConnectionIsShared; //whether a Connection is provided or we need to create our own
 	Keyspace keyspace;
+	String owner;
 	ObjectInstance mxInst;
 	private final Queue<QueryInfo> queryHistory = new ArrayBlockingQueue<>(10, true);
 
@@ -525,6 +526,10 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		} else {
 			attrs.put("snapshot", snapshotName);
 		}
+		if (owner != null) {
+			attrs.put("owner", owner);
+		}
+		attrs.put("federatedServiceResolver", federatedServiceResolver.toString());
 		try {
 			mxInst = ManagementFactory.getPlatformMBeanServer().registerMBean(this, ObjectName.getInstance("com.msd.gin.halyard", attrs));
 		} catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException | MalformedObjectNameException e) {

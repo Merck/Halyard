@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Nullable;
 
@@ -33,7 +34,8 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 	private final int evaluationTimeout;
 	private final Ticker ticker;
 
-	private final Cache<String, SailFederatedService> federatedServices = CacheBuilder.newBuilder().maximumSize(10).removalListener((evt) -> ((SailFederatedService) evt.getValue()).shutdown()).build();
+	private final Cache<String, SailFederatedService> federatedServices = CacheBuilder.newBuilder().maximumSize(10).expireAfterAccess(15, TimeUnit.MINUTES).removalListener((evt) -> ((SailFederatedService) evt.getValue()).shutdown())
+			.build();
 
 	/**
 	 * Federated service resolver that supports querying other HBase tables.
@@ -75,6 +77,7 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 			try {
 				federatedService = federatedServices.get(serviceUrl, () -> {
 					HBaseSail sail = new HBaseSail(hConnection, config, federatedTable, false, 0, true, evaluationTimeout, null, ticker, HBaseSailConnection.Factory.INSTANCE, this);
+					sail.owner = toString();
 					HBaseSail.ScanSettings scanSettings = sail.getScanSettings();
 					for (NameValuePair nvp : queryParams) {
 						switch (nvp.getName()) {

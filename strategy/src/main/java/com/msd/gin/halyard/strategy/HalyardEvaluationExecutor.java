@@ -30,11 +30,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-import javax.management.InstanceAlreadyExistsException;
-import javax.management.MBeanRegistrationException;
+import javax.management.JMException;
 import javax.management.MBeanServer;
-import javax.management.MalformedObjectNameException;
-import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -51,15 +48,16 @@ import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-final class HalyardEvaluationExecutor {
+final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean {
 	private static final Logger LOGGER = LoggerFactory.getLogger(HalyardEvaluationExecutor.class);
+    private static final BindingSet END_OF_QUEUE = new EmptyBindingSet();
+    // high default priority for dynamically created query nodes
+    private static final int DEFAULT_PRIORITY = 65535;
 
-    private static final int THREADS = Config.getInteger("halyard.evaluation.threads", 20);
-    private static final int MAX_RETRIES = Config.getInteger("halyard.evaluation.maxRetries", 3);
-    private static final int THREAD_GAIN = Config.getInteger("halyard.evaluation.threadGain", 5);
-    private static final int MAX_THREADS = Config.getInteger("halyard.evaluation.maxThreads", 100);
+    private static final int DEFAULT_THREADS = Config.getInteger("halyard.evaluation.threads", 20);
+	static final HalyardEvaluationExecutor INSTANCE = new HalyardEvaluationExecutor();
 
-	private static TrackingThreadPoolExecutor createExecutor(String groupName, String namePrefix) {
+	private TrackingThreadPoolExecutor createExecutor(String groupName, String namePrefix, int threads) {
 		ThreadGroup tg = new ThreadGroup(groupName);
 		AtomicInteger threadSeq = new AtomicInteger();
 		ThreadFactory tf = (r) -> {
@@ -68,50 +66,92 @@ final class HalyardEvaluationExecutor {
 			return thr;
 		};
 		// fixed-size thread pool that can wind down when idle
-		TrackingThreadPoolExecutor executor = new TrackingThreadPoolExecutor(THREADS, THREADS, 60L, TimeUnit.SECONDS, new PriorityBlockingQueue<>(64), tf);
+		TrackingThreadPoolExecutor executor = new TrackingThreadPoolExecutor(threads, threads, 60L, TimeUnit.SECONDS, new PriorityBlockingQueue<>(64), tf);
 		executor.allowCoreThreadTimeOut(true);
 		return executor;
 	}
-    private static final TrackingThreadPoolExecutor EXECUTOR = createExecutor("Halyard Executors", "Halyard ");
+    private final TrackingThreadPoolExecutor executor = createExecutor("Halyard Executors", "Halyard ", DEFAULT_THREADS);
     // a map of query model nodes and their priority
-    private static final Cache<QueryModelNode, Integer> PRIORITY_MAP_CACHE = CacheBuilder.newBuilder().weakKeys().build();
-    // high default priority for dynamically created query nodes
-    private static final int DEFAULT_PRIORITY = 65535;
+    private final Cache<QueryModelNode, Integer> priorityMapCache = CacheBuilder.newBuilder().weakKeys().build();
 
-    private static volatile long previousCompletedTaskCount;
+    private int maxRetries = Config.getInteger("halyard.evaluation.maxRetries", 3);
+    private int threadGain = Config.getInteger("halyard.evaluation.threadGain", 5);
+    private int maxThreads = Config.getInteger("halyard.evaluation.maxThreads", 100);
+
+    private int maxQueueSize = Config.getInteger("halyard.evaluation.maxQueueSize", 5000);
+	private int pollTimeoutMillis = Config.getInteger("halyard.evaluation.pollTimeoutMillis", 1000);
+
+	private volatile long previousCompletedTaskCount;
+
+	private static void registerMBeans(MBeanServer mbs, HalyardEvaluationExecutor executor) throws JMException {
+		{
+			Hashtable<String,String> attrs = new Hashtable<>();
+			attrs.put("type", HalyardEvaluationExecutor.class.getName());
+			attrs.put("id", Integer.toString(executor.hashCode()));
+			mbs.registerMBean(executor, ObjectName.getInstance("com.msd.gin.halyard", attrs));
+		}
+		{
+			Hashtable<String,String> attrs = new Hashtable<>();
+			attrs.put("type", TrackingThreadPoolExecutor.class.getName());
+			attrs.put("id", Integer.toString(executor.executor.hashCode()));
+			mbs.registerMBean(executor.executor, ObjectName.getInstance("com.msd.gin.halyard", attrs));
+		}
+	}
 
 	static {
 		MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
 		try {
-			Hashtable<String,String> attrs = new Hashtable<>();
-			attrs.put("type", TrackingThreadPoolExecutor.class.getName());
-			attrs.put("id", Integer.toString(EXECUTOR.hashCode()));
-			mbs.registerMBean(EXECUTOR, ObjectName.getInstance("com.msd.gin.halyard", attrs));
-		} catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException | MalformedObjectNameException e) {
+			registerMBeans(mbs, INSTANCE);
+		} catch (JMException e) {
 			throw new AssertionError(e);
 		}
 	}
 
-    private static boolean checkThreads(int retries) {
+	@Override
+	public void setMaxRetries(int maxRetries) {
+		this.maxRetries = maxRetries;
+	}
+
+	@Override
+	public int getMaxRetries() {
+		return maxRetries;
+	}
+
+	@Override
+	public void setQueuePollTimeoutMillis(int millis) {
+		this.pollTimeoutMillis = millis;
+	}
+
+	@Override
+	public int getQueuePollTimeoutMillis() {
+		return pollTimeoutMillis;
+	}
+
+	@Override
+	public TrackingThreadPoolExecutorMXBean getThreadPoolExecutor() {
+		return executor;
+	}
+
+	private boolean checkThreads(int retries) {
 		boolean resetRetries;
-		final int maxPoolSize = EXECUTOR.getMaximumPoolSize();
+		final int maxPoolSize = executor.getMaximumPoolSize();
 		// if we've been consistently blocked and are at full capacity
-		if (retries > MAX_RETRIES && EXECUTOR.getActiveCount() >= maxPoolSize) {
+		if (retries > maxRetries && executor.getActiveCount() >= maxPoolSize) {
 			// if we are not blocked overall then don't worry about it - might just be taking a long time for results to bubble up the query tree to us
-			resetRetries = (EXECUTOR.getCompletedTaskCount() > previousCompletedTaskCount);
+			resetRetries = (executor.getCompletedTaskCount() > previousCompletedTaskCount);
 			if (!resetRetries) {
 				// we are completely blocked, try adding some emergency threads
 				synchronized (HalyardEvaluationExecutor.class) {
 					// check thread pool hasn't been modified already in the meantime
-					if (maxPoolSize == EXECUTOR.getMaximumPoolSize()) {
-						if (maxPoolSize < MAX_THREADS) {
-							LOGGER.warn("All {} threads seem to be blocked - adding {} more\n{}", EXECUTOR.getPoolSize(), THREAD_GAIN, EXECUTOR.toString());
-							EXECUTOR.setMaximumPoolSize(Math.min(EXECUTOR.getMaximumPoolSize()+THREAD_GAIN, MAX_THREADS));
-							EXECUTOR.setCorePoolSize(Math.min(EXECUTOR.getCorePoolSize()+THREAD_GAIN, MAX_THREADS));
+					if (maxPoolSize == executor.getMaximumPoolSize()) {
+						if (maxPoolSize < maxThreads) {
+							LOGGER.warn("All {} threads seem to be blocked - adding {} more\n{}", executor.getPoolSize(), threadGain, executor.toString());
+							executor.setMaximumPoolSize(Math.min(executor.getMaximumPoolSize()+threadGain, maxThreads));
+							executor.setCorePoolSize(Math.min(executor.getCorePoolSize()+threadGain, maxThreads));
 							resetRetries = true;
 						} else {
 							// out of options
-							throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", MAX_THREADS));
+							throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", maxThreads));
 						}
 					} else {
 						resetRetries = true;
@@ -121,7 +161,7 @@ final class HalyardEvaluationExecutor {
 		} else {
 			resetRetries = false;
 		}
-    	previousCompletedTaskCount = EXECUTOR.getCompletedTaskCount();
+    	previousCompletedTaskCount = executor.getCompletedTaskCount();
 		return resetRetries;
     }
 
@@ -131,13 +171,13 @@ final class HalyardEvaluationExecutor {
      * @param iter
      * @param node an implementation of any {@TupleExpr} sub-type
      */
-	static void pullAndPushAsync(BindingSetPipe pipe,
+	void pullAndPushAsync(BindingSetPipe pipe,
 			CloseableIteration<BindingSet, QueryEvaluationException> iter,
 			TupleExpr node, HalyardEvaluationStrategy strategy) {
-		EXECUTOR.execute(new IterateAndPipeTask(pipe, iter, node, strategy));
+		executor.execute(new IterateAndPipeTask(pipe, iter, node, strategy));
     }
 
-	static void pullAndPush(BindingSetPipe pipe,
+	void pullAndPush(BindingSetPipe pipe,
 			CloseableIteration<BindingSet, QueryEvaluationException> iter, TupleExpr node, HalyardEvaluationStrategy strategy) {
 		IterateAndPipeTask pai = new IterateAndPipeTask(pipe, iter, node, strategy);
 		while(pai.pushNext());
@@ -149,9 +189,9 @@ final class HalyardEvaluationExecutor {
      * @param node an implementation of any {@TupleExpr} sub-type
      * @return iteration of binding sets to pull from.
      */
-	static CloseableIteration<BindingSet, QueryEvaluationException> pushAndPull(Consumer<BindingSetPipe> pushAction, TupleExpr node, HalyardEvaluationStrategy strategy) {
+	CloseableIteration<BindingSet, QueryEvaluationException> pushAndPull(Consumer<BindingSetPipe> pushAction, TupleExpr node, HalyardEvaluationStrategy strategy) {
         BindingSetPipeQueue queue = new BindingSetPipeQueue();
-        EXECUTOR.execute(new PipeAndQueueTask(queue.pipe, pushAction, node, strategy));
+        executor.execute(new PipeAndQueueTask(queue.pipe, pushAction, node, strategy));
         return queue.iteration;
 	}
 
@@ -160,8 +200,8 @@ final class HalyardEvaluationExecutor {
      * @param node the node that you want the priority for
      * @return the priority of the node, a count of the number of child nodes of {@code node}.
      */
-    private static int getPriorityForNode(final TupleExpr node) {
-        Integer p = PRIORITY_MAP_CACHE.getIfPresent(node);
+    private int getPriorityForNode(final TupleExpr node) {
+        Integer p = priorityMapCache.getIfPresent(node);
         if (p != null) {
             return p;
         } else {
@@ -178,29 +218,29 @@ final class HalyardEvaluationExecutor {
             // populate the priority cache
             new AbstractQueryModelVisitor<RuntimeException>() {
                 @Override
-                protected void meetNode(QueryModelNode n) throws RuntimeException {
+                protected void meetNode(QueryModelNode n) {
                     int pp = counter.getAndIncrement();
-                    PRIORITY_MAP_CACHE.put(n, pp);
+                    priorityMapCache.put(n, pp);
                     super.meetNode(n);
                 }
 
                 @Override
-                public void meet(Filter node) throws RuntimeException {
+                public void meet(Filter node) {
                     super.meet(node);
                     node.getCondition().visit(this);
                 }
 
                 @Override
-                public void meet(Service n) throws RuntimeException {
+                public void meet(Service n) {
                     final int checkpoint = counter.get();
                     n.visitChildren(this);
                     int pp = counter.getAndIncrement();
-                    PRIORITY_MAP_CACHE.put(n, pp);
+                    priorityMapCache.put(n, pp);
                     counter.getAndUpdate((int count) -> 2 * count - checkpoint + 1); //at least double the distance to have a space for service optimizations
                 }
 
                 @Override
-                public void meet(LeftJoin node) throws RuntimeException {
+                public void meet(LeftJoin node) {
                     super.meet(node);
                     if (node.hasCondition()) {
                         meetNode(node.getCondition());
@@ -208,12 +248,12 @@ final class HalyardEvaluationExecutor {
                 }
             }.meetOther(root);
 
-            Integer priority = PRIORITY_MAP_CACHE.getIfPresent(node);
+            Integer priority = priorityMapCache.getIfPresent(node);
             if (priority == null) {
                 // else node is dynamically created, so climb the tree to find an ancestor with a priority
                 QueryModelNode parent = node.getParentNode();
                 int depth = 1;
-                while (parent != null && (priority = PRIORITY_MAP_CACHE.getIfPresent(parent)) == null) {
+                while (parent != null && (priority = priorityMapCache.getIfPresent(parent)) == null) {
                     parent = parent.getParentNode();
                     depth++;
                 }
@@ -231,7 +271,7 @@ final class HalyardEvaluationExecutor {
     }
 
 
-	static abstract class PrioritizedTask implements Comparable<PrioritizedTask>, Runnable {
+	abstract class PrioritizedTask implements Comparable<PrioritizedTask>, Runnable {
     	static final int MIN_SUB_PRIORITY = 0;
     	static final int MAX_SUB_PRIORITY = 999;
     	final TupleExpr queryNode;
@@ -273,7 +313,7 @@ final class HalyardEvaluationExecutor {
     /**
      * A holder for the BindingSetPipe and the iterator over a tree of query sub-parts
      */
-    static final class IterateAndPipeTask extends PrioritizedTask {
+    final class IterateAndPipeTask extends PrioritizedTask {
         private final BindingSetPipe pipe;
         private final CloseableIteration<BindingSet, QueryEvaluationException> iter;
         private final AtomicInteger pushPriority = new AtomicInteger();
@@ -320,7 +360,7 @@ final class HalyardEvaluationExecutor {
     	public void run() {
         	if (pushNext()) {
         		pushPriority.updateAndGet(count -> (count < MAX_SUB_PRIORITY) ? count+1 : MAX_SUB_PRIORITY);
-                EXECUTOR.execute(this);
+                executor.execute(this);
         	}
     	}
 
@@ -330,7 +370,7 @@ final class HalyardEvaluationExecutor {
 		}
     }
 
-    static final class PipeAndQueueTask extends PrioritizedTask {
+    final class PipeAndQueueTask extends PrioritizedTask {
         private final BindingSetPipe pipe;
         private final Consumer<BindingSetPipe> pushAction;
 
@@ -355,13 +395,9 @@ final class HalyardEvaluationExecutor {
 		}
     }
 
-    private static final int MAX_QUEUE_SIZE = Config.getInteger("halyard.evaluation.maxQueueSize", 5000);
-	private static final int POLL_TIMEOUT_MILLIS = Config.getInteger("halyard.evaluation.pollTimeoutMillis", 1000);
-    private static final BindingSet END = new EmptyBindingSet();
+    final class BindingSetPipeQueue {
 
-    static final class BindingSetPipeQueue {
-
-        private final LinkedBlockingQueue<BindingSet> queue = new LinkedBlockingQueue<>(MAX_QUEUE_SIZE);
+        private final LinkedBlockingQueue<BindingSet> queue = new LinkedBlockingQueue<>(maxQueueSize);
         private volatile Throwable exception;
 
         final BindingSetPipeIteration iteration = new BindingSetPipeIteration();
@@ -379,7 +415,7 @@ final class HalyardEvaluationExecutor {
     			BindingSet bs = null;
     			try {
                     for (int retries = 0; bs == null && !isClosed(); retries++) {
-    					bs = queue.poll(POLL_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+    					bs = queue.poll(pollTimeoutMillis, TimeUnit.MILLISECONDS);
     					Throwable thr = exception;
     					if (thr != null) {
 	    					if (thr instanceof RuntimeException) {
@@ -398,7 +434,7 @@ final class HalyardEvaluationExecutor {
                 } catch (InterruptedException ex) {
                     throw new QueryEvaluationException(ex);
                 }
-                return bs == END ? null : bs;
+                return bs == END_OF_QUEUE ? null : bs;
             }
 
             @Override
@@ -424,7 +460,7 @@ final class HalyardEvaluationExecutor {
             private boolean addToQueue(BindingSet bs) throws InterruptedException {
             	boolean added = false;
             	for (int retries = 0; !added && !isClosed(); retries++) {
-            		added = queue.offer(bs, POLL_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+            		added = queue.offer(bs, pollTimeoutMillis, TimeUnit.MILLISECONDS);
 
 					if (!added) {
 						if(checkThreads(retries)) {
@@ -443,7 +479,7 @@ final class HalyardEvaluationExecutor {
             @Override
             public void close() throws InterruptedException {
             	if(!isClosed) {
-	                addToQueue(END);
+	                addToQueue(END_OF_QUEUE);
 	                isClosed = true;
             	}
             }

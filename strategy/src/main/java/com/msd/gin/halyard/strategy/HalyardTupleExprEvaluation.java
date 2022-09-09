@@ -16,9 +16,6 @@
  */
 package com.msd.gin.halyard.strategy;
 
-import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPush;
-import static com.msd.gin.halyard.strategy.HalyardEvaluationExecutor.pullAndPushAsync;
-
 import com.msd.gin.halyard.algebra.ConstrainedStatementPattern;
 import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
 import com.msd.gin.halyard.algebra.HashJoin;
@@ -163,6 +160,7 @@ final class HalyardTupleExprEvaluation {
 	private static final String ANON_PREDICATE_VAR = "__pred";
 	private static final String ANON_OBJECT_VAR = "__obj";
 
+	private final HalyardEvaluationExecutor executor = HalyardEvaluationExecutor.INSTANCE;
     private final HalyardEvaluationStrategy parentStrategy;
 	private final TupleFunctionRegistry tupleFunctionRegistry;
 	private final TripleSource tripleSource;
@@ -195,7 +193,7 @@ final class HalyardTupleExprEvaluation {
      * @return an iteration of binding sets
      */
     CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) {
-    	return HalyardEvaluationExecutor.pushAndPull(pipe -> evaluateTupleExpr(pipe, expr, bindings), expr, parentStrategy);
+    	return executor.pushAndPull(pipe -> evaluateTupleExpr(pipe, expr, bindings), expr, parentStrategy);
     }
 
     /**
@@ -458,7 +456,7 @@ final class HalyardTupleExprEvaluation {
         }
 
         // Return an iterator that converts the RDF statements (triples) to var bindings
-        pullAndPushAsync(parent, new ConvertingIteration<Statement, BindingSet, QueryEvaluationException>(stIter) {
+        executor.pullAndPushAsync(parent, new ConvertingIteration<Statement, BindingSet, QueryEvaluationException>(stIter) {
 
             @Override
             protected BindingSet convert(Statement st) {
@@ -650,7 +648,7 @@ final class HalyardTupleExprEvaluation {
 
 			};
 		} // else standard reification iteration
-    	pullAndPushAsync(parent, results, ref, parentStrategy);
+		executor.pullAndPushAsync(parent, results, ref, parentStrategy);
 	}
 
     /**
@@ -842,7 +840,7 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateDescribeOperator(BindingSetPipe parent, DescribeOperator operator, BindingSet bindings) {
-		pullAndPushAsync(parent, new DescribeIteration(evaluate(operator.getArg(), bindings), parentStrategy,
+    	executor.pullAndPushAsync(parent, new DescribeIteration(evaluate(operator.getArg(), bindings), parentStrategy,
 				operator.getBindingNames(), bindings), operator, parentStrategy);
     }
 
@@ -1348,7 +1346,7 @@ final class HalyardTupleExprEvaluation {
                 }
                 // otherwise: perform a SELECT query
                 CloseableIteration<BindingSet, QueryEvaluationException> result = fs.select(service, freeVars, bindings, baseUri);
-				pullAndPushAsync(parent, service.isSilent() ? new SilentIteration<>(result) : result, service, parentStrategy);
+                executor.pullAndPushAsync(parent, service.isSilent() ? new SilentIteration<>(result) : result, service, parentStrategy);
             } catch (QueryEvaluationException e) {
                 // suppress exceptions if silent
                 if (service.isSilent()) {
@@ -1900,7 +1898,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateExternalSet(BindingSetPipe parent, ExternalSet externalSet, BindingSet bindings) {
         try {
-			pullAndPushAsync(parent, externalSet.evaluate(bindings), externalSet, parentStrategy);
+        	executor.pullAndPushAsync(parent, externalSet.evaluate(bindings), externalSet, parentStrategy);
         } catch (QueryEvaluationException e) {
             parent.handleException(e);
         }
@@ -2007,7 +2005,7 @@ final class HalyardTupleExprEvaluation {
         //temporary solution using copy of the original iterator
         //re-writing this to push model is a bit more complex task
         try {
-			pullAndPushAsync(parent, new PathIteration(new StrictEvaluationStrategy(null, null) {
+        	executor.pullAndPushAsync(parent, new PathIteration(new StrictEvaluationStrategy(null, null) {
                 @Override
                 public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(ZeroLengthPath zlp, BindingSet bindings) throws QueryEvaluationException {
                     zlp.setParentNode(alp);
@@ -2035,10 +2033,10 @@ final class HalyardTupleExprEvaluation {
     private void evaluateBindingSetAssignment(BindingSetPipe parent, BindingSetAssignment bsa, BindingSet bindings) {
         final Iterator<BindingSet> iter = bsa.getBindingSets().iterator();
         if (bindings.size() == 0) { // empty binding set
-			pullAndPush(parent, new CloseableIteratorIteration<>(iter), bsa, parentStrategy);
+        	executor.pullAndPush(parent, new CloseableIteratorIteration<>(iter), bsa, parentStrategy);
         } else {
             final QueryBindingSet b = new QueryBindingSet(bindings);
-			pullAndPush(parent, new LookAheadIteration<BindingSet, QueryEvaluationException>() {
+            executor.pullAndPush(parent, new LookAheadIteration<BindingSet, QueryEvaluationException>() {
                 @Override
                 protected BindingSet getNextElement() throws QueryEvaluationException {
                     QueryBindingSet result = null;
