@@ -16,11 +16,11 @@
  */
 package com.msd.gin.halyard.optimizers;
 
-import com.msd.gin.halyard.strategy.MemoryStoreWithHalyardStrategy;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +34,9 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.parser.sparql.SPARQLParser;
 import org.junit.Test;
-import static org.junit.Assert.*;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  *
@@ -98,7 +100,7 @@ public class HalyardQueryJoinOptimizerTest {
         predicateStats.put(pred1, 100.0);
         predicateStats.put(pred2, 5.0);
         predicateStats.put(pred3, 25.0);
-        new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(() -> new MemoryStoreWithHalyardStrategy.MockStatementPatternCardinalityCalculator(predicateStats), null)).optimize(expr, null, null);
+        new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(() -> new MockStatementPatternCardinalityCalculator(predicateStats), null)).optimize(expr, null, null);
         List<IRI> joinOrder = new ArrayList<>();
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
             @Override
@@ -128,7 +130,7 @@ public class HalyardQueryJoinOptimizerTest {
         predicateStats.put(pred2, 5.0);
         predicateStats.put(preda, 2.0);
         predicateStats.put(predb, 45.0);
-        new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(() -> new MemoryStoreWithHalyardStrategy.MockStatementPatternCardinalityCalculator(predicateStats), null)).optimize(expr, null, null);
+        new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(() -> new MockStatementPatternCardinalityCalculator(predicateStats), null)).optimize(expr, null, null);
         List<IRI> joinOrder = new ArrayList<>();
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
             @Override
@@ -144,4 +146,19 @@ public class HalyardQueryJoinOptimizerTest {
         });
         assertEquals(expr.toString(), Arrays.asList(preda, pred2, pred1, predb), joinOrder);
     }
+
+
+	public static class MockStatementPatternCardinalityCalculator extends SimpleStatementPatternCardinalityCalculator {
+		final Map<IRI, Double> predicateStats;
+	
+		public MockStatementPatternCardinalityCalculator(Map<IRI, Double> predicateStats) {
+			this.predicateStats = predicateStats;
+		}
+	
+		@Override
+		public double getCardinality(StatementPattern sp, Collection<String> boundVars) {
+			IRI predicate = (IRI) sp.getPredicateVar().getValue();
+			return predicateStats.getOrDefault(predicate, super.getCardinality(sp, boundVars));
+		}
+	}
 }

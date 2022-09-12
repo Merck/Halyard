@@ -1680,10 +1680,6 @@ final class HalyardTupleExprEvaluation {
                 		return parent.push(bs);
                 	}
                     @Override
-                    public void close() throws InterruptedException {
-                    	parent.close();
-                    }
-                    @Override
                     public String toString() {
                     	return label + "(probe)";
                     }

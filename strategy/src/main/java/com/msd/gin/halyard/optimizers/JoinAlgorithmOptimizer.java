@@ -15,10 +15,12 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 
 	private final EvaluationStatistics statistics;
 	private final int hashJoinLimit;
+	private final float cardinalityRatio;
 
-	public JoinAlgorithmOptimizer(EvaluationStatistics stats, int hashJoinLimit) {
+	public JoinAlgorithmOptimizer(EvaluationStatistics stats, int hashJoinLimit, float ratio) {
 		this.statistics = stats;
 		this.hashJoinLimit = hashJoinLimit;
+		this.cardinalityRatio = ratio;
 	}
 
 	@Override
@@ -31,13 +33,13 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 				// get cardinalities assuming no bound variables as nothing additionally will be bound with a hash join
 				double leftCard = statistics.getCardinality(left);
 				double rightCard = statistics.getCardinality(right);
-				if (rightCard <= hashJoinLimit && leftCard >= 2*rightCard) {
+				if (rightCard <= hashJoinLimit && leftCard >= cardinalityRatio*rightCard) {
 					// hash right
 					join.setAlgorithm(HashJoin.INSTANCE);
 					join.setCostEstimate(0.1);
 					left.setResultSizeEstimate(leftCard);
 					right.setResultSizeEstimate(rightCard);
-				} else if (leftCard <= hashJoinLimit && rightCard >= 2*leftCard) {
+				} else if (leftCard <= hashJoinLimit && rightCard >= cardinalityRatio*leftCard) {
 					// hash left
 					join.setAlgorithm(HashJoin.INSTANCE);
 					join.setCostEstimate(0.1);
@@ -57,7 +59,7 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 				// get cardinalities assuming no bound variables as nothing additionally will be bound with a hash join
 				double leftCard = statistics.getCardinality(left);
 				double rightCard = statistics.getCardinality(right);
-				if (rightCard <= hashJoinLimit && leftCard >= 2*rightCard) {
+				if (rightCard <= hashJoinLimit && leftCard >= cardinalityRatio*rightCard) {
 					// hash right
 					leftJoin.setAlgorithm(HashJoin.INSTANCE);
 					leftJoin.setCostEstimate(0.1);

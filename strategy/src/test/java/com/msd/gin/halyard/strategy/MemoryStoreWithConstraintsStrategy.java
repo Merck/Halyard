@@ -34,7 +34,7 @@ class MemoryStoreWithConstraintsStrategy extends MemoryStore {
             protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, final TripleSource tripleSource) {
             	HalyardEvaluationStatistics stats = new HalyardEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY, null);
                 HalyardEvaluationStrategy evalStrat = new HalyardEvaluationStrategy(new MockTripleSource(tripleSource), dataset, null, stats);
-                evalStrat.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(evalStrat, tripleSource.getValueFactory(), stats));
+                evalStrat.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(evalStrat, tripleSource.getValueFactory(), stats, 0, Float.MAX_VALUE));
                 return evalStrat;
             }
 

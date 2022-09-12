@@ -6,13 +6,10 @@ import com.msd.gin.halyard.algebra.NestedLoops;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
@@ -39,24 +36,25 @@ public class HalyardStrategyJoinTest {
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> data() {
 		List<Object[]> testValues = new ArrayList<>();
-		testValues.add(new Object[] {0});
-		testValues.add(new Object[] {Integer.MAX_VALUE});
+		testValues.add(new Object[] {"Nested", 0, Float.MAX_VALUE});
+		testValues.add(new Object[] {"Hash", Integer.MAX_VALUE, 0.0f});
 		return testValues;
 	}
 
-	private final Map<IRI, Double> predicateStats = new HashMap<>();
     private final int hashJoinLimit;
+    private final float cardinalityRatio;
     private Repository repo;
     private RepositoryConnection con;
     private MemoryStoreWithHalyardStrategy strategy;
 
-    public HalyardStrategyJoinTest(int hashJoinLimit) {
+    public HalyardStrategyJoinTest(String algo, int hashJoinLimit, float cardinalityRatio) {
        this.hashJoinLimit = hashJoinLimit;
+       this.cardinalityRatio = cardinalityRatio;
     }
 
     @Before
     public void setUp() throws Exception {
-    	strategy = new MemoryStoreWithHalyardStrategy(predicateStats, hashJoinLimit);
+    	strategy = new MemoryStoreWithHalyardStrategy(hashJoinLimit, cardinalityRatio);
         repo = new SailRepository(strategy);
         repo.init();
         con = repo.getConnection();
@@ -78,72 +76,89 @@ public class HalyardStrategyJoinTest {
 
     @Test
     public void testJoin_1var() throws Exception {
-        String q ="prefix : <http://example/> select ?s ?t where {?s :r/:s ?t}";
-        predicateStats.put(repo.getValueFactory().createIRI("http://example/r"), 25.0);
+        String q = "prefix : <http://example/> select ?s ?t where {?s :r/:s ?t}";
         joinTest(q, "/test-cases/join-results-1.srx", 1, expectedAlgo());
     }
 
     @Test
     public void testJoin_2var() throws Exception {
         // star join
-        String q ="prefix : <http://example/> select ?x ?y where {?x :p ?y. ?x :t ?y}";
+        String q = "prefix : <http://example/> select ?x ?y where {?x :p ?y. ?x :t ?y}";
         joinTest(q, "/test-cases/join-results-2.srx", 0, null);
     }
 
     @Test
     public void testJoin_0var() throws Exception {
-        String q ="prefix : <http://example/> select * where {?s :r ?t. ?x :s ?y}";
-        predicateStats.put(repo.getValueFactory().createIRI("http://example/r"), 25.0);
+        String q = "prefix : <http://example/> select * where {?s :r ?t. ?x :s ?y}";
         joinTest(q, "/test-cases/join-results-0.srx", 1, expectedAlgo());
     }
 
     @Test
     public void testJoin_empty_0var() throws Exception {
-        String q ="prefix : <http://example/> select * where {:x1 :q \"a\". ?x :p ?y}";
+        String q = "prefix : <http://example/> select * where {:x1 :q \"a\". ?x :p ?y}";
         joinTest(q, "/test-cases/join-results-empty-0.srx", 1, expectedAlgo());
     }
 
 
     @Test
     public void testLeftJoin_1var() throws Exception {
-        String q ="prefix : <http://example/> select ?s ?t where {?s :r ?k. optional {?k :s ?t} }";
-        predicateStats.put(repo.getValueFactory().createIRI("http://example/r"), 250.0);
+        String q = "prefix : <http://example/> select ?s ?t where {?s :r ?k. optional {?k :s ?t} }";
         joinTest(q, "/test-cases/left-join-results-1.srx", 1, expectedAlgo());
     }
 
     @Test
     public void testLeftJoin_2var() throws Exception {
         // star join
-        String q ="prefix : <http://example/> select ?x ?y where {?x :p ?y. optional {?x :t ?y} }";
-        predicateStats.put(repo.getValueFactory().createIRI("http://example/p"), 250.0);
+        String q = "prefix : <http://example/> select ?x ?y where {?x :p ?y. optional {?x :t ?y} }";
         joinTest(q, "/test-cases/left-join-results-2.srx", 1, expectedAlgo());
     }
 
     @Test
     public void testLeftJoin_0var() throws Exception {
-        String q ="prefix : <http://example/> select * where {?s :r ?t. optional {?x :s ?y} }";
-        predicateStats.put(repo.getValueFactory().createIRI("http://example/r"), 250.0);
+        String q = "prefix : <http://example/> select * where {?s :r ?t. optional {?x :s ?y} }";
         joinTest(q, "/test-cases/left-join-results-0.srx", 1, expectedAlgo());
     }
 
     @Test
     public void testLeftJoin_empty_0var() throws Exception {
-        String q ="prefix : <http://example/> select * where {:x1 :q \"a\". optional {?x :p ?y} }";
-        joinTest(q, "/test-cases/left-join-results-empty-0.srx", 1, NestedLoops.NAME);
+        String q = "prefix : <http://example/> select * where {:x1 :q \"a\". optional {?x :p ?y} }";
+        joinTest(q, "/test-cases/left-join-results-empty-0.srx", 1, expectedAlgo());
     }
 
     @Test
     public void testLeftJoin_empty_0var_swapped() throws Exception {
-        String q ="prefix : <http://example/> select * where {?x :p ?y. optional {:x1 :q \"a\"} }";
+        String q = "prefix : <http://example/> select * where {?x :p ?y. optional {:x1 :q \"a\"} }";
         joinTest(q, "/test-cases/left-join-results-empty-0.srx", 1, expectedAlgo());
     }
 
+    @Test
+    public void testBadNestedLeftJoin() throws Exception {
+        String q = "prefix : <http://example/> select ?x ?y ?z where {?x :name 'paul'. optional {?y :name 'george'. optional {?x :email ?z} } }";
+        joinTest(q, "/test-cases/cs-0605124.ttl", "/test-cases/cs-0605124-ex3.srx", 2, expectedAlgo(), expectedAlgo());
+    }
+
+    @Test
+    public void testNoncommutativeAnd1() throws Exception {
+        String q = "prefix : <http://example/> select ?x ?y ?z where {?x :name 'paul'. {?y :name 'george'. optional {?x :email ?z}} }";
+        joinTest(q, "/test-cases/cs-0605124.ttl", "/test-cases/cs-0605124-ex4.srx", 2, HashJoin.NAME, expectedAlgo());
+    }
+
+    @Test
+    public void testNoncommutativeAnd2() throws Exception {
+        String q = "prefix : <http://example/> select ?x ?y ?z where {{?y :name 'george'. optional {?x :email ?z}} ?x :name 'paul'. }";
+        joinTest(q, "/test-cases/cs-0605124.ttl", "/test-cases/cs-0605124-ex4.srx", 2, HashJoin.NAME, expectedAlgo());
+    }
 
     private void joinTest(String q, String expectedOutput, int expectedJoins, String expectedAlgo) throws Exception {
-    	if (expectedJoins == 0 && expectedAlgo != null) {
+    	joinTest(q, "/test-cases/join-data.ttl", expectedOutput, expectedJoins, expectedAlgo != null ? new String[] {expectedAlgo} : null);
+    }
+
+    private void joinTest(String q, String data, String expectedOutput, int expectedJoins, String... expectedAlgos) throws Exception {
+    	if (expectedJoins == 0 && expectedAlgos != null) {
     		throw new IllegalArgumentException("No join expected");
     	}
-        con.add(getClass().getResource("/test-cases/join-data.ttl"));
+
+    	con.add(getClass().getResource(data));
         Set<BindingSet> results;
         try (TupleQueryResult res = con.prepareTupleQuery(q).evaluate()) {
             results = toSet(res);
@@ -154,9 +169,10 @@ public class HalyardStrategyJoinTest {
                 expectedResults = toSet(res);
             }
         }
-        assertEquals(expectedResults, results);
-        List<BinaryTupleOperator> joins = new ArrayList<>();
         TupleExpr expr = strategy.getQueryHistory().getLast();
+        assertEquals(expr.toString(), expectedResults, results);
+
+        List<BinaryTupleOperator> joins = new ArrayList<>();
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>() {
 			@Override
 			public void meet(Join node) {
@@ -171,8 +187,9 @@ public class HalyardStrategyJoinTest {
         });
         assertEquals(expectedJoins, joins.size());
         if (!joins.isEmpty()) {
-	        for (BinaryTupleOperator join : joins) {
-	        	assertEquals(expr.toString(), expectedAlgo, join.getAlgorithmName());
+	        for (int i=0; i<joins.size(); i++) {
+	        	BinaryTupleOperator join = joins.get(i);
+	        	assertEquals(expr.toString(), expectedAlgos[i], join.getAlgorithmName());
 	        }
 	        assertEquals(expectedResults.size(), joins.get(0).getResultSizeActual());
         }

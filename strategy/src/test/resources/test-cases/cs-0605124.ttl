@@ -1,0 +1,7 @@
+# Example 1 from https://arxiv.org/abs/cs/0605124
+@prefix : <http://example/> .
+
+:Paul :name "paul"; :phone "777-3426" .
+:John :name "john"; :email "john@acd.edu" .
+:George :name "george"; :webPage "www.george.edu" .
+:Ringo :name "ringo"; :email "ringo@acd.edu"; :webPage "www.starr.edu"; :phone "888-4537" .
