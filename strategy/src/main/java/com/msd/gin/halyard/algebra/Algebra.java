@@ -6,7 +6,9 @@ import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
+import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
+import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Union;
 import org.eclipse.rdf4j.query.algebra.Var;
 
@@ -20,6 +22,10 @@ public final class Algebra {
 		return tupleExpr;
 	}
 
+	/**
+	 * Removes a subtree.
+	 * @param expr node and descendants to be removed.
+	 */
 	public static void remove(TupleExpr expr) {
 		QueryModelNode parent = expr.getParentNode();
 		if (parent instanceof Join) {
@@ -29,7 +35,7 @@ public final class Algebra {
 			} else if (join.getRightArg() == expr) {
 				join.replaceWith(join.getLeftArg());
 			} else {
-				throw new QueryEvaluationException(String.format("Corrupt join: {}", join));
+				throw new QueryEvaluationException(String.format("Corrupt join: %s", join));
 			}
 		} else if (parent instanceof Union) {
 			Union union = (Union) parent;
@@ -38,10 +44,12 @@ public final class Algebra {
 			} else if (union.getRightArg() == expr) {
 				union.replaceWith(union.getLeftArg());
 			} else {
-				throw new QueryEvaluationException(String.format("Corrupt union: {}", union));
+				throw new QueryEvaluationException(String.format("Corrupt union: %s", union));
 			}
+		} else if (parent instanceof UnaryTupleOperator) {
+			expr.replaceWith(new SingletonSet());
 		} else {
-			throw new QueryEvaluationException(String.format("Cannot remove {} from {}", expr.getSignature(), parent.getSignature()));
+			throw new QueryEvaluationException(String.format("Cannot remove %s from %s", expr.getSignature(), parent.getSignature()));
 		}
 	}
 

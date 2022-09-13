@@ -55,7 +55,7 @@ public class HalyardQueryJoinOptimizerTest {
         new HalyardQueryJoinOptimizer(createStatistics()).optimize(expr, null, null);
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
             @Override
-            public void meet(Join node) throws RuntimeException {
+            public void meet(Join node) {
                 assertTrue(expr.toString(), ((StatementPattern)node.getLeftArg()).getObjectVar().hasValue());
                 assertEquals(expr.toString(), "c", ((StatementPattern)node.getRightArg()).getObjectVar().getName());
             }
@@ -68,7 +68,7 @@ public class HalyardQueryJoinOptimizerTest {
         new HalyardQueryJoinOptimizer(createStatistics()).optimize(expr, null, null);
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
             @Override
-            public void meet(Join node) throws RuntimeException {
+            public void meet(Join node) {
                 assertEquals(expr.toString(), "d", ((StatementPattern)node.getLeftArg()).getObjectVar().getName());
                 assertTrue(expr.toString(), ((StatementPattern)node.getRightArg()).getObjectVar().hasValue());
             }
@@ -81,7 +81,7 @@ public class HalyardQueryJoinOptimizerTest {
         new HalyardQueryJoinOptimizer(createStatistics()).optimize(expr, null, null);
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
             @Override
-            public void meet(Join node) throws RuntimeException {
+            public void meet(Join node) {
                 if (node.getLeftArg() instanceof StatementPattern) {
                     assertEquals(expr.toString(), "b", ((StatementPattern)node.getLeftArg()).getObjectVar().getName());
                 }
@@ -104,7 +104,7 @@ public class HalyardQueryJoinOptimizerTest {
         List<IRI> joinOrder = new ArrayList<>();
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
             @Override
-            public void meet(Join node) throws RuntimeException {
+            public void meet(Join node) {
                 if (node.getLeftArg() instanceof StatementPattern) {
                     joinOrder.add((IRI) ((StatementPattern)node.getLeftArg()).getPredicateVar().getValue());
                 }
@@ -134,7 +134,7 @@ public class HalyardQueryJoinOptimizerTest {
         List<IRI> joinOrder = new ArrayList<>();
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
             @Override
-            public void meet(Join node) throws RuntimeException {
+            public void meet(Join node) {
                 if (node.getLeftArg() instanceof StatementPattern) {
                     joinOrder.add((IRI) ((StatementPattern)node.getLeftArg()).getPredicateVar().getValue());
                 }
@@ -145,6 +145,27 @@ public class HalyardQueryJoinOptimizerTest {
             }
         });
         assertEquals(expr.toString(), Arrays.asList(preda, pred2, pred1, predb), joinOrder);
+    }
+
+    @Test
+    public void testQueryJoinOptimizerWithStarJoin() {
+    	ValueFactory vf = SimpleValueFactory.getInstance();
+        final TupleExpr expr = new SPARQLParser().parseQuery("SELECT * WHERE { ?a <http://whatever/1> ?b; <http://whatever/2> ?c }", BASE_URI).getTupleExpr();
+        IRI pred1 = vf.createIRI("http://whatever/1");
+        IRI pred2 = vf.createIRI("http://whatever/2");
+        Map<IRI, Double> predicateStats = new HashMap<>();
+        predicateStats.put(pred1, 100.0);
+        predicateStats.put(pred2, 5.0);
+        new StarJoinOptimizer().optimize(expr, null, null);
+        new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(() -> new MockStatementPatternCardinalityCalculator(predicateStats), null)).optimize(expr, null, null);
+        List<IRI> joinOrder = new ArrayList<>();
+        expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
+            @Override
+            public void meet(StatementPattern node) {
+                joinOrder.add((IRI) node.getPredicateVar().getValue());
+            }
+        });
+        assertEquals(expr.toString(), Arrays.asList(pred2, pred1), joinOrder);
     }
 
 

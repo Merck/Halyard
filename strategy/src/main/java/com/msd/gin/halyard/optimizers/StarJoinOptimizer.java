@@ -18,7 +18,6 @@ package com.msd.gin.halyard.optimizers;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Multimaps;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.StarJoin;
 
@@ -32,10 +31,11 @@ import org.eclipse.rdf4j.RDF4JException;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.algebra.Join;
+import org.eclipse.rdf4j.query.algebra.QueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.Service;
-import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
+import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
@@ -60,11 +60,14 @@ public class StarJoinOptimizer implements QueryOptimizer {
 			BGPCollector<RDF4JException> collector = new BGPCollector<>(this);
 			node.visit(collector);
 			if(!collector.getStatementPatterns().isEmpty()) {
-				processJoins(node, collector.getStatementPatterns());
+				Parent parent = new Parent();
+				node.replaceWith(parent);
+				parent.setArg(node);
+				processJoins(parent, collector.getStatementPatterns());
 			}
 		}
 
-		private void processJoins(Join parent, List<StatementPattern> sps) {
+		private void processJoins(Parent parent, List<StatementPattern> sps) {
 			ListMultimap<Pair<Var,Var>, StatementPattern> spByCtxSubj = ArrayListMultimap.create(sps.size(), 4);
 			for(StatementPattern sp : sps) {
 				Var ctxVar = sp.getContextVar();
@@ -76,7 +79,7 @@ public class StarJoinOptimizer implements QueryOptimizer {
 				List<StatementPattern> subjSps = (List<StatementPattern>) entry.getValue();
 				if(subjSps.size() > 1) {
 					for(StatementPattern sp : subjSps) {
-						sp.replaceWith(new SingletonSet());
+						Algebra.remove(sp);
 					}
 					starJoins.add(new StarJoin(entry.getKey().getRight(), entry.getKey().getLeft(), subjSps));
 				}
@@ -86,9 +89,35 @@ public class StarJoinOptimizer implements QueryOptimizer {
 				Join combined = new Join();
 				parent.replaceWith(combined);
 				TupleExpr starJoinTree = Algebra.join(starJoins);
-				combined.setLeftArg(parent);
+				combined.setLeftArg(parent.getArg());
 				combined.setRightArg(starJoinTree);
+			} else {
+				parent.replaceWith(parent.getArg());
 			}
+		}
+	}
+
+	static final class Parent extends UnaryTupleOperator {
+		private static final long serialVersionUID = 1620947330539139269L;
+
+		@Override
+		public <X extends Exception> void visit(QueryModelVisitor<X> visitor) throws X {
+			visitor.meetOther(this);
+		}
+
+		@Override
+		public boolean equals(Object other) {
+			return other instanceof Parent && super.equals(other);
+		}
+
+		@Override
+		public int hashCode() {
+			return super.hashCode() ^ "Parent".hashCode();
+		}
+
+		@Override
+		public Parent clone() {
+			return (Parent) super.clone();
 		}
 	}
 }
