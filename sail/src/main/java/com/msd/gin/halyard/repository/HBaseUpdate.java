@@ -1,5 +1,6 @@
 package com.msd.gin.halyard.repository;
 
+import com.google.common.base.Stopwatch;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.query.EmptyTripleSource;
 import com.msd.gin.halyard.sail.HBaseSail;
@@ -13,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.rdf4j.RDF4JException;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -156,7 +158,7 @@ public class HBaseUpdate extends SailUpdate {
 				if (deleteClause != null) {
 					// for deletes, TupleFunctions are expected in the where clause
 					whereClause = optimize(whereClause, uc.getDataset(), uc.getBindingSet(), true);
-					deleteInfo = new ModifyInfo(StatementPatternCollector.process(deleteClause), WhereCollector.process(whereClause));
+					deleteInfo = new ModifyInfo(deleteClause, StatementPatternCollector.process(deleteClause), WhereCollector.process(whereClause));
 				}
 
 				TimestampedUpdateContext tsUc = new TimestampedUpdateContext(uc.getUpdateExpr(), uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
@@ -273,6 +275,18 @@ public class HBaseUpdate extends SailUpdate {
 			if (deleteClause != null) {
 				List<StatementPattern> deletePatterns = deleteClause.getStatementPatterns();
 
+				TupleExpr expr = deleteClause.getClause();
+				int deleteCount = 0;
+				if (sail.isTrackResultTime()) {
+					expr.setTotalTimeNanosActual(Math.max(0, expr.getTotalTimeNanosActual()));
+				}
+				Stopwatch stopwatch;
+				if (sail.isTrackResultSize()) {
+					expr.setResultSizeActual(Math.max(0, expr.getResultSizeActual()));
+					stopwatch = Stopwatch.createStarted();
+				} else {
+					stopwatch = null;
+				}
 				Value patternValue;
 				for (StatementPattern deletePattern : deletePatterns) {
 
@@ -310,6 +324,14 @@ public class HBaseUpdate extends SailUpdate {
 						IRI[] remove = getDefaultRemoveGraphs(uc.getDataset());
 						con.removeStatement(uc, subject, predicate, object, remove);
 					}
+					deleteCount++;
+				}
+				if (sail.isTrackResultTime()) {
+					stopwatch.stop();
+					expr.setTotalTimeNanosActual(expr.getTotalTimeNanosActual() + stopwatch.elapsed(TimeUnit.NANOSECONDS));
+				}
+				if (sail.isTrackResultSize()) {
+					expr.setResultSizeActual(expr.getResultSizeActual() + deleteCount);
 				}
 			}
 		}
@@ -318,6 +340,18 @@ public class HBaseUpdate extends SailUpdate {
 			if (insertClause != null) {
 				List<StatementPattern> insertPatterns = insertClause.getStatementPatterns();
 
+				TupleExpr expr = insertClause.getClause();
+				int insertCount = 0;
+				if (sail.isTrackResultTime()) {
+					expr.setTotalTimeNanosActual(Math.max(0, expr.getTotalTimeNanosActual()));
+				}
+				Stopwatch stopwatch;
+				if (sail.isTrackResultSize()) {
+					expr.setResultSizeActual(Math.max(0, expr.getResultSizeActual()));
+					stopwatch = Stopwatch.createStarted();
+				} else {
+					stopwatch = null;
+				}
 				// bnodes in the insert pattern are locally scoped for each
 				// individual source binding.
 				MapBindingSet bnodeMapping = new MapBindingSet();
@@ -335,7 +369,15 @@ public class HBaseUpdate extends SailUpdate {
 						} else {
 							con.addStatement(uc, toBeInserted.getSubject(), toBeInserted.getPredicate(), toBeInserted.getObject(), toBeInserted.getContext());
 						}
+						insertCount++;
 					}
+				}
+				if (sail.isTrackResultTime()) {
+					stopwatch.stop();
+					expr.setTotalTimeNanosActual(expr.getTotalTimeNanosActual() + stopwatch.elapsed(TimeUnit.NANOSECONDS));
+				}
+				if (sail.isTrackResultSize()) {
+					expr.setResultSizeActual(expr.getResultSizeActual() + insertCount);
 				}
 			}
 		}
@@ -483,12 +525,18 @@ public class HBaseUpdate extends SailUpdate {
 	}
 
 	static class ModifyInfo {
+		private final TupleExpr clause;
 		private final List<StatementPattern> stPatterns;
 		private final List<TupleFunctionCall> tupleFunctionCalls;
 
-		ModifyInfo(List<StatementPattern> stPatterns, List<TupleFunctionCall> tupleFunctionCalls) {
+		ModifyInfo(TupleExpr clause, List<StatementPattern> stPatterns, List<TupleFunctionCall> tupleFunctionCalls) {
+			this.clause = clause;
 			this.stPatterns = stPatterns;
 			this.tupleFunctionCalls = tupleFunctionCalls;
+		}
+
+		public TupleExpr getClause() {
+			return clause;
 		}
 
 		public List<StatementPattern> getStatementPatterns() {
@@ -503,10 +551,10 @@ public class HBaseUpdate extends SailUpdate {
 	static class InsertCollector extends StatementPatternCollector {
 		private final List<TupleFunctionCall> tupleFunctionCalls = new ArrayList<>();
 
-		static ModifyInfo process(TupleExpr expr) {
+		static ModifyInfo process(TupleExpr clause) {
 			InsertCollector insertCollector = new InsertCollector();
-			expr.visit(insertCollector);
-			return new ModifyInfo(insertCollector.getStatementPatterns(), insertCollector.getTupleFunctionCalls());
+			clause.visit(insertCollector);
+			return new ModifyInfo(clause, insertCollector.getStatementPatterns(), insertCollector.getTupleFunctionCalls());
 		}
 
 		public List<TupleFunctionCall> getTupleFunctionCalls() {
