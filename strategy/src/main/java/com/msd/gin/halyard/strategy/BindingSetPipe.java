@@ -61,7 +61,9 @@ abstract class BindingSetPipe {
     }
 
     public void close() throws InterruptedException {
-    	parent.close();
+    	if (parent != null) {
+    		parent.close();
+    	}
     }
 
     public final boolean pushLast(BindingSet bs) throws InterruptedException {

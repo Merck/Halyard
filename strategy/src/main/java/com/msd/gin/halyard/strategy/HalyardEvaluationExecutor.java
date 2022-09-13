@@ -346,19 +346,19 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
                         if (pipe.push(bs)) { //true indicates more data is expected from this binding set, put it on the queue
                            	return true;
                         } else {
-                        	pipe.close();
                         	iter.close();
+                        	pipe.close();
                         }
                 	} else {
-            			pipe.close();
             			iter.close();
+            			pipe.close();
             		}
             	} else {
             		iter.close();
             	}
             } catch (Throwable e) {
-                pipe.handleException(e);
                 iter.close();
+                return pipe.handleException(e);
             }
         	return false;
 		}

@@ -256,7 +256,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 							@Override
 							protected void throwInterruptedException() {
 								throw new QueryEvaluationException(
-										String.format("Query evaluation exceeded specified timeout %ds", sail.evaluationTimeoutSecs));
+										String.format("Query evaluation exceeded specified timeout %ds:\n%s", sail.evaluationTimeoutSecs, optimizedTupleExpr));
 							}
 						};
 			} catch (QueryEvaluationException ex) {

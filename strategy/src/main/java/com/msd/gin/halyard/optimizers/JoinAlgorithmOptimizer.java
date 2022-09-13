@@ -4,23 +4,26 @@ import com.msd.gin.halyard.algebra.HashJoin;
 
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
+import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 
 public class JoinAlgorithmOptimizer implements QueryOptimizer {
+	private static double INDEX_LOOKUP_COST = 10;
+	private static double HASH_LOOKUP_COST = 0.1;
+	private static double HASH_BUILD_COST = 0.3;
 
-	private final EvaluationStatistics statistics;
+	private final ExtendedEvaluationStatistics statistics;
 	private final int hashJoinLimit;
-	private final float cardinalityRatio;
+	private final float costRatio;
 
-	public JoinAlgorithmOptimizer(EvaluationStatistics stats, int hashJoinLimit, float ratio) {
+	public JoinAlgorithmOptimizer(ExtendedEvaluationStatistics stats, int hashJoinLimit, float ratio) {
 		this.statistics = stats;
 		this.hashJoinLimit = hashJoinLimit;
-		this.cardinalityRatio = ratio;
+		this.costRatio = ratio;
 	}
 
 	@Override
@@ -28,46 +31,30 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 		tupleExpr.visit(new AbstractQueryModelVisitor<RuntimeException>() {
 			@Override
 			public void meet(Join join) throws RuntimeException {
-				TupleExpr left = join.getLeftArg();
-				TupleExpr right = join.getRightArg();
-				// get cardinalities assuming no bound variables as nothing additionally will be bound with a hash join
-				double leftCard = statistics.getCardinality(left);
-				double rightCard = statistics.getCardinality(right);
-				if (rightCard <= hashJoinLimit && leftCard >= cardinalityRatio*rightCard) {
-					// hash right
-					join.setAlgorithm(HashJoin.INSTANCE);
-					join.setCostEstimate(0.1);
-					left.setResultSizeEstimate(leftCard);
-					right.setResultSizeEstimate(rightCard);
-				} else if (leftCard <= hashJoinLimit && rightCard >= cardinalityRatio*leftCard) {
-					// hash left
-					join.setAlgorithm(HashJoin.INSTANCE);
-					join.setCostEstimate(0.1);
-					left.setResultSizeEstimate(leftCard);
-					right.setResultSizeEstimate(rightCard);
-					// need to swap args
-					join.setLeftArg(right);
-					join.setRightArg(left);
-				}
+				selectJoinAlgorithm(join);
 				super.meet(join);
 			}
 
 			@Override
 			public void meet(LeftJoin leftJoin) throws RuntimeException {
-				TupleExpr left = leftJoin.getLeftArg();
-				TupleExpr right = leftJoin.getRightArg();
-				// get cardinalities assuming no bound variables as nothing additionally will be bound with a hash join
-				double leftCard = statistics.getCardinality(left);
-				double rightCard = statistics.getCardinality(right);
-				if (rightCard <= hashJoinLimit && leftCard >= cardinalityRatio*rightCard) {
-					// hash right
-					leftJoin.setAlgorithm(HashJoin.INSTANCE);
-					leftJoin.setCostEstimate(0.1);
-					left.setResultSizeEstimate(leftCard);
-					right.setResultSizeEstimate(rightCard);
-				}
+				selectJoinAlgorithm(leftJoin);
 				super.meet(leftJoin);
 			}
 		});
+	}
+
+	private void selectJoinAlgorithm(BinaryTupleOperator join) {
+		TupleExpr left = join.getLeftArg();
+		TupleExpr right = join.getRightArg();
+		double leftCard = statistics.getCardinality(left);
+		double rightCard = statistics.getCardinality(right);
+		double nestedRightCard = statistics.getCardinality(right, left.getBindingNames());
+		double nestedCost = leftCard * nestedRightCard * INDEX_LOOKUP_COST;
+		double hashCost = leftCard*HASH_LOOKUP_COST + rightCard*HASH_BUILD_COST;
+		boolean useHash = rightCard <= hashJoinLimit && costRatio*hashCost < nestedCost;
+		if (useHash) {
+			join.setAlgorithm(HashJoin.INSTANCE);
+			join.setCostEstimate(hashCost);
+		}
 	}
 }

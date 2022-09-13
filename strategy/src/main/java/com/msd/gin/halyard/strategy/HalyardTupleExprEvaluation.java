@@ -1605,74 +1605,46 @@ final class HalyardTupleExprEvaluation {
 
     private void evaluateHashJoin(BindingSetPipe topPipe, final BinaryTupleOperator join, final BindingSet bindings, boolean isLeftJoin) {
     	join.setAlgorithm(HashJoin.INSTANCE);
+    	parentStrategy.initTracking(join);
     	TupleExpr probeExpr = join.getLeftArg();
     	TupleExpr buildExpr = join.getRightArg();
-    	parentStrategy.initTracking(join);
-    	Set<String> joinAttributeNames = probeExpr.getBindingNames();
-		joinAttributeNames.retainAll(buildExpr.getBindingNames());
-		final String[] joinAttributes = joinAttributeNames.toArray(new String[joinAttributeNames.size()]);
-
-		final Map<BindingSetHashKey, List<BindingSet>> hashTable;
-		int initialSize = (int) Math.max(0, buildExpr.getResultSizeEstimate());
-		if (joinAttributes.length > 0) {
-			hashTable = new HashMap<>(initialSize);
-		} else {
-			hashTable = Collections.<BindingSetHashKey, List<BindingSet>>singletonMap(BindingSetHashKey.EMPTY, new ArrayList<>(initialSize));
-		}
-
-		final String label = isLeftJoin ? "HashLeftJoinBindingSetPipe" : "HashJoinBindingSetPipe";
-
-		evaluateTupleExpr(new BindingSetPipe(topPipe) {
-			int keyCount;
-			long bsCount;
+		evaluateTupleExpr(new BindingSetPipe(null) {
+	    	final HashJoinTable hashTable = new HashJoinTable(probeExpr, buildExpr);
             @Override
             protected boolean next(BindingSet buildBs) throws InterruptedException {
-    			BindingSetHashKey hashKey = BindingSetHashKey.create(joinAttributes, buildBs);
-    			synchronized (hashTable) {
-    				List<BindingSet> hashValue = hashTable.get(hashKey);
-    				boolean newEntry = (hashValue == null);
-    				if (newEntry) {
-    					int averageSize = (keyCount > 0) ? (int) (bsCount/keyCount) : 0;
-    					hashValue = new ArrayList<>(averageSize + 1);
-    					hashTable.put(hashKey, hashValue);
-    					keyCount++;
-    				}
-    				hashValue.add(buildBs);
-    				bsCount++;
-    			}
+            	hashTable.put(buildBs);
             	return true;
             }
             @Override
-            public void close() throws InterruptedException {
-                evaluateTupleExpr(new BindingSetPipe(parent) {
-                	@Override
-                	protected boolean next(BindingSet probeBs) throws InterruptedException {
-                		if (probeBs.size() == 0) {
-        					// the empty bindingset should be merged with all binding sets in the hash table
-        					Collection<List<BindingSet>> hashValues = hashTable.values();
-        					for (List<BindingSet> hashValue : hashValues) {
-        						for (BindingSet b : hashValue) {
-        							if (!pushToParent(join(probeBs, b))) {
-        								return false;
-        							}
-        						}
-        					}
-                		} else {
-        					BindingSetHashKey key = BindingSetHashKey.create(joinAttributes, probeBs);
-        					List<BindingSet> hashValue = hashTable.get(key);
-        					if (hashValue != null && !hashValue.isEmpty()) {
-	        					for (BindingSet b : hashValue) {
-	    							if (!pushToParent(join(probeBs, b))) {
-	    								return false;
-	    							}
-	        					}
-        					} else if (isLeftJoin) {
+            public void close() {
+            	evaluateTupleExpr(new BindingSetPipe(topPipe) {
+        			@Override
+        			protected boolean next(BindingSet probeBs) throws InterruptedException {
+    					if (probeBs.size() == 0) {
+    						// the empty bindingset should be merged with all binding sets in the hash table
+    						Collection<? extends List<BindingSet>> hashValues = hashTable.all();
+    						for (List<BindingSet> hashValue : hashValues) {
+    							for (BindingSet b : hashValue) {
+    								if (!pushToParent(join(probeBs, b))) {
+    									return false;
+    								}
+    							}
+    						}
+    	        		} else {
+    						List<BindingSet> hashValue = hashTable.get(probeBs);
+    						if (hashValue != null && !hashValue.isEmpty()) {
+    	    					for (BindingSet b : hashValue) {
+    								if (!pushToParent(join(probeBs, b))) {
+    									return false;
+    								}
+    	    					}
+    						} else if (isLeftJoin) {
     							if (!pushToParent(probeBs)) {
     								return false;
     							}
-        					}
-                		}
-                		return true;
+    						}
+    	        		}
+    	        		return true;
                 	}
                 	private boolean pushToParent(BindingSet bs) throws InterruptedException {
                 		parentStrategy.incrementResultSizeActual(join);
@@ -1680,15 +1652,60 @@ final class HalyardTupleExprEvaluation {
                 	}
                     @Override
                     public String toString() {
-                    	return label + "(probe)";
+                    	return isLeftJoin ? "LeftHashJoinBindingSetPipe" : "HashJoinBindingSetPipe";
                     }
                 }, probeExpr, bindings);
             }
             @Override
             public String toString() {
-            	return label + "(build)";
+            	return "HashTableBindingSetPipe";
             }
     	}, buildExpr, bindings);
+    }
+
+    private static final class HashJoinTable {
+    	private final String[] joinAttributes;
+    	private final Map<BindingSetHashKey, List<BindingSet>> hashTable;
+		private int keyCount;
+		private long bsCount;
+
+    	HashJoinTable(TupleExpr probeExpr, TupleExpr buildExpr) {
+    		Set<String> joinAttributeNames = probeExpr.getBindingNames();
+    		joinAttributeNames.retainAll(buildExpr.getBindingNames());
+    		joinAttributes = joinAttributeNames.toArray(new String[joinAttributeNames.size()]);
+
+    		int initialSize = (int) Math.max(0, buildExpr.getResultSizeEstimate());
+    		if (joinAttributes.length > 0) {
+    			hashTable = new HashMap<>(initialSize);
+    		} else {
+    			hashTable = Collections.<BindingSetHashKey, List<BindingSet>>singletonMap(BindingSetHashKey.EMPTY, new ArrayList<>(initialSize));
+    		}
+    	}
+
+    	void put(BindingSet bs) {
+			BindingSetHashKey hashKey = BindingSetHashKey.create(joinAttributes, bs);
+			synchronized (this) {
+				List<BindingSet> hashValue = hashTable.get(hashKey);
+				boolean newEntry = (hashValue == null);
+				if (newEntry) {
+					int averageSize = (keyCount > 0) ? (int) (bsCount/keyCount) : 0;
+					hashValue = new ArrayList<>(averageSize + 1);
+					hashTable.put(hashKey, hashValue);
+					keyCount++;
+				}
+				hashValue.add(bs);
+				bsCount++;
+			}
+    	}
+
+    	List<BindingSet> get(BindingSet bs) {
+    		BindingSetHashKey key = BindingSetHashKey.create(joinAttributes, bs);
+			return hashTable.get(key);
+    	}
+
+    	Collection<? extends List<BindingSet>> all() {
+    		return hashTable.values();
+    	}
     }
 
     private static BindingSet join(BindingSet b1, BindingSet b2) {
