@@ -219,7 +219,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             // while we have a strong ref to the root node, none of the child node keys should be gc-ed
 
             //starting priority for ServiceRoot must be evaluated from the original service args node
-            int startingPriority = root instanceof ServiceRoot ? getPriorityForNode(((ServiceRoot)root).originalServiceArgs) : 0;
+            int startingPriority = root instanceof ServiceRoot ? getPriorityForNode(((ServiceRoot)root).originalServiceArgs) - 1 : 0;
             final AtomicInteger counter = new AtomicInteger(startingPriority);
 
             // populate the priority cache
@@ -239,11 +239,10 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
                 @Override
                 public void meet(Service n) {
-                    final int checkpoint = counter.get();
-                    n.visitChildren(this);
                     int pp = counter.getAndIncrement();
                     priorityMapCache.put(n, pp);
-                    counter.getAndUpdate((int count) -> 2 * count - checkpoint + 1); //at least double the distance to have a space for service optimizations
+                    n.visitChildren(this);
+                    counter.getAndUpdate((int count) -> 2 * count - pp + 1); //at least double the distance to have a space for service optimizations
                 }
 
                 @Override

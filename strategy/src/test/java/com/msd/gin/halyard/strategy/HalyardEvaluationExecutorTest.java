@@ -54,10 +54,10 @@ public class HalyardEvaluationExecutorTest {
 		assertEquals(2, executor.getPriorityForNode(sp1));
 		assertEquals(6, executor.getPriorityForNode(j2));
 		assertEquals(7, executor.getPriorityForNode(sp2));
-		assertEquals(21, executor.getPriorityForNode(service));
-		assertEquals(12, executor.getPriorityForNode(j3));
-		assertEquals(13, executor.getPriorityForNode(sp3));
-		assertEquals(17, executor.getPriorityForNode(sp4));
+		assertEquals(11, executor.getPriorityForNode(service));
+		assertEquals(13, executor.getPriorityForNode(j3));
+		assertEquals(14, executor.getPriorityForNode(sp3));
+		assertEquals(18, executor.getPriorityForNode(sp4));
 
 		ServiceRoot serviceRoot = ServiceRoot.create(service);
 		Join serviceJoin = (Join) serviceRoot.getArg();
