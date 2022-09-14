@@ -76,7 +76,7 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 	/** Track the exeution time of each node in the plan. */
 	boolean trackTime;
 
-	private QueryOptimizerPipeline pipeline;
+	QueryOptimizerPipeline pipeline;
 
     /**
      * Ensures 'now' is the same across all parts of the query evaluation chain.

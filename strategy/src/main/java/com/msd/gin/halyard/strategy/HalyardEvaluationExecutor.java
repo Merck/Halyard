@@ -53,7 +53,6 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     private static final BindingSet END_OF_QUEUE = new EmptyBindingSet();
     // high default priority for dynamically created query nodes
     private static final int DEFAULT_PRIORITY = 65535;
-    private static final int RETRY_LIMIT = 50;
 
 	static final HalyardEvaluationExecutor INSTANCE = new HalyardEvaluationExecutor();
 
@@ -73,6 +72,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
     private int threads = Config.getInteger("halyard.evaluation.threads", 20);
     private int maxRetries = Config.getInteger("halyard.evaluation.maxRetries", 3);
+    private int retryLimit = Config.getInteger("halyard.evaluation.retryLimit", 100);
     private int threadGain = Config.getInteger("halyard.evaluation.threadGain", 5);
     private int maxThreads = Config.getInteger("halyard.evaluation.maxThreads", 100);
 
@@ -120,6 +120,26 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 	}
 
 	@Override
+	public void setRetryLimit(int limit) {
+		this.retryLimit = limit;
+	}
+
+	@Override
+	public int getRetryLimit() {
+		return retryLimit;
+	}
+
+	@Override
+	public void setMaxQueueSize(int size) {
+		this.maxQueueSize = size;
+	}
+
+	@Override
+	public int getMaxQueueSize() {
+		return maxQueueSize;
+	}
+
+	@Override
 	public void setQueuePollTimeoutMillis(int millis) {
 		this.pollTimeoutMillis = millis;
 	}
@@ -160,7 +180,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 					}
 				}
 			}
-		} else if (retries > RETRY_LIMIT) {
+		} else if (retries > retryLimit) {
 			throw new QueryEvaluationException(String.format("Maximum retries exceeded: %d", retries));
 		} else {
 			resetRetries = false;

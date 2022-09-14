@@ -55,8 +55,7 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 	private final ExtendedEvaluationStatistics statistics;
 	private final EvaluationStrategy strategy;
 	private final ValueFactory valueFactory;
-	private final int hashJoinLimit;
-	private final float costRatio;
+	private final JoinAlgorithmOptimizer joinAlgoOptimizer;
 
 	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory, ExtendedEvaluationStatistics statistics) {
 		this(strategy, valueFactory, statistics, 500, 2.0f);
@@ -66,8 +65,11 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 		this.strategy = strategy;
 		this.valueFactory = valueFactory;
 		this.statistics = statistics;
-		this.hashJoinLimit = hashJoinLimit;
-		this.costRatio = costRatio;
+		this.joinAlgoOptimizer = new JoinAlgorithmOptimizer(statistics, hashJoinLimit, costRatio);
+	}
+
+	JoinAlgorithmOptimizer getJoinAlgorithmOptimizer() {
+		return joinAlgoOptimizer;
 	}
 
 	@Override
@@ -92,7 +94,7 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 			new OrderLimitOptimizer(),
 			new TupleFunctionCallOptimizer(),
 			new ParentReferenceCleaner(),
-			new JoinAlgorithmOptimizer(statistics, hashJoinLimit, costRatio)
+			joinAlgoOptimizer
 		);
 	}
 }

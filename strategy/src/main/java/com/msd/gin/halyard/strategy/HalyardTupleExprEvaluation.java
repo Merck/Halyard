@@ -1872,6 +1872,9 @@ final class HalyardTupleExprEvaluation {
     private void evaluateStarJoin(BindingSetPipe parent, StarJoin starJoin, BindingSet bindings) {
     	Join nestedJoins = starJoin.toJoins();
     	Join topJoin = new StarJoin.TopJoin(starJoin, nestedJoins.getLeftArg(), nestedJoins.getRightArg());
+    	if (parentStrategy.pipeline instanceof HalyardQueryOptimizerPipeline) {
+    		((HalyardQueryOptimizerPipeline)parentStrategy.pipeline).getJoinAlgorithmOptimizer().optimize(topJoin, null, null);
+    	}
     	evaluateTupleExpr(parent, topJoin, bindings);
     }
 
