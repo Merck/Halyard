@@ -10,7 +10,6 @@ import java.util.Set;
 import javax.annotation.Nonnull;
 
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
@@ -84,15 +83,6 @@ public class ExtendedEvaluationStatistics extends EvaluationStatistics {
 			}
 			return constantVarCount;
 		}
-
-        @Override
-        public void meet(Filter node) {
-            super.meetUnaryTupleOperator(node);
-            double subCost = cardinality;
-            cardinality = 1;
-            node.getCondition().visit(this);
-            cardinality *= subCost;
-        }
 
         @Override
         protected void meetNode(QueryModelNode node) {

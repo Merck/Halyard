@@ -20,6 +20,7 @@ import com.msd.gin.halyard.common.Config;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFFactory;
+import com.msd.gin.halyard.optimizers.SimpleStatementPatternCardinalityCalculator;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.File;
@@ -81,6 +82,8 @@ import static org.junit.Assert.*;
  */
 @RunWith(Parameterized.class)
 public class HBaseSailTest {
+	private static final double S_CARD = SimpleStatementPatternCardinalityCalculator.SUBJECT_VAR_CARDINALITY;
+	private static final double O_CARD = SimpleStatementPatternCardinalityCalculator.OBJECT_VAR_CARDINALITY;
 
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> data() {
@@ -718,9 +721,9 @@ public class HBaseSailTest {
         TupleExpr q2 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {graph <http://whatevercontext> {?s a ?o}}", "http://whatever/").getTupleExpr();
         TupleExpr q3 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s <http://whatever/> ?o}", "http://whatever/").getTupleExpr();
         TupleExpr q4 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s ?p \"whatever\"^^<" + HALYARD.SEARCH.stringValue() + ">}", "http://whatever/").getTupleExpr();
-        assertEquals(100.0, sail.statistics.getCardinality(q1), 0.01);
-        assertEquals(100.0, sail.statistics.getCardinality(q2), 0.01);
-        assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);
+		assertEquals(S_CARD * O_CARD, sail.statistics.getCardinality(q1), 0.01);
+		assertEquals(S_CARD * O_CARD, sail.statistics.getCardinality(q2), 0.01);
+		assertEquals(S_CARD * O_CARD, sail.statistics.getCardinality(q3), 0.01);
         assertEquals(0.0001, sail.statistics.getCardinality(q4), 0.00001);
 		try (SailConnection conn = sail.getConnection()) {
 	        conn.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);

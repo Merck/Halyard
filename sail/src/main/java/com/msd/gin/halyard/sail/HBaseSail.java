@@ -408,7 +408,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	}
 
 	String getFederatedServiceResolverName() {
-		return federatedServiceResolver.getClass().getSimpleName() + "@" + federatedServiceResolver.hashCode();
+		return federatedServiceResolver.getClass().getSimpleName() + "@" + Integer.toHexString(federatedServiceResolver.hashCode());
 	}
 
 	BufferedMutator getBufferedMutator() {

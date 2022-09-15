@@ -163,7 +163,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 			resetRetries = (executor.getCompletedTaskCount() > previousCompletedTaskCount);
 			if (!resetRetries) {
 				// we are completely blocked, try adding some emergency threads
-				synchronized (HalyardEvaluationExecutor.class) {
+				synchronized (this) {
 					// check thread pool hasn't been modified already in the meantime
 					if (maxPoolSize == executor.getMaximumPoolSize()) {
 						if (maxPoolSize < maxThreads) {

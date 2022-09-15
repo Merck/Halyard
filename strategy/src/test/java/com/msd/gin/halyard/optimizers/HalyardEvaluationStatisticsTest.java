@@ -33,34 +33,38 @@ import org.junit.runners.Parameterized;
  */
 @RunWith(Parameterized.class)
 public class HalyardEvaluationStatisticsTest {
+	private static final double S = SimpleStatementPatternCardinalityCalculator.SUBJECT_VAR_CARDINALITY;
+	private static final double P = SimpleStatementPatternCardinalityCalculator.PREDICATE_VAR_CARDINALITY;
+	private static final double O = SimpleStatementPatternCardinalityCalculator.OBJECT_VAR_CARDINALITY;
+	private static final double PRI = HalyardEvaluationStatistics.PRIORITY_VAR_FACTOR;
 
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][] {
-            {"select * where {?s a ?o}",            1.0E2, null, null},
-            {"select * where {?s ?p ?o}",           1.0E3, null, null},
-            {"select * where {?s a \"1\"}",         1.0E1, null, null},
-            {"select * where {?a ?b ?c; ?d ?e}",    1.0E8, null, null},
-            {"select * where {?a a ?c; ?d ?e}",     1.0E6, null, null},
-            {"select * where {?a ?b ?c; a ?e}",     1.0E7, null, null},
-            {"select * where {?s a ?o}",            1.0E1, new String[]{"o"}, null},
-            {"select * where {?s ?p ?o}",           1.0E1, new String[]{"s", "o"}, null},
+            {"select * where {?s a ?o}",            S*O, null, null},
+            {"select * where {?s ?p ?o}",           S*P*O, null, null},
+            {"select * where {?s a \"1\"}",         S, null, null},
+            {"select * where {?a ?b ?c; ?d ?e}",    S*P*O*P*O, null, null},
+            {"select * where {?a a ?c; ?d ?e}",     S*O*P*O, null, null},
+            {"select * where {?a ?b ?c; a ?e}",     S*P*O*O, null, null},
+            {"select * where {?s a ?o}",            S, new String[]{"o"}, null},
+            {"select * where {?s ?p ?o}",           P, new String[]{"s", "o"}, null},
             {"select * where {?s a \"1\"}",         1.0,   new String[]{"s"}, null},
-            {"select * where {?a ?b ?c; ?d ?e}",    1.0E4, new String[]{"b", "c"}, null},
-            {"select * where {?a a ?c; ?d ?e}",     1.0E3, new String[]{"d", "c"}, null},
-            {"select * where {?a ?b ?c; a ?e}",     1.0E2, new String[]{"b", "e", "c"}, null},
-            {"select * where {{?a a \"1\". optional {?a a ?b}} union {?a a \"2\"}}", 1010.0, null, null},
+            {"select * where {?a ?b ?c; ?d ?e}",    S*P*O, new String[]{"b", "c"}, null},
+            {"select * where {?a a ?c; ?d ?e}",     S*O, new String[]{"d", "c"}, null},
+            {"select * where {?a ?b ?c; a ?e}",     S, new String[]{"b", "e", "c"}, null},
+            {"select * where {{?a a \"1\". optional {?a a ?b}} union {?a a \"2\"}}", S*O + S, null, null},
             {"select * where {?s a \"1\"^^<" + HALYARD.SEARCH + ">}",           1.0E-4,   new String[]{"s"}, null},
-            {"select * where {?a ?b ?c}",           1.0E-4, new String[]{"a"}, new String[]{"a"}},
-            {"select * where {?a ?b ?c}",           1.0E-11, new String[]{"a", "b"}, new String[]{"a", "b"}},
-            {"select * where {?a ?b ?c}",           1.0E-18, new String[]{"a", "b" , "c"}, new String[]{"a", "b", "c"}},
-            {"select * where {?a ?b ?c}",           1.0E-3, null, new String[]{"a"}},
-            {"select * where {?a ?b ?c}",           1.0E-9, null, new String[]{"a", "b"}},
-            {"select * where {?s ?p ?o filter(?o != 1)}", 1.0E3, null, null},
+            {"select * where {?a ?b ?c}",           P*O/PRI, new String[]{"a"}, new String[]{"a"}},
+            {"select * where {?a ?b ?c}",           O/PRI/PRI, new String[]{"a", "b"}, new String[]{"a", "b"}},
+            {"select * where {?a ?b ?c}",           1/PRI/PRI/PRI, new String[]{"a", "b" , "c"}, new String[]{"a", "b", "c"}},
+            {"select * where {?a ?b ?c}",           S*P*O/PRI, null, new String[]{"a"}},
+            {"select * where {?a ?b ?c}",           S*P*O/PRI/PRI, null, new String[]{"a", "b"}},
+            {"select * where {?s ?p ?o filter(?o != 1)}", S*P*O, null, null},
             {"select * where {values ?s {1 2 3}}", 1.0, null, null},
             {"select * where {}", 1.0, null, null},
             {"select * where {service <http://remote> {?s ?p ?o}}", 103.0, null, null},
-            {"select * where {?s <:p>* ?o}", 2.0E3, null, null},
+            {"select * where {?s <:p>* ?o}", 2*S*P*O, null, null},
         });
     }
 

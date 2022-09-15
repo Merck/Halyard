@@ -51,6 +51,7 @@ import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatistics {
+	static final double PRIORITY_VAR_FACTOR = 1000000.0;
 
 	public static interface ServiceStatsProvider {
 	
@@ -91,7 +92,7 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
 
     private static class HalyardCardinalityCalculator extends ExtendedCardinalityCalculator {
 
-        private final ServiceStatsProvider srvProvider;
+    	private final ServiceStatsProvider srvProvider;
         private final Set<String> priorityVariables;
         private final Map<TupleExpr, Double> mapToUpdate;
 
@@ -113,7 +114,7 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
             for (Var v : sp.getVarList()) {
                 //decrease cardinality for each priority variable present
                 if (v != null && priorityVariables.contains(v.getName())) {
-                	card /= 1000000.0;
+                	card /= PRIORITY_VAR_FACTOR;
                 }
             }
             return card;
@@ -139,7 +140,7 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
             node.getRightArg().visit(newCalc);
             cardinality = newCalc.cardinality;
             updateMap(node.getRightArg());
-            cardinality *= leftArgCost * leftArgCost;
+            cardinality *= leftArgCost;
             updateMap(node);
         }
 
