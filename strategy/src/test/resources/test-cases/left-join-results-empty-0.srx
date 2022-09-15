@@ -26,6 +26,22 @@
     </result>
     <result>
       <binding name="x">
+        <uri>http://example/x2</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">21</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="x">
+        <uri>http://example/x2</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">22</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="x">
         <uri>http://example/x3</uri>
       </binding>
       <binding name="y">

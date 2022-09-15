@@ -25,6 +25,7 @@ import com.msd.gin.halyard.algebra.StarJoin;
 import com.msd.gin.halyard.common.LiteralConstraint;
 import com.msd.gin.halyard.common.ValueConstraint;
 import com.msd.gin.halyard.common.ValueType;
+import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
 import com.msd.gin.halyard.strategy.aggregators.Aggregator;
 import com.msd.gin.halyard.strategy.aggregators.AvgAggregator;
@@ -148,16 +149,16 @@ import org.eclipse.rdf4j.query.algebra.helpers.TupleExprs;
 import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
 
-import net.sf.saxon.expr.flwor.TupleExpression;
-
 /**
- * Evaluates {@link TupleExpression}s and it's sub-interfaces and implementations.
+ * Evaluates {@link TupleExpr}s and it's sub-interfaces and implementations.
  * @author Adam Sotona (MSD)
  */
 final class HalyardTupleExprEvaluation {
 	private static final String ANON_SUBJECT_VAR = "__subj";
 	private static final String ANON_PREDICATE_VAR = "__pred";
 	private static final String ANON_OBJECT_VAR = "__obj";
+	private static final int DEFAULT_HASH_JOIN_LIMIT = 10000;
+	private static final int MAX_INITIAL_HASH_JOIN_TABLE_SIZE = 5000;
 
 	private final HalyardEvaluationExecutor executor = HalyardEvaluationExecutor.INSTANCE;
     private final HalyardEvaluationStrategy parentStrategy;
@@ -1604,57 +1605,140 @@ final class HalyardTupleExprEvaluation {
     }
 
     private void evaluateHashJoin(BindingSetPipe topPipe, final BinaryTupleOperator join, final BindingSet bindings, boolean isLeftJoin) {
+    	final int hashJoinLimit;
+    	{
+    		JoinAlgorithmOptimizer algoOpt = parentStrategy.getJoinAlgorithmOptimizer();
+        	if (algoOpt != null) {
+        		hashJoinLimit = algoOpt.getHashJoinLimit();
+        	} else {
+        		hashJoinLimit = DEFAULT_HASH_JOIN_LIMIT;
+        	}
+    	}
+    	AbstractHashTableJoiner joiner;
+    	if (isLeftJoin) {
+    		joiner = new AbstractHashTableJoiner(topPipe, join, bindings) {
+    			class LeftHashJoinBindingSetPipe extends AbstractHashJoinBindingSetPipe {
+					protected LeftHashJoinBindingSetPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
+						super(parent, hashTablePartition);
+					}
+	    			@Override
+	    			protected boolean next(BindingSet probeBs) throws InterruptedException {
+						if (probeBs.size() == 0) {
+							// the empty binding set should be merged with all binding sets in the hash table
+							Collection<? extends List<BindingSetHashValue>> hashValues = hashTablePartition.all();
+							for (List<BindingSetHashValue> hashValue : hashValues) {
+								for (BindingSetHashValue bshv : hashValue) {
+									if (!pushToParent(bshv.joinTo(probeBs))) {
+										return false;
+									}
+								}
+							}
+		        		} else {
+							List<BindingSetHashValue> hashValue = hashTablePartition.get(probeBs);
+							if (hashValue != null && !hashValue.isEmpty()) {
+		    					for (BindingSetHashValue bshv : hashValue) {
+									if (!pushToParent(bshv.joinTo(probeBs))) {
+										return false;
+									}
+		    					}
+							} else {
+								if (!pushToParent(probeBs)) {
+									return false;
+								}
+							}
+		        		}
+		        		return true;
+	            	}
+	                @Override
+	                public String toString() {
+	                	return "LeftHashJoinBindingSetPipe";
+	                }
+    			}
+
+				@Override
+				protected BindingSetPipe createPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
+					return new LeftHashJoinBindingSetPipe(parent, hashTablePartition);
+				}
+    		};
+    	} else {
+    		joiner = new AbstractHashTableJoiner(topPipe, join, bindings) {
+    			class HashJoinBindingSetPipe extends AbstractHashJoinBindingSetPipe {
+					protected HashJoinBindingSetPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
+						super(parent, hashTablePartition);
+					}
+	    			@Override
+	    			protected boolean next(BindingSet probeBs) throws InterruptedException {
+						if (probeBs.size() == 0) {
+							// the empty binding set should be merged with all binding sets in the hash table
+							Collection<? extends List<BindingSetHashValue>> hashValues = hashTablePartition.all();
+							for (List<BindingSetHashValue> hashValue : hashValues) {
+								for (BindingSetHashValue bshv : hashValue) {
+									if (!pushToParent(bshv.joinTo(probeBs))) {
+										return false;
+									}
+								}
+							}
+		        		} else {
+							List<BindingSetHashValue> hashValue = hashTablePartition.get(probeBs);
+							if (hashValue != null && !hashValue.isEmpty()) {
+		    					for (BindingSetHashValue bshv : hashValue) {
+									if (!pushToParent(bshv.joinTo(probeBs))) {
+										return false;
+									}
+		    					}
+							}
+		        		}
+		        		return true;
+	            	}
+	                @Override
+	                public String toString() {
+	                	return "HashJoinBindingSetPipe";
+	                }
+    			}
+
+				@Override
+				protected BindingSetPipe createPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
+					return new HashJoinBindingSetPipe(parent, hashTablePartition);
+				}
+    		};
+    	}
+    	buildHashTable(join, bindings, joiner, isLeftJoin ? Integer.MAX_VALUE : hashJoinLimit);
+    }
+
+    private void buildHashTable(final BinaryTupleOperator join, final BindingSet bindings, AbstractHashTableJoiner hashTableJoiner, final int hashJoinLimit) {
     	join.setAlgorithm(HashJoin.INSTANCE);
     	parentStrategy.initTracking(join);
     	TupleExpr probeExpr = join.getLeftArg();
     	TupleExpr buildExpr = join.getRightArg();
 		evaluateTupleExpr(new BindingSetPipe(null) {
-	    	final HashJoinTable hashTable = new HashJoinTable(probeExpr, buildExpr);
+			final int initialSize = (int) Math.min(MAX_INITIAL_HASH_JOIN_TABLE_SIZE, Math.max(0, buildExpr.getResultSizeEstimate()));
+			final String[] joinAttributes = HashJoinTable.getJoinAttributes(probeExpr, buildExpr);
+	    	HashJoinTable hashTable = new HashJoinTable(initialSize, joinAttributes);
             @Override
             protected boolean next(BindingSet buildBs) throws InterruptedException {
-            	hashTable.put(buildBs);
+            	HashJoinTable partition;
+            	synchronized (this) {
+                	if (hashTable.entryCount() >= hashJoinLimit) {
+                		partition = hashTable;
+                		hashTable = new HashJoinTable(initialSize, joinAttributes);
+                	} else {
+                		partition = null;
+                	}
+            		hashTable.put(buildBs);
+            	}
+            	if (partition != null) {
+            		hashTableJoiner.doJoin(partition, false);
+            	}
             	return true;
             }
             @Override
-            public void close() {
-            	evaluateTupleExpr(new BindingSetPipe(topPipe) {
-        			@Override
-        			protected boolean next(BindingSet probeBs) throws InterruptedException {
-    					if (probeBs.size() == 0) {
-    						// the empty bindingset should be merged with all binding sets in the hash table
-    						Collection<? extends List<BindingSet>> hashValues = hashTable.all();
-    						for (List<BindingSet> hashValue : hashValues) {
-    							for (BindingSet b : hashValue) {
-    								if (!pushToParent(join(probeBs, b))) {
-    									return false;
-    								}
-    							}
-    						}
-    	        		} else {
-    						List<BindingSet> hashValue = hashTable.get(probeBs);
-    						if (hashValue != null && !hashValue.isEmpty()) {
-    	    					for (BindingSet b : hashValue) {
-    								if (!pushToParent(join(probeBs, b))) {
-    									return false;
-    								}
-    	    					}
-    						} else if (isLeftJoin) {
-    							if (!pushToParent(probeBs)) {
-    								return false;
-    							}
-    						}
-    	        		}
-    	        		return true;
-                	}
-                	private boolean pushToParent(BindingSet bs) throws InterruptedException {
-                		parentStrategy.incrementResultSizeActual(join);
-                		return parent.push(bs);
-                	}
-                    @Override
-                    public String toString() {
-                    	return isLeftJoin ? "LeftHashJoinBindingSetPipe" : "HashJoinBindingSetPipe";
-                    }
-                }, probeExpr, bindings);
+            public void close() throws InterruptedException {
+            	synchronized (this) {
+            		if (hashTable != null) {
+                   		hashTableJoiner.doJoin(hashTable, true);
+            			hashTable = null;
+            		}
+            	}
             }
             @Override
             public String toString() {
@@ -1663,62 +1747,146 @@ final class HalyardTupleExprEvaluation {
     	}, buildExpr, bindings);
     }
 
-    private static final class HashJoinTable {
-    	private final String[] joinAttributes;
-    	private final Map<BindingSetHashKey, List<BindingSet>> hashTable;
-		private int keyCount;
-		private long bsCount;
+    private abstract class AbstractHashTableJoiner {
+    	private final AtomicLong joinsInProgress = new AtomicLong();
+    	private final AtomicBoolean joinsFinished = new AtomicBoolean();
+    	private final BindingSetPipe parent;
+    	private final BinaryTupleOperator join;
+    	private final BindingSet bindings;
 
-    	HashJoinTable(TupleExpr probeExpr, TupleExpr buildExpr) {
-    		Set<String> joinAttributeNames = probeExpr.getBindingNames();
-    		joinAttributeNames.retainAll(buildExpr.getBindingNames());
-    		joinAttributes = joinAttributeNames.toArray(new String[joinAttributeNames.size()]);
+    	AbstractHashTableJoiner(BindingSetPipe parent, BinaryTupleOperator join, BindingSet bindings) {
+    		this.parent = parent;
+    		this.join = join;
+    		this.bindings = bindings;
+    	}
 
-    		int initialSize = (int) Math.max(0, buildExpr.getResultSizeEstimate());
-    		if (joinAttributes.length > 0) {
-    			hashTable = new HashMap<>(initialSize);
+    	/**
+    	 * Performs a hash-join.
+    	 * @param hashTablePartition hash table to join against.
+    	 * @param isLast true if this is the last time doJoin() will be called for the current join operation.
+    	 * @throws InterruptedException
+    	 */
+    	public final void doJoin(HashJoinTable hashTablePartition, boolean isLast) throws InterruptedException {
+    		if (hashTablePartition.entryCount() == 0) {
+    			if (isLast) {
+    				parent.close();
+    			}
     		} else {
-    			hashTable = Collections.<BindingSetHashKey, List<BindingSet>>singletonMap(BindingSetHashKey.EMPTY, new ArrayList<>(initialSize));
+    			joinsInProgress.incrementAndGet();
+    			if (isLast) {
+            		joinsFinished.set(true);
+    			}
+    			// NB: this part may execute asynchronously
+            	evaluateTupleExpr(createPipe(parent, hashTablePartition), join.getLeftArg(), bindings);
     		}
     	}
 
-    	void put(BindingSet bs) {
-			BindingSetHashKey hashKey = BindingSetHashKey.create(joinAttributes, bs);
-			synchronized (this) {
-				List<BindingSet> hashValue = hashTable.get(hashKey);
-				boolean newEntry = (hashValue == null);
-				if (newEntry) {
-					int averageSize = (keyCount > 0) ? (int) (bsCount/keyCount) : 0;
-					hashValue = new ArrayList<>(averageSize + 1);
-					hashTable.put(hashKey, hashValue);
-					keyCount++;
-				}
-				hashValue.add(bs);
-				bsCount++;
+    	protected abstract BindingSetPipe createPipe(BindingSetPipe parent, HashJoinTable hashTablePartition);
+
+    	abstract class AbstractHashJoinBindingSetPipe extends BindingSetPipe {
+    		protected final HashJoinTable hashTablePartition;
+    		protected AbstractHashJoinBindingSetPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
+				super(parent);
+				this.hashTablePartition = hashTablePartition;
 			}
+			protected final boolean pushToParent(BindingSet bs) throws InterruptedException {
+        		parentStrategy.incrementResultSizeActual(join);
+        		return parent.push(bs);
+        	}
+            @Override
+        	public void close() throws InterruptedException {
+            	joinsInProgress.decrementAndGet();
+            	if (joinsFinished.get() && joinsInProgress.compareAndSet(0L, -1L)) {
+            		parent.close();
+            	}
+        	}
+    	}
+    }
+
+    private static final class HashJoinTable {
+    	private final String[] joinAttributes;
+    	private final Map<BindingSetHashKey, List<BindingSetHashValue>> hashTable;
+		private int keyCount;
+		private int bsCount;
+
+		static String[] getJoinAttributes(TupleExpr probeExpr, TupleExpr buildExpr) {
+    		Set<String> joinAttributeNames = probeExpr.getBindingNames();
+    		joinAttributeNames.retainAll(buildExpr.getBindingNames());
+    		return joinAttributeNames.toArray(new String[joinAttributeNames.size()]);
+		}
+
+		HashJoinTable(int initialSize, String[] joinAttributes) {
+			this.joinAttributes = joinAttributes;
+    		if (joinAttributes.length > 0) {
+    			hashTable = new HashMap<>(initialSize);
+    		} else {
+    			hashTable = Collections.<BindingSetHashKey, List<BindingSetHashValue>>singletonMap(BindingSetHashKey.EMPTY, new ArrayList<>(initialSize));
+    		}
     	}
 
-    	List<BindingSet> get(BindingSet bs) {
+		void put(BindingSet bs) {
+			BindingSetHashKey hashKey = BindingSetHashKey.create(joinAttributes, bs);
+			List<BindingSetHashValue> hashValue = hashTable.get(hashKey);
+			boolean newEntry = (hashValue == null);
+			if (newEntry) {
+				int averageSize = (keyCount > 0) ? (int) (bsCount/keyCount) : 0;
+				hashValue = new ArrayList<>(averageSize + 1);
+				hashTable.put(hashKey, hashValue);
+				keyCount++;
+			}
+			hashValue.add(BindingSetHashValue.create(bs));
+			bsCount++;
+		}
+
+		int entryCount() {
+			return bsCount;
+		}
+
+    	List<BindingSetHashValue> get(BindingSet bs) {
     		BindingSetHashKey key = BindingSetHashKey.create(joinAttributes, bs);
 			return hashTable.get(key);
     	}
 
-    	Collection<? extends List<BindingSet>> all() {
+    	Collection<? extends List<BindingSetHashValue>> all() {
     		return hashTable.values();
     	}
     }
 
-    private static BindingSet join(BindingSet b1, BindingSet b2) {
-		QueryBindingSet result = new QueryBindingSet(b1);
-		for (String name : b2.getBindingNames()) {
-			if (!result.hasBinding(name)) {
-				Value v = b2.getValue(name);
-				if (v != null) {
-					result.addBinding(name, v);
-				}
-			}
+    private static final class BindingSetHashValue {
+    	final String[] names;
+    	final Value[] values;
+
+    	static BindingSetHashValue create(BindingSet bs) {
+    		int size = bs.size();
+    		String[] names = new String[size];
+    		Value[] values = new Value[size];
+    		int i = 0;
+    		for (String key : bs.getBindingNames()) {
+    			names[i] = key;
+    			values[i] = bs.getValue(key);
+    			i++;
+    		}
+    		return new BindingSetHashValue(names, values);
+    	}
+
+    	private BindingSetHashValue(String[] names, Value[] values) {
+			this.names = names;
+			this.values = values;
 		}
-		return result;
+
+    	BindingSet joinTo(BindingSet bs) {
+    		QueryBindingSet result = new QueryBindingSet(bs);
+    		for (int i=0; i<names.length; i++) {
+    			String name = names[i];
+    			if (!result.hasBinding(name)) {
+    				Value v = values[i];
+    				if (v != null) {
+    					result.addBinding(name, v);
+    				}
+    			}
+    		}
+    		return result;
+    	}
     }
 
     /**
@@ -1872,8 +2040,9 @@ final class HalyardTupleExprEvaluation {
     private void evaluateStarJoin(BindingSetPipe parent, StarJoin starJoin, BindingSet bindings) {
     	Join nestedJoins = starJoin.toJoins();
     	Join topJoin = new StarJoin.TopJoin(starJoin, nestedJoins.getLeftArg(), nestedJoins.getRightArg());
-    	if (parentStrategy.pipeline instanceof HalyardQueryOptimizerPipeline) {
-    		((HalyardQueryOptimizerPipeline)parentStrategy.pipeline).getJoinAlgorithmOptimizer().optimize(topJoin, null, null);
+		JoinAlgorithmOptimizer algoOpt = parentStrategy.getJoinAlgorithmOptimizer();
+    	if (algoOpt != null) {
+    		algoOpt.optimize(topJoin, null, null);
     	}
     	evaluateTupleExpr(parent, topJoin, bindings);
     }

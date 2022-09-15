@@ -376,7 +376,10 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             		iter.close();
             	}
             } catch (Throwable e) {
-                iter.close();
+            	try {
+                    iter.close();
+            	} catch (QueryEvaluationException ignore) {
+            	}
                 return pipe.handleException(e);
             }
         	return false;

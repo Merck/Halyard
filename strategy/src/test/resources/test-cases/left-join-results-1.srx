@@ -29,5 +29,21 @@
         <literal datatype="http://www.w3.org/2001/XMLSchema#integer">3</literal>
       </binding>
     </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/x3</uri>
+      </binding>
+      <binding name="t">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">31</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/x3</uri>
+      </binding>
+      <binding name="t">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#string">3a</literal>
+      </binding>
+    </result>
   </results>
 </sparql>

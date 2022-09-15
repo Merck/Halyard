@@ -36,25 +36,28 @@ public class HalyardStrategyJoinTest {
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> data() {
 		List<Object[]> testValues = new ArrayList<>();
-		testValues.add(new Object[] {"Nested", 0, Float.MAX_VALUE});
-		testValues.add(new Object[] {"Hash", Integer.MAX_VALUE, 0.0f});
+		testValues.add(new Object[] {"Nested", 0, 0, Float.MAX_VALUE});
+		testValues.add(new Object[] {"Hash", Integer.MAX_VALUE, Integer.MAX_VALUE, 0.0f});
+		testValues.add(new Object[] {"Partitioned hash", Integer.MAX_VALUE, 1, 0.0f});
 		return testValues;
 	}
 
-    private final int hashJoinLimit;
+	private final int optHashJoinLimit;
+	private final int evalHashJoinLimit;
     private final float cardinalityRatio;
     private Repository repo;
     private RepositoryConnection con;
     private MemoryStoreWithHalyardStrategy strategy;
 
-    public HalyardStrategyJoinTest(String algo, int hashJoinLimit, float cardinalityRatio) {
-       this.hashJoinLimit = hashJoinLimit;
-       this.cardinalityRatio = cardinalityRatio;
+    public HalyardStrategyJoinTest(String algo, int optHashJoinLimit, int evalHashJoinLimit, float cardinalityRatio) {
+		this.optHashJoinLimit = optHashJoinLimit;
+		this.evalHashJoinLimit = evalHashJoinLimit;
+		this.cardinalityRatio = cardinalityRatio;
     }
 
     @Before
     public void setUp() throws Exception {
-    	strategy = new MemoryStoreWithHalyardStrategy(hashJoinLimit, cardinalityRatio);
+    	strategy = new MemoryStoreWithHalyardStrategy(optHashJoinLimit, evalHashJoinLimit, cardinalityRatio);
         repo = new SailRepository(strategy);
         repo.init();
         con = repo.getConnection();
@@ -67,7 +70,7 @@ public class HalyardStrategyJoinTest {
     }
 
     private String expectedAlgo() {
-    	if (hashJoinLimit == 0) {
+    	if (optHashJoinLimit == 0) {
     		return NestedLoops.NAME;
     	} else {
     		return HashJoin.NAME;
@@ -97,6 +100,18 @@ public class HalyardStrategyJoinTest {
     public void testJoin_empty_0var() throws Exception {
         String q = "prefix : <http://example/> select * where {:x1 :q \"a\". ?x :p ?y}";
         joinTest(q, "/test-cases/join-results-empty-0.srx", 1, expectedAlgo());
+    }
+
+    @Test
+    public void testJoin_empty_left() throws Exception {
+        String q = "prefix : <http://example/> select * where {:x1 :z ?y. ?y :p ?v}";
+        joinTest(q, "/test-cases/join-results-empty.srx", 1, expectedAlgo());
+    }
+
+    @Test
+    public void testJoin_empty_right() throws Exception {
+        String q = "prefix : <http://example/> select * where {:x1 :p ?y. ?y :z ?v}";
+        joinTest(q, "/test-cases/join-results-empty.srx", 1, expectedAlgo());
     }
 
 

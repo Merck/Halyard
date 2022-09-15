@@ -38,6 +38,34 @@
         <literal datatype="http://www.w3.org/2001/XMLSchema#integer">3</literal>
       </binding>
     </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/x1</uri>
+      </binding>
+      <binding name="t">
+        <uri>http://example/y1</uri>
+      </binding>
+      <binding name="x">
+        <uri>http://example/y3</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">31</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/x1</uri>
+      </binding>
+      <binding name="t">
+        <uri>http://example/y1</uri>
+      </binding>
+      <binding name="x">
+        <uri>http://example/y3a</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#string">3a</literal>
+      </binding>
+    </result>
 
     <result>
       <binding name="s">
@@ -67,6 +95,34 @@
         <literal datatype="http://www.w3.org/2001/XMLSchema#integer">3</literal>
       </binding>
     </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/x2</uri>
+      </binding>
+      <binding name="t">
+        <uri>http://example/y2</uri>
+      </binding>
+      <binding name="x">
+        <uri>http://example/y3</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">31</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/x2</uri>
+      </binding>
+      <binding name="t">
+        <uri>http://example/y2</uri>
+      </binding>
+      <binding name="x">
+        <uri>http://example/y3a</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#string">3a</literal>
+      </binding>
+    </result>
 
     <result>
       <binding name="s">
@@ -94,6 +150,91 @@
       </binding>
       <binding name="y">
         <literal datatype="http://www.w3.org/2001/XMLSchema#integer">3</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/x3</uri>
+      </binding>
+      <binding name="t">
+        <uri>http://example/y3</uri>
+      </binding>
+      <binding name="x">
+        <uri>http://example/y3</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">31</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/x3</uri>
+      </binding>
+      <binding name="t">
+        <uri>http://example/y3</uri>
+      </binding>
+      <binding name="x">
+        <uri>http://example/y3a</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#string">3a</literal>
+      </binding>
+    </result>
+
+    <result>
+      <binding name="s">
+        <uri>http://example/x3</uri>
+      </binding>
+      <binding name="t">
+        <uri>http://example/y3a</uri>
+      </binding>
+      <binding name="x">
+        <uri>http://example/y2</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">2</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/x3</uri>
+      </binding>
+      <binding name="t">
+        <uri>http://example/y3a</uri>
+      </binding>
+      <binding name="x">
+        <uri>http://example/y3</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">3</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/x3</uri>
+      </binding>
+      <binding name="t">
+        <uri>http://example/y3a</uri>
+      </binding>
+      <binding name="x">
+        <uri>http://example/y3</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#integer">31</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="s">
+        <uri>http://example/x3</uri>
+      </binding>
+      <binding name="t">
+        <uri>http://example/y3a</uri>
+      </binding>
+      <binding name="x">
+        <uri>http://example/y3a</uri>
+      </binding>
+      <binding name="y">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#string">3a</literal>
       </binding>
     </result>
   </results>

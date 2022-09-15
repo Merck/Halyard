@@ -58,7 +58,7 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 	private final JoinAlgorithmOptimizer joinAlgoOptimizer;
 
 	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory, ExtendedEvaluationStatistics statistics) {
-		this(strategy, valueFactory, statistics, 500, 2.0f);
+		this(strategy, valueFactory, statistics, 50000, 2.0f);
 	}
 
 	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory, ExtendedEvaluationStatistics statistics, int hashJoinLimit, float costRatio) {

@@ -77,9 +77,10 @@ abstract class BindingSetPipe {
 
     protected boolean handleException(Throwable e) {
         if (parent != null) {
-            parent.handleException(e);
+            return parent.handleException(e);
+        } else {
+        	throw new QueryEvaluationException(e);
         }
-        return false;
     }
 
     protected boolean isClosed() {

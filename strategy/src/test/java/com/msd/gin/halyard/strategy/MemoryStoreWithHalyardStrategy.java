@@ -17,6 +17,7 @@
 package com.msd.gin.halyard.strategy;
 
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.optimizers.SimpleStatementPatternCardinalityCalculator;
 
 import java.util.LinkedList;
@@ -48,15 +49,17 @@ import org.eclipse.rdf4j.sail.memory.MemoryStoreConnection;
 public class MemoryStoreWithHalyardStrategy extends MemoryStore {
 
 	private final LinkedList<TupleExpr> queryHistory = new LinkedList<>();
-	private final int hashJoinLimit;
+	private final int optHashJoinLimit;
+	private final int evalHashJoinLimit;
 	private final float cardinalityRatio;
 
 	MemoryStoreWithHalyardStrategy() {
-		this(0, Float.MAX_VALUE);
+		this(0, 0, Float.MAX_VALUE);
 	}
 
-	MemoryStoreWithHalyardStrategy(int hashJoinLimit, float cardinalityRatio) {
-		this.hashJoinLimit = hashJoinLimit;
+	MemoryStoreWithHalyardStrategy(int optHashJoinLimit, int evalHashJoinLimit, float cardinalityRatio) {
+		this.optHashJoinLimit = optHashJoinLimit;
+		this.evalHashJoinLimit = evalHashJoinLimit;
 		this.cardinalityRatio = cardinalityRatio;
 	}
 
@@ -77,8 +80,12 @@ public class MemoryStoreWithHalyardStrategy extends MemoryStore {
             			queryHistory.add(expr);
             			return super.evaluate(expr, bindings);
             		}
+            		@Override
+            		protected JoinAlgorithmOptimizer getJoinAlgorithmOptimizer() {
+            			return new JoinAlgorithmOptimizer(stats, evalHashJoinLimit, cardinalityRatio);
+            		}
             	};
-                evalStrat.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(evalStrat, tripleSource.getValueFactory(), stats, hashJoinLimit, cardinalityRatio));
+                evalStrat.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(evalStrat, tripleSource.getValueFactory(), stats, optHashJoinLimit, cardinalityRatio));
                 evalStrat.setTrackResultSize(true);
                 return evalStrat;
             }

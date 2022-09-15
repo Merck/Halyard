@@ -18,6 +18,7 @@ package com.msd.gin.halyard.strategy;
 
 import com.google.common.base.Stopwatch;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -76,7 +77,7 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 	/** Track the exeution time of each node in the plan. */
 	boolean trackTime;
 
-	QueryOptimizerPipeline pipeline;
+	private QueryOptimizerPipeline pipeline;
 
     /**
      * Ensures 'now' is the same across all parts of the query evaluation chain.
@@ -127,6 +128,14 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 
 	String getSourceString() {
 		return queryContext.getAttribute(QUERY_CONTEXT_SOURCE_STRING_ATTRIBUTE);
+	}
+
+	protected JoinAlgorithmOptimizer getJoinAlgorithmOptimizer() {
+    	if (pipeline instanceof HalyardQueryOptimizerPipeline) {
+    		return ((HalyardQueryOptimizerPipeline)pipeline).getJoinAlgorithmOptimizer();
+    	} else {
+    		return null;
+    	}
 	}
 
 	/**

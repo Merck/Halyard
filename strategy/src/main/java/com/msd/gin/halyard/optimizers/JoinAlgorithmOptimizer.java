@@ -26,17 +26,21 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 		this.costRatio = ratio;
 	}
 
+	public int getHashJoinLimit() {
+		return hashJoinLimit;
+	}
+
 	@Override
 	public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
 		tupleExpr.visit(new AbstractQueryModelVisitor<RuntimeException>() {
 			@Override
-			public void meet(Join join) throws RuntimeException {
+			public void meet(Join join) {
 				selectJoinAlgorithm(join);
 				super.meet(join);
 			}
 
 			@Override
-			public void meet(LeftJoin leftJoin) throws RuntimeException {
+			public void meet(LeftJoin leftJoin) {
 				selectJoinAlgorithm(leftJoin);
 				super.meet(leftJoin);
 			}
