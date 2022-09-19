@@ -86,8 +86,9 @@ public final class HalyardTableUtils {
 	static final int READ_VERSIONS = 1;
 	private static final Compression.Algorithm DEFAULT_COMPRESSION_ALGORITHM = Compression.Algorithm.GZ;
     private static final DataBlockEncoding DEFAULT_DATABLOCK_ENCODING = DataBlockEncoding.PREFIX;
-	private static final long REGION_MAX_FILESIZE = 10000000000l;
+	private static final long REGION_MAX_FILESIZE = 10000000000l;  // 10GB
     private static final String REGION_SPLIT_POLICY = "org.apache.hadoop.hbase.regionserver.ConstantSizeRegionSplitPolicy";
+    private static final int MAX_CLIENT_SCANNER_CACHE_SIZE = 10000;
 
     private HalyardTableUtils() {}
 
@@ -728,7 +729,7 @@ public final class HalyardTableUtils {
 		scan.readVersions(READ_VERSIONS);
         scan.setAllowPartialResults(true);
         scan.setBatch(10);
-        scan.setCaching(rowBatchSize);
+        scan.setCaching(Math.min(MAX_CLIENT_SCANNER_CACHE_SIZE, rowBatchSize));
         // dont cause the block cache to be flushed when doing an indiscriminate scan
         scan.setCacheBlocks(!indiscriminate);
         if(startRow != null) {

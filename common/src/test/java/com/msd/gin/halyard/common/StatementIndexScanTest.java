@@ -166,7 +166,23 @@ public class StatementIndexScanTest {
     @Test
     public void testScanLiterals() throws Exception {
         Set<Literal> actual = new HashSet<>();
-        Scan scan = StatementIndex.scanLiterals(rdfFactory);
+        Scan scan = StatementIndex.scanLiterals(null, null, rdfFactory);
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
+            Result r;
+            while ((r = rs.next()) != null) {
+                for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
+                    assertTrue("Not a literal: "+stmt.getObject(), stmt.getObject().isLiteral());
+                    actual.add((Literal) stmt.getObject());
+                }
+            }
+        }
+        assertSets(allLiterals, actual);
+    }
+
+    @Test
+    public void testScanLiteralsPredicate() throws Exception {
+        Set<Literal> actual = new HashSet<>();
+        Scan scan = StatementIndex.scanLiterals(RDF.VALUE, null, rdfFactory);
         try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {
@@ -182,7 +198,23 @@ public class StatementIndexScanTest {
     @Test
     public void testScanLiteralsContext() throws Exception {
         Set<Literal> actual = new HashSet<>();
-        Scan scan = StatementIndex.scanLiterals(vf.createIRI(CTX), rdfFactory);
+        Scan scan = StatementIndex.scanLiterals(null, vf.createIRI(CTX), rdfFactory);
+        try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
+            Result r;
+            while ((r = rs.next()) != null) {
+                for (Statement stmt : HalyardTableUtils.parseStatements(null, null, null, null, r, reader, rdfFactory)) {
+                    assertTrue("Not a literal: "+stmt.getObject(), stmt.getObject().isLiteral());
+                    actual.add((Literal) stmt.getObject());
+                }
+            }
+        }
+        assertSets(allLiterals, actual);
+    }
+
+    @Test
+    public void testScanLiteralsPredicateContext() throws Exception {
+        Set<Literal> actual = new HashSet<>();
+        Scan scan = StatementIndex.scanLiterals(RDF.VALUE, vf.createIRI(CTX), rdfFactory);
         try (ResultScanner rs = keyspaceConn.getScanner(scan)) {
             Result r;
             while ((r = rs.next()) != null) {

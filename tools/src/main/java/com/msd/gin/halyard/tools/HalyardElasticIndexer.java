@@ -85,6 +85,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
 	private static final String INDEX_URL_PROPERTY = confProperty(TOOL_NAME, "index.url");
 	private static final String CREATE_INDEX_PROPERTY = confProperty(TOOL_NAME, "index.create");
+	private static final String PREDICATE_PROPERTY = confProperty(TOOL_NAME, "property");
 	private static final String NAMED_GRAPH_PROPERTY = confProperty(TOOL_NAME, "named-graph");
 	private static final String ALIAS_PROPERTY = confProperty(TOOL_NAME, "alias");
 
@@ -181,6 +182,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         addOption("s", "source-dataset", "dataset_table", SOURCE_NAME_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-index", "target_url", INDEX_URL_PROPERTY, "Elasticsearch target index url <server>:<port>/<index_name>", true, true);
         addOption("c", "create-index", null, CREATE_INDEX_PROPERTY, "Optionally create Elasticsearch index", false, true);
+        addOption("p", "predicate", "predicate", PREDICATE_PROPERTY, "Optionally restrict indexing to the given predicate only", false, true);
         addOption("g", "named-graph", "named_graph", NAMED_GRAPH_PROPERTY, "Optionally restrict indexing to the given named graph only", false, true);
         addOption("u", "restore-dir", "restore_folder", SNAPSHOT_PATH_PROPERTY, "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
         addOption("a", "alias", "alias", ALIAS_PROPERTY, "If creating an index, optionally add it to an alias", false, true);
@@ -225,6 +227,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         configureString(cmd, 'u', null);
         configureBoolean(cmd, 'c');
         configureString(cmd, 'a', null);
+        configureIRI(cmd, 'p', null);
         configureIRI(cmd, 'g', null);
         String source = getConf().get(SOURCE_NAME_PROPERTY);
         String target = getConf().get(INDEX_URL_PROPERTY);
@@ -237,6 +240,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         		throw new IOException("Snapshot restore directory already exists");
         	}
         }
+        String predicate = getConf().get(PREDICATE_PROPERTY);
         String namedGraph = getConf().get(NAMED_GRAPH_PROPERTY);
 
         getConf().set("es.nodes", targetUrl.getHost()+":"+targetUrl.getPort());
@@ -322,15 +326,10 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 		} finally {
 			keyspace.close();
 		}
-        Scan scan;
-        if (namedGraph != null) {
-            //scan only given named graph from COSP literal region(s)
-        	Resource graph = SimpleValueFactory.getInstance().createIRI(namedGraph);
-        	scan = StatementIndex.scanLiterals(graph, rdfFactory);
-        } else {
-            //scan OSP literal region(s)
-        	scan = StatementIndex.scanLiterals(rdfFactory);
-        }
+        SimpleValueFactory vf = SimpleValueFactory.getInstance();
+        IRI predicateIRI = (predicate != null) ? vf.createIRI(predicate) : null;
+        Resource graphIRI = (namedGraph != null) ? vf.createIRI(namedGraph) : null;
+        Scan scan = StatementIndex.scanLiterals(predicateIRI, graphIRI, rdfFactory);
         keyspace.initMapperJob(
             scan,
             IndexerMapper.class,

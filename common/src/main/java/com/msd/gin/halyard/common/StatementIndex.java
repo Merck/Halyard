@@ -78,7 +78,19 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		return scans;
 	}
 
-	public static final Scan scanLiterals(RDFFactory rdfFactory) {
+	public static final Scan scanLiterals(IRI predicate, Resource graph, RDFFactory rdfFactory) {
+		if (predicate != null && graph != null) {
+			return scanPredicateGraphLiterals(predicate, graph, rdfFactory);
+		} else if (predicate != null && graph == null) {
+			return scanPredicateLiterals(predicate, rdfFactory);
+		} else if (predicate == null && graph != null) {
+			return scanGraphLiterals(graph, rdfFactory);
+		} else {
+			return scanAllLiterals(rdfFactory);
+		}
+	}
+
+	private static final Scan scanAllLiterals(RDFFactory rdfFactory) {
 		StatementIndex<SPOC.O,SPOC.S,SPOC.P,SPOC.C> index = rdfFactory.getOSPIndex();
 		int typeSaltSize = rdfFactory.typeSaltSize;
 		if (typeSaltSize == 1) {
@@ -94,7 +106,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		}
 	}
 
-	public static final Scan scanLiterals(Resource graph, RDFFactory rdfFactory) {
+	private static final Scan scanGraphLiterals(Resource graph, RDFFactory rdfFactory) {
 		RDFContext ctx = rdfFactory.createContext(graph);
 		StatementIndex<SPOC.C,SPOC.O,SPOC.S,SPOC.P> index = rdfFactory.getCOSPIndex();
 		int typeSaltSize = rdfFactory.typeSaltSize;
@@ -109,6 +121,44 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 			);
 		} else {
 			return index.scanWithConstraint(ctx, new ValueConstraint(ValueType.LITERAL));
+		}
+	}
+
+	private static final Scan scanPredicateLiterals(IRI predicate, RDFFactory rdfFactory) {
+		RDFPredicate pred = rdfFactory.createPredicate(predicate);
+		StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> index = rdfFactory.getPOSIndex();
+		int typeSaltSize = rdfFactory.typeSaltSize;
+		if (typeSaltSize == 1) {
+			ByteSequence predb = new ByteArray(pred.getKeyHash(index));
+			int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
+			return index.scan(
+				predb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role2.startKey()), index.get3StartKey(), index.get4StartKey(),
+				predb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role2.stopKey()), index.get3StopKey(), index.role4.endStopKey(),
+				cardinality,
+				true
+			);
+		} else {
+			return index.scanWithConstraint(pred, new ValueConstraint(ValueType.LITERAL));
+		}
+	}
+
+	private static final Scan scanPredicateGraphLiterals(IRI predicate, Resource graph, RDFFactory rdfFactory) {
+		RDFPredicate pred = rdfFactory.createPredicate(predicate);
+		RDFContext ctx = rdfFactory.createContext(graph);
+		StatementIndex<SPOC.C,SPOC.P,SPOC.O,SPOC.S> index = rdfFactory.getCPOSIndex();
+		int typeSaltSize = rdfFactory.typeSaltSize;
+		if (typeSaltSize == 1) {
+			ByteSequence predb = new ByteArray(pred.getKeyHash(index));
+			ByteSequence ctxb = new ByteArray(ctx.getKeyHash(index));
+			int cardinality = VAR_CARDINALITY*VAR_CARDINALITY;
+			return index.scan(
+				ctxb, predb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role3.startKey()), index.get4StartKey(),
+				ctxb, predb, rdfFactory.writeSaltAndType(0, ValueType.LITERAL, null, index.role3.stopKey()), index.role4.endStopKey(),
+				cardinality,
+				true
+			);
+		} else {
+			return index.scanWithConstraint(ctx, pred, new ValueConstraint(ValueType.LITERAL));
 		}
 	}
 
