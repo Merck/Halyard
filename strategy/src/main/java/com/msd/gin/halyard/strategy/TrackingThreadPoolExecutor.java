@@ -1,6 +1,9 @@
 package com.msd.gin.halyard.strategy;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,7 +20,7 @@ public final class TrackingThreadPoolExecutor extends ThreadPoolExecutor impleme
 	}
 
 	public Map<Thread, Runnable> getActiveTasks() {
-		return runningTasks;
+		return Collections.unmodifiableMap(runningTasks);
 	}
 
 	@Override
@@ -31,33 +34,46 @@ public final class TrackingThreadPoolExecutor extends ThreadPoolExecutor impleme
 	}
 
 	@Override
-	public String getThreadDump() {
-		StringBuilder buf = new StringBuilder(1024);
-		buf.append("Threads:\n");
+	public ThreadInfo[] getThreadDump() {
+		// NB: the size is only approximate as the contents of the map is under constant change!!!
+		List<ThreadInfo> dump = new ArrayList<>(runningTasks.size());
 		for (Map.Entry<Thread, Runnable> entry : getActiveTasks().entrySet()) {
 			Thread t = entry.getKey();
 			Runnable r = entry.getValue();
-			buf.append("  ").append(t.getName())
-				.append('[').append(t.getState()).append("]: ")
-				.append(r).append('\n');
+			dump.add(new ThreadInfo(t.getName(), t.getState(), r.toString()));
 		}
-		return buf.toString();
+		return dump.toArray(new ThreadInfo[dump.size()]);
 	}
 
 	@Override
-	public String getQueueDump() {
-		int n = 10;
-		StringBuilder buf = new StringBuilder(1024);
-		buf.append("Queue (first " + n + "):\n");
+	public QueueInfo[] getQueueDump() {
+		return getQueueDump(10);
+	}
+
+	private QueueInfo[] getQueueDump(int n) {
+		// NB: the size is only approximate as the contents of the queue is under constant change!!!
+		List<QueueInfo> dump = new ArrayList<>(runningTasks.size());
 		Iterator<Runnable> iter = getQueue().iterator();
 		for (int i = 0; i < n && iter.hasNext(); ) {
-			buf.append("  ").append(++i).append(": ").append(iter.next()).append('\n');
+			dump.add(new QueueInfo(iter.next().toString()));
 		}
-		return buf.toString();
+
+		return dump.toArray(new QueueInfo[dump.size()]);
 	}
 
 	@Override
 	public String toString() {
-		return super.toString() + "\n" + getThreadDump() + "\n" + getQueueDump();
+		int n = 10;
+		StringBuilder buf = new StringBuilder(super.toString());
+		buf.append("\nThreads:\n");
+		for (ThreadInfo ti : getThreadDump()) {
+			buf.append("  ").append(ti).append("\n");
+		}
+		buf.append("\nQueue (first " + n + "):\n");
+		int i = 0;
+		for (QueueInfo qi : getQueueDump(n)) {
+			buf.append("  ").append(++i).append(": ").append(qi).append("\n");
+		}
+		return buf.toString();
 	}
 }
