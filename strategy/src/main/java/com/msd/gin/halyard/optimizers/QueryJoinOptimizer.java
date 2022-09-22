@@ -46,7 +46,9 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 	/**
 	 * Applies generally applicable optimizations: path expressions are sorted from more to less specific.
 	 *
-	 * @param tupleExpr
+	 * @param tupleExpr expression to optimize
+	 * @param dataset the dataset that will be used
+	 * @param bindings any bindings that will be used
 	 */
 	@Override
 	public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
@@ -391,6 +393,12 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 		 * Selects from a list of tuple expressions the next tuple expression that should be evaluated. This method
 		 * selects the tuple expression with highest number of bound variables, preferring variables that have been
 		 * bound in other tuple expressions over variables with a fixed value.
+		 * @param expressions expressions to order
+		 * @param cardinalityMap cardinalities of the expressions
+		 * @param varsMap vars used by the expressions
+		 * @param varFreqMap var frequency
+		 * @param boundVars vars that are bound
+		 * @return the next expression that should be evaluated
 		 */
 		protected TupleExpr selectNextTupleExpr(List<TupleExpr> expressions, Map<TupleExpr, Double> cardinalityMap,
 				Map<TupleExpr, List<Var>> varsMap, Map<Var, Integer> varFreqMap, Set<String> boundVars) {

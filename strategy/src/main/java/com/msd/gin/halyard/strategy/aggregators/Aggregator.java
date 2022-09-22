@@ -60,6 +60,7 @@ public abstract class Aggregator implements AutoCloseable {
 
 	/**
 	 * Must be thread-safe.
+	 * @param bs binding set to process
 	 */
 	public abstract void process(BindingSet bs);
 	public abstract Value getValue();
