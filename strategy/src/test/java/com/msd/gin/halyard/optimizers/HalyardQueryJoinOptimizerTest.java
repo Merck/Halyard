@@ -69,8 +69,8 @@ public class HalyardQueryJoinOptimizerTest {
         expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(Join node) {
-                assertEquals(expr.toString(), "d", ((StatementPattern)node.getLeftArg()).getObjectVar().getName());
-                assertTrue(expr.toString(), ((StatementPattern)node.getRightArg()).getObjectVar().hasValue());
+                assertTrue(expr.toString(), ((StatementPattern)node.getLeftArg()).getObjectVar().hasValue());
+                assertEquals(expr.toString(), "d", ((StatementPattern)node.getRightArg()).getObjectVar().getName());
             }
         });
     }

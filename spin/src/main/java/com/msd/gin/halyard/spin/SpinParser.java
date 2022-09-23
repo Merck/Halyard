@@ -146,6 +146,7 @@ import com.google.common.base.Function;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Sets;
+import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.spin.function.FunctionParser;
 import com.msd.gin.halyard.spin.function.KnownFunctionParser;
 import com.msd.gin.halyard.spin.function.KnownTupleFunctionParser;
@@ -803,8 +804,7 @@ public class SpinParser {
 				visitGroupBy((Resource) groupBy);
 			}
 			if (group != null) {
-				group.setArg(projection.getArg());
-				projection.setArg(group);
+				Algebra.compose(projection, group, projection.getArg());
 			}
 
 			Value having = TripleSources.singleValue(select, SP.HAVING_PROPERTY, store);
@@ -819,8 +819,7 @@ public class SpinParser {
 			Value orderby = TripleSources.singleValue(select, SP.ORDER_BY_PROPERTY, store);
 			if (orderby instanceof Resource) {
 				Order order = visitOrderBy((Resource) orderby);
-				order.setArg(projection.getArg());
-				projection.setArg(order);
+				Algebra.compose(projection, order, projection.getArg());
 			}
 
 			boolean distinct = TripleSources.booleanValue(select, SP.DISTINCT_PROPERTY, store);
@@ -1027,9 +1026,6 @@ public class SpinParser {
 					} else {
 						valueExpr = new Var(varName);
 					}
-					if (projName == null) {
-						projName = varName;
-					}
 				} else {
 					// resource
 					if (projName == null) {
@@ -1050,7 +1046,7 @@ public class SpinParser {
 					group = new Group();
 				}
 				for (AggregateOperator op : aggregates) {
-					group.addGroupElement(new GroupElem(projName, op));
+					group.addGroupElement(new GroupElem(projName != null ? projName : varName, op));
 				}
 			}
 			aggregates = oldAggregates;
@@ -1374,7 +1370,7 @@ public class SpinParser {
 						Var subjVar = getVar(subj);
 						Var objVar = getVar(obj);
 						tupleNode = new ArbitraryLengthPath(subjVar,
-								new StatementPattern(subjVar, getVar(subPath), objVar), objVar, minPath.longValue());
+								new StatementPattern(subjVar.clone(), getVar(subPath), objVar), objVar.clone(), minPath.longValue());
 					} else {
 						throw new UnsupportedOperationException(types.toString());
 					}

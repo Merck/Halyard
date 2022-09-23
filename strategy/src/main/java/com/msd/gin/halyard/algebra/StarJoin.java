@@ -30,7 +30,7 @@ import org.eclipse.rdf4j.query.algebra.QueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
-import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
+import org.eclipse.rdf4j.query.algebra.helpers.collectors.StatementPatternCollector;
 
 public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	private static final long serialVersionUID = -4523270958311045771L;
@@ -115,9 +115,9 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	@Override
 	public void replaceChildNode(final QueryModelNode current, final QueryModelNode replacement) {
 		if (current == commonVar) {
-			commonVar = (Var) replacement;
+			setCommonVar((Var) replacement);
 		} else if (current == contextVar) {
-			contextVar = (Var) replacement;
+			setContextVar((Var) replacement);
 		} else {
 			final int index = args.indexOf(current);
 			if (index >= 0) {
@@ -149,7 +149,19 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 
 	@Override
 	public StarJoin clone() {
-		return (StarJoin) super.clone();
+		StarJoin clone = (StarJoin) super.clone();
+
+		clone.setCommonVar(commonVar.clone());
+		if (contextVar != null) {
+			clone.setContextVar(contextVar.clone());
+		}
+
+		for (int i=0; i<args.size(); i++) {
+			TupleExpr exprClone = args.get(i).clone();
+			clone.args.set(i, exprClone);
+			exprClone.setParentNode(clone);
+		}
+		return clone;
 	}
 
 

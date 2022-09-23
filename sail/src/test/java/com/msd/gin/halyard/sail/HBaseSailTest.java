@@ -39,9 +39,9 @@ import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.TableDescriptor;
 import org.apache.hadoop.hbase.client.TableDescriptorBuilder;
+import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.transaction.IsolationLevel;
 import org.eclipse.rdf4j.common.transaction.IsolationLevels;
-import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
@@ -712,11 +712,9 @@ public class HBaseSailTest {
     }
 
     @Test
-    public void testCardinalityCalculator() throws Exception {
-		HBaseSail sail = new HBaseSail(hconn, useTable("cardinalitytable"), true, 0, usePushStrategy, 10, null, null);
+	public void testCardinalityCalculatorWithoutStats() throws Exception {
+		HBaseSail sail = new HBaseSail(hconn, useTable("cardinalitytable_nostats"), true, 0, usePushStrategy, 10, null, null);
 		sail.init();
-		RDFFactory rdfFactory = sail.getRDFFactory();
-        SimpleValueFactory f = SimpleValueFactory.getInstance();
         TupleExpr q1 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s a ?o}", "http://whatever/").getTupleExpr();
         TupleExpr q2 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {graph <http://whatevercontext> {?s a ?o}}", "http://whatever/").getTupleExpr();
         TupleExpr q3 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s <http://whatever/> ?o}", "http://whatever/").getTupleExpr();
@@ -725,12 +723,25 @@ public class HBaseSailTest {
 		assertEquals(S_CARD * O_CARD, sail.statistics.getCardinality(q2), 0.01);
 		assertEquals(S_CARD * O_CARD, sail.statistics.getCardinality(q3), 0.01);
         assertEquals(0.0001, sail.statistics.getCardinality(q4), 0.00001);
+		sail.shutDown();
+	}
+
+	@Test
+	public void testCardinalityCalculatorWithStats() throws Exception {
+		HBaseSail sail = new HBaseSail(hconn, useTable("cardinalitytable_stats"), true, 0, usePushStrategy, 10, null, null);
+		sail.init();
+		RDFFactory rdfFactory = sail.getRDFFactory();
+		ValueFactory vf = sail.getValueFactory();
 		try (SailConnection conn = sail.getConnection()) {
-	        conn.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
-			conn.addStatement(f.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_" + rdfFactory.id(RDF.TYPE)), VOID.TRIPLES, f.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
-	        conn.addStatement(f.createIRI("http://whatevercontext"), VOID.TRIPLES, f.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
-			conn.addStatement(f.createIRI("http://whatevercontext_property_" + rdfFactory.id(RDF.TYPE)), VOID.TRIPLES, f.createLiteral(20l), HALYARD.STATS_GRAPH_CONTEXT);
+			conn.addStatement(HALYARD.STATS_ROOT_NODE, VOID.TRIPLES, vf.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
+			conn.addStatement(vf.createIRI(HALYARD.STATS_ROOT_NODE.stringValue() + "_property_" + rdfFactory.id(RDF.TYPE)), VOID.TRIPLES, vf.createLiteral(5000l), HALYARD.STATS_GRAPH_CONTEXT);
+			conn.addStatement(vf.createIRI("http://whatevercontext"), VOID.TRIPLES, vf.createLiteral(10000l), HALYARD.STATS_GRAPH_CONTEXT);
+			conn.addStatement(vf.createIRI("http://whatevercontext_property_" + rdfFactory.id(RDF.TYPE)), VOID.TRIPLES, vf.createLiteral(20l), HALYARD.STATS_GRAPH_CONTEXT);
 		}
+		TupleExpr q1 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s a ?o}", "http://whatever/").getTupleExpr();
+		TupleExpr q2 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {graph <http://whatevercontext> {?s a ?o}}", "http://whatever/").getTupleExpr();
+		TupleExpr q3 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s <http://whatever/> ?o}", "http://whatever/").getTupleExpr();
+		TupleExpr q4 = QueryParserUtil.parseTupleQuery(QueryLanguage.SPARQL, "select * where {?s ?p \"whatever\"^^<" + HALYARD.SEARCH.stringValue() + ">}", "http://whatever/").getTupleExpr();
         assertEquals(5000.0, sail.statistics.getCardinality(q1), 0.01);
         assertEquals(20.0, sail.statistics.getCardinality(q2), 0.01);
         assertEquals(100.0, sail.statistics.getCardinality(q3), 0.01);

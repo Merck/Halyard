@@ -67,10 +67,14 @@ public final class Algebra {
 		return te;
 	}
 
+	public static UnaryTupleOperator compose(UnaryTupleOperator op1, UnaryTupleOperator op2, TupleExpr expr) {
+		op2.setArg(expr);
+		op1.setArg(op2);
+		return op1;
+	}
+
 	public static Var createAnonVar(String varName) {
-		Var var = new Var(varName);
-		var.setAnonymous(true);
-		return var;
+		return new Var(varName, true);
 	}
 
 }

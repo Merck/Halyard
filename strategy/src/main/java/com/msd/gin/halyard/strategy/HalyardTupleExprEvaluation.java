@@ -1670,7 +1670,11 @@ final class HalyardTupleExprEvaluation {
 			}
 		} else {
     		joinAttributeNames = probeExpr.getBindingNames();
-    		joinAttributeNames.retainAll(buildExpr.getBindingNames());
+    		if (!joinAttributeNames.isEmpty()) {
+    			// make modifiable
+    			joinAttributeNames = new HashSet<>(joinAttributeNames);
+    			joinAttributeNames.retainAll(buildExpr.getBindingNames());
+    		}
 		}
 		return joinAttributeNames;
 	}
@@ -2165,10 +2169,11 @@ final class HalyardTupleExprEvaluation {
 			Var allSubjVar = Algebra.createAnonVar(ANON_SUBJECT_VAR);
 			Var allPredVar = Algebra.createAnonVar(ANON_PREDICATE_VAR);
 			Var allObjVar = Algebra.createAnonVar(ANON_OBJECT_VAR);
-			StatementPattern sp = new StatementPattern(allSubjVar, allPredVar, allObjVar);
+			StatementPattern sp;
 			if (contextVar != null) {
-				sp.setScope(Scope.NAMED_CONTEXTS);
-				sp.setContextVar(contextVar);
+				sp = new StatementPattern(Scope.NAMED_CONTEXTS, allSubjVar, allPredVar, allObjVar, contextVar.clone());
+			} else {
+				sp = new StatementPattern(allSubjVar, allPredVar, allObjVar);
 			}
 			evaluateStatementPattern(new BindingSetPipe(parent) {
 				private final BigHashSet<Value> set = BigHashSet.create();

@@ -7,12 +7,6 @@
  *******************************************************************************/
 package com.msd.gin.halyard.spin;
 
-import com.msd.gin.halyard.algebra.Algebra;
-import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
-import com.msd.gin.halyard.spin.function.ConstructTupleFunction;
-import com.msd.gin.halyard.spin.function.InverseMagicProperty;
-import com.msd.gin.halyard.spin.function.SelectTupleFunction;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -55,6 +49,12 @@ import org.eclipse.rdf4j.query.parser.ParsedTupleQuery;
 import org.eclipse.rdf4j.queryrender.sparql.SPARQLQueryRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.msd.gin.halyard.algebra.Algebra;
+import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
+import com.msd.gin.halyard.spin.function.ConstructTupleFunction;
+import com.msd.gin.halyard.spin.function.InverseMagicProperty;
+import com.msd.gin.halyard.spin.function.SelectTupleFunction;
 
 public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 
@@ -150,29 +150,29 @@ public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 					final TupleFunction func = entry.getValue();
 					TupleExpr stmts = sp.clone();
 
-					List<? super Var> subjList = new ArrayList<ValueExpr>(4);
-					TupleExpr subjNodes = addVarsFromRdfList(subjList, sp.getSubjectVar(), spIndex);
+					List<? super Var> clonedSubjList = new ArrayList<ValueExpr>(4);
+					TupleExpr subjNodes = addVarsFromRdfList(clonedSubjList, sp.getSubjectVar(), spIndex);
 					if (subjNodes != null) {
 						stmts = new Join(stmts, subjNodes);
 					} else {
-						subjList = Collections.<ValueExpr>singletonList(sp.getSubjectVar());
+						clonedSubjList = Collections.<ValueExpr>singletonList(sp.getSubjectVar().clone());
 					}
 
-					List<? super Var> objList = new ArrayList<ValueExpr>(4);
-					TupleExpr objNodes = addVarsFromRdfList(objList, sp.getObjectVar(), spIndex);
+					List<? super Var> clonedObjList = new ArrayList<ValueExpr>(4);
+					TupleExpr objNodes = addVarsFromRdfList(clonedObjList, sp.getObjectVar(), spIndex);
 					if (objNodes != null) {
 						stmts = new Join(stmts, objNodes);
 					} else {
-						objList = Collections.<ValueExpr>singletonList(sp.getObjectVar());
+						clonedObjList = Collections.<ValueExpr>singletonList(sp.getObjectVar().clone());
 					}
 
 					ExtendedTupleFunctionCall funcCall = new ExtendedTupleFunctionCall(func.getURI());
 					if (func instanceof InverseMagicProperty) {
-						funcCall.setArgs((List<ValueExpr>) objList);
-						funcCall.setResultVars((List<Var>) subjList);
+						funcCall.setArgs((List<ValueExpr>) clonedObjList);
+						funcCall.setResultVars((List<Var>) clonedSubjList);
 					} else {
-						funcCall.setArgs((List<ValueExpr>) subjList);
-						funcCall.setResultVars((List<Var>) objList);
+						funcCall.setArgs((List<ValueExpr>) clonedSubjList);
+						funcCall.setResultVars((List<Var>) clonedObjList);
 					}
 
 					TupleExpr magicPropertyNode;
@@ -229,7 +229,7 @@ public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 			return node;
 		}
 
-		private TupleExpr addVarsFromRdfList(List<? super Var> list, Var subj,
+		private TupleExpr addVarsFromRdfList(List<? super Var> clonedVars, Var subj,
 				Map<String, Map<IRI, List<StatementPattern>>> spIndex) {
 			TupleExpr node = null;
 			do {
@@ -255,7 +255,7 @@ public class SpinMagicPropertyInterpreter implements QueryOptimizer {
 				}
 
 				StatementPattern firstStmt = firstStmts.get(0);
-				list.add(firstStmt.getObjectVar());
+				clonedVars.add(firstStmt.getObjectVar().clone());
 				node = join(node, firstStmt);
 
 				StatementPattern restStmt = restStmts.get(0);

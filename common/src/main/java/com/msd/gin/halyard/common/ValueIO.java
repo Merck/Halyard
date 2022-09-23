@@ -173,15 +173,44 @@ public class ValueIO {
 	private static final byte DOI_HTTP_SCHEME = 'd';
 	private static final byte DOI_HTTPS_SCHEME = 'D';
 
-	private static ByteBuffer calendarTypeToBytes(byte type, XMLGregorianCalendar cal, ByteBuffer b) {
-		b = ensureCapacity(b, 11);
+	private static ByteBuffer writeCalendar(byte type, XMLGregorianCalendar cal, ByteBuffer b) {
+		BigDecimal fracSecs = cal.getFractionalSecond();
+		long subMillis;
+		if (fracSecs != null && fracSecs.scale() > 3) {
+			BigDecimal fracMillis = fracSecs.scaleByPowerOfTen(3);
+			subMillis = fracMillis.subtract(new BigDecimal(fracMillis.toBigInteger())).scaleByPowerOfTen(6).longValue();
+		} else {
+			subMillis = 0L;
+		}
+		b = ensureCapacity(b, (subMillis > 0) ? 1 + Long.BYTES + Short.BYTES + Long.BYTES : 1 + Long.BYTES + Short.BYTES);
 		b.put(type).putLong(cal.toGregorianCalendar().getTimeInMillis());
+		if (subMillis > 0) {
+			b.putLong(subMillis);
+		}
 		if(cal.getTimezone() != DatatypeConstants.FIELD_UNDEFINED) {
 			b.putShort((short) cal.getTimezone());
-		} else {
-			b.putShort(Short.MIN_VALUE);
 		}
 		return b;
+	}
+
+	private static XMLGregorianCalendar readCalendar(ByteBuffer b) {
+		long millis = b.getLong();
+		long subMillis = (b.remaining() >= 4) ? b.getLong() : 0L;
+		int tz = (b.remaining() >= 2) ? b.getShort() : Short.MIN_VALUE;
+		GregorianCalendar c = newGregorianCalendar();
+		c.setTimeInMillis(millis);
+		XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
+		if (subMillis > 0) {
+			BigDecimal fracSecs = cal.getFractionalSecond().add(BigDecimal.valueOf(subMillis, 9)).stripTrailingZeros();
+			cal.setFractionalSecond(fracSecs);
+		} else if (BigDecimal.ZERO.compareTo(cal.getFractionalSecond()) == 0) {
+			cal.setFractionalSecond(null);
+		}
+		if (tz == Short.MIN_VALUE) {
+			tz = DatatypeConstants.FIELD_UNDEFINED;
+		}
+		cal.setTimezone(tz);
+		return cal;
 	}
 
 	private static String readString(ByteBuffer b) {
@@ -771,27 +800,16 @@ public class ValueIO {
 		addByteWriter(XSD.TIME, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
-				return calendarTypeToBytes(TIME_TYPE, l.calendarValue(), b);
+				return writeCalendar(TIME_TYPE, l.calendarValue(), b);
 			}
 		});
 		addByteReader(TIME_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				long millis = b.getLong();
-				int tz = b.getShort();
-				GregorianCalendar c = newGregorianCalendar();
-				c.setTimeInMillis(millis);
-				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
+				XMLGregorianCalendar cal = readCalendar(b);
 				cal.setYear(null);
 				cal.setMonth(DatatypeConstants.FIELD_UNDEFINED);
 				cal.setDay(DatatypeConstants.FIELD_UNDEFINED);
-				if (BigDecimal.ZERO.compareTo(cal.getFractionalSecond()) == 0) {
-					cal.setFractionalSecond(null);
-				}
-				if(tz == Short.MIN_VALUE) {
-					tz = DatatypeConstants.FIELD_UNDEFINED;
-				}
-				cal.setTimezone(tz);
 				return vf.createLiteral(cal);
 			}
 		});
@@ -799,22 +817,17 @@ public class ValueIO {
 		addByteWriter(XSD.DATE, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
-				return calendarTypeToBytes(DATE_TYPE, l.calendarValue(), b);
+				return writeCalendar(DATE_TYPE, l.calendarValue(), b);
 			}
 		});
 		addByteReader(DATE_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				long millis = b.getLong();
-				int tz = b.getShort();
-				GregorianCalendar c = newGregorianCalendar();
-				c.setTimeInMillis(millis);
-				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
-				cal.setTime(DatatypeConstants.FIELD_UNDEFINED, DatatypeConstants.FIELD_UNDEFINED, DatatypeConstants.FIELD_UNDEFINED, null);
-				if(tz == Short.MIN_VALUE) {
-					tz = DatatypeConstants.FIELD_UNDEFINED;
-				}
-				cal.setTimezone(tz);
+				XMLGregorianCalendar cal = readCalendar(b);
+				cal.setHour(DatatypeConstants.FIELD_UNDEFINED);
+				cal.setMinute(DatatypeConstants.FIELD_UNDEFINED);
+				cal.setSecond(DatatypeConstants.FIELD_UNDEFINED);
+				cal.setFractionalSecond(null);
 				return vf.createLiteral(cal);
 			}
 		});
@@ -822,24 +835,13 @@ public class ValueIO {
 		addByteWriter(XSD.DATETIME, new ByteWriter() {
 			@Override
 			public ByteBuffer writeBytes(Literal l, ByteBuffer b) {
-				return calendarTypeToBytes(DATETIME_TYPE, l.calendarValue(), b);
+				return writeCalendar(DATETIME_TYPE, l.calendarValue(), b);
 			}
 		});
 		addByteReader(DATETIME_TYPE, new ByteReader() {
 			@Override
 			public Literal readBytes(ByteBuffer b, ValueFactory vf) {
-				long millis = b.getLong();
-				int tz = b.getShort();
-				GregorianCalendar c = newGregorianCalendar();
-				c.setTimeInMillis(millis);
-				XMLGregorianCalendar cal = DATATYPE_FACTORY.newXMLGregorianCalendar(c);
-				if (BigDecimal.ZERO.compareTo(cal.getFractionalSecond()) == 0) {
-					cal.setFractionalSecond(null);
-				}
-				if (tz == Short.MIN_VALUE) {
-					tz = DatatypeConstants.FIELD_UNDEFINED;
-				}
-				cal.setTimezone(tz);
+				XMLGregorianCalendar cal = readCalendar(b);
 				return vf.createLiteral(cal);
 			}
 		});

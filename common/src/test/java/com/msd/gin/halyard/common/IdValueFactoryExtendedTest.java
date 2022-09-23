@@ -10,6 +10,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -61,8 +63,9 @@ public class IdValueFactoryExtendedTest {
 			vf.createIRI(RDF.NAMESPACE),
 			vf.createLiteral("xyz", vf.createIRI(RDF.NAMESPACE)),
 			vf.createLiteral(NOW),
+			vf.createLiteral(LocalDateTime.of(1990, 6, 20, 0, 0, 0, 20005000)),
 			vf.createLiteral("13:03:22", XSD.TIME),
-			vf.createLiteral("13:03:22.040", XSD.TIME),
+			vf.createLiteral(LocalTime.of(13, 3, 22, 40030000)),
 			vf.createLiteral("1980-02-14", XSD.DATE),
 			vf.createLiteral("foo", vf.createIRI("urn:bar:1")),
 			vf.createLiteral("foo", "en-GB"),

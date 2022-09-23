@@ -2,6 +2,7 @@ package com.msd.gin.halyard.sail.search;
 
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimaps;
+import com.msd.gin.halyard.algebra.BGPCollector;
 import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
 import com.msd.gin.halyard.common.InternalObjectLiteral;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -28,7 +29,6 @@ import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
-import org.eclipse.rdf4j.query.algebra.helpers.BGPCollector;
 
 /**
  * [] a halyard:Query; halyard:query 'what'; halyard:limit 5; halyard:matches [rdf:value ?v; halyard:score ?score; halyard:index ?index]
@@ -131,23 +131,23 @@ public class SearchInterpreter implements QueryOptimizer {
 			if (params.invalid) {
 				return false;
 			}
-			tfc.addArg(params.queryVar != null ? params.queryVar : new ValueConstant(VF.createLiteral("")));
-			tfc.addArg(params.limitVar != null ? params.limitVar : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_RESULT_SIZE)));
-			tfc.addArg(params.fuzzinessVar != null ? params.fuzzinessVar : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_FUZZINESS)));
-			tfc.addArg(params.phraseSlopVar != null ? params.phraseSlopVar : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_PHRASE_SLOP)));
+			tfc.addArg(params.queryVar != null ? params.queryVar.clone() : new ValueConstant(VF.createLiteral("")));
+			tfc.addArg(params.limitVar != null ? params.limitVar.clone() : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_RESULT_SIZE)));
+			tfc.addArg(params.fuzzinessVar != null ? params.fuzzinessVar.clone() : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_FUZZINESS)));
+			tfc.addArg(params.phraseSlopVar != null ? params.phraseSlopVar.clone() : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_PHRASE_SLOP)));
 			tfc.addArg(new ValueConstant(new InternalObjectLiteral<>(params.matches)));
 			for (SearchParams.MatchParams matchParams : params.matches) {
 				if (matchParams.matchVar != null) {
-					tfc.addResultVar(matchParams.matchVar);
+					tfc.addResultVar(matchParams.matchVar.clone());
 				}
 				for (Var valueVar : matchParams.valueVars) {
-					tfc.addResultVar(valueVar);
+					tfc.addResultVar(valueVar.clone());
 				}
 				for (Var scoreVar : matchParams.scoreVars) {
-					tfc.addResultVar(scoreVar);
+					tfc.addResultVar(scoreVar.clone());
 				}
 				for (Var indexVar : matchParams.indexVars) {
-					tfc.addResultVar(indexVar);
+					tfc.addResultVar(indexVar.clone());
 				}
 			}
 			return true;

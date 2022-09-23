@@ -14,10 +14,11 @@ import org.eclipse.rdf4j.query.algebra.Var;
 public class ExtendedTupleFunctionCall extends TupleFunctionCall {
 	private static final long serialVersionUID = 2773708379343562817L;
 
-	private TupleExpr depExpr = new SingletonSet();
+	private TupleExpr depExpr;
 
 	public ExtendedTupleFunctionCall(String uri) {
 		setURI(uri);
+		setDependentExpression(new SingletonSet());
 	}
 
 	public void setDependentExpression(TupleExpr expr) {

@@ -11,20 +11,20 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizerPipeline;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.BindingAssigner;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.BindingSetAssignmentInliner;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.CompareOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.ConstantOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.FilterOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.OrderLimitOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.ParentReferenceCleaner;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.RegexAsStringFunctionOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.SameTermFilterOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.UnionScopeChangeOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.BindingAssignerOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.BindingSetAssignmentInlinerOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.CompareOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.ConjunctiveConstraintSplitterOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.ConstantOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.DisjunctiveConstraintOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.FilterOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.IterativeEvaluationOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.OrderLimitOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.ParentReferenceCleaner;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.QueryModelNormalizerOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.RegexAsStringFunctionOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.SameTermFilterOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.UnionScopeChangeOptimizer;
 
 public class ExtendedQueryOptimizerPipeline implements QueryOptimizerPipeline {
 	private final ExtendedEvaluationStatistics statistics;
@@ -40,16 +40,16 @@ public class ExtendedQueryOptimizerPipeline implements QueryOptimizerPipeline {
 	@Override
 	public Iterable<QueryOptimizer> getOptimizers() {
 		return Arrays.asList(
-			new BindingAssigner(),
-			new BindingSetAssignmentInliner(),
+			new BindingAssignerOptimizer(),
+			new BindingSetAssignmentInlinerOptimizer(),
 			new ConstantOptimizer(strategy),
 			new RegexAsStringFunctionOptimizer(valueFactory),
 			new CompareOptimizer(),
-			new ConjunctiveConstraintSplitter(),
+			new ConjunctiveConstraintSplitterOptimizer(),
 			new DisjunctiveConstraintOptimizer(),
 			new SameTermFilterOptimizer(),
 			new UnionScopeChangeOptimizer(),
-			new QueryModelNormalizer(),
+			new QueryModelNormalizerOptimizer(),
 			new QueryJoinOptimizer(statistics),
 			// new SubSelectJoinOptimizer(),
 			new IterativeEvaluationOptimizer(),

@@ -29,8 +29,8 @@ import org.eclipse.rdf4j.repository.sail.SailRepository;
 public class W3CApprovedSPARQL11QueryTest extends SPARQL11QueryComplianceTest {
 
     public W3CApprovedSPARQL11QueryTest(String displayName, String testURI, String name, String queryFileURL,
-			String resultFileURL, Dataset dataset, boolean ordered) {
-		super(displayName, testURI, name, queryFileURL, resultFileURL, dataset, ordered);
+			String resultFileURL, Dataset dataset, boolean ordered, boolean laxCardinality) {
+		super(displayName, testURI, name, queryFileURL, resultFileURL, dataset, ordered, laxCardinality);
     }
 
     @Override

@@ -20,7 +20,7 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
-import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryModelNormalizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.QueryModelNormalizerOptimizer;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.junit.jupiter.api.Test;
 
@@ -41,14 +41,16 @@ public class TupleFunctionCallOptimizerTest {
 
 	private ExtendedTupleFunctionCall createTupleFunctionCall(String name, String[] inputVars, String[] outputVars) {
 		ExtendedTupleFunctionCall tfc = new ExtendedTupleFunctionCall(name);
-		tfc.setArgs(Arrays.asList(inputVars).stream().<ValueExpr>map(s -> new Var(s)).collect(Collectors.toList()));
+		if (inputVars != null) {
+			tfc.setArgs(Arrays.asList(inputVars).stream().<ValueExpr>map(s -> new Var(s)).collect(Collectors.toList()));
+		}
 		tfc.setResultVars(Arrays.asList(outputVars).stream().map(s -> new Var(s)).collect(Collectors.toList()));
 		return tfc;
 	}
 
 	private void optimize(TupleExpr root) {
 		new TupleFunctionCallOptimizer().optimize(root, null, null);
-		new QueryModelNormalizer().optimize(root, null, null);
+		new QueryModelNormalizerOptimizer().optimize(root, null, null);
 	}
 
 	@Test
@@ -105,10 +107,8 @@ public class TupleFunctionCallOptimizerTest {
 	@Test
 	public void testMultipleTupleFunctions() {
 		ValueFactory vf = SimpleValueFactory.getInstance();
-		ExtendedTupleFunctionCall tfcx = createTupleFunctionCall("http://func/X", new String[] {"arg1", "arg2", "arg3"}, new String[] {"v"});
-		((Var)tfcx.getArgs().get(0)).setValue(vf.createLiteral("a"));
-		((Var)tfcx.getArgs().get(1)).setValue(vf.createLiteral("b"));
-		((Var)tfcx.getArgs().get(2)).setValue(vf.createLiteral("c"));
+		ExtendedTupleFunctionCall tfcx = createTupleFunctionCall("http://func/X", null, new String[] {"v"});
+		tfcx.setArgs(Arrays.asList(new ValueConstant(vf.createLiteral("a")), new ValueConstant(vf.createLiteral("b")), new ValueConstant(vf.createLiteral("c"))));
 		ExtendedTupleFunctionCall tfc1 = createTupleFunctionCall("http://func/1", "v", "out1");
 		ExtendedTupleFunctionCall tfc2 = createTupleFunctionCall("http://func/2", "v", "out2");
 		ExtendedTupleFunctionCall tfc3 = createTupleFunctionCall("http://func/3", "v", "out3");

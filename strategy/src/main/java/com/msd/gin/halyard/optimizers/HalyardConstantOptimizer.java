@@ -1,6 +1,7 @@
 package com.msd.gin.halyard.optimizers;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -36,7 +37,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.numeric.Rand;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.rdfterm.STRUUID;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.rdfterm.UUID;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
+import org.eclipse.rdf4j.query.algebra.helpers.AbstractSimpleQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +54,7 @@ public final class HalyardConstantOptimizer implements QueryOptimizer {
 
 	@Override
 	public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-		ConstantVisitor visitor = new ConstantVisitor();
+		ConstantVisitor visitor = new ConstantVisitor(strategy);
 		tupleExpr.visit(visitor);
 		Set<String> varsBefore = visitor.varNames;
 
@@ -62,19 +63,28 @@ public final class HalyardConstantOptimizer implements QueryOptimizer {
 		Set<String> varsAfter = varCollector.varNames;
 
 		if (varsAfter.size() < varsBefore.size()) {
+
 			varsBefore.removeAll(varsAfter);
+
 			for (ProjectionElemList projElems : visitor.projElemLists) {
 				for (ProjectionElem projElem : projElems.getElements()) {
-					String name = projElem.getSourceName();
+
+					String name = projElem.getName();
+
 					if (varsBefore.contains(name)) {
 						UnaryTupleOperator proj = (UnaryTupleOperator) projElems.getParentNode();
 						Extension ext = new Extension(proj.getArg());
 						proj.setArg(ext);
-						Var lostVar = new Var(name);
+
 						Value value = bindings.getValue(name);
-						if (value != null) {
-							lostVar.setValue(value);
+
+						Var lostVar;
+						if (value == null) {
+							lostVar = new Var(name);
+						} else {
+							lostVar = new Var(name, value);
 						}
+
 						ext.addElement(new ExtensionElem(lostVar, name));
 					}
 				}
@@ -82,14 +92,27 @@ public final class HalyardConstantOptimizer implements QueryOptimizer {
 		}
 	}
 
-	class ConstantVisitor extends VarNameCollector {
+	private static class ConstantVisitor extends VarNameCollector {
 
-		final List<ProjectionElemList> projElemLists = new ArrayList<>();
+		private final EvaluationStrategy strategy;
+
+		public ConstantVisitor(EvaluationStrategy strategy) {
+			this.strategy = strategy;
+		}
+
+		List<ProjectionElemList> projElemLists = Collections.emptyList();
 
 		@Override
 		public void meet(ProjectionElemList projElems) {
 			super.meet(projElems);
-			projElemLists.add(projElems);
+			if (projElemLists.isEmpty()) {
+				projElemLists = Collections.singletonList(projElems);
+			} else {
+				if (projElemLists.size() == 1) {
+					projElemLists = new ArrayList<>(projElemLists);
+				}
+				projElemLists.add(projElems);
+			}
 		}
 
 		@Override
@@ -105,14 +128,14 @@ public final class HalyardConstantOptimizer implements QueryOptimizer {
 					if (leftIsTrue) {
 						or.replaceWith(new ValueConstant(BooleanLiteral.TRUE));
 					} else {
-						or.replaceWith(or.getRightArg());
+						or.replaceWith(or.getRightArg().clone());
 					}
 				} else if (isConstant(or.getRightArg())) {
 					boolean rightIsTrue = strategy.isTrue(or.getRightArg(), EmptyBindingSet.getInstance());
 					if (rightIsTrue) {
 						or.replaceWith(new ValueConstant(BooleanLiteral.TRUE));
 					} else {
-						or.replaceWith(or.getLeftArg());
+						or.replaceWith(or.getLeftArg().clone());
 					}
 				}
 			} catch (ValueExprEvaluationException e) {
@@ -135,14 +158,14 @@ public final class HalyardConstantOptimizer implements QueryOptimizer {
 				} else if (isConstant(and.getLeftArg())) {
 					boolean leftIsTrue = strategy.isTrue(and.getLeftArg(), EmptyBindingSet.getInstance());
 					if (leftIsTrue) {
-						and.replaceWith(and.getRightArg());
+						and.replaceWith(and.getRightArg().clone());
 					} else {
 						and.replaceWith(new ValueConstant(BooleanLiteral.FALSE));
 					}
 				} else if (isConstant(and.getRightArg())) {
 					boolean rightIsTrue = strategy.isTrue(and.getRightArg(), EmptyBindingSet.getInstance());
 					if (rightIsTrue) {
-						and.replaceWith(and.getLeftArg());
+						and.replaceWith(and.getLeftArg().clone());
 					} else {
 						and.replaceWith(new ValueConstant(BooleanLiteral.FALSE));
 					}
@@ -247,11 +270,7 @@ public final class HalyardConstantOptimizer implements QueryOptimizer {
 			// we treat constant functions as the 'regular case' and make
 			// exceptions for specific SPARQL built-in functions that require
 			// different treatment.
-			if (function instanceof Rand || function instanceof UUID || function instanceof STRUUID) {
-				return false;
-			}
-
-			return true;
+			return !(function instanceof Rand) && !(function instanceof UUID) && !(function instanceof STRUUID);
 		}
 
 		@Override
@@ -273,7 +292,7 @@ public final class HalyardConstantOptimizer implements QueryOptimizer {
 					if (strategy.isTrue(node.getCondition(), EmptyBindingSet.getInstance())) {
 						node.replaceWith(node.getResult());
 					} else {
-						node.replaceWith(node.getAlternative());
+						node.replaceWith(node.getAlternative().clone());
 					}
 				} catch (ValueExprEvaluationException e) {
 					logger.debug("Failed to evaluate UnaryValueOperator with a constant argument", e);
@@ -288,7 +307,7 @@ public final class HalyardConstantOptimizer implements QueryOptimizer {
 		 */
 		@Override
 		public void meet(Regex node) {
-			super.meetNode(node);
+			super.meet(node);
 
 			if (isConstant(node.getArg()) && isConstant(node.getPatternArg()) && isConstant(node.getFlagsArg())) {
 				try {
@@ -307,9 +326,13 @@ public final class HalyardConstantOptimizer implements QueryOptimizer {
 		}
 	}
 
-	class VarNameCollector extends AbstractQueryModelVisitor<RuntimeException> {
+	private static class VarNameCollector extends AbstractSimpleQueryModelVisitor<RuntimeException> {
 
 		final Set<String> varNames = new HashSet<>();
+
+		protected VarNameCollector() {
+			super(true);
+		}
 
 		@Override
 		public void meet(Var var) {

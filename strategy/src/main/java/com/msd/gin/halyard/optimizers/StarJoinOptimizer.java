@@ -19,6 +19,7 @@ package com.msd.gin.halyard.optimizers;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.msd.gin.halyard.algebra.Algebra;
+import com.msd.gin.halyard.algebra.BGPCollector;
 import com.msd.gin.halyard.algebra.StarJoin;
 
 import java.util.ArrayList;
@@ -39,7 +40,6 @@ import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
-import org.eclipse.rdf4j.query.algebra.helpers.BGPCollector;
 
 public class StarJoinOptimizer implements QueryOptimizer {
 

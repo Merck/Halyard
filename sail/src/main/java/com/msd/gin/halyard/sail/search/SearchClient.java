@@ -19,7 +19,7 @@ public final class SearchClient {
 	}
 
 	public SearchResponse<SearchDocument> search(String query, int limit, int fuzziness, int slop) throws IOException {
-		return client.search(s -> s.index(index).query(q -> q.queryString(qs -> qs.query(query).defaultField(SearchDocument.LABEL_FIELD).fuzziness(Integer.toString(fuzziness)).phraseSlop(new Double(slop)))).size(limit),
+		return client.search(s -> s.index(index).query(q -> q.queryString(qs -> qs.query(query).defaultField(SearchDocument.LABEL_FIELD).fuzziness(Integer.toString(fuzziness)).phraseSlop(Double.valueOf(slop)))).size(limit),
 				SearchDocument.class);
 	}
 }

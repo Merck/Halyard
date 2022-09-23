@@ -19,6 +19,7 @@ import org.eclipse.rdf4j.query.algebra.Compare;
 import org.eclipse.rdf4j.query.algebra.FunctionCall;
 import org.eclipse.rdf4j.query.algebra.MathExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryValueEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceResolver;
@@ -27,9 +28,11 @@ import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.datetime.Now;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryEvaluationContext;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.TupleFunctionEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtil;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.XMLDatatypeMathUtil;
+import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 
 /**
  * SPARQL 1.1 extended query evaluation strategy. This strategy adds the use of virtual properties, as well as extended
@@ -67,12 +70,22 @@ public class ExtendedEvaluationStrategy extends TupleFunctionEvaluationStrategy 
 	}
 
 	@Override
+	protected QueryValueEvaluationStep prepare(Compare node, QueryEvaluationContext context) {
+		return supplyBinaryValueEvaluation(node, (leftVal, rightVal) -> BooleanLiteral
+				.valueOf(QueryEvaluationUtil.compare(leftVal, rightVal, node.getOperator(), false)), context);
+	}
+
+	@Override
 	public Value evaluate(MathExpr node, BindingSet bindings)
-			throws ValueExprEvaluationException, QueryEvaluationException {
+			throws QueryEvaluationException {
 		Value leftVal = evaluate(node.getLeftArg(), bindings);
 		Value rightVal = evaluate(node.getRightArg(), bindings);
 
-		if ((leftVal instanceof Literal) && (rightVal instanceof Literal)) {
+		return mathOperationApplier(node, leftVal, rightVal);
+	}
+
+	private Value mathOperationApplier(MathExpr node, Value leftVal, Value rightVal) {
+		if (leftVal.isLiteral() && rightVal.isLiteral()) {
 			return XMLDatatypeMathUtil.compute((Literal) leftVal, (Literal) rightVal, node.getOperator());
 		}
 
@@ -106,5 +119,73 @@ public class ExtendedEvaluationStrategy extends TupleFunctionEvaluationStrategy 
 
 		return function.evaluate(tripleSource, argValues);
 
+	}
+
+	@Override
+	public QueryValueEvaluationStep prepare(FunctionCall node, QueryEvaluationContext context)
+			throws QueryEvaluationException {
+		Function function = funcRegistry
+				.get(node.getURI())
+				.orElseThrow(() -> new QueryEvaluationException("Unknown function '" + node.getURI() + "'"));
+
+		// the NOW function is a special case as it needs to keep a shared
+		// return
+		// value for the duration of the query.
+		if (function instanceof Now) {
+			return prepare((Now) function, context);
+		}
+
+		List<ValueExpr> args = node.getArgs();
+
+		QueryValueEvaluationStep[] argSteps = new QueryValueEvaluationStep[args.size()];
+
+		boolean allConstant = determineIfFunctionCallWillBeAConstant(context, function, args, argSteps);
+		if (allConstant) {
+			Value[] argValues = evaluateAllArguments(args, argSteps, EmptyBindingSet.getInstance());
+			Value res = function.evaluate(tripleSource, argValues);
+			return new QueryValueEvaluationStep.ConstantQueryValueEvaluationStep(res);
+		} else {
+			return bindings -> {
+				Value[] argValues = evaluateAllArguments(args, argSteps, bindings);
+				return function.evaluate(tripleSource, argValues);
+			};
+		}
+	}
+
+	/**
+	 * If all input is constant normally the function call output will be constant as well.
+	 *
+	 * @param context  used to precompile arguments of the function
+	 * @param function that might be constant
+	 * @param args     that the function must evaluate
+	 * @param argSteps side effect this array is filled
+	 * @return if this function resolves to a constant value
+	 */
+	private boolean determineIfFunctionCallWillBeAConstant(QueryEvaluationContext context, Function function,
+			List<ValueExpr> args, QueryValueEvaluationStep[] argSteps) {
+		boolean allConstant = true;
+		if (function.mustReturnDifferentResult()) {
+			allConstant = false;
+			for (int i = 0; i < args.size(); i++) {
+				argSteps[i] = precompile(args.get(i), context);
+			}
+		} else {
+			for (int i = 0; i < args.size(); i++) {
+				argSteps[i] = precompile(args.get(i), context);
+				if (!argSteps[i].isConstant()) {
+					allConstant = false;
+				}
+			}
+		}
+		return allConstant;
+	}
+
+	private Value[] evaluateAllArguments(List<ValueExpr> args, QueryValueEvaluationStep[] argSteps,
+			BindingSet bindings) {
+		Value[] argValues = new Value[argSteps.length];
+		for (int i = 0; i < args.size(); i++) {
+			argValues[i] = argSteps[i].evaluate(bindings);
+		}
+		return argValues;
 	}
 }

@@ -36,7 +36,7 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
-import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
+import org.eclipse.rdf4j.query.algebra.helpers.collectors.StatementPatternCollector;
 
 /**
  *
@@ -62,7 +62,7 @@ public final class HalyardQueryJoinOptimizer extends QueryJoinOptimizer {
                 super.meet(node);
             }
         });
-        tupleExpr.visit(new QueryJoinOptimizer.JoinVisitor() {
+        tupleExpr.visit(new QueryJoinOptimizer.JoinVisitor(statistics) {
             private Set<String> priorityBounds = new HashSet<>();
 
             @Override

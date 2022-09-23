@@ -31,7 +31,7 @@ public class ConstrainedStatementPattern extends StatementPattern {
 	}
 
 	private ConstrainedStatementPattern(StatementPattern sp) {
-		super(sp.getScope(), sp.getSubjectVar(), sp.getPredicateVar(), sp.getObjectVar(), sp.getContextVar());
+		super(sp.getScope(), sp.getSubjectVar().clone(), sp.getPredicateVar().clone(), sp.getObjectVar().clone(), sp.getContextVar() != null ? sp.getContextVar().clone() : null);
 	}
 
 	public void setSubjectType(ValueType t) {

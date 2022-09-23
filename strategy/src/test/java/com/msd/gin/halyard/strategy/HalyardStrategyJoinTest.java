@@ -3,7 +3,6 @@ package com.msd.gin.halyard.strategy;
 import com.msd.gin.halyard.algebra.Algorithms;
 
 import java.io.InputStream;
-import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -17,6 +16,7 @@ import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
+import org.eclipse.rdf4j.query.impl.TupleQueryResultBuilder;
 import org.eclipse.rdf4j.query.resultio.QueryResultIO;
 import org.eclipse.rdf4j.query.resultio.TupleQueryResultFormat;
 import org.eclipse.rdf4j.repository.Repository;
@@ -221,7 +221,9 @@ public class HalyardStrategyJoinTest {
         }
         Set<BindingSet> expectedResults;
         try (InputStream in = getClass().getResourceAsStream(expectedOutput)) {
-            try (TupleQueryResult res = QueryResultIO.parseTuple(in, TupleQueryResultFormat.SPARQL, new WeakReference<Object>(this))) {
+        	TupleQueryResultBuilder tqrBuilder = new TupleQueryResultBuilder();
+        	QueryResultIO.parseTuple(in, TupleQueryResultFormat.SPARQL, tqrBuilder, repo.getValueFactory());
+            try (TupleQueryResult res = tqrBuilder.getQueryResult()) {
                 expectedResults = toSet(res);
             }
         }

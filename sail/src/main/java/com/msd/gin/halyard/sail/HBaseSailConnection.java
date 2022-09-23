@@ -53,14 +53,14 @@ import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
-import org.eclipse.rdf4j.common.transaction.IsolationLevel;
-import org.eclipse.rdf4j.common.transaction.IsolationLevels;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.EmptyIteration;
 import org.eclipse.rdf4j.common.iteration.ExceptionConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.ReducedIteration;
 import org.eclipse.rdf4j.common.iteration.TimeLimitIteration;
+import org.eclipse.rdf4j.common.transaction.IsolationLevel;
+import org.eclipse.rdf4j.common.transaction.IsolationLevels;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Namespace;
@@ -82,6 +82,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContextInitializer;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
@@ -103,7 +104,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 	public static final String QUERY_CONTEXT_SEARCH_ATTRIBUTE = SearchClient.class.getName();
 	private static final int MAX_QUERY_CACHE_SIZE = Config.getInteger("hayard.evaluation.maxQueryCacheSize", 100);
 
-	private final Cache<PreparedQueryKey, TupleExpr> queryCache = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(MAX_QUERY_CACHE_SIZE).expireAfterWrite(1L, TimeUnit.HOURS).build();
+	private final Cache<PreparedQueryKey, PreparedQuery> queryCache = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(MAX_QUERY_CACHE_SIZE).expireAfterWrite(1L, TimeUnit.HOURS).build();
 
     private final HBaseSail sail;
 	private final SearchClient searchClient;
@@ -187,6 +188,12 @@ public class HBaseSailConnection extends AbstractSailConnection {
 			strategy = new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), 0L, stats);
 			strategy.setOptimizerPipeline(new ExtendedQueryOptimizerPipeline(strategy, source.getValueFactory(), stats));
 		}
+		if (trackResultSize) {
+			strategy.setTrackResultSize(trackResultSize);
+		}
+		if (trackResultTime) {
+			strategy.setTrackTime(trackResultTime);
+		}
 		return strategy;
 	}
 
@@ -213,6 +220,11 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		return tupleExpr;
 	}
 
+	private PreparedQuery prepareQuery(TupleExpr tupleExpr, Dataset dataset, BindingSet queryBindings, boolean includeInferred, RDFStarTripleSource tripleSource, EvaluationStrategy strategy) {
+		TupleExpr optimizedTupleExpr = optimize(tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy);
+		return new PreparedQuery(optimizedTupleExpr, strategy.precompile(optimizedTupleExpr));
+	}
+
 	// evaluate queries/ subqueries
     @Override
 	public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(final TupleExpr tupleExpr, final Dataset dataset, final BindingSet bindings, final boolean includeInferred) throws SailException {
@@ -229,11 +241,11 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		try {
 			initQueryContext(queryContext);
 
-			TupleExpr optimizedTupleExpr;
+			PreparedQuery preparedQuery;
 			if (sourceString != null) {
 				PreparedQueryKey pqkey = new PreparedQueryKey(sourceString, dataset, queryBindings, includeInferred);
 				try {
-					optimizedTupleExpr = queryCache.get(pqkey, () -> optimize(tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy));
+					preparedQuery = queryCache.get(pqkey, () -> prepareQuery(tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy));
 				} catch (ExecutionException e) {
 					if (e.getCause() instanceof RuntimeException) {
 						throw (RuntimeException) e.getCause();
@@ -242,14 +254,14 @@ public class HBaseSailConnection extends AbstractSailConnection {
 					}
 				}
 			} else {
-				optimizedTupleExpr = optimize(tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy);
+				preparedQuery = prepareQuery(tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy);
 			}
 
 			try {
 				// evaluate the expression against the TripleSource according to the
 				// EvaluationStrategy.
-				CloseableIteration<BindingSet, QueryEvaluationException> iter = evaluateInternal(strategy, optimizedTupleExpr);
-				sail.trackQuery(sourceString, tupleExpr, optimizedTupleExpr);
+				CloseableIteration<BindingSet, QueryEvaluationException> iter = evaluateInternal(preparedQuery);
+				sail.trackQuery(sourceString, tupleExpr, preparedQuery.getTupleExpression());
 				if (!sail.pushStrategy) {
 					// NB: Iteration methods may do on-demand evaluation hence need to wrap these too
 					iter = new QueryContextIteration(iter, queryContext);
@@ -259,7 +271,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 							@Override
 							protected void throwInterruptedException() {
 								throw new QueryEvaluationException(
-										String.format("Query evaluation exceeded specified timeout %ds:\n%s", sail.evaluationTimeoutSecs, optimizedTupleExpr));
+										String.format("Query evaluation exceeded specified timeout %ds:\n%s", sail.evaluationTimeoutSecs, preparedQuery.getTupleExpression()));
 							}
 						};
 			} catch (QueryEvaluationException ex) {
@@ -297,14 +309,8 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		}
 	}
 
-	protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(EvaluationStrategy strategy, TupleExpr tupleExpr) {
-		if (trackResultSize) {
-			strategy.setTrackResultSize(trackResultSize);
-		}
-		if (trackResultTime) {
-			strategy.setTrackTime(trackResultTime);
-		}
-		return strategy.evaluate(tupleExpr, EmptyBindingSet.getInstance());
+	protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(PreparedQuery query) {
+		return query.evaluate();
 	}
 
     @Override
@@ -764,6 +770,28 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		@Override
 		public int hashCode() {
 			return Objects.hash(toArray());
+		}
+	}
+
+	protected static final class PreparedQuery {
+		private final TupleExpr tree;
+		private final QueryEvaluationStep step;
+
+		public PreparedQuery(TupleExpr tree, QueryEvaluationStep step) {
+			this.tree = tree;
+			this.step = step;
+		}
+
+		public CloseableIteration<BindingSet, QueryEvaluationException> evaluate() {
+			return step.evaluate(EmptyBindingSet.getInstance());
+		}
+
+		public TupleExpr getTupleExpression() {
+			return tree;
+		}
+
+		public QueryEvaluationStep getQueryEvaluationStep() {
+			return step;
 		}
 	}
 
