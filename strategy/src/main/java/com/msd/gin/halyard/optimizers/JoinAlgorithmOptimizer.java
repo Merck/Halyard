@@ -5,8 +5,10 @@ import com.msd.gin.halyard.algebra.HashJoin;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
+import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
+import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
@@ -35,14 +37,14 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 		tupleExpr.visit(new AbstractQueryModelVisitor<RuntimeException>() {
 			@Override
 			public void meet(Join join) {
-				selectJoinAlgorithm(join);
 				super.meet(join);
+				selectJoinAlgorithm(join);
 			}
 
 			@Override
 			public void meet(LeftJoin leftJoin) {
-				selectJoinAlgorithm(leftJoin);
 				super.meet(leftJoin);
+				selectJoinAlgorithm(leftJoin);
 			}
 		});
 	}
@@ -50,15 +52,28 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 	private void selectJoinAlgorithm(BinaryTupleOperator join) {
 		TupleExpr left = join.getLeftArg();
 		TupleExpr right = join.getRightArg();
-		double leftCard = statistics.getCardinality(left);
-		double rightCard = statistics.getCardinality(right);
-		double nestedRightCard = statistics.getCardinality(right, left.getBindingNames());
-		double nestedCost = leftCard * nestedRightCard * INDEX_LOOKUP_COST;
-		double hashCost = leftCard*HASH_LOOKUP_COST + rightCard*HASH_BUILD_COST;
-		boolean useHash = rightCard <= hashJoinLimit && costRatio*hashCost < nestedCost;
-		if (useHash) {
-			join.setAlgorithm(HashJoin.INSTANCE);
-			join.setCostEstimate(hashCost);
+		if (isSupported(left) && isSupported(right)) {
+			double leftCard = statistics.getCardinality(left);
+			double rightCard = statistics.getCardinality(right);
+			double nestedRightCard = statistics.getCardinality(right, left.getBindingNames());
+			double nestedCost = leftCard * nestedRightCard * INDEX_LOOKUP_COST;
+			double hashCost = leftCard*HASH_LOOKUP_COST + rightCard*HASH_BUILD_COST;
+			boolean useHash = rightCard <= hashJoinLimit && costRatio*hashCost < nestedCost;
+			if (useHash) {
+				join.setAlgorithm(HashJoin.INSTANCE);
+				join.setCostEstimate(hashCost);
+			}
 		}
+	}
+
+	/**
+	 * NB: Hash-join only coincides with SPARQL semantics in a few special cases (e.g. no complex scoping).
+	 * @param expr expression to check
+	 * @return true if a hash-join can be used
+	 */
+	private static boolean isSupported(TupleExpr expr) {
+		return (expr instanceof StatementPattern)
+				|| (expr instanceof BindingSetAssignment)
+				|| ((expr instanceof BinaryTupleOperator) && HashJoin.NAME.equals(((BinaryTupleOperator)expr).getAlgorithmName()));
 	}
 }

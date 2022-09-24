@@ -197,7 +197,7 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 	void initTracking(TupleExpr queryNode) {
 		if (trackResultSize) {
 			synchronized (queryNode) {
-				// set resultsSizeActual to at least be 0 so we can track iterations that don't procude anything
+				// set resultsSizeActual to at least be 0 so we can track iterations that don't produce anything
 				queryNode.setResultSizeActual(Math.max(0, queryNode.getResultSizeActual()));
 			}
 		}

@@ -138,7 +138,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.ExternalSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.TupleFunctionEvaluationStrategy;
-import org.eclipse.rdf4j.query.algebra.evaluation.iterator.BindingSetHashKey;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.DescribeIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.PathIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ProjectionIterator;
@@ -844,7 +843,7 @@ final class HalyardTupleExprEvaluation {
 				operator.getBindingNames(), bindings), operator, parentStrategy);
     }
 
-    /**
+	/**
      * Makes a {@link BindingSet} comparable
      * @author schremar
      *
@@ -1614,120 +1613,29 @@ final class HalyardTupleExprEvaluation {
         		hashJoinLimit = DEFAULT_HASH_JOIN_LIMIT;
         	}
     	}
-    	AbstractHashTableJoiner joiner;
-    	if (isLeftJoin) {
-    		joiner = new AbstractHashTableJoiner(topPipe, join, bindings) {
-    			class LeftHashJoinBindingSetPipe extends AbstractHashJoinBindingSetPipe {
-					protected LeftHashJoinBindingSetPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
-						super(parent, hashTablePartition);
-					}
-	    			@Override
-	    			protected boolean next(BindingSet probeBs) throws InterruptedException {
-						if (probeBs.size() == 0) {
-							// the empty binding set should be merged with all binding sets in the hash table
-							Collection<? extends List<BindingSetHashValue>> hashValues = hashTablePartition.all();
-							for (List<BindingSetHashValue> hashValue : hashValues) {
-								for (BindingSetHashValue bshv : hashValue) {
-									if (!pushToParent(bshv.joinTo(probeBs))) {
-										return false;
-									}
-								}
-							}
-		        		} else {
-							List<BindingSetHashValue> hashValue = hashTablePartition.get(probeBs);
-							if (hashValue != null && !hashValue.isEmpty()) {
-		    					for (BindingSetHashValue bshv : hashValue) {
-									if (!pushToParent(bshv.joinTo(probeBs))) {
-										return false;
-									}
-		    					}
-							} else {
-								if (!pushToParent(probeBs)) {
-									return false;
-								}
-							}
-		        		}
-		        		return true;
-	            	}
-	                @Override
-	                public String toString() {
-	                	return "LeftHashJoinBindingSetPipe";
-	                }
-    			}
-
-				@Override
-				protected BindingSetPipe createPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
-					return new LeftHashJoinBindingSetPipe(parent, hashTablePartition);
-				}
-    		};
-    	} else {
-    		joiner = new AbstractHashTableJoiner(topPipe, join, bindings) {
-    			class HashJoinBindingSetPipe extends AbstractHashJoinBindingSetPipe {
-					protected HashJoinBindingSetPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
-						super(parent, hashTablePartition);
-					}
-	    			@Override
-	    			protected boolean next(BindingSet probeBs) throws InterruptedException {
-						if (probeBs.size() == 0) {
-							// the empty binding set should be merged with all binding sets in the hash table
-							Collection<? extends List<BindingSetHashValue>> hashValues = hashTablePartition.all();
-							for (List<BindingSetHashValue> hashValue : hashValues) {
-								for (BindingSetHashValue bshv : hashValue) {
-									if (!pushToParent(bshv.joinTo(probeBs))) {
-										return false;
-									}
-								}
-							}
-		        		} else {
-							List<BindingSetHashValue> hashValue = hashTablePartition.get(probeBs);
-							if (hashValue != null && !hashValue.isEmpty()) {
-		    					for (BindingSetHashValue bshv : hashValue) {
-									if (!pushToParent(bshv.joinTo(probeBs))) {
-										return false;
-									}
-		    					}
-							}
-		        		}
-		        		return true;
-	            	}
-	                @Override
-	                public String toString() {
-	                	return "HashJoinBindingSetPipe";
-	                }
-    			}
-
-				@Override
-				protected BindingSetPipe createPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
-					return new HashJoinBindingSetPipe(parent, hashTablePartition);
-				}
-    		};
-    	}
-    	buildHashTable(join, bindings, joiner, isLeftJoin ? Integer.MAX_VALUE : hashJoinLimit);
+    	AbstractHashTableJoiner joiner = isLeftJoin ? new LeftHashTableJoiner(topPipe, join, bindings) : new HashTableJoiner(topPipe, join, bindings);
+    	buildHashTable(joiner, bindings, isLeftJoin ? Integer.MAX_VALUE : hashJoinLimit);
     }
 
-    private void buildHashTable(final BinaryTupleOperator join, final BindingSet bindings, AbstractHashTableJoiner hashTableJoiner, final int hashJoinLimit) {
-    	join.setAlgorithm(HashJoin.INSTANCE);
-    	parentStrategy.initTracking(join);
-    	TupleExpr probeExpr = join.getLeftArg();
-    	TupleExpr buildExpr = join.getRightArg();
+    private void buildHashTable(AbstractHashTableJoiner joiner, final BindingSet bindings, final int hashJoinLimit) {
+    	joiner.join.setAlgorithm(HashJoin.INSTANCE);
+    	parentStrategy.initTracking(joiner.join);
 		evaluateTupleExpr(new BindingSetPipe(null) {
-			final int initialSize = (int) Math.min(MAX_INITIAL_HASH_JOIN_TABLE_SIZE, Math.max(0, buildExpr.getResultSizeEstimate()));
-			final String[] joinAttributes = HashJoinTable.getJoinAttributes(probeExpr, buildExpr);
-	    	HashJoinTable hashTable = new HashJoinTable(initialSize, joinAttributes);
+	    	HashJoinTable hashTable = joiner.createHashTable();
             @Override
             protected boolean next(BindingSet buildBs) throws InterruptedException {
             	HashJoinTable partition;
             	synchronized (this) {
                 	if (hashTable.entryCount() >= hashJoinLimit) {
                 		partition = hashTable;
-                		hashTable = new HashJoinTable(initialSize, joinAttributes);
+                		hashTable = joiner.createHashTable();
                 	} else {
                 		partition = null;
                 	}
             		hashTable.put(buildBs);
             	}
             	if (partition != null) {
-            		hashTableJoiner.doJoin(partition, false);
+            		joiner.doJoin(partition, false);
             	}
             	return true;
             }
@@ -1735,7 +1643,7 @@ final class HalyardTupleExprEvaluation {
             public void close() throws InterruptedException {
             	synchronized (this) {
             		if (hashTable != null) {
-                   		hashTableJoiner.doJoin(hashTable, true);
+                   		joiner.doJoin(hashTable, true);
             			hashTable = null;
             		}
             	}
@@ -1744,7 +1652,54 @@ final class HalyardTupleExprEvaluation {
             public String toString() {
             	return "HashTableBindingSetPipe";
             }
-    	}, buildExpr, bindings);
+    	}, joiner.buildExpr, bindings);
+    }
+
+
+	private static Set<String> getJoinAttributes(TupleExpr probeExpr,  TupleExpr buildExpr) {
+		Set<String> joinAttributeNames;
+		// for statement patterns can ignore equal common constant vars
+		if (probeExpr instanceof StatementPattern && buildExpr instanceof StatementPattern) {
+			Map<String,Var> probeVars = getVars((StatementPattern) probeExpr);
+			Map<String,Var> buildVars = getVars((StatementPattern) buildExpr);
+			joinAttributeNames = new HashSet<>(5);
+			for (Map.Entry<String,Var> entry : probeVars.entrySet()) {
+				String name = entry.getKey();
+				Var otherVar = buildVars.get(name);
+				if (otherVar != null) {
+					if (!isSameConstant(entry.getValue(), otherVar)) {
+						joinAttributeNames.add(name);
+					}
+				}
+			}
+		} else {
+    		joinAttributeNames = probeExpr.getBindingNames();
+    		joinAttributeNames.retainAll(buildExpr.getBindingNames());
+		}
+		return joinAttributeNames;
+	}
+
+	private static boolean isSameConstant(Var v1, Var v2) {
+		return v1.isConstant() && v2.isConstant() && v1.getValue().equals(v2.getValue());
+	}
+
+	private static Map<String,Var> getVars(StatementPattern sp) {
+		Map<String,Var> vars = new HashMap<>(5);
+		Var subjVar = sp.getSubjectVar();
+		vars.put(subjVar.getName(), subjVar);
+		Var predVar = sp.getPredicateVar();
+		vars.put(predVar.getName(), predVar);
+		Var objVar = sp.getObjectVar();
+		vars.put(objVar.getName(), objVar);
+		Var ctxVar = sp.getContextVar();
+		if (ctxVar != null) {
+			vars.put(ctxVar.getName(), ctxVar);
+		}
+		return vars;
+	}
+
+    private static <E> String[] toStringArray(Collection<E> c) {
+        return c.toArray(new String[c.size()]);
     }
 
     private abstract class AbstractHashTableJoiner {
@@ -1752,13 +1707,46 @@ final class HalyardTupleExprEvaluation {
     	private final AtomicBoolean joinsFinished = new AtomicBoolean();
     	private final BindingSetPipe parent;
     	private final BinaryTupleOperator join;
+    	private final TupleExpr probeExpr;
+    	private final TupleExpr buildExpr;
     	private final BindingSet bindings;
+    	private final Set<String> joinAttributeSet;
+    	private final String[] joinAttributes;
+		private final String[] buildAttributes;
+		private final int initialSize;
 
-    	AbstractHashTableJoiner(BindingSetPipe parent, BinaryTupleOperator join, BindingSet bindings) {
+    	protected AbstractHashTableJoiner(BindingSetPipe parent, BinaryTupleOperator join, BindingSet bindings) {
     		this.parent = parent;
     		this.join = join;
     		this.bindings = bindings;
+        	this.probeExpr = join.getLeftArg();
+        	this.buildExpr = join.getRightArg();
+        	this.joinAttributeSet = getJoinAttributes(probeExpr, buildExpr);
+        	this.joinAttributes = toStringArray(joinAttributeSet);
+    		this.buildAttributes = toStringArray(buildExpr.getBindingNames());
+    		this.initialSize = (int) Math.min(MAX_INITIAL_HASH_JOIN_TABLE_SIZE, Math.max(0, buildExpr.getResultSizeEstimate()));
     	}
+
+    	final HashJoinTable createHashTable() {
+	    	return new HashJoinTable(initialSize, joinAttributes, buildAttributes);
+    	}
+
+		boolean hasUnboundOptionalValue(BindingSet probeBs) {
+	    	for (String name : joinAttributes) {
+	    		if (probeBs.getValue(name) == null) {
+	    			return true;
+	    		}
+	    	}
+	    	return false;
+		}
+
+		boolean canJoin(BindingSetValues buildBsv, BindingSet probeBs) {
+			return buildBsv.canJoin(buildAttributes, joinAttributeSet, probeBs);
+		}
+
+		BindingSet join(BindingSetValues buildBsv, BindingSet probeBs) {
+			return buildBsv.joinTo(buildAttributes, probeBs);
+		}
 
     	/**
     	 * Performs a hash-join.
@@ -1803,30 +1791,151 @@ final class HalyardTupleExprEvaluation {
     	}
     }
 
+	final class HashTableJoiner extends AbstractHashTableJoiner {
+		HashTableJoiner(BindingSetPipe parent, BinaryTupleOperator join, BindingSet bindings) {
+			super(parent, join, bindings);
+		}
+
+		final class HashJoinBindingSetPipe extends AbstractHashJoinBindingSetPipe {
+			protected HashJoinBindingSetPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
+				super(parent, hashTablePartition);
+			}
+			@Override
+			protected boolean next(BindingSet probeBs) throws InterruptedException {
+				if (probeBs.size() == 0) {
+					// the empty binding set should be merged with all binding sets in the hash table
+					Collection<? extends List<BindingSetValues>> hashValues = hashTablePartition.all();
+					for (List<BindingSetValues> hashValue : hashValues) {
+						for (BindingSetValues bsv : hashValue) {
+							if (!pushToParent(join(bsv, probeBs))) {
+								return false;
+							}
+						}
+					}
+				} else if (hasUnboundOptionalValue(probeBs)) {
+					// have to manually search through all the binding sets
+					Collection<? extends List<BindingSetValues>> hashValues = hashTablePartition.all();
+					for (List<BindingSetValues> hashValue : hashValues) {
+						for (BindingSetValues bsv : hashValue) {
+							if (canJoin(bsv, probeBs)) {
+								if (!pushToParent(join(bsv, probeBs))) {
+									return false;
+								}
+							}
+						}
+					}
+				} else {
+					List<BindingSetValues> hashValue = hashTablePartition.get(probeBs);
+					if (hashValue != null && !hashValue.isEmpty()) {
+						for (BindingSetValues bsv : hashValue) {
+							if (!pushToParent(join(bsv, probeBs))) {
+								return false;
+							}
+						}
+					}
+				}
+				return true;
+			}
+		    @Override
+		    public String toString() {
+		    	return "HashJoinBindingSetPipe";
+		    }
+		}
+
+		@Override
+		protected BindingSetPipe createPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
+			return new HashJoinBindingSetPipe(parent, hashTablePartition);
+		}
+	}
+
+	final class LeftHashTableJoiner extends AbstractHashTableJoiner {
+		LeftHashTableJoiner(BindingSetPipe parent, BinaryTupleOperator join, BindingSet bindings) {
+			super(parent, join, bindings);
+		}
+
+		final class LeftHashJoinBindingSetPipe extends AbstractHashJoinBindingSetPipe {
+			protected LeftHashJoinBindingSetPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
+				super(parent, hashTablePartition);
+			}
+			@Override
+			protected boolean next(BindingSet probeBs) throws InterruptedException {
+				if (probeBs.size() == 0) {
+					// the empty binding set should be merged with all binding sets in the hash table
+					Collection<? extends List<BindingSetValues>> hashValues = hashTablePartition.all();
+					for (List<BindingSetValues> hashValue : hashValues) {
+						for (BindingSetValues bsv : hashValue) {
+							if (!pushToParent(join(bsv, probeBs))) {
+								return false;
+							}
+						}
+					}
+				} else if (hasUnboundOptionalValue(probeBs)) {
+					// have to manually search through all the binding sets
+					Collection<? extends List<BindingSetValues>> hashValues = hashTablePartition.all();
+					boolean foundJoin = false;
+					for (List<BindingSetValues> hashValue : hashValues) {
+						for (BindingSetValues bsv : hashValue) {
+							if (canJoin(bsv, probeBs)) {
+								foundJoin = true;
+								if (!pushToParent(join(bsv, probeBs))) {
+									return false;
+								}
+							}
+						}
+					}
+					if (!foundJoin) {
+						if (!pushToParent(probeBs)) {
+							return false;
+						}
+					}
+				} else {
+					List<BindingSetValues> hashValue = hashTablePartition.get(probeBs);
+					if (hashValue != null && !hashValue.isEmpty()) {
+						for (BindingSetValues bsv : hashValue) {
+							if (!pushToParent(join(bsv, probeBs))) {
+								return false;
+							}
+						}
+					} else {
+						if (!pushToParent(probeBs)) {
+							return false;
+						}
+					}
+				}
+				return true;
+			}
+		    @Override
+		    public String toString() {
+		    	return "LeftHashJoinBindingSetPipe";
+		    }
+		}
+
+		@Override
+		protected BindingSetPipe createPipe(BindingSetPipe parent, HashJoinTable hashTablePartition) {
+			return new LeftHashJoinBindingSetPipe(parent, hashTablePartition);
+		}
+	}
+
     private static final class HashJoinTable {
     	private final String[] joinAttributes;
-    	private final Map<BindingSetHashKey, List<BindingSetHashValue>> hashTable;
+    	private final String[] buildAttributes;
+    	private final Map<BindingSetValues, List<BindingSetValues>> hashTable;
 		private int keyCount;
 		private int bsCount;
 
-		static String[] getJoinAttributes(TupleExpr probeExpr, TupleExpr buildExpr) {
-    		Set<String> joinAttributeNames = probeExpr.getBindingNames();
-    		joinAttributeNames.retainAll(buildExpr.getBindingNames());
-    		return joinAttributeNames.toArray(new String[joinAttributeNames.size()]);
-		}
-
-		HashJoinTable(int initialSize, String[] joinAttributes) {
+		HashJoinTable(int initialSize, String[] joinAttributes, String[] buildAttributes) {
 			this.joinAttributes = joinAttributes;
+			this.buildAttributes = buildAttributes;
     		if (joinAttributes.length > 0) {
     			hashTable = new HashMap<>(initialSize);
     		} else {
-    			hashTable = Collections.<BindingSetHashKey, List<BindingSetHashValue>>singletonMap(BindingSetHashKey.EMPTY, new ArrayList<>(initialSize));
+    			hashTable = Collections.<BindingSetValues, List<BindingSetValues>>singletonMap(BindingSetValues.EMPTY, new ArrayList<>(initialSize));
     		}
     	}
 
 		void put(BindingSet bs) {
-			BindingSetHashKey hashKey = BindingSetHashKey.create(joinAttributes, bs);
-			List<BindingSetHashValue> hashValue = hashTable.get(hashKey);
+			BindingSetValues hashKey = BindingSetValues.create(joinAttributes, bs);
+			List<BindingSetValues> hashValue = hashTable.get(hashKey);
 			boolean newEntry = (hashValue == null);
 			if (newEntry) {
 				int averageSize = (keyCount > 0) ? (int) (bsCount/keyCount) : 0;
@@ -1834,7 +1943,7 @@ final class HalyardTupleExprEvaluation {
 				hashTable.put(hashKey, hashValue);
 				keyCount++;
 			}
-			hashValue.add(BindingSetHashValue.create(bs));
+			hashValue.add(BindingSetValues.create(buildAttributes, bs));
 			bsCount++;
 		}
 
@@ -1842,50 +1951,13 @@ final class HalyardTupleExprEvaluation {
 			return bsCount;
 		}
 
-    	List<BindingSetHashValue> get(BindingSet bs) {
-    		BindingSetHashKey key = BindingSetHashKey.create(joinAttributes, bs);
+    	List<BindingSetValues> get(BindingSet bs) {
+    		BindingSetValues key = BindingSetValues.create(joinAttributes, bs);
 			return hashTable.get(key);
     	}
 
-    	Collection<? extends List<BindingSetHashValue>> all() {
+    	Collection<? extends List<BindingSetValues>> all() {
     		return hashTable.values();
-    	}
-    }
-
-    private static final class BindingSetHashValue {
-    	final String[] names;
-    	final Value[] values;
-
-    	static BindingSetHashValue create(BindingSet bs) {
-    		int size = bs.size();
-    		String[] names = new String[size];
-    		Value[] values = new Value[size];
-    		int i = 0;
-    		for (String key : bs.getBindingNames()) {
-    			names[i] = key;
-    			values[i] = bs.getValue(key);
-    			i++;
-    		}
-    		return new BindingSetHashValue(names, values);
-    	}
-
-    	private BindingSetHashValue(String[] names, Value[] values) {
-			this.names = names;
-			this.values = values;
-		}
-
-    	BindingSet joinTo(BindingSet bs) {
-    		QueryBindingSet result = new QueryBindingSet(bs);
-    		for (int i=0; i<names.length; i++) {
-    			String name = names[i];
-    			if (!result.hasBinding(name)) {
-    				Value v = values[i];
-    				if (v != null) {
-    					result.addBinding(name, v);
-    				}
-    			}
-    		}
-    		return result;
     	}
     }
 

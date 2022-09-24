@@ -91,6 +91,13 @@ public class HalyardStrategyJoinTest {
     }
 
     @Test
+    public void testJoin_2var_constant() throws Exception {
+        // star join
+        String q = "prefix : <http://example/> select ?x ?y where {:y3 :s ?x, ?y}";
+        joinTest(q, "/test-cases/join-results-2-constant.srx", 0, null);
+    }
+
+    @Test
     public void testJoin_0var() throws Exception {
         String q = "prefix : <http://example/> select * where {?s :r ?t. ?x :s ?y}";
         joinTest(q, "/test-cases/join-results-0.srx", 1, expectedAlgo());
@@ -112,6 +119,16 @@ public class HalyardStrategyJoinTest {
     public void testJoin_empty_right() throws Exception {
         String q = "prefix : <http://example/> select * where {:x1 :p ?y. ?y :z ?v}";
         joinTest(q, "/test-cases/join-results-empty.srx", 1, expectedAlgo());
+    }
+
+    @Test
+	public void testJoin_unbound_value() throws Exception {
+		String q = "prefix : <http://example/> "
+				+ "select ?x ?y where { "
+				+ "  values (?x ?y) { (undef 22) } "
+				+ "  ?x :p ?y"
+				+ "}";
+		joinTest(q, "/test-cases/join-results-unbound-value.srx", 1, expectedAlgo());
     }
 
 
@@ -146,6 +163,19 @@ public class HalyardStrategyJoinTest {
         joinTest(q, "/test-cases/left-join-results-empty-0.srx", 1, expectedAlgo());
     }
 
+	@Test
+	public void testLefJoin_unbound_value() throws Exception {
+		String q = "prefix : <http://example/> "
+				+ "select ?x ?y where { "
+				+ "  values (?x ?y) { (undef 22) } "
+				+ "  optional { "
+				+ "    ?x :p ?y "
+				+ "  }"
+				+ "}";
+		joinTest(q, "/test-cases/left-join-results-unbound-value.srx", 1, expectedAlgo());
+	}
+
+
     @Test
     public void testBadNestedLeftJoin() throws Exception {
         String q = "prefix : <http://example/> select ?x ?y ?z where {?x :name 'paul'. optional {?y :name 'george'. optional {?x :email ?z} } }";
@@ -163,6 +193,17 @@ public class HalyardStrategyJoinTest {
         String q = "prefix : <http://example/> select ?x ?y ?z where {{?y :name 'george'. optional {?x :email ?z}} ?x :name 'paul'. }";
         joinTest(q, "/test-cases/cs-0605124.ttl", "/test-cases/cs-0605124-ex4.srx", 2, HashJoin.NAME, expectedAlgo());
     }
+
+    @Test
+	public void testCartesianProduct() throws Exception {
+		String q = ""
+				+ "select ?x ?y where { "
+				+ "  values ?x { undef 67 } "
+				+ "  values ?y { undef 42 } "
+				+ "}";
+		joinTest(q, "/test-cases/cartesian-product-results.srx", 1, expectedAlgo());
+	}
+
 
     private void joinTest(String q, String expectedOutput, int expectedJoins, String expectedAlgo) throws Exception {
     	joinTest(q, "/test-cases/join-data.ttl", expectedOutput, expectedJoins, expectedAlgo != null ? new String[] {expectedAlgo} : null);
