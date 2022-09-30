@@ -3,6 +3,7 @@ name: Halyard-star CI
 on:
   push:
     branches: [ latest ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ latest ]
 
