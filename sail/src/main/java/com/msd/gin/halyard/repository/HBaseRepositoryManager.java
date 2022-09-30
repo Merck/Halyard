@@ -23,6 +23,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -205,6 +206,7 @@ public final class HBaseRepositoryManager extends RepositoryManager {
                 result.add(repInfo);
             }
         }
+		Collections.sort(result);
         return result;
     }
 
