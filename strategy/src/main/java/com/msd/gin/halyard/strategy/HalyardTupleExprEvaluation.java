@@ -72,6 +72,7 @@ import org.eclipse.rdf4j.model.vocabulary.SESAME;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
+import org.eclipse.rdf4j.query.MutableBindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryResults;
 import org.eclipse.rdf4j.query.algebra.AggregateOperator;
@@ -955,8 +956,8 @@ final class HalyardTupleExprEvaluation {
     	parentStrategy.initTracking(group);
     	if (group.getGroupBindingNames().isEmpty()) {
     		// no GROUP BY present
-			final GroupValue aggregators = createGroupValue(group, bindings);
     		evaluateTupleExpr(new BindingSetPipe(parent) {
+    			final GroupValue aggregators = createGroupValue(group, bindings);
 				@Override
 				protected boolean next(BindingSet bs) throws InterruptedException {
 					aggregators.addValues(bs);
@@ -975,25 +976,21 @@ final class HalyardTupleExprEvaluation {
 				}
     		}, group.getArg(), bindings);
     	} else {
-			final Map<GroupKey,GroupValue> groupByMap = new ConcurrentHashMap<>();
     		evaluateTupleExpr(new BindingSetPipe(parent) {
+    			final Map<BindingSetValues,GroupValue> groupByMap = new ConcurrentHashMap<>();
+    			final String[] groupNames = toStringArray(group.getGroupBindingNames());
 				@Override
 				protected boolean next(BindingSet bs) throws InterruptedException {
-					GroupValue aggregators = groupByMap.computeIfAbsent(new GroupKey(bs, group), k -> createGroupValue(group, bindings));
+					GroupValue aggregators = groupByMap.computeIfAbsent(BindingSetValues.create(groupNames, bs), k -> createGroupValue(group, bindings));
 					aggregators.addValues(bs);
 					return true;
 				}
 				@Override
 				public void close() throws InterruptedException {
 					if (!groupByMap.isEmpty()) {
-						for(Map.Entry<GroupKey,GroupValue> aggEntry : groupByMap.entrySet()) {
-							QueryBindingSet result = new QueryBindingSet(bindings);
-							for (String name : group.getGroupBindingNames()) {
-								Value v = aggEntry.getKey().bindingSet.getValue(name);
-								if (v != null) {
-									result.setBinding(name, v);
-								}
-							}
+						for(Map.Entry<BindingSetValues,GroupValue> aggEntry : groupByMap.entrySet()) {
+							BindingSetValues groupKey = aggEntry.getKey();
+							MutableBindingSet result = groupKey.setBindings(groupNames, bindings);
 							aggEntry.getValue().bindResult(result);
 							parentStrategy.incrementResultSizeActual(group);
 							parent.push(result);
@@ -1034,60 +1031,6 @@ final class HalyardTupleExprEvaluation {
 		return new GroupValue(aggregators);
     }
 
-    private static final class GroupKey implements Serializable {
-		private static final long serialVersionUID = 2483566881092991496L;
-		private final BindingSet bindingSet;
-		private final Group group;
-		private final int hash;
-
-		GroupKey(BindingSet bindingSet, Group group) {
-			this.bindingSet = bindingSet;
-			this.group = group;
-
-			int nextHash = 0;
-			for (String name : group.getGroupBindingNames()) {
-				Value value = bindingSet.getValue(name);
-				if (value != null) {
-					nextHash ^= value.hashCode();
-				}
-			}
-			this.hash = nextHash;
-		}
-
-		@Override
-		public int hashCode() {
-			return hash;
-		}
-
-		@Override
-		public boolean equals(Object other) {
-			if (other instanceof GroupKey && other.hashCode() == hash) {
-				BindingSet otherSolution = ((GroupKey) other).bindingSet;
-				for (String name : group.getGroupBindingNames()) {
-					Value v1 = bindingSet.getValue(name);
-					Value v2 = otherSolution.getValue(name);
-					if (!Objects.equals(v1, v2)) {
-						return false;
-					}
-				}
-				return true;
-			}
-			return false;
-		}
-
-		@Override
-		public String toString() {
-			QueryBindingSet keybs = new QueryBindingSet();
-			for (String name : group.getGroupBindingNames()) {
-				Value value = bindingSet.getValue(name);
-				if (value != null) {
-					keybs.addBinding(name, value);
-				}
-			}
-			return keybs.toString();
-		}
-    }
-
     private static final class GroupValue {
 		private final Map<String, Aggregator> aggregators;
 
@@ -1101,7 +1044,7 @@ final class HalyardTupleExprEvaluation {
 			}
 		}
 
-		void bindResult(QueryBindingSet bs) {
+		void bindResult(MutableBindingSet bs) {
 			for(Map.Entry<String,Aggregator> entry : aggregators.entrySet()) {
 				try(Aggregator agg = entry.getValue()) {
 					Value v = agg.getValue();

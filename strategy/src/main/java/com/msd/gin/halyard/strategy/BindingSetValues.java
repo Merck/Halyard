@@ -7,6 +7,7 @@ import java.util.Set;
 
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
+import org.eclipse.rdf4j.query.MutableBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 
 final class BindingSetValues implements Serializable {
@@ -39,6 +40,18 @@ final class BindingSetValues implements Serializable {
 		this.values = values;
 	}
 
+	MutableBindingSet setBindings(String[] names, BindingSet bs) {
+		QueryBindingSet result = new QueryBindingSet(bs);
+		for (int i=0; i<names.length; i++) {
+			String name = names[i];
+			Value v = values[i];
+			if (v != null) {
+				result.setBinding(name, v);
+			}
+		}
+		return result;
+	}
+
 	boolean canJoin(String[] names, Set<String> joinNames, BindingSet bs) {
 		for (int i=0; i<names.length; i++) {
 			String name = names[i];
@@ -60,7 +73,7 @@ final class BindingSetValues implements Serializable {
 			if (!result.hasBinding(name)) {
 				Value v = values[i];
 				if (v != null) {
-					result.addBinding(name, v);
+					result.setBinding(name, v);
 				}
 			}
 		}
@@ -78,6 +91,10 @@ final class BindingSetValues implements Serializable {
 
 		BindingSetValues other = (BindingSetValues) o;
 		if (this.values.length != other.values.length) {
+			return false;
+		}
+
+		if (this.hashcode != 0 && other.hashcode != 0 && this.hashcode != other.hashcode) {
 			return false;
 		}
 
