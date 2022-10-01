@@ -1,0 +1,44 @@
+# sp
+com.msd.gin.halyard.spin.function.Add
+com.msd.gin.halyard.spin.function.Subtract
+com.msd.gin.halyard.spin.function.Multiply
+com.msd.gin.halyard.spin.function.Divide
+com.msd.gin.halyard.spin.function.And
+com.msd.gin.halyard.spin.function.Or
+com.msd.gin.halyard.spin.function.Not
+com.msd.gin.halyard.spin.function.EqualTo
+com.msd.gin.halyard.spin.function.NotEqualTo
+com.msd.gin.halyard.spin.function.LessThan
+com.msd.gin.halyard.spin.function.LessThanOrEqualTo
+com.msd.gin.halyard.spin.function.GreaterThan
+com.msd.gin.halyard.spin.function.GreaterThanOrEqualTo
+# afn
+com.msd.gin.halyard.spin.function.Localname
+# spl
+com.msd.gin.halyard.spin.function.ObjectFunction
+# spif
+com.msd.gin.halyard.spin.function.spif.Mod
+com.msd.gin.halyard.spin.function.spif.ParseDate
+com.msd.gin.halyard.spin.function.spif.DateFormat
+com.msd.gin.halyard.spin.function.spif.DecimalFormat
+com.msd.gin.halyard.spin.function.spif.Trim
+com.msd.gin.halyard.spin.function.spif.CurrentTimeMillis
+com.msd.gin.halyard.spin.function.spif.TimeMillis
+com.msd.gin.halyard.spin.function.spif.GenerateUUID
+com.msd.gin.halyard.spin.function.spif.Random
+com.msd.gin.halyard.spin.function.spif.Cast
+com.msd.gin.halyard.spin.function.spif.IndexOf
+com.msd.gin.halyard.spin.function.spif.LastIndexOf
+com.msd.gin.halyard.spin.function.spif.EncodeURL
+com.msd.gin.halyard.spin.function.spif.BuildString
+com.msd.gin.halyard.spin.function.spif.BuildURI
+com.msd.gin.halyard.spin.function.spif.ReplaceAll
+com.msd.gin.halyard.spin.function.spif.Name
+com.msd.gin.halyard.spin.function.spif.UnCamelCase
+com.msd.gin.halyard.spin.function.spif.IsValidURI
+com.msd.gin.halyard.spin.function.spif.HasAllObjects
+com.msd.gin.halyard.spin.function.spif.Invoke
+com.msd.gin.halyard.spin.function.spif.UpperCase
+com.msd.gin.halyard.spin.function.spif.LowerCase
+com.msd.gin.halyard.spin.function.spif.TitleCase
+com.msd.gin.halyard.spin.function.spif.LowerTitleCase

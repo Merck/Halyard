@@ -1,0 +1,200 @@
+<!--?xml version="1.0" encoding="UTF-8"?-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="https://www.w3.org/1999/xhtml"><head profile="https://www.w3.org/2003/g/data-view">
+    <meta content="text/html; charset=UTF-8" http-equiv="content-type">
+    <title>SPIN JavaScript Functions (SPINx)</title>
+	<link rel="stylesheet" type="text/css" href="assets/local.css">
+    <link href="assets/base.css" rel="stylesheet" type="text/css">
+  </head>
+
+  <body>
+    <div class="head">
+      <div>
+        <h1 id="title">SPIN JavaScript Functions (SPINx)</h1>
+        <h2>March 24, 2010</h2>
+      </div>
+       
+      <dl>
+        <dt>Authors:</dt>
+        <dd>Holger Knublauch &lt;<a href="mailto:holger@topquadrant.com" shape="rect">holger@topquadrant.com</a>&gt;</dd>
+      </dl>
+	  <div style="position: absolute; left: 500px; top: 120px"><a href="http://spinrdf.org/"><img src="assets/SPIN-400x97.png"></a></div>
+
+    </div>
+
+    <hr>
+
+    <h2 id="abstract">Abstract</h2> 
+    <p>
+    	This document describes the SPINx vocabulary, an extension of the
+    	SPIN framework that can be used to define new SPARQL functions based
+    	on JavaScript code.
+    	This makes it possible to extend SPARQL engines with new functions
+    	that execute JavaScript at run-time.
+    	The SPINx framework is very light-weight and is easy to implement and use.
+    </p>
+
+    <h2 id="sotd">Status of This Document</h2>
+
+    <p><em>1.0.0</em></p>
+    <p></p>
+    <p>
+    	This document is an optional part of the <a href="http://spinrdf.org/">SPARQL
+    	Inferencing Notation (SPIN)</a> specification.
+    </p>
+	<p style="color: red; font-weight: bold">
+		As of 2017, SPINx has further evolved into <a href="https://www.w3.org/TR/shacl-js/">SHACL-JS</a>,
+		which provides very similar capabilities.
+		SPINx should no longer be used and will be removed in a future TopBraid version.
+	</p>
+      
+    <hr>
+
+	<div class="toc">
+		<h2><a id="contents" name="contents">Table of Contents</a></h2>
+	  
+		<ul class="toc">
+	    	<li class="tocline1"><a href="#introduction">1 Introduction</a></li>
+	    	<li class="tocline1"><a href="#javaScriptCode">2 spinx:javaScriptCode</a></li>
+	    	<li class="tocline1"><a href="#javaScriptFile">3 spinx:javaScriptFile</a></li>
+	    	<li class="tocline1"><a href="#reference">Appendix: Reference</a> </li>
+	  	</ul>
+	</div>
+	<p>&nbsp;</p>
+	
+	
+	<h2 id="introduction">1 Introduction</h2>
+	<p>
+		While SPARQL is an immensely powerful language, many real-world use cases
+		require extensions that are not covered by the official standards.
+		Examples include complex string operations or mathematical computations.
+		SPARQL provides a built-in extension point, allowing anyone to define custom
+		functions, identified by a function URI.
+		The <a href="http://spinrdf.org/spin.html#spin-functions">SPIN</a>
+		framework makes it possible to define and share such functions in
+		a machine-readable format, fully compliant with the Semantic Web stack.
+		SPIN includes an RDF vocabulary for defining the arguments and return value
+		types of a function, as well as other useful information such as comments.
+		SPIN also has a built-in property (<code>spin:body</code>) to define how
+		a SPARQL function is to be executed, based on another SPARQL query.
+	</p>
+	<p>
+		Those user-defined SPIN functions are a very powerful way of extending SPARQL,
+		but they are still limited by whatever features are natively supported by
+		the executing SPARQL engine.
+		The SPINx framework described in this document makes it possible to define
+		new SPARQL functions that are backed by JavaScript/ECMAScript code.
+		Whenever such SPINx functions are invoked, a SPINx-aware SPARQL engine can
+		look up the function's body and execute it using a JavaScript interpreter.
+	</p>
+	<p>
+		The following sections introduce the two properties of the SPINx vocabulary.
+		You should already be familiar with
+		<a href="http://spinrdf.org/spin.html#spin-functions">user-defined SPIN functions</a>.
+	</p>
+    <p>&nbsp;</p>
+    
+    
+    <h2 id="javaScriptCode">2 spinx:javaScriptCode</h2>
+    <p>
+		The simplest way of defining a JavaScript-based SPIN function is by using
+		the property <code>spinx:javaScriptCode</code>.
+		This property can be used to link a SPIN function (subject) with a JavaScript
+		snippet (string object).
+		This is illustrated in the following example (in Turtle notation), which defines a new SPARQL
+		function <code>distance:squareInline</code> that takes one argument (<code>?arg1</code>)
+		and computes the square of this argument (<code>?arg1 * ?arg1</code>).
+    </p>
+	<pre class="query">distance:squareInline
+      a       spin:Function ;
+      rdfs:label "square inline"^^xsd:string ;
+      rdfs:subClassOf spin:Functions ;
+      spin:constraint
+              [ a       spl:Argument ;
+                rdfs:comment "The value to compute the square of"^^xsd:string ;
+                spl:predicate sp:arg1 ;
+                spl:valueType xsd:float
+              ] ;
+      spin:returnType xsd:float ;
+      <b>spinx:javaScriptCode
+              "return arg1 * arg1;"^^xsd:string</b> .</pre>
+	<p>
+		When executed, the function's JavaScript code snippet will be converted into a JavaScript
+		function that has the snippet as its body.
+	</p>
+	<p>
+		The function's JavaScript code can access the arguments using the pre-defined variables
+		<code>arg1</code>, <code>arg2</code> etc.
+		The values of those arguments depend on their type:
+	</p>
+	<ul>
+		<li>Literals are represented by matching JavaScript primitive types including
+		    strings and integers, depending on the RDF datatype.</li>
+		<li>URI resources are mapped to URI strings.</li>
+		<li>Blank nodes are mapped to whatever internal ID the platform uses - this is generally
+		    unreliable and therefore should not be used.</li>
+	</ul>
+	<p>
+		The return value of a SPINx function will be automatically converted to a RDF node
+		using the following policy:
+	</p>
+	<ul>
+		<li>If the <code>spin:returnType</code> is empty, then the function's result will be
+		    converted to a URI resource</li>
+		<li>Otherwise, the result of the JavaScript call will be converted to an RDF
+		    literal with the <code>spin:returnType</code> as datatype.</li>
+	</ul>
+    <p>&nbsp;</p>
+    
+    
+    <h2 id="javaScriptFile">3 spinx:javaScriptFile</h2>
+    <p>
+		While <code>spinx:javaScriptCode</code> is suitable for small snippets of simple
+		JavaScript code, the property <code>spinx:javaScriptFile</code> provides greater
+		flexibility to link a SPIN function with larger bodies of JavaScript code.
+		The subject of the <code>spinx:javaScriptFile</code> property is a SPIN function,
+		and the object is the URL of a JavaScript file, encoded as a string.
+	</p>
+	<p>
+		The following example (in Turtle notation) declares a similar function as above,
+		but with the JavaScript code stored in a file <code>distance.js</code>.
+		Since this is a relative path name, the engine should look up this file in the
+		same location as the SPIN file (i.e. the <code>distance</code> namespace).
+		Alternatively, the file location can also be an absolute URL.
+	</p>
+	<pre class="query">distance:square
+      a       spin:Function ;
+      rdfs:comment "Computes the square of a numeric value, backed by a JavaScript implementation." ;
+      rdfs:label "square"^^xsd:string ;
+      rdfs:subClassOf spin:Functions ;
+      spin:constraint
+              [ a       spl:Argument ;
+                rdfs:comment "The number to compute the square of."^^xsd:string ;
+                spl:predicate sp:arg1 ;
+                spl:valueType rdfs:Literal
+              ] ;
+      spin:returnType xsd:float ;
+      <b>spinx:javaScriptFile
+              "distance.js"^^xsd:string</b> .</pre>
+	<p>
+		The contents of the file <code>distance.js</code> is shown below:
+	</p>
+	<pre class="query">function square(x) { 
+	return x * x; 
+}</pre>
+	<p>
+		By default, the SPINx engine assumes that the JavaScript file contains a function with the
+		same name as the local name of the SPIN function (here: <code>distance:square</code> is mapped
+		to the JavaScript function <code>square</code>).
+		Alternatively, a SPINx function can contain a value for <code>spinx:javaScriptCode</code>
+		which is executed on top of the file, and may contain any other combination of function calls.
+	</p>
+    <p>&nbsp;</p>
+	    
+    <h2 id="reference">Appendix: Reference</h2>
+    <p>
+    	The URL of the SPINx schema is <a href="http://spinrdf.org/spinx">http://spinrdf.org/spinx</a>
+    </p>
+
+  
+</body></html>

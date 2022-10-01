@@ -3,6 +3,7 @@ package com.msd.gin.halyard.function;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.XMLLiteral;
+import com.msd.gin.halyard.spin.function.InverseMagicProperty;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.util.Collections;
@@ -24,7 +25,6 @@ import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunction;
-import org.eclipse.rdf4j.spin.function.InverseMagicProperty;
 import org.kohsuke.MetaInfServices;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;

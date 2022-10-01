@@ -5,7 +5,8 @@ import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.query.EmptyTripleSource;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.TimestampedUpdateContext;
-import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
+import com.msd.gin.halyard.spin.SpinMagicPropertyInterpreter;
+import com.msd.gin.halyard.spin.SpinParser;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
@@ -60,7 +61,6 @@ import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UpdateContext;
-import org.eclipse.rdf4j.spin.SpinParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

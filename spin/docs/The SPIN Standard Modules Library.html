@@ -1,0 +1,378 @@
+<!--?xml version="1.0" encoding="UTF-8"?-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="https://www.w3.org/1999/xhtml"><head profile="https://www.w3.org/2003/g/data-view">
+    <meta content="text/html; charset=UTF-8" http-equiv="content-type">
+    <title>The SPIN Standard Modules Library</title>
+	<link rel="stylesheet" type="text/css" href="assets/local.css">
+    <link href="assets/base.css" rel="stylesheet" type="text/css">
+  </head>
+
+  <body>
+    <div class="head">
+      <div>
+        <h1 id="title">The SPIN Standard Modules Library</h1>
+        <h2>October 20, 2009</h2>
+      </div>
+       
+      <dl>
+        <dt>Authors:</dt>
+        <dd>Holger Knublauch &lt;<a href="mailto:holger@topquadrant.com" shape="rect">holger@topquadrant.com</a>&gt;</dd>
+      </dl>
+	  <div style="position: absolute; left: 500px; top: 120px"><a href="http://spinrdf.org/"><img src="assets/SPIN-400x97.png"></a></div>
+
+    </div>
+
+    <hr>
+
+    <h2 id="abstract">Abstract</h2> 
+    <p>
+    	<a href="https://spinrdf.org/index.html">SPIN</a> provides a mechanism to encapsulate SPARQL
+    	queries into reusable building blocks so that they can be shared on the
+    	Semantic Web.  In particular, SPIN makes it possible to define new SPARQL
+    	functions and query templates together with definitions of their arguments.
+    	The SPIN Standard Modules Library (SPL) is a collection of such SPIN
+    	functions and templates that might be of general use.  Among others,
+    	this library covers some common domain modeling patterns such as attribute
+    	declarations with cardinality and value range constraints.  SPL also
+    	declares the standard SPARQL functions like <code>!=</code> and
+    	<code>bound</code>.
+    </p>
+
+    <h2 id="sotd">Status of This Document</h2>
+
+    <p><em>1.1.1</em></p>
+    <p></p>
+    <p>
+    	This document is part of the <a href="http://spinrdf.org/">SPARQL
+    	Inferencing Notation (SPIN)</a> specification.
+    </p>
+      
+    <hr>
+
+	<div class="toc">
+		<h2><a id="contents" name="contents">Table of Contents</a></h2>
+	  
+		<ul class="toc">
+	    	<li class="tocline1"><a href="#introduction">1 Introduction</a>
+	    		<ul class="toc">
+			      	<li class="tocline2"><a href="#an-example">1.1 An Example</a></li>
+			      	<li class="tocline2"><a href="#design-considerations">1.2 Design Considerations</a></li>
+			    </ul>
+			</li>
+	    	<li class="tocline1"><a href="#functions">2 Functions</a>
+	    		<ul class="toc">
+			      	<li class="tocline2"><a href="#hasValue">spl:hasValue</a></li>
+			      	<li class="tocline2"><a href="#hasValueOfType">spl:hasValueOfType</a></li>
+			      	<li class="tocline2"><a href="#instanceOf">spl:instanceOf</a></li>
+			      	<li class="tocline2"><a href="#objectCount">spl:objectCount</a></li>
+			    </ul>
+			</li>
+	    	<li class="tocline1"><a href="#templates">3 Templates</a>
+	    		<ul class="toc">
+		      		<li class="tocline2"><a href="#Argument">spl:Argument</a></li>
+		      		<li class="tocline2"><a href="#Attribute">spl:Attribute</a></li>
+		      		<li class="tocline2"><a href="#ConstructDefaultValues">spl:ConstructDefaultValues</a></li>
+		      		<li class="tocline2"><a href="#InferDefaultValue">spl:InferDefaultValue</a></li>
+		      	</ul>
+		    </li>
+	    	<li class="tocline1"><a href="#reference">Appendix: Reference</a> </li>
+	  	</ul>
+	</div>
+	<p>&nbsp;</p>
+	
+	<h2 id="introduction">1 Introduction</h2>
+	<p>
+		The SPIN Standard Modules Library has been designed to provide a small
+		collection of frequently needed SPARQL queries.  Each query module in
+		the SPL has a unified URI so that users don't need to reinvent the wheel
+		when they require similar functionality in their own SPIN models.
+	</p>
+	<p>
+		Potentially such a library could comprise domain specific features such
+		as geospatial functions, unit conversion, or mathematical utilities.
+		However, in order to keep the SPL as small as possible, the focus of SPL
+		is on domain modeling, i.e. on the language level similar to RDF Schema
+		and OWL.
+	</p>
+	
+	<h3 id="an-example">1.1 An Example</h3>
+	<p>
+		Here is an example use of the SPL template <code>spl:Attribute</code>
+		(at a class definition in N3 notation):
+	</p>
+	<pre class="query">    ex:Wine
+      a       rdfs:Class ;
+      rdfs:label "Wine"^^xsd:string ;
+      spin:constraint
+              [ a       spl:Attribute ;
+                rdfs:comment "the color of the wine"^^xsd:string ;
+                spl:predicate ex:color ;
+                spl:minCount 1 ;
+                spl:maxCount 1 ;
+                spl:valueType ex:Color ;
+                spl:defaultValue ex:Red
+              ] .</pre>
+    <p>
+    	The above example uses <code>spin:constraint</code> to link the class
+    	<code>ex:Wine</code> with a constraint on its property values.  The
+    	constraint is an instance of the template <code>spl:Attribute</code>,
+    	and SPIN engines will substitute the template call with a parameterized
+    	version of the template's body.  The generic body of the
+    	<code>spl:Attribute</code> template looks like:
+    </p>
+    <pre class="query">    ASK
+    WHERE {
+        {
+            FILTER (bound(?minCount) &amp;&amp; 
+                    (spl:objectCount(?this, ?predicate) &lt; ?minCount)) .
+        }
+        UNION
+        {
+            FILTER (bound(?maxCount) &amp;&amp; 
+                    (spl:objectCount(?this, ?predicate) &gt; ?maxCount)) .
+        }
+        UNION
+        {
+            FILTER bound(?valueType) .
+            ?this ?predicate ?value .
+            FILTER (!spl:instanceOf(?value, ?valueType)) .
+        }
+    }</pre>
+    <p>
+    	Applied to the arguments from the example above, the query can
+    	be read as: 
+    </p>
+    <pre class="query">    ASK
+    WHERE {
+        {
+            FILTER (bound(1) &amp;&amp; 
+                    (spl:objectCount(?this, ex:color) &lt; 1)) .
+        }
+        UNION
+        {
+            FILTER (bound(1) &amp;&amp; 
+                    (spl:objectCount(?this, ex:color) &gt; 1)) .
+        }
+        UNION
+        {
+            FILTER bound(ex:Color) .
+            ?this ex:color ?value .
+            FILTER (!spl:instanceOf(?value, ex:Color)) .
+        }
+    }</pre>
+    <p>
+    	
+    	Based on this simple substitution mechanism, SPIN-aware	tools
+    	can verify that any instance of <code>ex:Wine</code> has at least one
+    	and at most one value for the property <code>ex:color</code>.  The
+    	template's body query does the cardinality checking, and also checks
+    	that the value type of all <code>ex:color</code> values must match the
+    	class <code>ex:Color</code>.  Finally, the template also bundles in
+    	a <code>spl:defaultValue</code> that allows SPIN engines to initialize
+    	new instances of the class <code>ex:Wine</code> with <code>ex:Red</code>
+    	as default value for the <code>ex:color</code> property.
+    </p>
+    <p>
+    	Hand-coding all these common design patterns directly in SPARQL would
+    	have been inconvenient and unnecessarily verbose.
+    	The example shows how SPIN can be used to define new modeling constructs
+    	or even languages with directly executable semantics based on SPARQL.
+    </p>
+    
+	<h3 id="design-considerations">1.2 Design Considerations</h3>
+	<p>
+		The SPL is self-contained in so far that it does not rely on any other
+		SPIN libraries or special built-in functions of a particular SPARQL engine.
+		This means that any function or template that refers to resources from
+		other namespaces than <code>rdf</code>, <code>rdfs</code> or <code>owl</code>
+		is outside of the boundaries of SPL.
+	</p>
+	<p>
+		In addition to specific functions and templates, SPL also suggests a
+		categorization scheme for functions.  Abstract top-level classes such as
+		<code>spl:BooleanFunctions</code> can be used to group together functions
+		with comparable functionality.
+	</p>
+	<p>
+		SPL also includes definitions of the standard SPARQL functions such as
+		<code>bound</code> to formally declare their arguments and provide a
+		description.  Details about those functions are not covered by this document.
+	</p>
+	<p>
+		SPL is designed using open source principles, and participation of the
+		community is encouraged.  Please contact the authors if you would like
+		to add or change functionality.
+	</p>
+	<p>&nbsp;</p>
+
+	<h2 id="functions">2 Functions</h2>
+	<p>
+		The following SPL functions are stable at this stage.
+	</p>
+	
+	<h3 id="hasValue">spl:hasValue</h3>
+	<p>
+		<code>spl:hasValue</code> can be used to verify whether a given
+		resource has a given value for a given property.  The function
+		applies <code>rdfs:subPropertyOf</code> inferencing, i.e. values
+		of sub-properties of the provided property will also be checked.
+	</p>
+	<p>
+		Examples:
+	</p>
+	<pre class="query">    spl:hasValue(rdfs:Class, rdfs:label, "Class")   # true
+    spl:hasValue(rdf:rest, rdfs:seeAlso, rdf:)      # true</pre>
+	
+	<h3 id="hasValueOfType">spl:hasValueOfType</h3>
+	<p>
+		<code>spl:hasValueOfType</code> tests whether a given subject
+		has at least one value of a given type for a given property.
+		The function automatically applies sub-property inferencing,
+		i.e. also values of sub-properties of the given property will
+		be considered.
+		This function is comparable to <code>owl:someValueFrom</code>
+		restrictions in OWL, but with closed-world semantics.
+	</p>
+	<p>
+		Examples:
+	</p>
+	<pre class="query">    spl:hasValueOfType(rdfs:Class, rdfs:label, xsd:string)   # true
+    spl:hasValueOfType(rdf:Class, rdfs:label, xsd:int)       # false</pre>
+    
+	<h3 id="instanceOf">spl:instanceOf</h3>
+	<p>
+		<code>spl:instanceOf</code> can be used to verify whether a given
+		value has a given type.  The value can either be a resource or a
+		literal.  If the value is a resource, then it must have the provided
+		type (or a subclass thereof) as one of its <code>rdf:types</code>.
+		If the value is a literal, then its datatype must match the provided
+		XSD type.
+	</p>
+	<p>
+		Examples:
+	</p>
+	<pre class="query">    spl:instanceOf(owl:versionInfo, rdf:Property)   # true
+    spl:instanceOf(owl:Thing, rdf:Property)         # false
+    spl:instanceOf(42, xsd:integer)                 # true
+    spl:instanceOf("42", xsd:integer)               # false</pre>
+
+	<h3 id="objectCount">spl:objectCount</h3>
+	<p>
+		<code>spl:objectCount</code> is a convenience function that
+		delivers the number of values of a given subject/predicate combination.
+		This is frequently needed for constraint checking to verify the
+		cardinality of a property.
+	</p>
+	<p>
+		Examples:
+	</p>
+	<pre class="query">    spl:objectCount(owl:Thing, rdfs:label)   # 1</pre>
+
+	<p>&nbsp;</p>
+	
+	<h2 id="templates">3 Templates</h2>
+	<p>
+		The following SPIN templates are defined by SPL.
+	</p>
+	
+	<h3 id="Argument">spl:Argument</h3>
+	<p>
+		<code>spl:Argument</code> can be used to specify that instances of
+		a class can have values for a given property.  Arguments may be
+		declared to be optional, but in general have a maximum cardinality
+		of one.  SPIN itself uses <code>spl:Argument</code> to define
+		the arguments of functions and templates.   
+	</p>
+	<p>
+		Example:
+	</p>
+	<pre class="query">    []    a       spl:Argument ;
+      rdfs:comment "the maximum number of values permitted for the property" ;
+      spl:optional "true"^^xsd:boolean ;
+      spl:predicate spl:maxCount ;
+      spl:valueType xsd:integer .</pre>
+      
+	<h3 id="Attribute">spl:Attribute</h3>
+	<p>
+		Instances of the <code>spl:Attribute</code> template can be attached to classes
+		to specify metadata about a property <code>spl:predicate</code>.  The following
+		kinds of metadata are supported (all of which are optional):
+	</p>
+	<ul>
+		<li><code>rdfs:comment</code> a comment describing the use of the property at the class</li>
+		<li><code>spl:defaultValue</code> the default value of the property</li>
+		<li><code>spl:minCount</code> the minimum number of expected property values</li>
+		<li><code>spl:maxCount</code> the maximum number of expected property values</li>
+		<li><code>spl:valueType</code> the value range of the property</li>
+	</ul>  
+	<p>
+		Example:
+	</p>
+	<pre class="query">    :Parent
+      a       rdfs:Class ;
+      rdfs:label "Parent"^^xsd:string ;
+      rdfs:subClassOf :Person ;
+      spin:constraint
+              [ a       spl:Attribute ;
+                rdfs:comment "the children of this Parent"^^xsd:string ;
+                spl:predicate :child ;
+                spl:minCount 1 ;
+                spl:valueType :Person
+              ] .</pre>
+	
+	<h3 id="ConstructDefaultValues">spl:ConstructDefaultValues</h3>
+	<p>
+		<code>spl:ConstructDefaultValues</code> can be attached as a
+		<code>spin:constructor</code> to root classes so that all instances
+		of that class (and its subclasses) are initialized with default
+		values based on the <code>spl:defaultValue</code> of
+		<code>spl:Attribute</code> constraints.
+	</p>
+	<p>
+		Example:
+	</p>
+	<pre class="query">    spin:Modules
+      a       rdfs:Class ;
+      rdfs:comment "An \"artificial\" parent class for all Functions and Templates." ;
+      rdfs:label "Modules"^^xsd:string ;
+      rdfs:subClassOf rdfs:Resource ;
+      spin:constructor
+              [ a       spl:ConstructDefaultValues
+              ] .</pre>
+	
+	<h3 id="InferDefaultValue">spl:InferDefaultValue</h3>
+	<p>
+		<code>spl:InferDefaultValue</code> can be attached as a
+		<code>spin:rule</code> to a class so that all instances
+		of that class (and its subclasses) will have a default
+		value for a certain property.  In this case, default value
+		means that the specified value will be inferred whenever
+		there is no other value present for the subject/predicate
+		combination.  For example, if an instance of Product has
+		no value for its <code>madeIn</code> property, then a default
+		value will be inferred the next time inferences are run.
+		Some tools may also look for such declarations to collect
+		hints to drive user interfaces etc.
+	</p>
+	<p>
+		Example:
+	</p>
+	<pre class="query">    ex:Product
+      a       owl:Class ;
+      rdfs:subClassOf owl:Thing ;
+      spin:rule
+              [ a       spl:InferDefaultValue ;
+                spl:defaultValue ex:China ;
+                spl:predicate ex:madeIn
+              ] .
+</pre>
+              
+    <p>&nbsp;</p>
+	    
+    <h2 id="reference">Appendix: Reference</h2>
+    <p>
+    	The URL of the SPL schema is <a href="http://spinrdf.org/spl">http://spinrdf.org/spl</a>
+    </p>
+
+  
+</body></html>

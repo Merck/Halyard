@@ -1,0 +1,514 @@
+<!--?xml version="1.0" encoding="UTF-8"?-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="https://www.w3.org/1999/xhtml"><head profile="https://www.w3.org/2003/g/data-view">
+    <meta content="text/html; charset=UTF-8" http-equiv="content-type">
+    <title>SPIN Result Sets, Tables and Spreadsheets Vocabulary</title>
+	<link rel="stylesheet" type="text/css" href="assets/local.css">
+    <link href="assets/base.css" rel="stylesheet" type="text/css">
+  </head>
+
+  <body>
+    <div class="head">
+      <div>
+        <h1 id="title">SPIN Result Sets, Tables and Spreadsheets Vocabulary</h1>
+        <h2>February 12, 2010. Updated June 18, 2013.</h2>
+      </div>
+       
+      <dl>
+        <dt>Authors:</dt>
+        <dd>Holger Knublauch &lt;<a href="mailto:holger@topquadrant.com" shape="rect">holger@topquadrant.com</a>&gt;</dd>
+      </dl>
+	  <div style="position: absolute; left: 500px; top: 120px"><a href="http://spinrdf.org/"><img src="assets/SPIN-400x97.png"></a></div>
+
+    </div>
+
+    <hr>
+
+    <h2 id="abstract">Abstract</h2> 
+    <p>
+    	This document describes the SPR vocabulary: a collection of classes,
+    	properties and SPARQL functions that can be used to process tabular data in RDF.
+    	The tabular data may originate from the result sets of SPARQL SELECT queries,
+    	from external spreadsheet files or from user input.
+    	SPR does not prescribe details on the storage of the tabular data,
+    	e.g. as RDF triples, but instead only defines an abstract interface
+    	of SPARQL functions that can be used to query, iterate through and
+    	aggregate tabular data.  
+    </p>
+
+    <h2 id="sotd">Status of This Document</h2>
+
+    <p><em>1.0.0</em></p>
+    <p></p>
+    <p>
+    	This document is an optional part of the <a href="http://spinrdf.org/">SPARQL
+    	Inferencing Notation (SPIN)</a> specification.
+    </p>
+      
+    <hr>
+
+	<div class="toc">
+		<h2><a id="contents" name="contents">Table of Contents</a></h2>
+	  
+		<ul class="toc">
+	    	<li class="tocline1"><a href="#introduction">1 Introduction</a></li>
+	    	<li class="tocline1"><a href="#core">2 Core Concepts</a></li>
+	    	<li class="tocline1"><a href="#basic">3 Basic Functions</a>
+	    		<ul class="toc">
+	    			<li class="tocline1"><a href="#colCount">3.1 spr:colCount</a></li>
+	    			<li class="tocline1"><a href="#rowCount">3.2 spr:rowCount</a></li>
+	    			<li class="tocline1"><a href="#cell">3.3 spr:cell</a></li>
+	    			<li class="tocline1"><a href="#colName">3.4 spr:colName</a></li>
+	    		</ul>
+	    	</li>
+	    	<li class="tocline1"><a href="#aggregation">4 Aggregation Functions</a>
+	    		<ul class="toc">
+	    			<li class="tocline1"><a href="#aggregateCol">4.1 spr:aggregateCol</a></li>
+	    			<li class="tocline1"><a href="#aggregateRow">4.2 spr:aggregateRow</a></li>
+	    		</ul>
+	    	</li>
+	    	<li class="tocline1"><a href="#magic">5 Magic Properties</a>
+	    		<ul class="toc">
+	    			<li class="tocline1"><a href="#colIndices">5.1 spr:colIndices</a></li>
+	    			<li class="tocline1"><a href="#rowIndices">5.2 spr:rowIndices</a></li>
+	    			<li class="tocline1"><a href="#colCells">5.3 spr:colCells</a></li>
+	    			<li class="tocline1"><a href="#rowCells">5.4 spr:rowCells</a></li>
+	    		</ul>
+	    	</li>
+	    	<li class="tocline1"><a href="#basic">6 Optional Column Metadata Functions</a>
+	    		<ul class="toc">
+	    			<li class="tocline1"><a href="#colWidth">6.1 spr:colWidth</a></li>
+	    			<li class="tocline1"><a href="#colType">6.2 spr:colType</a></li>
+	    		</ul>
+	    	</li>
+	    	<li class="tocline1"><a href="#spra">7 SPRA</a></li>
+	    	<li class="tocline1"><a href="#reference">Appendix: Reference</a> </li>
+	  	</ul>
+	</div>
+	<p>&nbsp;</p>
+	
+	
+	<h2 id="introduction">1 Introduction</h2>
+	<p>
+		Having RDF-based projects operate on tabular data is a very common scenario.
+		Such data may originate from spreadsheets, from which it needs to be converted
+		into a given ontology.
+		Or the data may be the result of a separate processing step, such as a SPARQL
+		SELECT query returning a result set of variable bindings.  The user may want to
+		process data from such result sets in different ways than possible to express
+		with SPARQL alone, for example to run new kind of aggregators that are not
+		part of the standard vocabulary (string lists etc).
+	</p>
+	<p>
+		There is no standard way of storing tabular data in RDF.
+		Even for simpler structures such as lists, RDF is rather weak.
+		There are many different alternatives for doing so, such as converting the
+		rows into separate objects (resources) that have the column values as 
+		properties.
+	</p>
+	<p>
+		The SPIN Result Sets, Tables and Spreadsheets (SPR) Vocabulary is a collection
+		of SPIN functions that can be used to query tabular data from SPARQL queries.
+		The SPR namespace can be found at
+		<a href="http://spinrdf.org/spr"><code>&lt;http://spinrdf.org/spr&gt;</code></a>
+		and is commonly abbreviated with the prefix <code>spr</code>.
+		Those functions are independent from any particular table storage format
+		or mapping to triples.
+		Instead the SPIN functions are generic and use reflection at execution time
+		to derive the mappings from the table instances.
+		The separate namespace   
+		<a href="http://spinrdf.org/spra"><code>&lt;http://spinrdf.org/spra&gt;</code></a>
+		(commonly abbreviated with the prefix <code>spra</code>) is an example
+		implementation of the SPR interfaces, based on a very efficient URI-based
+		triple mapping.
+	</p>
+	<p>
+		This document enumerates the main functions of the SPR vocabulary.
+		More details can be found in the <code>spr</code> namespace itself.
+	</p>
+    <p>&nbsp;</p>
+    
+    
+    <h2 id="core">2 Core Concepts</h2>
+    <p>
+    	The SPR functions assume that a table is identified by a given
+    	RDF resource.
+    	This resource might be a blank node linking off to rows etc,
+    	or it could be a URI node that helps identify the cell values.
+    	It might even be a completely virtual resource that does not
+    	have any triples attached to it, but only serves as identifier
+    	to look up data from elsewhere (e.g. web services or databases).
+    </p>
+    <p>
+    	In the following example, the SPR function <code>spr:colCount</code> is used
+    	to get the number of columns in a given table.
+    </p>
+    <pre class="query">    SELECT ?colCount
+    WHERE {
+        ?this ex:tableData ?table .
+        LET (?colCount := spr:colCount(?table)) .
+    }</pre>
+    <p>
+    	A table (such as the resource matching the variable ?table in the example
+    	above) must have a <code>rdf:type</code> triple though, and this
+    	type must be a class that has the metaclass <code>spr:TableClass</code>.
+    	Table classes must specify the URIs of various low-level functions
+    	and these low-level functions are executed by the generic SPR functions.
+    </p>
+    <p>
+    	The following example (in Turtle notation) defines a table type <code>spra:Table</code>
+    	that uses the specified low-level functions:
+    </p>
+    <pre class="query">    spra:Table
+        a       spr:TableClass ;
+        rdfs:label "Table"^^xsd:string ;
+        rdfs:subClassOf spr:Table ;
+        spr:cellFunction spra:cellFunction ;
+        spr:colCountFunction spra:colCountFunction ;
+        spr:colNameFunction spra:colNameFunction ;
+        spr:rowCountFunction spra:rowCountFunction .</pre>
+    <p>
+    	The example class <code>spra:Table</code> is a subclass of <code>spr:Table</code>.
+    	The latter can be used as range of properties etc.
+    </p>
+    <p>
+    	When SPR functions operate on a given Table, then they can look up the
+    	"implementation" functions using the system properties such as
+    	<code>spr:colCountFunction</code>.
+    	These low-level functions then know the details of the selected storage
+    	format, and may either be declarative SPIN functions, or native built-ins.
+    </p>
+    <p>
+    	The following sections enumerate the core functions of the SPR vocabulary.
+    	The <code>spr</code>file itself contains additional functions, but those are
+    	only relevant as private helpers and should not be used externally.
+    </p>
+    <p>&nbsp;</p>
+    
+    
+    <h2 id="basic">3 Basic Table Functions</h2>
+    
+    <h3 id="colCount">3.1 spr:colCount</h3>
+    <p>
+    	Gets the number of columns of a given table.
+    </p>
+    <h4>Arguments:</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Table) - The table to operate on.</li>
+    </ul>
+    <h4>Result (xsd:integer):</h4>
+    <p>
+    	The number of columns (at least 1).
+    </p>
+    <p>&nbsp;</p>
+    
+    <h3 id="rowCount">3.2 spr:rowCount</h3>
+    <p>
+    	Gets the number of rows of a given table.
+    </p>
+    <h4>Arguments:</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Table) - The table to operate on.</li>
+    </ul>
+    <h4>Result (xsd:integer):</h4>
+    <p>
+    	The number of rows (at least 0).
+    </p>
+    <p>&nbsp;</p>
+    
+    <h3 id="cell">3.3 spr:cell</h3>
+    <p>
+    	Gets the value in a given table cell.
+    </p>
+    <h4>Arguments:</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Table) - The table to operate on.</li>
+    	<li><b>arg2</b> (xsd:integer) - The row index.</li>
+    	<li><b>arg3</b> (xsd:integer) - The column index.</li>
+    </ul>
+    <h4>Result:</h4>
+    <p>
+    	An RDF literal or resource that is the value of the given cell, or null if the cell is empty.
+    </p>
+    <p>&nbsp;</p>
+    
+    <h3 id="colName">3.4 spr:colName</h3>
+    <p>
+    	Gets the name of a given table column.
+    </p>
+    <h4>Arguments:</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Table) - The table to operate on.</li>
+    	<li><b>arg2</b> (xsd:integer) - The column index.</li>
+    </ul>
+    <h4>Result:</h4>
+    <p>
+    	The column name.
+    </p>
+    <p>&nbsp;</p>
+    
+    
+    <h2 id="aggregation">4 Aggregation Functions</h2>
+    <p>
+    	A common task on tables is to aggregate the values of a given row or column,
+    	for example to compute the average or sum, or to concatenate multiple values
+    	into a single string.
+    	Such aggregations begin with a start value (such as 0), then call an aggregator step
+    	function (such as the built-in mathematical + operator) and finally may call a
+    	result function that takes the aggregated result of the step functions to compute
+    	the final result (such as dividing the sum of values by the number of steps in the
+    	case of average).
+    </p>
+    <p>
+    	The SPR vocabulary defines a class <code>spr:Aggregator</code> that is illustrated
+    	in the class diagram below.
+    </p>
+    <p style="text-align:center">
+    	<img src="assets/sprAggregator-ClassDiagram.png">
+    </p>
+    <p>
+    	Each <code>spr:Aggregator</code> defines the following properties:
+    </p>
+    <ul>
+    	<li>
+    		<b>spr:startValue</b> - The initial value (e.g., 0).
+    	</li>
+    	<li>
+    		<b>spr:stepFunction</b> (spin:Function) - The URI of a SPARQL Function that
+    		takes two arguments (the aggregated value from the previous step, and the
+    		next cell value) and returns the aggregated value of those two (e.g.,
+    		<code>(?arg1 + ?arg2)</code>).
+    	</li>
+    	<li>
+    		<b>spr:resultFunction</b> (spin:Function, optional) -
+    		the URI of a SPARQL Function that takes two arguments (the aggregated end
+    		result of all step functions, and the total number of steps) and returns
+    		the end result (e.g., <code>(?arg1 / ?arg2)</code>).
+    	</li>
+    </ul>
+    <p>
+    	The SPR vocabulary includes a collection of predefined <code>spr:Aggregators</code>:
+    </p>
+    <ul>
+    	<li><b>spr:Avg</b> computes the average of the cell values.</li>
+    	<li><b>spr:Product</b> computes the product of the cell values.</li>
+    	<li><b>spr:Sum</b> computes the sum of the cell values.</li>
+    </ul>
+    <p>
+    	For example, <code>spr:Avg</code> is defined as follows.
+    </p>
+    <pre class="query">    spr:Avg
+        a       spr:Aggregator ;
+        rdfs:label "Avg"^^xsd:string ;
+        spr:resultFunction sp:divide ;
+        spr:startValue "0"^^xsd:double ;
+        spr:stepFunction sp:add .</pre>
+    <p>
+    	In the example above, <code>sp:divide</code> is the built-in SPARQL operator
+    	<code>/</code> and <code>sp:add</code> is the <code>+</code>.
+    	Arbitrary other functions can be used as well, such as <code>fn:concat</code>.
+    	Other aggregators can be defined and passed as argument into the following
+    	SPIN functions.
+    </p>
+    <p>&nbsp;</p>
+    
+    <h3 id="aggregateCol">4.1 spr:aggregateCol</h3>
+    <p>
+    	Iterates over all cells of a given column and applies a given
+    	<code>spr:Aggregator</code> on each of them.
+    </p>
+    <h4>Arguments:</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Aggregator) - The Aggregator to apply.</li>
+    	<li><b>arg2</b> (spr:Table) - The table to operate on.</li>
+    	<li><b>arg3</b> (xsd:integer) - The column index.</li>
+    </ul>
+    <h4>Result:</h4>
+    <p>
+    	The aggregated result.
+    </p>
+    <p>&nbsp;</p>
+    
+    <h3 id="aggregateRow">4.2 spr:aggregateRow</h3>
+    <p>
+    	Iterates over all cells of a given row and applies a given
+    	<code>spr:Aggregator</code> on each of them.
+    </p>
+    <h4>Arguments:</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Aggregator) - The Aggregator to apply.</li>
+    	<li><b>arg2</b> (spr:Table) - The table to operate on.</li>
+    	<li><b>arg3</b> (xsd:integer) - The column index.</li>
+    </ul>
+    <h4>Result:</h4>
+    <p>
+    	The aggregated result.
+    </p>
+    <p>&nbsp;</p>
+    
+    
+    <h2>5 Magic Properties</h2>
+    <p>
+    	SPR defines a collection of magic SPARQL properties (aka property functions)
+    	that can be used to traverse a given table.
+    	A typical use case is illustrated in the following example: 
+    </p>
+    <pre class="query">    CONSTRUCT {
+        ?company ex:employee _:person .
+        _:person a ex:Person .
+        _:person ex:firstName ?firstName .
+        _:person ex:lastName ?lastName .
+    }
+    WHERE {
+        ?company ex:mappedToTable ?table .
+        ?table spr:rowIndices ?rowIndex .
+        LET (?firstName := spr:cell(?table, ?rowIndex, 0)) .
+        LET (?lastName := spr:cell(?table, ?rowIndex, 1)) .
+    }</pre>
+    <p>&nbsp;</p>
+    
+    <h3 id="colIndices">5.1 spr:colIndices</h3>
+    <p>
+    	Iterates over all columns of a given table and binds the variable on
+    	the right with the indices, starting with 0.
+    </p>
+    <h4>Arguments (left side of magic property):</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Table) - The table to operate on.</li>
+    </ul>
+    <h4>Results (right side of magic property):</h4>
+    <ul>
+    	<li><b>?colIndex</b> - The running index of the column.</li>
+    </ul>
+    <p>&nbsp;</p>
+    
+    <h3 id="colIndices">5.2 spr:rowIndices</h3>
+    <p>
+    	Iterates over all rows of a given table and binds the variable on
+    	the right with the indices, starting with 0.
+    </p>
+    <h4>Arguments (left side of magic property):</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Table) - The table to operate on.</li>
+    </ul>
+    <h4>Results (right side of magic property):</h4>
+    <ul>
+    	<li><b>?rowIndex</b> - The running index of the row.</li>
+    </ul>
+    <p>&nbsp;</p>
+    
+    <h3 id="colCells">5.3 spr:colCells</h3>
+    <p>
+    	Iterates over all rows of a given column at a given table.
+    </p>
+    <h4>Arguments (left side of magic property):</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Table) - The table to operate on.</li>
+    	<li><b>arg2</b> (xsd:integer) - The column index.</li>
+    </ul>
+    <h4>Results (right side of magic property):</h4>
+    <ul>
+    	<li><b>?value</b> - The cell value at each step.</li>
+    	<li><b>?rowIndex</b> - The running index of the row.</li>
+    </ul>
+    <p>&nbsp;</p>
+    
+    <h3 id="rowCells">5.4 spr:rowCells</h3>
+    <p>
+    	Iterates over all columns of a given row at a given table.
+    </p>
+    <h4>Arguments (left side of magic property):</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Table) - The table to operate on.</li>
+    	<li><b>arg2</b> (xsd:integer) - The row index.</li>
+    </ul>
+    <h4>Results (right side of magic property):</h4>
+    <ul>
+    	<li><b>?value</b> - The cell value at each step.</li>
+    	<li><b>?colIndex</b> - The running index of the column.</li>
+    </ul>
+    <p>&nbsp;</p>
+    
+    
+    <h2 id="aggregation">6 Optional Column Metadata Functions</h2>
+    <p>
+    	SPIN Result Sets may contain additional information about columns that can
+    	be used to inform a rendering agent on how to display tables.
+    	This data may be derived from <code>spin:Columns</code> attached to
+    	SPIN templates, or other mechanisms.
+    	If present, then the following functions can be used to retrieve the column metadata.  
+    </p>
+    <p>&nbsp;</p>
+    
+    <h3 id="colWidth">6.1 spr:colWidth</h3>
+    <p>
+    	Gets the width of a given table column.
+    </p>
+    <h4>Arguments:</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Table) - The table to operate on.</li>
+    	<li><b>arg2</b> (xsd:integer) - The column index.</li>
+    </ul>
+    <h4>Result:</h4>
+    <p>
+    	The column width in pixels (xsd:integer), or unbound.
+    </p>
+    <p>&nbsp;</p>
+    
+    <h3 id="colType">6.2 spr:colType</h3>
+    <p>
+    	Gets the (data)type of a given table column.
+    	For example, if the type of a column is <code>xsd:float</code> then
+    	a display engine may want to right-align its cells.
+    </p>
+    <h4>Arguments:</h4>
+    <ul>
+    	<li><b>arg1</b> (spr:Table) - The table to operate on.</li>
+    	<li><b>arg2</b> (xsd:integer) - The column index.</li>
+    </ul>
+    <h4>Result:</h4>
+    <p>
+    	The type as a URI resource, or unbound.
+    </p>
+    <p>&nbsp;</p>
+    
+    
+    <h2 id="spra">7 SPRA</h2>
+    <p>
+    	The SPRA namespace is a (default) implementation of the SPR vocabulary
+    	that stores the cell values as illustrated in the following example.
+    </p>
+    <pre class="query">    &lt;http://example.org/table123&gt;
+          a       spra:Table ;
+          spra:colCount 2 ;
+          spra:rowCount 2 ;
+          spra:colName0 "firstName"^^xsd:string ;
+          spra:colName1 "lastName"^^xsd:string .
+    &lt;http://example.org/table123-r0-c0&gt; spra:value "Steve"^^xsd:string .
+    &lt;http://example.org/table123-r0-c1&gt; spra:value "Roach"^^xsd:string .
+    &lt;http://example.org/table123-r1-c0&gt; spra:value "Klaus"^^xsd:string .
+    &lt;http://example.org/table123-r1-c1&gt; spra:value "Schulze"^^xsd:string .
+    </pre>
+    <p>
+    	The low-level functions attached to the class <code>spra:Table</code>
+    	have URI naming conventions built-in so that the values of each cell
+    	can be accessed quickly with the help of string concatenations.
+    </p>
+    <p>
+    	Note that your application should not rely on the above low-level
+    	details but instead always access SPRA tables through the generic
+    	SPR functions.
+    </p>
+    <p>&nbsp;</p>
+	
+	    
+    <h2 id="reference">Appendix: Reference</h2>
+    <p>
+    	The URL of the SPR schema is <a href="http://spinrdf.org/spr">http://spinrdf.org/spr</a>
+    </p>
+    <p>
+    	The URL of the SPRA schema is <a href="http://spinrdf.org/spra">http://spinrdf.org/spra</a>
+    </p>
+
+  
+</body></html>

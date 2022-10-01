@@ -26,8 +26,9 @@ import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.function.DynamicFunctionRegistry;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.StatementPatternCardinalityCalculator;
-import com.msd.gin.halyard.sail.spin.SpinFunctionInterpreter;
-import com.msd.gin.halyard.sail.spin.SpinMagicPropertyInterpreter;
+import com.msd.gin.halyard.spin.SpinFunctionInterpreter;
+import com.msd.gin.halyard.spin.SpinMagicPropertyInterpreter;
+import com.msd.gin.halyard.spin.SpinParser;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.File;
@@ -81,7 +82,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
-import org.eclipse.rdf4j.spin.SpinParser;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestClientBuilder.HttpClientConfigCallback;

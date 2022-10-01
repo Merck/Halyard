@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.spin.SpinInferencing;
 
 import java.util.Arrays;
 import java.util.Collection;

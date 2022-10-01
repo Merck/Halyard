@@ -1,0 +1,1024 @@
+<!--?xml version="1.0" encoding="UTF-8"?-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="https://www.w3.org/1999/xhtml"><head profile="https://www.w3.org/2003/g/data-view">
+    <meta content="text/html; charset=UTF-8" http-equiv="content-type">
+    <title>SPIN - SPARQL Syntax</title>
+	<link rel="stylesheet" type="text/css" href="assets/local.css">
+    <link rel="stylesheet" type="text/css" href="assets/base.css">
+  </head>
+
+  <body>
+	<div class="head">
+        <h1 id="title">SPIN - SPARQL Syntax</h1>
+        <h2 id="SW">W3C Member Submission 22 February 2011, updated 12 September, 2013</h2>
+      	<dl>
+      		<dt>W3C Member Submission:</dt>
+      			<dd><a href="https://www.w3.org/Submission/2011/SUBM-spin-sparql-20110222/">https://www.w3.org/Submission/2011/SUBM-spin-sparql-20110222/</a></dd>
+      		<dt>This version (almost identical to W3C Member Submission, but with generalized handling of sp:text and added support for VALUES):</dt>
+      			<dd><a href="http://spinrdf.org/sp.html">http://spinrdf.org/sp.html</a></dd>
+        	<dt>Authors:</dt>
+        		<dd>Holger Knublauch &lt;<a href="mailto:holger@topquadrant.com" shape="rect">holger@topquadrant.com</a>&gt;</dd>
+      	</dl>
+		<p class="copyright">
+			Copyright © 2011 by the <a href="https://www.w3.org/Submission/2010/04/#submitting_parties">Submitting Members</a>.</p>
+			<p>This document is available under the <a href="https://www.w3.org/Consortium/Legal/copyright-documents" shape="rect">W3C Document License</a>. See the <a href="https://www.w3.org/Consortium/Legal/ipr-notice#Copyright" shape="rect">W3C Intellectual Rights Notice and Legal Disclaimers</a> for
+			additional information.
+		</p> 
+    </div>
+
+    <hr>
+
+    <h2 id="abstract">Abstract</h2> 
+    <p class="abstract">
+    	This document describes the SPIN SPARQL Syntax, an RDF representation
+    	of the semantic web query language SPARQL.  The SPIN SPARQL Syntax provides
+    	an alternative representation of SPARQL queries that goes beyond the
+    	textual format.  The main benefit of this syntax is that it makes it possible
+    	to consistently store SPARQL queries together with the domain model.  All
+    	resources from the domain model are represented as proper RDF resource
+    	references instead of only having them as strings.  Having a triple-based
+    	SPARQL representation makes it easier to maintain hybrid models in which
+    	RDF/OWL definitions are mixed with SPARQL expressions.
+    </p>
+
+    <h2 id="sotd">Status of This Document</h2>
+	<p>
+		SPIN has originally evolved as a specification developed by TopQuadrant.
+		As of February 2011, SPIN has been published by W3C as a member submission.
+		TopQuadrant may continue to improve SPIN in the future and make changes
+		that will be published here.
+		As of January 2013, this version is almost identical to the official W3C submission,
+		except that we have lifted the requirement of using the SPIN RDF syntax for
+		the definition of queries and update commands if (and only if) sp:text triples
+		are present.  Accordingly, we have changed the RDF source code of some
+		examples in the SPIN Modeling Vocabulary document, to make them easier to read.
+	</p>
+
+    <hr>
+
+	<div class="toc">
+  		<h2><a id="contents" name="contents">Table of Contents</a></h2>
+  		<ul class="toc">
+	    	<li class="tocline1"><a href="#overview">1 Overview</a> </li>
+	    	<li class="tocline1"><a href="#sp-expressions">2 Expressions</a>
+	    		<ul class="toc">
+		      		<li class="tocline2"><a href="#sp-constants">2.1 Constants</a></li>
+		      		<li class="tocline2"><a href="#sp-variables">2.2 Variables</a></li>
+		      		<li class="tocline2"><a href="#sp-functionCalls">2.3 Function calls</a></li>
+	      		</ul>
+	      	 </li>
+	    	<li class="tocline1"><a href="#sp-Elements">3 Elements</a>
+				<ul class="toc">
+		      		<li class="tocline2"><a href="#sp-TriplePattern">3.1 TriplePattern</a></li>
+		      		<li class="tocline2"><a href="#sp-TriplePath">3.2 TriplePath</a></li>
+		      		<li class="tocline2"><a href="#sp-Filter">3.3 Filter</a></li>
+		      		<li class="tocline2"><a href="#sp-Bind">3.4 Bind</a></li>
+		      		<li class="tocline2"><a href="#sp-ElementList">3.5 ElementList</a></li>
+		      		<li class="tocline2"><a href="#sp-Optional">3.6 Optional</a></li>
+		      		<li class="tocline2"><a href="#sp-Union">3.7 Union</a></li>
+		      		<li class="tocline2"><a href="#sp-NamedGraph">3.8 NamedGraph</a></li>
+		      		<li class="tocline2"><a href="#sp-SubQuery">3.9 SubQuery</a></li>
+		      		<li class="tocline2"><a href="#sp-NotExists">3.10 NotExists</a></li>
+		      		<li class="tocline2"><a href="#sp-Minus">3.11 Minus</a></li>
+		      		<li class="tocline2"><a href="#sp-Service">3.12 Service</a></li>
+		      		<li class="tocline2"><a href="#sp-Values">3.13 Values</a></li>
+		      	</ul>
+		    </li>
+	    	<li class="tocline1"><a href="#sp-Queries">4 Queries</a>
+	    		<ul class="toc">
+		      		<li class="tocline2"><a href="#sp-Ask">4.1 Ask</a></li>
+		      		<li class="tocline2"><a href="#sp-Select">4.2 Select</a></li>
+		      		<li class="tocline2"><a href="#sp-Describe">4.3 Describe</a></li>
+		      		<li class="tocline2"><a href="#sp-Construct">4.4 Construct</a></li>
+		      	</ul>
+		    </li>
+	    	<li class="tocline1"><a href="#sp-Update">5 Update Requests</a>
+	    		<ul class="toc">
+		      		<li class="tocline2"><a href="#sp-InsertData">5.1 Insert Data</a></li>
+		      		<li class="tocline2"><a href="#sp-DeleteData">5.2 Delete Data</a></li>
+		      		<li class="tocline2"><a href="#sp-Modify">5.3 Modify (Delete/Insert)</a></li>
+		      		<li class="tocline2"><a href="#sp-DeleteWhere">5.4 DeleteWhere</a></li>
+		      		<li class="tocline2"><a href="#sp-Load">5.5 Load</a></li>
+		      		<li class="tocline2"><a href="#sp-Clear">5.6 Clear</a></li>
+		      		<li class="tocline2"><a href="#sp-Create">5.7 Create</a></li>
+		      		<li class="tocline2"><a href="#sp-Drop">5.8 Drop</a></li>
+		      	</ul>
+		    </li>
+	    	<li class="tocline1"><a href="#sp-Reference">Appendix: Reference</a> </li>
+  		</ul>
+	</div>
+      
+	<h2 id="overview">1 Overview</h2> 
+	<p>
+		The design of the SPIN SPARQL Syntax was motivated by the need to have
+		a machine-readable notation of SPARQL queries so that they can be stored
+		together with other domain models and ontologies in RDF format.
+		The main goal is to enable SPIN compliant software tools to convert SPIN
+		RDF data structures into valid SPARQL query strings, so that they can be
+		processed for various purposes.  Editing tools would go the other direction
+		and turn a SPARQL query into an RDF structure.
+	</p>
+    <p>
+    	For example, the SPARQL query
+    </p>
+    <pre class="query">    # must be at least 18 years old
+    ASK WHERE {
+    	?this my:age ?age .
+    	FILTER (?age &lt; 18) .
+    }</pre>
+    <p>
+    	can be represented by a blank node in the SPIN RDF Syntax in Turtle as
+    </p>
+    <pre class="query">    [ a       sp:Ask ;
+                rdfs:comment "must be at least 18 years old"^^xsd:string ;
+                sp:where ([ sp:object sp:_age ;
+                            sp:predicate my:age ;
+                            sp:subject spin:_this
+                          ] [ a       sp:Filter ;
+                            sp:expression
+                                    [ sp:arg1 sp:_age ;
+                                      sp:arg2 18 ;
+                                      a sp:lt
+                                    ]
+                          ])
+    ]</pre>
+    <p>
+    	Alternatively, the property <code>sp:text</code> can be used within the
+    	surrounding blank node, creating a more human-readable notation:
+    </p>
+    <pre class="query">    [ a       sp:Ask ;
+                sp:text """
+                    # must be at least 18 years old
+                    ASK WHERE {
+                        ?this my:age ?age .
+                        FILTER (?age &lt; 18) .
+                    }"""
+    ]</pre>
+	<p>
+		In a typical scenario, each SPARQL query is stored as a (tree) structure
+		of blank nodes.  Syntax rules specify which elements can be nested into
+		each other.  The top-level blank node of a <em>query</em> is an instance of one
+		of the subclasses of <code>sp:Query</code>, such as <code>sp:Ask</code>.
+		Queries typically have a WHERE clause, encoded as a value of the
+		<code>sp:where</code> property.  The <em>elements</em> in the WHERE clause are
+		represented as instances of subclasses of <code>sp:Element</code>
+		(or plain <code>rdf:Lists</code> for element lists).
+		Some element types such as <code>sp:Filter</code> may point to an
+		<em>Expression</em>.  This document introduces the various types of
+		expressions, then the elements and finally the query objects and
+		SPARQL UPDATE language requests.
+	</p>
+	
+    <p>
+    	The URL of the SPIN SPARQL Syntax schema is
+    	<a href="http://spinrdf.org/sp">http://spinrdf.org/sp</a>.
+    	It currently covers all standard SPARQL language elements as well as
+    	parts of the evolving <a href="https://www.w3.org/TR/sparql11-query/">SPARQL 1.1</a>
+    	language including SPARQL Update.
+    </p>
+    <p>&nbsp;</p>
+
+
+	<h2 id="sp-expressions">2 Expressions</h2>
+	<p>
+		Expressions are used, among others, as conditions in FILTER elements
+		and in BIND assignments.  Three kinds of expressions are supported by
+		SPIN: Constants, Variables and Function calls. 
+	</p>
+	
+    <h3 id="sp-constants">2.1 Constants</h3>
+    <p>
+    	Constants are simply represented by a URI resource or a literal.
+    </p>
+    
+    <h3 id="sp-variables">2.2 Variables</h3>
+    <p>
+    	Variables are represented by resources that have a string value for
+    	the <code>sp:varName</code> property.  In many cases, these resources may
+    	be untyped blank nodes, but there is also a marker class
+    	<code>sp:Variable</code> that can be used to make variables
+    	better visible.  However, only <code>sp:varName</code> is used
+    	to distinguish variables from other types of expressions.
+    </p>
+    <p>
+    	The following example represents a variable called <code>?x</code>.
+    </p>
+    <pre class="query">    [ sp:varName "x"^^xsd:string
+    ]</pre>
+    
+    <h3 id="sp-functionCalls">2.3 Function calls</h3>
+    <p>
+    	Function calls are blank nodes that have the function's URI as
+    	their <code>rdf:type</code>.  All other properties of the blank node
+    	are interpreted as arguments.
+    	By default, the arguments are stored as values of the 
+    	pre-defined system properties <code>sp:arg1</code>,
+    	<code>sp:arg2</code>, etc.
+    	However, any other property can be used as well.
+    </p>
+    <p>
+    	When a function call is serialized back to SPARQL textual syntax,
+    	then the argument properties are ordered by their local names,
+    	and the built-in properties <code>sp:arg1</code> etc appear at
+    	their designed position, e.g. <code>sp:arg4</code> will always
+    	appear as forth argument.  Any other properties are filling in
+    	the remaining spots, not occupied by the built-in properties. 
+    </p>
+    <p> 
+    	Note that a function call cannot have a value for <code>sp:varName</code>
+    	because this would turn it into a variable.
+    </p>
+    <p>
+    	The following example represents the function call
+    	<code>ex:getMaximum(42, 43)</code>:
+    </p>
+    <pre class="query">    [ a       ex:getMaximum ;
+      sp:arg1 42 ;
+      sp:arg2 43
+    ]</pre>
+    <p>
+    	The SPIN RDF Syntax provides standard URIs for the built-in functions
+    	and operators of the SPARQL language.  For example, <code>sp:gt</code>
+    	represents the <code>&gt;</code> operator.
+    </p>
+    <p>
+    	SPARQL 1.1 introduces the ability to use <code>EXISTS</code> and
+    	<code>NOT EXISTS</code> in SPARQL expressions.  The SPIN RDF Syntax represents
+    	those as blank nodes of type <code>sp:exists</code> and <code>sp:notExists</code>.
+    	Those nodes point to a list of elements via the <code>sp:elements</code> property.  
+    </p>
+    <p>&nbsp;</p>
+
+    
+    <h2 id="sp-Elements">3 Elements</h2>
+    <p>
+    	SPARQL query elements are the main entities mentioned in WHERE
+    	clauses, including triple patterns and FILTER clauses. 
+    </p>
+    
+    <h3 id="sp-TriplePattern">3.1 TriplePattern</h3>
+    <p>
+    	A blank node that has exactly one value for the properties
+    	<code>sp:subject</code>, <code>sp:predicate</code> and
+    	<code>sp:object</code> represents a triple pattern.
+    	Optionally, the blank node may have the <code>rdf:type</code>
+    	<code>sp:TriplePattern</code>.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    ?this ex:age 42 .</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ sp:subject spin:_this ;
+      sp:predicate ex:age ;
+      sp:object 42
+    ]</pre>
+    <p>
+    	Note that the properties <code>sp:subject</code> etc are similar to the built-in
+    	system properties <code>rdf:subject</code>.  SPIN does not use the latter to avoid
+    	potentially confusing overlaps with the RDF reification vocabulary.
+    </p>
+    
+    <h3 id="sp-TriplePath">3.2 TriplePath</h3>
+    <p>
+    	Triple paths are similar to triple patterns, but have a path
+    	expression instead of a predicate.  SPIN represents triple
+    	paths as blank nodes with a value of <code>sp:path</code>,
+    	as well as <code>sp:subject</code> and <code>sp:object</code> values.
+    	The blank node may also have <code>sp:TriplePath</code> as
+    	its <code>rdf:type</code>.
+    </p>
+    <p>
+    	Various types of paths are supported, based on what is currently
+    	implemented in the Jena
+    	<a href="http://jena.sourceforge.net/ARQ/property_paths.html">ARQ API</a>:
+    	<a id="pathTypes">
+    </a></p><a id="pathTypes">
+   	<ul>
+   		<li><code>sp:SeqPath</code> represents a sequence of two
+   		nested sub-paths, specified by <code>sp:path1</code> and
+   		<code>sp:path2</code>.
+			</li>
+			<li><code>sp:AltPath</code> represents a union between two
+			alternative paths, specified by <code>sp:path1</code> and
+   		<code>sp:path2</code>.
+   		</li>
+   		<li><code>sp:ModPath</code> represents a modified path such
+   		as <code>path*</code> or <code>path{n,m}</code>.  The nested
+   		path is stored as <code>sp:subPath</code>, and
+   		<code>sp:modMin</code> and <code>sp:modMax</code> are used
+   		to store the min and max values.
+   		</li>
+   		<li><code>sp:ReversePath</code> represents a path in the inverse
+   		direction.  The property <code>sp:subPath</code> is used to
+   		point to the path that is to be reversed.
+   		</li>
+   		<li>Any other URI resource will be interpreted as a named
+   		property.</li>
+   	</ul>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    ?this ex:father/ex:age 42 .</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:TriplePath ;
+      sp:subject spin:_this ;
+      sp:path [ a       sp:SeqPath ;
+                sp:path1 ex:father ;
+                sp:path2 ex:age
+              ] ;
+      sp:object 42
+    ]</pre>
+    
+    <h3 id="sp-Filter">3.3 Filter</h3>
+    <p>
+    	Filter elements are stored as blank nodes that have
+    	<code>sp:Filter</code> as their <code>rdf:type</code>.
+    	The blank node must have exactly one value for the property
+    	<code>sp:expression</code>, pointing to an expression that
+    	can be evaluated to true or false.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    FILTER (?age &gt;= 18) .</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Filter ;
+      sp:expression
+              [ a       sp:ge ;
+                sp:arg1 [ sp:varName "age"^^xsd:string ] ;
+                sp:arg2 18
+              ]
+    ]</pre>
+    
+    <h3 id="sp-Bind">3.4 Bind</h3>
+    <p>
+    	The <code>BIND</code> keyword was introduced by SPARQL 1.1
+    	to assign a computed value to a variable in the middle of a
+    	pattern.  The computed value can then be used in other
+    	patterns, CONSTRUCT templates etc.
+    </p>
+    <p>
+    	The SPIN SPARQL Syntax introduces the class <code>sp:Bind</code> to
+    	represent BIND assignments.  Instances of this class must be blank
+    	nodes with one value for <code>sp:variable</code> to point at the
+    	variable on the right side of the assignment.  The property
+    	<code>sp:expression</code> is used to point to the root of the expression
+    	tree that delivers the computed value. 
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    BIND (2008 - ?birthYear AS ?age) .</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Bind ;
+      sp:variable [ sp:varName "age"^^xsd:string ] ;
+      sp:expression
+              [ a       sp:sub ;
+                sp:arg1 2008 ;
+                sp:arg2 [ sp:varName "birthYear"^^xsd:string  ]
+              ]
+    ]</pre>
+    <p>
+    	Note: Earlier versions of SPIN were using <code>sp:Let</code> instead of <code>sp:Bind</code>.
+    </p>
+    
+    <h3 id="sp-ElementList">3.5 ElementList</h3>
+    <p>
+    	Lists of other elements are used in various places in SPARQL,
+    	for example as root of the WHERE clause.  SPIN represents
+    	them as plain <code>rdf:Lists</code>, where each list member
+    	must be another element. 
+    </p>
+    
+    <h3 id="sp-Optional">3.6 Optional</h3>
+    <p>
+    	Optional element blocks are instances of
+    	<code>sp:Optional</code> where the property
+    	<code>sp:elements</code> is used to point to the list of
+    	optional elements (stored as <code>rdf:List</code>).
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    OPTIONAL { ?this ex:firstName ?value }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Optional ;
+      sp:elements ([ sp:subject spin:_this ;
+                     sp:predicate ex:firstName ;
+                     sp:object  [ sp:varName "value"^^xsd:string ]
+                   ])
+    ]</pre>
+    
+    <h3 id="sp-Union">3.7 Union</h3>
+    <p>
+    	The UNION operator in SPARQL can be used to specify a
+    	graph pattern that matches if one out of several sub-elements
+    	matches.  SPIN represents UNIONs as blank nodes of type
+    	<code>sp:Union</code>, where <code>sp:elements</code>
+    	points to an <code>rdf:List</code> of nested element
+    	lists (themselves <code>rdf:Lists</code>).
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    {
+        ?this ex:age 42
+    }
+    UNION
+    {
+        ?this ex:age 43
+    }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Union ;
+      sp:elements ( ([ sp:subject spin:_this ;
+                       sp:predicate ex:age ;
+                       sp:object 42
+                    ]) 
+                    ([ sp:subject spin:_this ;
+                       sp:predicate ex:age ;
+                       sp:object 43
+                    ]))
+    ]</pre>
+    
+    <h3 id="sp-NamedGraph">3.8 NamedGraph</h3>
+    <p>
+    	Blank instances of the class <code>sp:NamedGraph</code>
+    	represent named graph elements in a query.  The property
+    	<code>sp:graphNameNode</code> stores the URI resource of
+    	the named graph, or a variable.  <code>sp:elements</code>
+    	links the blank node with an <code>rdf:List</code>
+    	containing the elements in the named graph.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    GRAPH &lt;http://example.org&gt; { 
+    	?this ex:firstName ?value 
+    }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:NamedGraph ;
+      sp:graphNameNode &lt;http://example.org&gt; ;
+      sp:elements ([ sp:subject spin:_this ;
+                     sp:predicate ex:firstName ;
+                     sp:object  [ sp:varName "value"^^xsd:string ]
+                   ])
+    ]</pre>
+    
+    <h3 id="sp-SubQuery">3.9 SubQuery</h3>
+    <p>
+		Blank instancef of the class <code>sp:SubQuery</code>
+		represent sub-queries that are nested in the body of another
+		query.  The property <code>sp:query</code> points to the
+		nested query.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    SELECT ?y
+    WHERE {
+        ?class a rdfs:Class .
+        {
+            SELECT ?y
+            WHERE {
+                ?class rdfs:label ?y .
+            }
+        } .
+    }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">        [ a       sp:Select ;
+                sp:resultVariables (_:b2) ;
+                sp:where ([ sp:object rdfs:Class ;
+                            sp:predicate rdf:type ;
+                            sp:subject _:b1
+                          ] [ a       sp:SubQuery ;
+                            sp:query
+                                    [ a       sp:Select ;
+                                      sp:resultVariables (_:b2) ;
+                                      sp:where ([ sp:object _:b2 ;
+                                                  sp:predicate rdfs:label ;
+                                                  sp:subject _:b1
+                                                ])
+                                    ]
+                          ])
+              ]</pre>
+    
+    <h3 id="sp-NotExists">3.10 NotExists</h3>
+    </a><p><a id="pathTypes">
+    	SPARQL 1.1 will provide keywords for negation.
+    	One of the proposals (</a><a href="http://jena.sourceforge.net/ARQ/negation.html">implemented</a> in Jena's ARQ engine) is to use
+    	the NOT EXISTS keyword.
+    	In SPIN, NOT EXISTS blocks are represented as instances of
+    	<code>sp:NotExists</code> where the property
+    	<code>sp:elements</code> is used to point to the list of
+    	negative elements (stored as <code>rdf:List</code>).
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    NOT EXISTS { ?this ex:firstName ?value }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:NotExists ;
+      sp:elements ([ sp:subject spin:_this ;
+                     sp:predicate ex:firstName ;
+                     sp:object  [ sp:varName "value"^^xsd:string ]
+                   ])
+    ]</pre>
+    
+    <h3 id="sp-Minus">3.11 Minus</h3>
+    <p>
+    	In addition to NOT EXISTS, SPARQL 1.1 will also introduce the keyword MINUS.
+    	In SPIN, MINUS blocks are represented as instances of
+    	<code>sp:Minus</code> where the property
+    	<code>sp:elements</code> is used to point to the list of
+    	negative elements (stored as <code>rdf:List</code>).
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    MINUS { ?this ex:firstName ?value }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Minus ;
+      sp:elements ([ sp:subject spin:_this ;
+                     sp:predicate ex:firstName ;
+                     sp:object  [ sp:varName "value"^^xsd:string ]
+                   ])
+    ]</pre>
+        
+    <h3 id="sp-Service">3.12 Service</h3>
+    <p>
+    	The SERVICE keyword can be used to match a sub-query against a remote SPARQL end point.
+    	SPIN RDF Syntax represents such SERVICE calls with instances of
+    	<code>sp:Service</code> where the property
+    	<code>sp:elements</code> is used to point to the list of
+    	optional elements (stored as <code>rdf:List</code>), and the property
+    	<code>sp:serviceURI</code> points to the URI of the SPARQL end point.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    SERVICE &lt;http://dbpedia.org/sparql&gt; { 
+        ?this ex:firstName ?value }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Service ;
+      sp:serviceURI &lt;http://dbpedia.org/sparql&gt;
+      sp:elements ([ sp:subject spin:_this ;
+                     sp:predicate ex:firstName ;
+                     sp:object  [ sp:varName "value"^^xsd:string ]
+                   ])
+    ]</pre>
+        
+    <h3 id="sp-Values">3.13 Values</h3>
+    <p>
+    	The VALUES keyword can be used to pre-bind variables with given RDF nodes.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    SELECT ?country ?code
+    WHERE {
+        VALUES (?country ?code) {
+            (ex:Germany "de")
+            (ex:Norway "no")
+            (ex:Endor UNDEF)
+        } .
+    }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a sp:Select ;
+        sp:resultVariables  ( 
+            [ sp:varName  "country"^^xsd:string ]
+            [ sp:varName  "code"^^xsd:string ] ) ;
+        sp:where            ( 
+            [   a  sp:Values ;
+                sp:bindings  ( 
+                    ( ex:Germany "de" )
+                    ( ex:Norway "no" ) 
+                    ( ex:Norway sp:undef ) 
+                ) ;
+                sp:varNames  ( "country"^^xsd:string "code"^^xsd:string )
+            ] )
+     ]</pre>
+    <p>
+		VALUES clauses can also be used on queries, in which case the query object must
+		point to an <code>sp:Values</code> blank node via <code>sp:values</code>.
+    </p>
+    <p>&nbsp;</p>
+    
+    
+    <h2 id="sp-Queries">4 Queries</h2>
+    <p>
+    	Queries are the top-level objects in the SPIN metamodel.
+    	Queries are instances of the subclasses of <code>sp:Query</code>:
+    	<code>sp:Ask</code>, <code>sp:Select</code>, <code>sp:Describe</code>
+    	and <code>sp:Construct</code>.  Queries might be blank nodes,
+    	and in most cases they will be blank nodes that are only linked
+    	to the rest of a model via properties such as <code>spin:rule</code>
+    	or <code>spin:constraint</code>.
+    </p>
+    <p>
+    	Common to all query types is that they may have a WHERE clause.
+    	The WHERE clause is an element list stored as value of the
+    	<code>sp:where</code> property on the query instance.
+    </p>
+    <p>
+    	Other common properties are <code>sp:from</code> and
+    	<code>sp:fromNamed</code> which can be used to link a query instance
+    	with FROM and FROM NAMED URIs, respectively.
+    	Queries can have an <code>rdfs:comment</code> to capture a comment
+    	string.  In the textual notation of SPARQL, those comments would
+    	show up in the lines above the query, behind # characters.
+    	SPIN currently does not support comments that are placed elsewhere in
+    	the query, because many SPARQL parsers do not preserve this information. 
+    </p>
+    <p>
+    	Queries may have the textual form in the original SPARQL syntax
+    	stored as a string using <code>sp:text</code>.  This may contribute
+    	to readability and may be useful for tools that cannot parse the full
+    	SPIN SPARQL syntax.
+    	Note that while the textual notation of SPARQL supports explicit
+    	prefix declarations, these are not needed in SPIN.  The prefixes declared
+    	by the RDF model itself will be used in addition to those defined in the
+    	<code>sp:text</code>.
+    	Implementations should support both syntaxes, but if no full SPIN RDF
+    	parser is available, the engines may only use the <code>sp:text</code>
+    	triple.  In order to parse those, a system should prepend the prefix
+    	declarations from the surrounding RDF graph, to make the <code>sp:text</code>
+    	valid for parsing. 
+    </p>
+    <p>
+    	The following sections provide some details on the various types
+    	of queries.
+    </p>
+    
+    <h3 id="sp-Ask">4.1 Ask</h3>
+    <p>
+    	The class <code>sp:Ask</code> is used to represent ASK queries.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    # must be at least 18 years old
+    ASK WHERE {
+        ?this ex:age ?age .
+        FILTER (?age &gt;= 18) .
+    }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Ask ;
+      rdfs:comment "must be at least 18 years old"^^xsd:string ;
+      sp:where ([ sp:object _:b1 ;
+                  sp:predicate ex:age ;
+                  sp:subject spin:_this
+                ] [ a       sp:Filter ;
+                    sp:expression
+                            [ a       sp:ge ;
+                              sp:arg1 _:b1 ;
+                              sp:arg2 18
+                            ]
+                ])
+    ]</pre>
+    <p>
+    	Note that in the above example, the blank node <code>_:b1</code>
+    	points to the variable <code>?age</code> elsewhere in the model.
+    </p>
+    
+    <h3 id="sp-Select">4.2 Select</h3>
+    <p>
+    	The class <code>sp:Select</code> is used to represent
+    	<a href="https://www.w3.org/TR/rdf-sparql-query/#select">SELECT</a> queries.
+    </p>
+    <p>
+    	If a SELECT query has a
+    	<a href="https://www.w3.org/TR/rdf-sparql-query/#modDistinct">DISTINCT</a>
+    	keyword, then its value of
+    	<code>sp:distinct</code> is set to <code>true</code>.  Similarly,
+    	the <a href="https://www.w3.org/TR/rdf-sparql-query/#modReduced">REDUCED</a>
+    	keyword is mapped into <code>sp:reduced</code>.
+    </p>
+    <p>
+    	For SELECT queries that do not have the star (*) format, the property
+    	<code>sp:resultVariables</code> points to an <code>rdf:List</code>
+    	of the variables or aggregations behind the SELECT keyword.
+    	This property is left empty in the case of SELECT *.
+    </p>
+    <p>
+    	The following types of aggregations are supported right now:
+    </p>
+    <table>
+    	<tbody><tr>
+    		<th>SPARQL Aggregation</th>
+    		<th>SPIN Class</th>
+    	</tr>
+    	<tr>
+    		<td>AVG</td>
+    		<td>sp:Avg</td>
+    	</tr>
+    	<tr>
+    		<td>COUNT</td>
+    		<td>sp:Count</td>
+    	</tr>
+    	<tr>
+    		<td>MAX</td>
+    		<td>sp:Max</td>
+    	</tr>
+    	<tr>
+    		<td>MIN</td>
+    		<td>sp:Min</td>
+    	</tr>
+    	<tr>
+    		<td>SUM</td>
+    		<td>sp:Sum</td>
+    	</tr>
+    	<tr>
+    		<td>GROUP_CONCAT</td>
+    		<td>TODO</td>
+    	</tr>
+    	<tr>
+    		<td>SAMPLE</td>
+    		<td>TODO</td>
+    	</tr>
+    </tbody></table>
+    <p>
+    	For example, each COUNT expression is a blank node of type <code>sp:Count</code>
+    	which can have an expression in its <code>sp:expression</code> property.
+    	Each of those nodes can have a boolean flag <code>sp:distinct</code> to support
+    	the SPARQL DISTINCT keyword inside of an aggregation.
+    </p>
+    <p>
+    	SELECT queries may have <em>solution modifiers</em>.  A
+    	<a href="https://www.w3.org/TR/rdf-sparql-query/#modResultLimit">LIMIT</a>
+    	keyword is mapped into an integer value of <code>sp:limit</code>.
+    	Similarly, <a href="https://www.w3.org/TR/rdf-sparql-query/#modOffset">OFFSET</a>
+    	is stored with <code>sp:offset</code>.
+    </p>
+    <p>
+    	If an <a href="https://www.w3.org/TR/rdf-sparql-query/#modOrderBy">ORDER BY</a>
+    	statement is present in a query, then the SPIN query object will have a
+    	property <code>sp:orderBy</code> that points to an <code>rdf:List</code>.
+    	The members of this list are either expressions, or blank nodes of type
+    	<code>sp:Asc</code>	or <code>sp:Desc</code> which have the expression stored
+    	as value of the <code>sp:expression</code> property.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    SELECT COUNT(?object)
+    WHERE {
+    	?this ?arg1 ?object
+    }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Select ;
+      sp:resultVariables ([ a       sp:Count ;
+                            sp:expression sp:_object
+                          ]) ;
+      sp:where ([ sp:object sp:_object ;
+                  sp:predicate spin:_arg1 ;
+                  sp:subject spin:_this
+                ])
+    ]</pre>
+    
+    <h3 id="sp-Describe">4.3 Describe</h3>
+    <p>
+    	The class <code>sp:Describe</code> is used to represent DESCRIBE
+    	queries.  Comparable to SELECT queries, the property
+    	<code>sp:resultNodes</code> is used to link to the list of
+    	described variables.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    DESCRIBE ?value
+    WHERE {
+    	?this ex:uncle ?value
+    }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Describe ;
+      sp:resultNodes (sp:_value) ;
+      sp:where ([ sp:object sp:_value ;
+                  sp:predicate ex:uncle ;
+                  sp:subject spin:_this
+                ])
+    ]</pre>
+    
+    <h3 id="sp-Construct">4.4 Construct</h3>
+    <p>
+    	The class <code>sp:Construct</code> is used to represent CONSTRUCT
+    	queries.  Beside the usual <code>sp:where</code> clauses, the
+    	property <code>sp:templates</code> links to an <code>rdf:List</code>
+    	of template triples.  Each of these template triples is a blank
+    	node with values for <code>sp:subject</code>, <code>sp:predicate</code>
+    	and <code>sp:object</code>.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    # infer grandParent relationship
+    CONSTRUCT {
+    	?this ex:grandParent ?grandParent .
+    }
+    WHERE {
+        ?parent ex:child ?this .
+        ?grandParent ex:child ?parent .
+    }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Construct ;
+      rdfs:comment "infer grandParent relationship"^^xsd:string ;
+      sp:templates ([ sp:object sp:_grandParent ;
+                      sp:predicate ex:grandParent ;
+                      sp:subject spin:_this
+                    ]) ;
+      sp:where ([ sp:object spin:_this ;
+                  sp:predicate ex:child ;
+                  sp:subject sp:_parent
+                ] 
+                [ sp:object sp:_parent ;
+                  sp:predicate ex:child ;
+                  sp:subject sp:_grandParent
+                ])
+    ]</pre>
+	<p>&nbsp;</p>
+
+
+	<h2 id="sp-Update">5 Update Requests</h2>
+	<p>
+		The SPARQL UPDATE language is currently evolving as part of the
+		SPARQL 1.1 working group.
+		Many UPDATE operations share the same syntax as SPARQL queries in the
+		WHERE clause.
+		INSERT and DELETE operations are also similar to CONSTRUCT queries.
+		A major difference however is that the heads of the INSERT and DELETE
+		queries allow nested GRAPH elements, in addition to triple patterns.
+	</p>
+    
+    <h3 id="sp-InsertData">5.1 InsertData</h3>
+    <p>
+    	The class <code>sp:InsertData</code> represents INSERT DATA operations.
+    	The values of <code>sp:data</code> must be <code>rdf:Lists</code> with blank nodes
+    	as members - either triples or <code>sp:NamedGraph</code> elements.
+    	Note that this syntax is slighly more general than what the SPARQL 1.1 standard
+    	allows (either a named graph or a triples block), but the SPIN syntax is consistent
+    	with how similar blocks are represented in INSERT/DELETE operations and elsewhere.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    INSERT DATA {
+        GRAPH &lt;http://example.org&gt; {
+            owl:Nothing a owl:Nothing .
+        }
+    }</pre>
+    <pre class="query">    [ a       sp:InsertData ;
+                sp:data ([ a       sp:NamedGraph ;
+                            sp:elements ([ sp:object owl:Nothing ;
+                                        sp:predicate rdf:type ;
+                                        sp:subject owl:Nothing
+                                      ]) ;
+                            sp:graphNameNode &lt;http://example.org&gt;
+                          ])
+              ]</pre>
+    
+    <h3 id="sp-DeleteData">5.2 DeleteData</h3>
+    <p>
+    	DELETE DATA operations are encoded similar to INSERT DATA, but with
+    	<code>sp:DeleteData</code> instead of <code>sp:InsertData</code>.
+    </p>
+	
+    <h3 id="sp-Modify">5.3 Modify (DELETE/INSERT)</h3>
+	<p>
+		The class sp:Modify is used to represent DELETE/INSERT requests.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    WITH &lt;urn:example:graph&gt;
+    DELETE {
+        :Thing rdfs:label ?oldLabel .
+    }
+    INSERT {
+        :Thing rdfs:label "New label" .
+    }
+    WHERE {
+        :Thing rdfs:label ?oldLabel .
+    }</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Modify ;
+      sp:graphIRI &lt;urn:example:graph&gt; ;
+      sp:deletePattern ([ sp:object _:b1 ;
+                          sp:predicate rdfs:label ;
+                          sp:subject :Thing
+                        ]) ;
+      sp:insertPattern ([ sp:object "New label" ;
+                          sp:predicate rdfs:label ;
+                          sp:subject :Thing
+                        ]) ;
+      sp:where         ([ sp:object _:b1 ;
+                          sp:predicate rdfs:label ;
+                          sp:subject :Thing
+                        ])
+    ]</pre>
+    <p>
+    	The values of <code>sp:deletePattern</code> and <code>sp:insertPattern</code>
+    	must be <code>rdf:Lists</code> with blank nodes
+    	as members - either triples or <code>sp:NamedGraph</code> elements. 
+    	The properties may point to an empty list (<code>rdf:nil</code>) to make sure that
+    	the operation will print an empty DELETE or INSERT block, resp.
+    </p>
+    <p>
+    	The optional WITH clause is encoded using <code>sp:graphIRI</code>.
+    	<code>sp:using</code> and <code>sp:usingNamed</code> may point to zero or more
+    	named graphs (not stored as lists but individual triples).
+    </p>
+    <p>
+    	The WHERE clause is encoded similar to other queries, using <code>sp:where</code>.
+    </p>
+    
+    <h3 id="sp-DeleteWhere">5.4 DeleteWhere</h3>
+    <p>
+    	The class <code>sp:DeleteWhere</code> represents DELETE WHERE operations.
+    	The WHERE clause is encoded similar to other queries, using <code>sp:where</code>.
+    </p>
+    	
+    <h3 id="sp-Load">5.5 Load</h3>
+    <p>
+    	The class <code>sp:Load</code> represents LOAD operations.
+    	<code>sp:document</code> points to the document to load.
+    	The property <code>sp:into</code> may point to the optional target graph.
+    </p>
+    <p>
+    	Example:
+    </p>
+    <pre class="query">    LOAD &lt;http://example.org&gt; INTO GRAPH &lt;http://target.org&gt;</pre>
+    <p>
+    	Represented in SPIN Syntax as:
+    </p>
+    <pre class="query">    [ a       sp:Load ;
+      sp:document &lt;http://example.org&gt; ;
+      sp:into &lt;http://target.org&gt;
+    ]</pre>
+    	
+    <h3 id="sp-Clear">5.6 Clear</h3>
+    <p>
+    	The class <code>sp:Clear</code> represents CLEAR operations.
+    	The SILENT option is represented using <code>sp:silent</code> set to <code>"true"^^xsd:boolean</code>.
+    	The target is represented with either <code>sp:graphIRI</code> (pointing to a IRI resource),
+    	or boolean flags <code>sp:default</code>, <code>sp:named</code> or <code>sp:all</code> set to true.
+    </p>
+    	
+    <h3 id="sp-Create">5.7 Create</h3>
+    <p>
+    	The class <code>sp:Create</code> represents CREATE operations.
+    	The SILENT option is represented using <code>sp:silent</code> set to <code>"true"^^xsd:boolean</code>.
+    	The target is represented with <code>sp:graphIRI</code> (pointing to a IRI resource).
+    </p>
+    	
+    <h3 id="sp-Drop">5.8 Drop</h3>
+    <p>
+    	The class <code>sp:Drop</code> represents DROP operations.
+    	The SILENT option is represented using <code>sp:silent</code> set to <code>"true"^^xsd:boolean</code>.
+    	The target is represented with either <code>sp:graphIRI</code> (pointing to a IRI resource),
+    	or boolean flags <code>sp:default</code>, <code>sp:named</code> or <code>sp:all</code> set to true.
+    </p>
+	<p>&nbsp;</p>
+
+    
+    <h2 id="sp-Reference">Appendix: Reference</h2>
+    <p>
+    	The SPIN SPARQL Syntax schema can be found at
+    	<a href="http://spinrdf.org/sp">http://spinrdf.org/sp</a>.
+    </p> 
+
+  
+</body></html>

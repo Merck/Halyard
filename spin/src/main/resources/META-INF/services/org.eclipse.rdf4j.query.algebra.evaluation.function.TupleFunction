@@ -1,0 +1,11 @@
+# spif
+com.msd.gin.halyard.spin.function.spif.ForEach
+com.msd.gin.halyard.spin.function.spif.For
+com.msd.gin.halyard.spin.function.spif.Split
+# apf
+com.msd.gin.halyard.spin.function.apf.StrSplit
+com.msd.gin.halyard.spin.function.apf.ConcatTupleFunction
+# list
+com.msd.gin.halyard.spin.function.list.Member
+com.msd.gin.halyard.spin.function.list.Index
+com.msd.gin.halyard.spin.function.list.Length

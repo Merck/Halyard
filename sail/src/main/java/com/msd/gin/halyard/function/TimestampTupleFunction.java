@@ -4,6 +4,7 @@ import static com.msd.gin.halyard.vocab.HALYARD.*;
 
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.sail.HBaseTripleSource;
+import com.msd.gin.halyard.spin.function.AbstractSpinFunction;
 
 import java.util.Collections;
 import java.util.Date;
@@ -22,7 +23,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.QueryPreparer;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunction;
-import org.eclipse.rdf4j.spin.function.AbstractSpinFunction;
 import org.kohsuke.MetaInfServices;
 
 @MetaInfServices(TupleFunction.class)

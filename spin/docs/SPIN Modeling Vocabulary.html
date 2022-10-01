@@ -1,0 +1,1292 @@
+<!--?xml version="1.0" encoding="UTF-8"?-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="https://www.w3.org/1999/xhtml"><head profile="https://www.w3.org/2003/g/data-view">
+    <meta content="text/html; charset=UTF-8" http-equiv="content-type">
+    <title>SPIN Modeling Vocabulary</title>
+	<link rel="stylesheet" type="text/css" href="assets/local.css">
+    <link href="assets/base.css" rel="stylesheet" type="text/css">
+  </head>
+
+  <body>
+	<div class="head">
+		<h1 id="title">SPIN - Modeling Vocabulary</h1>
+		<h2 id="SW">W3C Member Submission 22 February 2011, updated 07 November, 2014</h2>
+       
+      	<dl>
+      		<dt>W3C Member Submission:</dt>
+      			<dd><a href="https://www.w3.org/Submission/2011/SUBM-spin-modeling-20110222/">https://www.w3.org/Submission/2011/SUBM-spin-modeling-20110222/</a></dd>
+      		<dt>This version  (almost identical to W3C Member Submission, but with generalized handling of sp:text and added spin:Columns):</dt>
+      			<dd><a href="http://spinrdf.org/spin.html">http://spinrdf.org/spin.html</a></dd>
+        	<dt>Authors:</dt>
+        		<dd>Holger Knublauch &lt;<a href="mailto:holger@topquadrant.com" shape="rect">holger@topquadrant.com</a>&gt;</dd>
+      	</dl>
+		<p class="copyright">
+			Copyright © 2011 by the <a href="https://www.w3.org/Submission/2010/04/#submitting_parties">Submitting Members</a>.</p>
+			<p>This document is available under the <a href="https://www.w3.org/Consortium/Legal/copyright-documents" shape="rect">W3C Document License</a>. See the <a href="https://www.w3.org/Consortium/Legal/ipr-notice#Copyright" shape="rect">W3C Intellectual Rights Notice and Legal Disclaimers</a> for
+			additional information.
+		</p> 
+
+    </div>
+
+    <hr>
+
+    <h2 id="abstract">Abstract</h2> 
+    <p>
+    	The SPIN Modeling Vocabulary is a light-weight collection of
+    	RDF properties and classes to support the use of SPARQL to
+    	specify rules and logical constraints.  Based on an RDF
+    	representation of SPARQL queries, SPIN defines three class
+    	description properties:
+    	<code>spin:constraint</code> can be used to define conditions
+    	that all members of a class must fulfill.
+    	<code>spin:rule</code> can be used to specify inference rules
+    	using SPARQL CONSTRUCTs and DELETE/INSERTs.
+    	<code>spin:constructor</code> can be used to initialize new
+    	instances with default values.
+    	In addition to these class description properties, SPIN provides
+    	a powerful meta-modeling capability that can be used to build
+    	your own modeling language and SPARQL extensions.
+    	These meta-modeling features provide the ability to encapsulate
+    	reusable SPARQL queries into <em>templates</em>, and to derive
+    	new SPARQL functions as well as magic properties from other SPARQL
+    	queries and functions.  
+    </p>
+
+    <h2 id="sotd">Status of This Document</h2>
+	<p>
+		SPIN has originally evolved as a specification developed by TopQuadrant.
+		As of February 2011, SPIN has been published by W3C as a member submission.
+		TopQuadrant may continue to improve SPIN in the future and make changes
+		that will be published here.
+		As of July 2014, this version is almost identical to the official W3C submission,
+		except that we have lifted the requirement of using the SPIN RDF syntax for
+		the definition of queries and update commands if (and only if) sp:text triples
+		are present.  Accordingly, we have changed the RDF source code of some
+		examples to make them easier to read.
+		Another change in June 2013 (with TopBraid 4.3) was the addition of the
+		concept of (optional) column metadata attached to SPIN templates.
+		The version of July 2014 (with TopBraid 4.5) has introduced the concept of
+		union templates, and the built-in SPARQL functions spin:ask, spin:construct
+		and spin:select.
+		The August 2014 version added constraint violation levels.
+		The November 2014 version introduced syntactic sugar on ASK constraints.
+	</p>
+      
+    <hr>
+
+<div class="toc">
+  <h2><a id="contents" name="contents">Table of Contents</a></h2>
+  
+  <ul class="toc">
+  
+    <li class="tocline1"><a href="#introduction">1 Introduction</a> </li>
+    <li class="tocline1"><a href="#spin-class-description">2 Class Description Vocabulary</a>
+    	<ul class="toc">
+	    	<li class="tocline2"><a href="#spin-constraints">2.1 Constraints</a>
+	    		<ul class="toc">
+    				<li class="tocline2"><a href="#spin-constraint-ask">2.1.1 Constraint checks using ASK</a></li>
+    				<li class="tocline2"><a href="#spin-constraint-construct">2.1.2 Constraint checks using CONSTRUCT</a></li>
+    				<li class="tocline2"><a href="#spin-constraint-fixes">2.1.3 Constraint violations that suggest fixes</a></li>
+    			</ul>
+    		</li>
+	    	<li class="tocline2"><a href="#spin-rules">2.2 Rules</a>
+	    		<ul class="toc">
+    				<li class="tocline2"><a href="#spin-rules-construct">2.2.1 Inference Rules using CONSTRUCT</a></li>
+    				<li class="tocline2"><a href="#spin-rules-update">2.2.2 Update Rules using DELETE/INSERT</a></li>
+    				<li class="tocline2"><a href="#spin-rules-order">2.2.3 Controlling the Execution Order of Rules</a></li>
+    				<li class="tocline2"><a href="#spin-rules-library">2.2.4 Organizing Rules in Libraries</a></li>
+    				<li class="tocline2"><a href="#spin-rules-thisUnbound">2.2.5 Controlling the binding of ?this</a></li>
+	    		</ul>
+	    	</li>
+	    	<li class="tocline2"><a href="#spin-constructors">2.3 Constructors</a></li>
+	    </ul>
+	</li>
+    <li class="tocline1"><a href="#spin-meta-modeling">3 Meta-Modeling Vocabulary</a>
+    	<ul class="toc">
+	    	<li class="tocline2"><a href="#spin-templates">3.1 Templates</a>
+	    		<ul class="toc">
+    				<li class="tocline2"><a href="#spin-columns">3.1.1 SPIN Column Metadata</a></li>
+	    		</ul>
+	    	</li>
+	    	<li class="tocline2"><a href="#spin-functions">3.2 Functions</a>
+	    		<ul class="toc">
+    				<li class="tocline2"><a href="#spin-functions-eval">3.2.1 The built-in Function spin:eval</a></li>
+	    		</ul>
+	    		<ul class="toc">
+    				<li class="tocline2"><a href="#spin-functions-ask">3.2.2 The built-in Function spin:ask</a></li>
+	    		</ul>
+	    	</li>
+	    	<li class="tocline2"><a href="#spin-magic">3.3 Magic Properties</a>
+	    		<ul class="toc">
+    				<li class="tocline2"><a href="#spin-magic-construct">3.3.1 The built-in Magic Property spin:construct</a></li>
+	    		</ul>
+	    		<ul class="toc">
+    				<li class="tocline2"><a href="#spin-magic-select">3.3.2 The built-in Magic Property spin:select</a></li>
+	    		</ul>
+	    	</li>
+	    </ul>
+	</li>
+    <li class="tocline1"><a href="#spin-libraries">4 Libraries</a>
+    	<ul class="toc">
+	    	<li class="tocline2"><a href="#spin-semweb">4.1 SPIN and the Semantic Web</a></li>
+	    	<li class="tocline2"><a href="#spin-imports">4.2 SPIN Imports</a></li>
+	    </ul>
+	</li>
+    <li class="tocline1"><a href="#spin-ref">Appendix: Reference</a> </li>
+  </ul>
+</div>
+      
+    <h2 id="introduction">1 Introduction</h2> 
+    <p>
+    	SPARQL is now firmly established as the standard query language for
+    	RDF models and Semantic Web data.  Many RDF APIs and databases come
+    	with SPARQL support out-of-the-box.  At the same time, SPARQL can be
+    	regarded as more than just a query language with a <code>SELECT</code>
+    	keyword:  SPARQL also provides means to check whether certain conditions
+    	currently hold in an RDF model (<code>ASK</code>), to derive new
+    	triples	from existing triples (<code>CONSTRUCT</code>), and to
+    	perform <code>DELETE</code> or <code>INSERT</code> operations.
+    	While these powerful elements are increasingly used by developers to
+    	solve application and modeling problems, SPIN defines a systematic
+    	framework on how to use SPARQL queries to drive applications. 
+    	SPIN takes SPARQL a step further and uses it to enhance existing RDF
+    	models with formal, executable descriptions.
+    </p>
+    <p>
+    	Based on the <a href="https://spinrdf.org/sp.html">SPIN SPARQL Syntax</a>, the SPIN
+    	Modeling Vocabulary (described in this document) defines a light-
+    	weight set of RDFS classes and properties that can be used to 
+    	systematically embed SPARQL queries into RDF models so that they
+    	can be executed with well-defined semantics.  The basic idea is
+    	to use specific RDF properties to link classes with SPARQL queries
+    	so that those SPARQL queries can be executed with a given context.
+    </p>
+    <p>
+    	The following chapters describe how this approach can be used to
+    	describe classes (and their instances,
+    	<a href="#spin-class-description">Chapter 2</a>), and how to build more
+    	complex modeling constructs out of reusable SPARQL queries
+    	(<a href="#spin-meta-modeling">Chapter 3</a>).
+		<a href="#spin-libraries">Chapter 4</a> describes guidelines on how the
+		SPIN vocabulary should be used in the context of the Semantic Web.
+    </p>
+    <p>
+    	Note that the example RDF snippets in this document mostly use the human-readable
+    	notation of SPIN RDF, using the <code>sp:text</code> property.
+    	SPIN editing tools such as TopBraid typically generate SPIN RDF triples that
+    	are better suited for machines to handle because they contain proper references
+    	to URI resources, are independent of prefix declarations etc.
+    </p>
+    <p>&nbsp;</p>
+    
+    
+    <h2 id="spin-class-description">2 Class Description Vocabulary</h2>
+    <p>
+    	The SPIN class description vocabulary defines several RDF properties
+    	that can be used to attach SPARQL queries to classes.  The property
+    	<code>spin:query</code> is the common base property of
+    	<code>spin:constraint</code>, <code>spin:rule</code> and
+    	<code>spin:constructor</code>.  SPIN-compliant tools can use these
+    	properties to execute SPARQL queries over the instances of the associated
+    	class(es) in response to events.  For example, <code>spin:rule</code>
+    	can be used by SPIN reasoning engines to construct inferred RDF triples
+    	from the currently asserted information in the model.
+    </p>
+    <p>
+    	The SPARQL queries referenced by the SPIN properties are interpreted
+    	in the context of the associated class.  At run-time, the SPARQL variable
+    	<code>?this</code> is (by default) pre-bound with instances of the class and its
+    	sub-classes.  Typically, the query itself does not need to bind
+    	<code>?this</code> to any value in the <code>WHERE</code> clause.
+    	The execution context (e.g., inference engine) will do this before the
+    	query is executed.  However, if the query object has the value <code>true</code>
+    	for the property <code>spin:thisUnbound</code> then the system will
+    	not do this pre-binding.  See separate <a href="#spin-rules-thisUnbound">section</a>
+    	on details about <code>spin:thisUnbound</code>.
+    </p>
+    <p>
+    	SPIN takes an object-oriented world view on Semantic Web models,
+    	in which SPARQL queries play a similar role to functions and methods.
+    	Inheritance (expressed using <code>rdfs:subClassOf</code>) is treated
+    	in the sense that any query defined for superclasses will also be
+    	applied to subclasses.  In other words, SPIN class descriptors can
+    	only "narrow down" and further restrict what has been defined further
+    	up in the class hierarchy.  In this spirit, <em>global</em> class
+    	descriptions are those that are attached to the root class
+    	<code>rdfs:Resource</code> or its OWL equivalent <code>owl:Thing</code>.
+    	Those global queries may not even mention <code>?this</code> at all.
+    </p>
+    <p>
+    	The following sections provide details on the three SPIN class
+    	description properties.
+    </p>
+    
+    
+    <h3 id="spin-constraints">2.1 Constraints</h3>
+    <p>
+    	The property <code>spin:constraint</code> can be used to link an
+    	<code>rdfs:Class</code> with SPARQL <code>ASK</code> or
+    	<code>CONSTRUCT</code> queries.
+    	Each ASK query defines a constraint that is assumed to evaluate to
+    	<code>false</code> for each instance of the associated class (and
+    	its subclasses).  In other words, if an ASK constraint evaluates to
+    	true for one instance, then the instance violates the condition.
+    	Optionally, CONSTRUCT queries can create instances of a
+    	<code>spin:ConstraintViolation</code> class that provide details
+    	on a specific violation.
+    	At query execution time, the SPARQL variable <code>?this</code> is bound
+    	to the current instance of the class.
+    </p>
+    <p>
+    	Interactive tools such as editing forms may use the constraints
+    	to validate user input.  Web services may check parameter ranges.
+    	Since SPIN queries are directly attached to class definitions
+    	in a machine-readable format, the intended "meaning" and scope of
+    	those classes can be clearly communicated to other agents.
+    </p>
+    
+    <h4 id="spin-constraint-ask">2.1.1 Constraint checks using ASK</h4>
+    <p>
+    	The following example defines a constraint on the example class
+    	<code>ex:Parent</code> so that each instance of parent must
+    	be at least 18 years of <code>ex:age</code>.
+    </p>
+    <pre class="query">    ex:Parent
+      a       rdfs:Class ;
+      rdfs:label "Parent"^^xsd:string ;
+      rdfs:subClassOf ex:Person ;
+      spin:constraint
+              [ a       sp:Ask ;
+                sp:text """
+                    # must be at least 18 years old
+                    ASK WHERE {
+                        ?this ex:age ?age .
+                        FILTER (?age &lt; 18) .
+                    }"""
+              ] .</pre>
+    <p id="spin-constraint-ask-sugar">
+    	Constraint violations may be associated with additional information.
+    	In the following example, the violation will be reported as a warning
+    	and pointing at the <code>ex:age</code> property as the cause.
+    </p>
+    <pre class="query">    ex:Parent
+      a       rdfs:Class ;
+      rdfs:label "Parent"^^xsd:string ;
+      rdfs:subClassOf ex:Person ;
+      spin:constraint
+              [ a       sp:Ask ;
+                sp:text """
+                    # must be at least 18 years old
+                    ASK WHERE {
+                        ?this ex:age ?age .
+                        FILTER (?age &lt; 18) .
+                    }""" ;
+                <b>spin:violationPath ex:age ;
+                spin:violationLevel spin:Warning</b>
+              ] .</pre>
+    
+    <h4 id="spin-constraint-construct">2.1.2 Constraint checks using CONSTRUCT</h4>
+    <p>
+    	The following example uses a SPARQL CONSTRUCT query, which is
+    	more complex than the ASK style but much more flexible.
+    	The CONSTRUCT is assumed to create instances of the system class
+    	<code>spin:ConstraintViolation</code>.  These instances are usually
+    	blank nodes, and additional properties can be attached to
+    	violation instances so that editing tools can guide user input:
+    </p>
+   	<ul>
+   		<li><code>rdfs:label</code> can provide a human-readable text
+   		    that explains the reason of the constraint violation
+   		</li>
+   		<li><code>spin:violationRoot</code> can link to the resource
+   			that is the source of the constraint violation
+   		</li>
+   		<li><code>spin:violationPath</code> can point to a SPIN RDF
+   		    path expression, which is often the URI of a property
+   		</li>
+   		<li><code>spin:violationValue</code> can point to a specific RDF node
+   		    that caused the violation (together with violationRoot and
+   		    violationPath this can be used to point at a certain triple)
+   		</li>
+   		<li><code>spin:violationLevel</code> can point to an instance of
+   		    <code>spin:ConstraintViolationLevel</code> to indicate the
+   		    severity of the violation.  See the table below for possible values.
+   		    Defaults to <code>spin:Error</code>.
+   		</li>
+   		<li><code>spin:fix</code> can point to one or more
+   			<a href="#spin-templates">SPIN Templates</a> that wrap a SPARQL
+   			Update request.  Details <a href="#spin-constraint-fixes">below</a>.
+   		</li>
+   	</ul>
+   	<p>
+   		Supported values of <code>spin:violationLevel</code> are:
+   	</p>
+   	<table>
+   		<tbody><tr>
+   			<th>Level</th>
+   			<th>Description</th>
+   		</tr>
+   		<tr>
+   			<td>spin:Info</td>
+   			<td>Indicates that the violation is not a problem. Can be used for diagnostic and
+   			debugging purposes.</td>
+   		</tr>
+   		<tr>
+   			<td>spin:Warning</td>
+   			<td>A problem that may not have to be fixed but may lead to issues in the future.</td>
+   		</tr>
+   		<tr>
+   			<td>spin:Error</td>
+   			<td>An error that should be fixed. This is the default level.</td>
+   		</tr>
+   		<tr>
+   			<td>spin:Fatal</td>
+   			<td>A severe error that must be fixed. Constraint checking engines may decide to stop
+   			further evaluation once a fatal error has been detected.</td>
+   		</tr>
+   	</tbody></table>
+   	<p>
+   		The following example constructs constraint violations whenever a person's spouse has
+   		the same gender as the current person.
+   	</p>
+    <pre class="query">	spin:constraint
+          [ a       sp:Construct ;
+            sp:text """
+                CONSTRUCT {
+                    _:violation a spin:ConstraintViolation ;
+                         spin:violationRoot ?this ;
+                         spin:violationPath kennedys:spouse ;
+                         spin:violationValue ?spouse ;
+                         spin:violationLevel spin:Warning ;
+                         rdfs:label "Same-sex marriage not permitted (in this model)"
+                }
+                WHERE {
+                    ?this kennedys:spouse ?spouse .
+                    ?this kennedys:gender ?gender .
+                    ?spouse kennedys:gender ?spouseGender .
+                    FILTER (?gender = ?spouseGender) .
+                }"""
+          ] .</pre>
+    <p>
+    	SPIN constraints can be used for various purposes, but in
+    	particular to verify that an instance of a class maintains its
+    	expected state with regards to its property values and
+    	relationships with other resources.  For example, simple SPIN
+    	constraints may only verify the range of some datatype literals,
+    	but other, more complex, constraints may walk adjacent nodes as well,
+    	starting a graph pattern matching at the context variable <code>?this</code>.
+    	Anything that can be expressed in SPARQL can be used in SPIN constraints,
+    	including queries against other SPARQL end points, <code>FILTER</code> clauses
+    	and complex mathematical calculations.
+    </p>
+    <p>
+    	<em>
+	    	Please note that the values of the <code>spin:constraint</code>
+	    	property may also be <a href="#spin-templates">SPIN template</a> calls,
+	    	assuming these templates wrap CONSTRUCT or ASK queries.  Basically, SPIN
+	    	allows you to use templates whenever a query is expected, as long as
+	    	the query type matches the expectations.
+    	</em> 
+    </p>
+    
+    <h4 id="spin-constraint-fixes">2.1.3 Constraint violations that suggest fixes</h4>
+    <p>
+    	Constraint checks of the <code>CONSTRUCT</code> form may also create
+    	extra information that can guide the user to fix the reported constraint
+    	violation.  The <code>spin:ConstraintViolation</code> can have one or more values
+    	for <code>spin:fix</code>, pointing to a call (instance) of a
+    	<code>spin:UpdateTemplate</code>.  The template call will typically have
+    	additional arguments that can also be constructed as part of the constraint
+    	check's CONSTRUCT clause.
+    </p>
+    <p>
+    	The following example query is attached to a Person class using
+    	<code>spin:constraint</code>.  If the Person (<code>?this</code>)
+    	has some spouse and is less than 18 years of age, then a violation
+    	will be reported.  The <code>spin:ConstraintViolation</code> also
+    	points to a SPIN template of type <code>:DeleteTriple</code>,
+    	constructed as an anonymous node with the identifier <code>_:fix</code>.
+    </p>
+    <pre class="query">    CONSTRUCT {
+        _:violation a spin:ConstraintViolation ;
+                rdfs:label "Underage marriage not allowed" ;
+                spin:violationRoot ?this ;
+                spin:violationPath :spouse ;
+                spin:fix _:fix .
+        _:fix a :DeleteTriple ;
+                rdf:subject ?this ;
+                rdf:predicate :spouse ;
+                rdf:object ?spouse .
+    }
+    WHERE {
+        ?this :spouse ?spouse .
+        ?this :age ?age .
+        FILTER (?age &lt; 18) .
+    }</pre>
+    <p>
+    	Without going into details about the <code>:DeleteTriple</code> template,
+    	it is a <code>spin:UpdateTemplate</code> that wraps a SPARQL DELETE
+    	command on the specified triple.  The template takes three arguments,
+    	<code>rdf:subject</code>, <code>rdf:predicate</code> and <code>rdf:object</code>,
+    	which are filled by the CONSTRUCT above using the current variable bindings.  
+    	The template would have a human-readable label so that user interfaces can
+    	propose a fix from a context menu.
+    </p>
+
+    
+    <h3 id="spin-rules">2.2 Rules</h3>
+    <p>
+    	The property <code>spin:rule</code> can be used to link an
+    	<code>rdfs:Class</code> with SPARQL <code>CONSTRUCT</code> queries
+    	or <code>DELETE/INSERT</code> update operations.
+    	Each query or operation defines an inference rule that is applied
+    	to all instances of the associated class and its subclasses.
+    </p>
+    
+    <h4 id="spin-rules-construct">2.2.1 Inference Rules using CONSTRUCT</h4>
+    <p>
+    	If the property <code>spin:rule</code> points to a <code>CONSTRUCT</code> query,
+    	then this defines an inference rule that defines how additional triples can
+    	be inferred from what is stated in the <code>WHERE</code> clause. 
+    	For each binding of the pattern in the <code>WHERE</code>
+    	clause of the rule, the triple templates from the <code>CONSTRUCT</code>
+    	clause are instantiated and added as inferred triples to the
+    	underlying model.  At query execution time, the SPARQL variable
+    	<code>?this</code> is bound to the current instance of the class.
+    </p>
+    <p>
+    	The following example defines a rule that infers the values of the
+    	<code>ex:grandParent</code> property from values of <code>ex:child</code>.
+    </p>
+    <pre class="query">    ex:Person
+      a       rdfs:Class ;
+      rdfs:label "Person"^^xsd:string ;
+      rdfs:subClassOf owl:Thing ;
+      spin:rule
+              [ a       sp:Construct ;
+                sp:text """
+                    CONSTRUCT {
+                        ?this ex:grandParent ?grandParent .
+                    }
+                    WHERE {
+                        ?parent ex:child ?this .
+                        ?grandParent ex:child ?parent .
+                    }"""
+              ] .</pre>
+    <p>
+    	The property <code>spin:rule</code> has the type <code>spin:RuleProperty</code>.
+    	Any sub-property of <code>spin:rule</code> can be used in addition to
+    	<code>spin:rule</code> to store rules. 
+    </p>
+    <p>
+    	The newly inferred triples of a <code>CONSTRUCT</code> rule will go into a special
+    	inferences graph.  This graph is part of the default query graph that the <code>WHERE</code> clause
+    	will be evaluated on, so that inferences from the previous step will be visible to the "next" rule.
+    </p>
+    
+    <h4 id="spin-rules-update">2.2.2 Update Rules using DELETE/INSERT</h4>
+    <p>
+    	If the property <code>spin:rule</code> points to a SPARQL UPDATE operation, then
+    	this defines an update rule that will lead to assertions, not inferences.
+    	This is potentially more powerful than <code>CONSTRUCT</code> rules, because
+    	UPDATE rules may include a <code>DELETE</code> clause (<code>DELETE WHERE</code>
+    	is also supported), and furthermore it becomes possible to specify the target
+    	graphs that shall be modified.
+    	Another advantage of using UPDATE rules is that no specific inferences graph may
+    	be needed, and thus rule execution may be faster.
+    </p>
+    <p>
+    	However, note that UPDATEs with DELETEs may more easily lead to infinite loops,
+    	because rules may undo the results of previous steps.
+    	Also note that changes will be made to the actual models, so that the result of
+    	rules may be accidentally saved while editing and evaluating the rules. 
+    </p>
+    <p>
+    	The following example defines a rule that infers the values of the
+    	<code>ex:grandParent</code> property from values of <code>ex:child</code>,
+    	and inserts the resulting triples into a specified named graph.
+    </p>
+    <pre class="query">    WITH &lt;http://example.org/people/relationships&gt;
+    INSERT {
+    	?this ex:grandParent ?grandParent .
+    }
+    WHERE {
+    	?parent ex:child ?this .
+    	?grandParent ex:child ?parent .
+    }</pre>
+    
+    <h4 id="spin-rules-order">2.2.3 Controlling the Execution Order of Rules</h4>
+    <p>
+    	By default all rules may be executed in a random order.
+    	However, the SPIN vocabulary provides some properties that can be used
+    	to guide the execution engine.
+    	Designers can use these properties to attach metadata to the rules to
+    	help the engine skip certain rules.
+    	This often makes it possible to just do a single iteration over all rules.
+    </p>
+    <p>
+    	On the most granular level, it is possible to group rules into categories
+    	using sub-properties of <code>spin:rule</code>.  The property
+    	<code>spin:nextRuleProperty</code> can be used to link two such
+    	properties together, so that rules from one group will be executed before
+    	others.  For example, if you want to run all <code>ex:importRules</code>
+    	before all <code>spin:rules</code> then add the triple
+    	<code>ex:importRule spin:nextRuleProperty spin:rule</code> and
+    	use <code>ex:importRule</code> to attach the high priority rules to your class.
+    </p>
+    <p>
+    	The <code>rdfs:comment</code> of a rule should be used as the final level of
+    	ordering.  This allows developers to insert comments
+    	such as "# Step 1: ...", "# Step 2: ..." etc as first lines of their
+    	rules.  User interfaces can use the same ordering and (like TopBraid)
+    	may do so by default.
+    </p>
+    <p>
+    	The property <code>spin:rulePropertyMaxIterationCount</code> can be attached
+    	to any sub-property of <code>spin:rule</code> to instruct the engine to
+    	execute certain rules a certain number of times.  In particular this
+    	makes it possible to make sure that rules that create blank nodes are only
+    	executed once, avoiding problems with infinite loops.
+    </p>
+    
+    <h4 id="spin-rules-library">2.2.4 Organizing Rules in Libraries</h4>
+    <p>
+    	In some cases, rules may be imported from a library.  Such library
+    	files may only declare the rules themselves but have no additional
+    	triples in them that would be relevant for the rule execution.  The
+    	base URI (<code>owl:Ontology</code>) of such files can be annotated
+    	to be an instance of <code>spin:LibraryOntology</code>.  In this
+    	case, all triples from that named graph should be ignored by SPIN
+    	rule engines.
+    </p>
+    
+    <h4 id="spin-rules-thisUnbound">2.2.5 Controlling the binding of ?this</h4>
+    <p>
+    	In the default setting, a SPIN rules or constraint checking engine will
+    	pre-bind the variable <code>?this</code> with all instances of the associated
+    	class.  A naive implementation of this is to add a triple match such as
+    	<code>?this rdf:type ex:Class</code> to the WHERE clause.  This check will
+    	make sure that the system only iterates over values of that class.  However,
+    	this additional check can also be a significant amount of work for the engine,
+    	and may lead to many unnecessary matches.  Furthermore, in many cases this
+    	pre-binding is not really necessary because the remaining conditions in the
+    	WHERE clause may be sufficiently strong to bind <code>?this</code> with all
+    	expected instances.
+    </p>
+    <p>
+    	In those cases, the property <code>spin:thisUnbound</code>
+    	should be set to <code>"true"^^xsd:boolean</code> to instruct the engine
+    	to bypass the explicit binding of <code>?this</code>.  The <code>spin:thisUnbound</code>
+    	property has been introduced with SPIN 1.1.  As a recommendation, display engines
+    	should render the variable <code>?this</code> in bold face to indicate that it has
+    	a special meaning, unless <code>spin:thisUnbound</code> is set.   
+	</p>    
+    
+    <h3 id="spin-constructors">2.3 Constructors</h3>
+    <p>
+    	The property <code>spin:constructor</code> can be used to link an
+    	<code>rdfs:Class</code> with SPARQL <code>CONSTRUCT</code> queries
+    	or <code>DELETE/INSERT</code> update operations.
+    	Each Construct query defines an inference rule that can be
+    	applied to all new instances of the associated class and its
+    	subclasses at creation-time.  Constructors are usually only
+    	evaluated once, to set initial default values to some properties
+    	of the instances.  At query execution time, the SPARQL variable
+    	<code>?this</code> is bound to the current instance of the class.
+    </p>
+    <p>
+    	For example, if a user creates a new instance of
+    	<code>ex:USCitizen</code> then its constructor can be used to
+    	automatically set its <code>ex:birthCountry</code>
+    	property to <code>ex:USA</code>.  However, this value may of
+    	course be replaced later, during the evolution of the model.
+    </p>
+    <pre class="query">    ex:USCitizen
+      a       rdfs:Class ;
+      rdfs:label "US citizen"^^xsd:string ;
+      rdfs:subClassOf ex:Person ;
+      spin:constructor
+              [ a       sp:Construct ;
+                sp:text """
+                    CONSTRUCT {
+                        ?this ex:birthCountry ex:USA .
+                    }
+                    WHERE {
+                    }"""
+              ] .</pre>
+    <p>
+    	At execution time, the only triple that will be reliably present
+    	for <code>?this</code> is the <code>rdf:type</code> triple that
+    	links <code>?this</code> with the class that has the constructor
+    	attached to it, or a subclass thereof. 
+    </p>
+    <p>
+    	SPIN-compliant engines need to make sure that superclass
+    	constructors are executed before subclass constructors.
+    	As a consequence, constructors of subclasses may assume that
+    	additional triples are present, and may query them in their
+    	<code>WHERE</code> clauses.
+    </p>
+    <p>
+    	Constructors should also be executed by SPIN inference engines:
+    	If a rule creates a new <code>rdf:type</code> triple, then the
+    	corresponding constructors should be called on the subject of the
+    	type triple.  The constructors should be executed after the rule
+    	has been executed completely - this will make sure that all
+    	triples mentioned in the rule's construct template will have been
+    	created and can be queried by the WHERE clause of the constructors.
+    </p>
+    <p>&nbsp;</p>
+
+    
+    <h2 id="spin-meta-modeling">3 Meta-Modeling Vocabulary</h2>
+    <p>
+    	SPARQL queries are often similar and only differ in a value or two.
+    	SPIN can be used to generalize SPARQL queries so that they can be
+    	reused in multiple contexts.  The SPIN Meta-Modeling Vocabulary
+    	described in the following sections introduces three mechanisms of
+    	encapsulating SPARQL query templates: <a href="#spin-templates">Templates</a>,
+    	<a href="#spin-functions">Functions</a> and <a href="#spin-magic">Magic Properties</a>.
+    </p>
+    
+    <h3 id="spin-templates">3.1 Templates</h3>
+    <p>
+    	Templates are reusable "boxed" SPARQL queries that can be used in conjunction with
+    	properties such as <code>spin:rule</code> or <code>spin:constraint</code>, but
+    	also in other places.
+    </p>
+    <p>
+    	The following example defines a template <code>ex:MinCardinality</code>
+    	that can be used to verify that <code>?this</code> has at least
+    	<code>?count</code> values for a given property <code>?predicate</code>.
+    	Note that the function <code>ex:cardinality</code> is a user-defined
+    	SPIN function that will be described later.
+    </p>
+    <pre class="query">    ex:MinCardinality
+      a       spin:AskTemplate ;
+      rdfs:subClassOf 	spin:AskTemplates ;
+      rdfs:comment "Checks whether ?this has at least ?count values for a given property ?predicate." ;
+      rdfs:label "Min cardinality"^^xsd:string ;
+      spin:constraint
+              [ a       spl:Argument ;
+                rdfs:comment "the minimum number of values expected" ;
+                spl:predicate ex:count ;
+                spl:valueType xsd:integer
+              ] ;
+      spin:constraint
+              [ a       spl:Argument ;
+                rdfs:comment "the property being restricted" ;
+                spl:predicate ex:predicate ;
+                spl:valueType rdf:Property
+              ] ;
+      spin:labelTemplate "at least {?count} values for {?predicate}"^^xsd:string ;
+      spin:body
+              [ a       sp:Ask ;
+                sp:text """
+                    ASK WHERE {
+                        FILTER (ex:cardinality(?predicate) &lt; ?count) .
+                    }"""
+              ] .</pre>
+    
+    <p>
+    	Templates are instances of subclasses of the metaclass <code>spin:Template</code>:
+    	<code>spin:AskTemplate</code>, <code>spin:ConstructTemplate</code>,
+    	<code>spin:SelectTemplate</code> and <code>spin:UpdateTemplate</code>, depending
+    	on the type of query that they wrap.  These metaclasses should not be confused
+    	with the similarly sounding classes such as <code>spin:AskTemplates</code>,
+    	which are only meant to serve as a way of organizing existing templates in
+    	categories, e.g. so that they show up nicely in class trees.
+    </p>
+    <p>
+    	In order to "call" a template, the user needs to instantiate the template class.
+    	In the following example, the above template <code>ex:MinCardinality</code>
+    	is used to constrain that all instances of the class <code>ex:Parent</code>
+    	must have at least one value for the <code>ex:child</code> property.
+    </p>
+    <pre class="query">    ex:Parent
+      a       owl:Class ;
+      rdfs:label "Parent"^^xsd:string ;
+      rdfs:subClassOf owl:Thing ;
+      spin:constraint
+              [ a ex:MinCardinality ;
+                ex:count 1 ;
+                ex:predicate ex:child
+              ] .</pre>
+    
+    <p>
+    	Each argument of a template must be represented by one argument descriptor
+    	(instance of the template <code>spl:Argument</code>, where the namespace
+    	for the prefix <code>spl</code> is <code>http://spinrdf.org/spl#</code>).
+    	Each argument descriptor must point to an RDF property using
+    	<code>spl:predicate</code>.  This property will hold the actual template
+    	values when the template is instantiated.
+    	The local name of that property is used as variable name for the argument.
+    	For example, the property <code>sp:arg1</code> represents the variable
+    	<code>?arg1</code>.
+       	Arguments can also have a value type using <code>spl:valueType</code> and
+       	might be <code>spl:optional</code>.
+       	Furthermore, arguments can define a default value using
+       	<code>spl:defaultValue</code>.  The default value shall be used for an
+       	argument if no value has been specified explicitly in the template call.
+       	It is strongly recommended to define an <code>rdfs:comment</code> for
+       	each argument, to describe the role of the argument in the query.
+    </p>
+    <p>
+    	The encapsulated query itself must be stored using <code>spin:body</code>.
+    	Depending on the type of template, <code>spin:body</code> must be an instance
+    	of <code>sp:Ask</code>, <code>sp:Construct</code>, <code>sp:Describe</code>
+    	or <code>sp:Select</code>, <code>sp:Modify</code> or <code>sp:DeleteWhere</code>.
+    </p>
+    <p>
+    	At execution time, the query will already have the variables
+    	declared in the argument descriptors pre-assigned with the
+    	arguments in the template call.
+    </p>
+    <p>
+    	Template calls can not be executed if one or more of the non-optional arguments
+    	have no values.  The only exception is if the template class (or any of its
+    	superclasses) has <code>rdf:type spl:UnionTemplate</code>, in which case all
+    	arguments are optional. 
+    </p>
+    <p>
+    	Templates should define a value for <code>spin:labelTemplate</code>
+    	with place-holders for the variable names between { and } so that
+    	user interfaces can render the template calls in a human-readable way.
+    	For example, the template call above would be rendered as
+    </p>
+    <pre class="query">    at least 1 values for ex:child</pre>
+    <p>
+    	Templates can be published on the Semantic Web and then imported
+    	by other models.  SPIN agents could in principle dynamically resolve
+    	templates from the internet, similar to distributed Web Services.
+    	Such template libraries can specify domain-specific modeling languages
+    	(as alternatives to, or in addition to languages like OWL).  Since
+    	templates are executable, these	template-based modeling languages
+    	have well-defined formal semantics. 
+    </p>
+    <p>
+    	When CONSTRUCT templates are executed, for example as SPIN constraints or rules,
+    	then the SPIN engine needs to also execute the bodies of any superclass of those
+    	templates.
+    </p>
+    <p>
+    	<em>See also: <a href="http://composing-the-semantic-web.blogspot.com/2009/01/understanding-spin-templates.html">Understanding SPIN Templates</a></em>
+    </p>
+    <h4 id="spin-columns">3.1.1 SPIN Column Metadata</h4>
+    <p>
+    	As of SPIN 1.3.0 (published with TopBraid 4.3 in June 2013), the SPIN Modeling Vocabulary
+    	has been extended with classes and properties that can be used to attach metadata to
+    	tabular data, especially those tables produced by SELECT templates.
+    	The class <code>spin:TableDataProvider</code> has been introduced to serve as one superclass
+    	of <code>spin:SelectTemplate</code>.  Each <code>spin:TableDataProvider</code> (and thus
+    	SELECT template) may point to one or more instances of <code>spin:Column</code> via the
+    	property <code>spin:column</code>.
+    	The instances of <code>spin:Column</code> are often blank nodes.
+		Each <code>spin:Column</code> may have the following properties (all except
+		<code>spin:columnIndex</code> are optional):
+    </p>
+    <table style="border: 1px solid; border-collapse: collapse;">
+    	<tbody><tr>
+    		<th>Property</th>
+    		<th>Range</th>
+    		<th>Description</th>
+    	</tr>
+    	<tr>
+    		<td>rdfs:label</td>
+    		<td>xsd:string</td>
+    		<td>A display label for the head of the table.</td>
+    	</tr>
+    	<tr>
+    		<td>spin:columnIndex</td>
+    		<td>xsd:integer</td>
+    		<td>The index of the column from left to right, starting with 0.</td>
+    	</tr>
+    	<tr>
+    		<td>spin:columnType</td>
+    		<td>rdfs:Class</td>
+    		<td>The (data) type of the column. For example, xsd:float columns should be right-aligned.</td>
+    	</tr>
+    	<tr>
+    		<td>spin:columnWidth</td>
+    		<td>xsd:integer</td>
+    		<td>The width of the column in pixels.</td>
+    	</tr>
+    </tbody></table>
+    <p>
+    	The following example (in Turtle notation) defines a SPIN template for a SELECT query that
+    	returns the name and birth date of each child of a given parent.
+    </p>
+    <pre class="query">&lt;http://topbraid.org/schema.ui#ChildrenOverview&gt;
+      a       spin:SelectTemplate ;
+      rdfs:comment "A (demo) SELECT template displaying some information about the children of a given schema:Person."^^xsd:string ;
+      rdfs:label "Children overview"^^xsd:string ;
+      rdfs:subClassOf spin:SelectTemplates ;
+      spin:constraint
+              [ a       spl:Argument ;
+                rdfs:comment "The schema:Person to get the children of."^^xsd:string ;
+                spl:predicate arg:parent ;
+                spl:valueType schema:Person
+              ] ;
+      spin:body
+              [ a       sp:Select ;
+                sp:text """
+                    SELECT ?childName ?birthDate
+                    WHERE {
+                        ?child schema:parent ?parent .
+                        ?child rdfs:label ?childName .
+                        OPTIONAL { 
+                            ?child schema:birthDate ?birthDate .
+                        } .
+                    }
+                    """
+              ] ;
+      spin:column
+              [ a       spin:Column ;
+                rdfs:label "Name of Child"^^xsd:string ;
+                spin:columnIndex 0 ;
+                spin:columnType xsd:string ;
+                spin:columnWidth 200
+              ] ;
+      spin:column
+              [ a       spin:Column ;
+                rdfs:label "Birth date"^^xsd:string ;
+                spin:columnIndex 1 ;
+                spin:columnType xsd:date ;
+                spin:columnWidth 100
+              ] ;
+      spin:labelTemplate "Overview of children of {?parent}"^^xsd:string .</pre>
+    <p>
+    	A possible rendering of such a table could look like the following (here, using
+    	<code>swa:ResultSetGrid</code> from <a href="http://uispin.org/">SPARQL Web Pages</a>).
+    </p>
+    <p style="text-align: center">
+    	<img src="assets/spin-column-example.png">
+    </p>
+    <p>&nbsp;</p>
+    
+    
+    <h3 id="spin-functions">3.2 Functions</h3>
+    <p>
+    	SPIN can be used to define new SPARQL functions so that these
+    	new function can be used in expressions such as <code>FILTER</code>
+    	or <code>BIND</code> clauses.
+    	Technically, SPIN Functions are very similar to SPIN Templates.
+    	Functions are defined by a body and zero or more argument descriptors.
+    	The body of a function must be an Ask query, or a Select query with
+    	exactly one result variable.
+    </p>
+    <p>
+    	The following example declares a new function <code>ex:cardinality</code>
+    	that gets the number of values of a given property at the current
+    	subject (<code>?this</code>), using a SPARQL <code>COUNT</code>
+    	query.
+    </p>
+    <pre class="query">    ex:cardinality
+      a       spin:Function ;
+      rdfs:subClassOf 	spin:Functions ;
+      rdfs:comment "Gets the number of values of a given property at the current subject (?this)." ;
+      rdfs:label "cardinality"^^xsd:string ;
+      spin:constraint
+              [ a       spl:Argument ;
+                rdfs:comment "The property to get the cardinality of." ;
+                spl:predicate sp:arg1
+              ] ;
+      spin:body
+              [ a       sp:Select ;
+                sp:text """
+                    SELECT (COUNT(?object) AS ?result)
+                    WHERE {
+                        ?this ?arg1 ?object .
+                    }"""
+              ] .</pre>
+    <p>
+    	Once the function is defined, it can be used in SPARQL queries such as
+    </p>
+    <pre class="query">    FILTER (ex:cardinality(ex:child) &gt; 0)</pre>
+    <p>
+    	The expression above is represented in SPIN syntax as
+    </p>
+    <pre class="query">    [ a       sp:Filter ;
+      sp:expression
+                 [ sp:arg1 [ sp:arg1 :child ;
+                             a ex:cardinality
+                           ] ;
+                   sp:arg2 0 ;
+                   a sp:gt
+                 ]
+    ]</pre>
+    <p>
+    	Arguments are declared the same way as with Templates (see above).
+    	The main difference is that a function's arguments must be ordered
+    	so that the traditional textual SPARQL notation can correctly round-
+    	trip them.  By default, a Function's arguments are sorted alphabetically
+    	by their local name.
+        Functions often use the system properties <code>sp:arg1</code>,
+        <code>sp:arg2</code> etc to declare the arguments in their expected order,
+        but any other property can be used as well.
+        Function calls will use the declared default values for an argument if
+        no other values have been explicitly specified.
+    </p>
+    <p>
+    	Functions do not need to have a <code>spin:body</code>.  In those cases,
+    	the execution environment is assumed to provide different implementations
+    	of them, e.g. as hard-coded Java functions or using JavaScript
+    	(see <a href="http://spinrdf.org/spinx.html">SPINx</a>).
+    </p>
+    <p>
+    	Function (and template) classes may be marked to be <em>abstract</em> by setting the property
+    	<code>spin:abstract</code> to <code>true</code>.  This indicates to the environment
+    	that the function shall not be instantiated directly, but only serves as a way
+    	to organize and group other functions in a hierarchy.
+    </p>
+    <p>
+    	Functions can be marked to be <em>private</em> by setting the property
+    	<code>spin:private</code> to <code>true</code>.  This tells the environment that
+    	the function is only supposed to be used as a "helper" of other functions, but
+    	not elsewhere.
+    </p>
+    <p>
+    	<em>See also: <a href="http://composing-the-semantic-web.blogspot.com/2009/01/understanding-spin-functions.html">Understanding SPIN Functions</a></em>
+    </p>
+    
+    <h4 id="spin-functions-eval">3.2.1 The built-in Function spin:eval</h4>
+    <p>
+    	SPIN compliant SPARQL engines must provide a built-in SPARQL function
+    	<code>spin:eval</code> that can be used to evaluate a SPIN expression or
+    	query at execution time.  This makes it possible to define higher level
+    	functions, that take other function calls and queries as arguments.
+    	For example, it is possible to place a SPIN expression as an argument into
+    	a template.  The body of the template can then reference the expression
+    	(as a pre-bound variable) and evaluate it. 
+    </p>
+    <p>
+    	<code>spin:eval</code> takes any odd number of arguments.  The first argument
+    	must be a reference to a SPIN expression (e.g., instance of a SPARQL function
+    	from the SP namespace) or a <code>sp:Select</code> or a <code>sp:Ask</code>.
+    	The other arguments must come in pairs, so that the first one is a property
+    	and the second is a value that shall be pre-bound in the evaluation of the
+    	expression.
+    </p>
+    <p>
+    	In the following example, an expression (bound to a variable ?expression)
+    	is executed, with the variable <code>?arg3</code> bound to the literal "value".
+    	The result of the function will be assigned to <code>?result</code>.
+    </p>
+    <pre class="query">    BIND (spin:eval(?expression, sp:arg3, "value") AS ?result)</pre>
+    <p>
+    	If the expression argument is a <code>sp:Select</code>, then the result will
+    	be the first binding of the first result variable.
+    	If the expression argument is a <code>sp:Ask</code>, then a typed boolean literal
+    	will be returned.
+    </p>
+    
+    <h4 id="spin-functions-ask">3.2.2 The built-in Function spin:ask</h4>
+    <p>
+    	SPIN compliant SPARQL engines must provide a built-in SPARQL function
+    	<code>spin:ask</code> that can be used to execute a SPIN ASK query or
+    	corresponding template call at execution time.
+    	This makes it possible to define higher level functions and execution engines,
+    	that take other queries as arguments.
+    </p>
+    <p>
+    	The first argument of <code>spin:ask</code> must be a reference to a <code>sp:Ask</code>
+    	or a template call that has an ASK query as its body.
+    	All subsequent arguments must come in pairs, with the first one being a variable name
+    	and the second its binding.  These bindings need to be applied for the execution of
+    	the query.  The result of <code>spin:ask</code> is a boolean.
+    	In the following example, <code>?query</code> is assumed to point at a <code>sp:Ask</code>,
+    	and the variable <code>?this</code> will be pre-bound with the value <code>owl:Thing</code>: 
+    </p>
+    <pre class="query">    BIND (spin:ask(?query, "this", owl:Thing) AS ?result)</pre>
+
+    
+    <h3 id="spin-magic">3.3 Magic Properties</h3>
+    <p>
+    	<em>Magic Properties</em> (aka <em>Property Functions</em>) are supported by many SPARQL engines
+    	(such as <a href="http://jena.sourceforge.net/ARQ/extension.html#propertyFunctions">Jena ARQ</a>)
+    	to dynamically compute values at query time.  Typically, a magic property
+    	is backed by a calculation function that determines bindings of the
+    	variables on the left or right side of the predicate.
+	</p>
+	<p>
+		SPIN enables users to define such magic properties.
+		The magic properties are declared in a very similar way as
+		<a href="#spin-functions">SPIN Functions</a>, but provide greater flexibility.
+		In contrast to BIND/FILTER functions, magic properties can return multiple
+		values.  Furthermore, any input or output variable may be unbound, and it is the
+		task of the magic property to find all potential bindings of those variables.
+	</p>
+	<p>
+		The metaclass <code>spin:MagicProperty</code> is used to represent magic
+		properties.  As shown below, <code>spin:MagicProperty</code> is a subclass
+		of <code>spin:Function</code> and <code>rdf:Property</code>, making it possible
+		to use them either as functions or as predicates in a triple match.
+	</p>
+	<p style="text-align: center"><img src="assets/SPIN-Metaclass-Diagram.png" alt="SPIN metaclass diagram"></p>
+	<p>
+		Let's look at an example magic property <code>grandParent</code> which defines
+		the grandparent relationship between persons.  This is defined as a
+		<code>spin:MagicProperty</code> with one argument <code>?arg1</code> of
+		type <code>kennedys:Person</code>.  The <code>spin:body</code> of the magic
+		property is as follows: 
+	</p>
+	<pre class="query">    SELECT ?grandParent
+    WHERE {
+        ?parent kennedys:child ?arg1 .
+        ?grandParent kennedys:child ?parent .
+    }</pre>
+    <p>
+    	The complete SPIN RDF definition of this magic property is shown below.
+    </p>
+    <pre class="query">
+    :grandParent
+      a       spin:MagicProperty ;
+      rdfs:label "grand parent"^^xsd:string ;
+      rdfs:subClassOf spin:MagicProperties ;
+      spin:constraint
+              [ a       spl:Argument ;
+                rdfs:comment "The Person to get the grandparent(s) of."^^xsd:string ;
+                spl:predicate sp:arg1 ;
+                spl:valueType kennedys:Person
+              ] ;
+      spin:body
+              [ a       sp:Select ;
+                sp:text """
+                    SELECT ?grandParent
+                    WHERE {
+                        ?parent kennedys:child ?arg1 .
+                        ?grandParent kennedys:child ?parent .
+                    }"""
+              ] .</pre>
+    <p>
+    	An example use of this function is
+    </p>
+    <pre class="query">    SELECT *
+    WHERE {
+        kennedys:JohnKennedyJr :grandParent ?grandParent .
+    }</pre>
+    <p>
+    	Which returns bindings of <code>?grandParent</code> with
+    	<code>kennedys:JosephKennedy</code> and <code>kennedys:RoseFitzgerald</code>.
+    	At execution time, the predicate <code>:grandParent</code> is treated
+    	like a function call based on the SPARQL query defined as body of the
+    	magic property.  The value on the left side of the magic property
+    	will be passed into the function as <code>?arg1</code>.  The result bindings
+    	of the variables in the SELECT clause will be bound to the variables on the
+    	right hand side of the magic property.  The names of the input and output
+    	variables are irrelevant, just the order of occurrence counts.  
+    </p>
+    <p>
+    	Note that a property like <code>:grandParent</code> can also be used
+    	as a regular property.  It is left to the implementation whether it
+    	will create regular triples or do the computation dynamically.
+    </p>
+    <p>
+    	Magic properties can also take multiple arguments and result values
+    	using a (rather obscure) list syntax - these cases are technically supported
+    	but complex to represent in the SPIN RDF syntax.  If possible, it is strongly
+    	recommended	to define magic properties with just one argument and one result variable.
+    	This provides greater flexibility to the implementations, and simplifies
+    	the syntax and implementation burden.  
+    </p>
+    <p>
+    	With this background, let's look at another use case of the same function
+    	from above:
+    </p>
+    <pre class="query">    SELECT *
+    WHERE {
+        ?grandChild :grandParent kennedys:RoseFitzgerald .
+    }</pre>
+    <p>
+    	The query above binds <code>?grandChild</code> with all grand children
+    	of <code>kennedys:RoseFitzgerald</code> (a cast of dozens, including
+    	<code>kennedys:JohnKennedyJr</code>).  It is also possible to leave
+    	the object blank, to get all <code>grandParent</code> relationships
+    	in the whole model.
+    </p>
+    <p>
+    	At execution time, the engine should add the arguments to the result
+    	variables of the body (here: change the signature to
+    	<code>SELECT ?grandParent ?arg1</code>).  Then pre-bind all variables
+    	that have been supplied with values and execute the SELECT query.
+    	Use the result bindings to fill in values for the the unbound variables.
+    	If a magic property is used like a triple match, then the result must
+    	include all existing values in the query graph, in addition to the
+    	bindings derived from the function.
+    </p>
+    <p>
+    	Since <code>spin:MagicProperty</code> is a subclass of <code>spin:Function</code>,
+    	any magic property can also be used as a regular FILTER or LET function.
+    	In this case, only the first result variable of the first result row will be
+    	returned.
+    </p>
+    <p>
+    	Note that SPIN functions and magic properties can be used to implement
+    	behavior known as <em>backward chaining</em> in rule languages.
+    	Functions can call each other, even recursively, and the SPARQL engine
+    	will iterate over multiple possible solution spaces and do back tracking
+    	if it does not find bindings for the original query.
+    </p>
+    
+    <h4 id="spin-magic-construct">3.3.1 The built-in Magic Property spin:construct</h4>
+    <p>
+    	SPIN compliant SPARQL engines must provide a built-in SPARQL magic property
+    	<code>spin:construct</code> that can be used to execute a SPIN CONSTRUCT query or
+    	corresponding template call at execution time.
+    	This makes it possible to define higher level functions and execution engines,
+    	that take other queries as arguments.
+    </p>
+    <p>
+    	The first argument on the left hand side of <code>spin:construct</code> must be a
+    	reference to a <code>sp:Construct</code> or a template call that has a CONSTRUCT query as its body.
+    	All subsequent arguments must come in pairs, with the first one being a variable name
+    	and the second its binding.  These bindings need to be applied for the execution of
+    	the query.  The right hand side of the magic property must be a list of a exactly three
+    	entries.  Those are typically unbound variables such as <code>(?s ?p ?o)</code> that
+    	will receive the subject, predicate and object of the constructed triples as their values.
+    	If any of those entries are bound, they will be interpreted as a match, which means that
+    	only those triples that actually have matching subject, predicate or object will be
+    	returned by the magic property.
+    </p>
+    <p>
+    	In the following example, <code>?query</code> is assumed to point at a <code>sp:Construct</code>,
+    	and the variable <code>?this</code> will be pre-bound with the value <code>owl:Thing</code>.
+    	As a result of the execution, the variables <code>?s</code>, <code>?p</code> and <code>?o</code>
+    	will be bound to the constructed triples. 
+    </p>
+    <pre class="query">     (?query "this" owl:Thing) spin:construct (?s ?p ?o)</pre>
+    
+    <h4 id="spin-magic-select">3.3.2 The built-in Magic Property spin:select</h4>
+    <p>
+    	SPIN compliant SPARQL engines must provide a built-in SPARQL magic property
+    	<code>spin:select</code> that can be used to execute a SPIN SELECT query or
+    	corresponding template call at execution time.
+    	This makes it possible to define higher level functions and execution engines,
+    	that take other queries as arguments.
+    </p>
+    <p>
+    	The first argument on the left hand side of <code>spin:select</code> must be a
+    	reference to a <code>sp:Select</code> or a template call that has a SELECT query as its body.
+    	It may also be an <code>sp:Ask</code> query, in which case it is interpreted as
+    	a SELECT query with exactly one result variable and one row.
+    	All subsequent arguments must come in pairs, with the first one being a variable name
+    	and the second its binding.  These bindings need to be applied for the execution of
+    	the query.  The right hand side of the magic property must be a list of a entries
+    	that match the number of result variables from the SPARQL query.
+    	Those are typically unbound variables such as <code>(?a ?b)</code> if the SELECT
+    	delivers two columns.
+    	If any of those entries are bound, they will be interpreted as a match, which means that
+    	only those rows that actually have matching values will be returned by the magic property.
+    </p>
+    <p>
+    	In the following example, <code>?query</code> is assumed to point at a <code>sp:Select</code>,
+    	and the variable <code>?this</code> will be pre-bound with the value <code>owl:Thing</code>.
+    	As a result of the execution, the variables <code>?a</code> and <code>?b</code>
+    	will be bound to the resulting variable bindings. 
+    </p>
+    <pre class="query">     (?query "this" owl:Thing) spin:select (?a ?b)</pre>
+
+    <p>&nbsp;</p>
+
+    
+	
+    <h2 id="spin-libraries">4 SPIN Libraries</h2>
+    <p>
+		SPIN is a modeling language that has been designed with the Semantic Web
+		in mind.  This chapter describes how SPIN documents should be organized
+		to make the best use of this infrastructure.
+	</p>
+    
+    <h3 id="spin-semweb">4.1 SPIN and the Semantic Web</h3>
+    <p>
+		SPIN constraints, rules and constructors are associated with RDFS/OWL classes
+		using dedicated properties such as <code>spin:constraint</code>.  On the
+		Semantic Web this means that when an RDFS class is shared online, then users
+		of the class will also get the associated semantics in the same way as they
+		get labels, comments etc.  So typically, class definitions and semantics are
+		stored in the same document.
+	</p>
+	<p>
+		With the SPIN meta-modeling vocabulary the situation is slightly different,
+		because SPIN functions and templates can also be used in other places.
+		However, SPIN functions and templates have a unique URI and therefore can be
+		uploaded to some Semantic Web site so that SPIN-aware agents can find an
+		executable description of the function or template by following its URI.
+		In practice this means that SPIN users planning to share their files should
+		make sure that the selected URIs are de-referencable.  This simply
+		means that if a software agent encounters a SPIN function in a SPARQL query,
+		and the function is not natively known to the engine, then the engine can
+		follow the link to the function to get all triples needed to understand how
+		to execute it, including <code>spin:body</code>.
+	</p>
+	<p>
+		If SPIN files are not shared on the Semantic Web but only used locally, then
+		it is a good practice to help the environment find function and template
+		definitions.  We recommend a naming convention to store such SPIN files with
+		an ending such as <code>.spin.ttl</code> or <code>.spin.rdf</code>.
+		This makes it easier for tools to recognize that the file may contain SPIN
+		functions and templates so that the tool can pre-load the functions into memory in advance.
+	</p>
+    
+    <h3 id="spin-imports">4.2 SPIN Imports</h3>
+    <p>
+		Some constraint or rule libraries are independent from a particular domain
+		ontology, and rather describe general patterns.  For example, it is possible
+		to describe the semantics of a subset of OWL using SPIN constraints, and thus
+		re-use the OWL restrictions vocabulary to validate integrity constraints on
+		existing OWL models.  Such libraries may contain <code>spin:constraints</code>
+		that are simply attached to <code>owl:Thing</code> or another global root class.
+	</p>
+	<p>
+		In order to use such libraries in the context of OWL, one option is to define
+		an <code>owl:imports</code> to link the domain ontology with the constraint
+		library.  However, this means that OWL semantics would be applied to the library
+		itself, because OWL engines would merge in all the triples from the SPIN file
+		and treat them on the same level as the actual domain triples.  Furthermore,
+		the additional triples might clutter up user interfaces.
+	</p>
+	<p>
+		SPIN includes the <code>spin:imports</code> property, that can be used
+		to link the base URI of a domain ontology with a SPIN file, specified by the
+		base URI of the SPIN file.  For a SPIN constraint checker (or rule engine),
+		the <code>spin:imports</code> keyword has the same meaning as <code>owl:imports</code>,
+		i.e. all triples from the imported file will be added to the current RDF graph.
+		However, the triples specified by <code>spin:imports</code> will not be imported
+		in an OWL sense and therefore remain invisible to any OWL tool.
+	</p>
+    <p>
+    	In the following example, the current domain ontology (spinOWLTest) imports a
+		SPIN constraint library that defines a subset of OWL for constraint checking,
+		so that SPIN engines will report a constraint violation whenever an instance
+		of <code>:Person</code> does not have 1 <code>:lastName</code>.  Note that this
+		file does not import the SPIN namespace - it just declares a prefix for it.
+    </p>
+    <pre class="query">    @prefix :        &lt;http://tests.spin.topbraid.org/imports/spinOWLTest#&gt; .
+    @prefix owl:     &lt;https://www.w3.org/2002/07/owl#&gt; .
+    @prefix spin:    &lt;http://spinrdf.org/spin#&gt; .
+    @prefix rdf:     &lt;https://www.w3.org/1999/02/22-rdf-syntax-ns#&gt; .
+    @prefix rdfs:    &lt;https://www.w3.org/2000/01/rdf-schema#&gt; .
+    @prefix xsd:     &lt;https://www.w3.org/2001/XMLSchema#&gt; .
+
+    &lt;http://tests.spin.topbraid.org/imports/spinOWLTest&gt;
+      rdf:type owl:Ontology ;
+      spin:imports &lt;http://topbraid.org/spin/spinowl&gt; .
+
+    :Person
+      rdf:type owl:Class ;
+      rdfs:label "Person"^^xsd:string ;
+      rdfs:subClassOf owl:Thing ;
+      rdfs:subClassOf
+              [ rdf:type owl:Restriction ;
+                owl:cardinality "1"^^xsd:int ;
+                owl:onProperty :lastName
+              ] ;...</pre>
+	<p>&nbsp;</p>
+
+	
+    <h2 id="spin-ref">Appendix: Reference</h2>
+    <p>
+    	The URL of the SPIN schema is <a href="http://spinrdf.org/spin">http://spinrdf.org/spin</a>
+    	The URL of the SPIN Standard Module library (SPL) is <a href="http://spinrdf.org/spl">http://spinrdf.org/spl</a>
+    </p>  
+</body></html>
