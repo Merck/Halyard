@@ -155,9 +155,13 @@ public final class HalyardExport extends AbstractHalyardTool {
             long time = System.currentTimeMillis()+1;
             long count = counter.get();
             log.logStatus(MessageFormat.format("Export finished with {0} records/triples in average speed {1}/s", count, (1000 * count)/(time - startTime)));
-            closeWriter();
+            try {
+                closeWriter();
+            } catch (Exception e) {
+                throw new ExportException(e);
+            }
         }
-        protected abstract void closeWriter() throws ExportException;
+        protected abstract void closeWriter() throws Exception;
     }
 
     private static class CSVResultWriter extends QueryResultWriter {
@@ -247,12 +251,8 @@ public final class HalyardExport extends AbstractHalyardTool {
         }
 
         @Override
-        public void closeWriter() throws ExportException {
-            try {
-                writer.close();
-            } catch (IOException e) {
-                throw new ExportException(e);
-            }
+        public void closeWriter() throws IOException {
+            writer.close();
         }
     }
 
@@ -290,12 +290,8 @@ public final class HalyardExport extends AbstractHalyardTool {
         }
 
         @Override
-        public void closeWriter() throws ExportException {
-            try {
-                out.close();
-            } catch (IOException e) {
-                throw new ExportException(e);
-            }
+        public void closeWriter() throws IOException {
+            out.close();
         }
     }
 
@@ -322,8 +318,8 @@ public final class HalyardExport extends AbstractHalyardTool {
                 }
                 Driver driver = AccessController.doPrivileged(new PrivilegedExceptionAction<Driver>() {
                     @Override
-                    public Driver run() throws ClassNotFoundException, InstantiationException, IllegalAccessException {
-                        return (Driver)Class.forName(driverClass, true, new URLClassLoader(urls.toArray(new URL[urls.size()]))).newInstance();
+                    public Driver run() throws ReflectiveOperationException {
+                        return (Driver)Class.forName(driverClass, true, new URLClassLoader(urls.toArray(new URL[urls.size()]))).getDeclaredConstructor().newInstance();
                     }
                 });
                 Properties props = new Properties();
@@ -414,12 +410,8 @@ public final class HalyardExport extends AbstractHalyardTool {
         }
 
         @Override
-        public void closeWriter() throws ExportException {
-            try {
-                con.close();
-            } catch (SQLException e) {
-                throw new ExportException(e);
-            }
+        public void closeWriter() throws SQLException {
+            con.close();
         }
     }
 
@@ -454,45 +446,45 @@ public final class HalyardExport extends AbstractHalyardTool {
         }
 
         @Override
-        protected void closeWriter() throws ExportException {
+        protected void closeWriter() {
         }
     }
 
     /**
      * Export function is called for the export execution with given arguments.
-     * @param conf Hadoop Configuration instance
+     * @param sail Halyard instance
      * @param log StatusLog notification service implementation for back-calls
-     * @param source String source HTable name
      * @param query String SPARQL Graph query
      * @param targetUrl String URL of the target system (+folder or schema, +table or file name)
      * @param driverClass String JDBC Driver class name (for JDBC export only)
      * @param driverClasspath String with JDBC Driver classpath delimited by : (for DB export only)
      * @param jdbcProperties Arrays of String JDBC connection properties (for DB export only)
      * @param trimTable boolean option to trim target JDBC table before export (for DB export only)
-     * @param elasticIndexURL elastic index URL (if query requires it)
      * @throws ExportException in case of an export problem
      */
-    public static void export(Configuration conf, StatusLog log, String source, String query, String targetUrl, String driverClass, String driverClasspath, String[] jdbcProperties, boolean trimTable, String elasticIndexURL) throws ExportException {
-        try (QueryResultWriter writer = createWriter(conf, log, targetUrl, driverClass, driverClasspath, jdbcProperties, trimTable)) {
-            SailRepository rep = new SailRepository(new HBaseSail(conf, source, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null));
-            rep.init();
-            try {
-                writer.initTimer();
-                log.logStatus("Query execution started");
-                try(RepositoryConnection conn = rep.getConnection()) {
-                    Query q = conn.prepareQuery(QueryLanguage.SPARQL, query);
-                    if (q instanceof TupleQuery) {
-                        writer.writeTupleQueryResult(((TupleQuery)q).evaluate());
-                    } else if (q instanceof GraphQuery) {
-                        writer.writeGraphQueryResult(((GraphQuery)q).evaluate());
-                    } else {
-                        throw new ExportException("Only SPARQL Tuple and Graph query types are supported.");
-                    }
-                    log.logStatus("Export finished");
-                }
-            } finally {
-                rep.shutDown();
-            }
+    public static void export(HBaseSail sail, StatusLog log, String query, String targetUrl, String driverClass, String driverClasspath, String[] jdbcProperties, boolean trimTable) throws ExportException {
+    	try {
+	    	try (QueryResultWriter writer = createWriter(sail.getConfiguration(), log, targetUrl, driverClass, driverClasspath, jdbcProperties, trimTable)) {
+	            SailRepository rep = new SailRepository(sail);
+	            rep.init();
+	            try {
+	                writer.initTimer();
+	                log.logStatus("Query execution started");
+	                try(RepositoryConnection conn = rep.getConnection()) {
+	                    Query q = conn.prepareQuery(QueryLanguage.SPARQL, query);
+	                    if (q instanceof TupleQuery) {
+	                        writer.writeTupleQueryResult(((TupleQuery)q).evaluate());
+	                    } else if (q instanceof GraphQuery) {
+	                        writer.writeGraphQueryResult(((GraphQuery)q).evaluate());
+	                    } else {
+	                        throw new ExportException("Only SPARQL Tuple and Graph query types are supported.");
+	                    }
+	                    log.logStatus("Export finished");
+	                }
+	            } finally {
+	                rep.shutDown();
+	            }
+	    	}
         } catch (RepositoryException | MalformedQueryException | QueryEvaluationException | IOException e) {
             throw new ExportException(e);
         }
@@ -517,7 +509,8 @@ public final class HalyardExport extends AbstractHalyardTool {
             }
             return new JDBCResultWriter(log, targetUrl.substring(0, i), targetUrl.substring(i+1), jdbcProperties, driverClass, driverCP, trimTable);
         } else {
-            OutputStream out = FileSystem.get(URI.create(targetUrl), conf).create(new Path(targetUrl));
+	    	FileSystem fileSystem = FileSystem.get(URI.create(targetUrl), conf);
+            OutputStream out = fileSystem.create(new Path(targetUrl));
             try {
                 if (targetUrl.endsWith(".bz2")) {
                     out = new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.BZIP2, out);
@@ -592,7 +585,11 @@ public final class HalyardExport extends AbstractHalyardTool {
 
     @Override
     protected int run(CommandLine cmd) throws Exception {
-        export(getConf(), new StatusLog() {
+    	String source = cmd.getOptionValue('s');
+    	String query = cmd.getOptionValue('q');
+    	String elasticIndexURL = cmd.getOptionValue('i');
+    	HBaseSail sail = new HBaseSail(getConf(), source, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null);
+    	export(sail, new StatusLog() {
             @Override
             public void tick() {}
 
@@ -600,7 +597,7 @@ public final class HalyardExport extends AbstractHalyardTool {
             public void logStatus(String status) {
                 LOG.info(status);
             }
-        }, cmd.getOptionValue('s'), cmd.getOptionValue('q'), cmd.getOptionValue('t'), cmd.getOptionValue('c'), cmd.getOptionValue('l'), cmd.getOptionValues('p'), cmd.hasOption('r'), cmd.getOptionValue('i'));
+        }, query, cmd.getOptionValue('t'), cmd.getOptionValue('c'), cmd.getOptionValue('l'), cmd.getOptionValues('p'), cmd.hasOption('r'));
         return 0;
     }
 }

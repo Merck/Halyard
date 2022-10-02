@@ -19,21 +19,19 @@ import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.msd.gin.halyard.spin.SpinWellKnownFunctions;
 
 final class SpinWellKnownFunctions {
 
 	private static final ValueFactory valueFactory = SimpleValueFactory.getInstance();
 
-	private static final FunctionRegistry functionRegistry = FunctionRegistry.getInstance();
-
-	static final SpinWellKnownFunctions INSTANCE = new SpinWellKnownFunctions();
+	private final FunctionRegistry functionRegistry;
 
 	private final BiMap<String, IRI> stringToUri = HashBiMap.create(64);
 
 	private final BiMap<IRI, String> uriToString = stringToUri.inverse();
 
-	public SpinWellKnownFunctions() {
+	public SpinWellKnownFunctions(FunctionRegistry functionRegistry) {
+		this.functionRegistry = functionRegistry;
 		stringToUri.put(FN.SUBSTRING.stringValue(), valueFactory.createIRI(SP.NAMESPACE, "substr"));
 		stringToUri.put(FN.SUBSTRING_BEFORE.stringValue(), valueFactory.createIRI(SP.NAMESPACE, "strbefore"));
 		stringToUri.put(FN.SUBSTRING_AFTER.stringValue(), valueFactory.createIRI(SP.NAMESPACE, "strafter"));

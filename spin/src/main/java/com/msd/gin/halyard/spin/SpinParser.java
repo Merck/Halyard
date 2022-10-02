@@ -212,20 +212,24 @@ public class SpinParser {
 	}
 
 	public SpinParser(Input input) {
-		this(input, SpinWellKnownVars.INSTANCE::getName, SpinWellKnownFunctions.INSTANCE::getName);
+		this(input, FunctionRegistry.getInstance(), TupleFunctionRegistry.getInstance());
+	}
+
+	public SpinParser(Input input, FunctionRegistry funcReg, TupleFunctionRegistry tupleFuncReg) {
+		this(input, SpinWellKnownVars.INSTANCE::getName, new SpinWellKnownFunctions(funcReg)::getName, funcReg, tupleFuncReg);
 	}
 
 	public SpinParser(Input input, Function<IRI, String> wellKnownVarsMapper,
-			Function<IRI, String> wellKnownFuncMapper) {
+			Function<IRI, String> wellKnownFuncMapper, FunctionRegistry funcReg, TupleFunctionRegistry tupleFuncReg) {
 		this.input = input;
 		this.wellKnownVars = wellKnownVarsMapper;
 		this.wellKnownFunctions = wellKnownFuncMapper;
 		this.functionParsers = Arrays.<FunctionParser>asList(
-				new KnownFunctionParser(FunctionRegistry.getInstance(), wellKnownFunctions),
+				new KnownFunctionParser(funcReg, wellKnownFunctions),
 				new SpinTupleFunctionAsFunctionParser(this), new SpinFunctionParser(this),
 				new SpinxFunctionParser(this));
 		this.tupleFunctionParsers = Arrays.<TupleFunctionParser>asList(
-				new KnownTupleFunctionParser(TupleFunctionRegistry.getInstance()), new SpinTupleFunctionParser(this));
+				new KnownTupleFunctionParser(tupleFuncReg), new SpinTupleFunctionParser(this));
 	}
 
 	public List<FunctionParser> getFunctionParsers() {

@@ -29,6 +29,7 @@ import com.msd.gin.halyard.optimizers.StatementPatternCardinalityCalculator;
 import com.msd.gin.halyard.spin.SpinFunctionInterpreter;
 import com.msd.gin.halyard.spin.SpinMagicPropertyInterpreter;
 import com.msd.gin.halyard.spin.SpinParser;
+import com.msd.gin.halyard.spin.SpinParser.Input;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.File;
@@ -40,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -230,9 +232,9 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	private RDFFactory rdfFactory;
 	private StatementIndices stmtIndices;
 	private ValueFactory valueFactory;
-	private FunctionRegistry functionRegistry = new DynamicFunctionRegistry();
-	private TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
-	private SpinParser spinParser = new SpinParser();
+	private final FunctionRegistry functionRegistry = new DynamicFunctionRegistry();
+	private final TupleFunctionRegistry tupleFunctionRegistry = TupleFunctionRegistry.getInstance();
+	private final SpinParser spinParser = new SpinParser(Input.TEXT_FIRST, functionRegistry, tupleFunctionRegistry);
 	private final List<QueryContextInitializer> queryContextInitializers = new ArrayList<>();
 	private final ScanSettings scanSettings = new ScanSettings();
 	final SailConnectionFactory connFactory;
@@ -268,7 +270,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 			FederatedServiceResolver fsr) {
 		this.hConnection = conn;
 		this.hConnectionIsShared = (conn != null);
-		this.config = config;
+		this.config = Objects.requireNonNull(config);
 		this.tableName = TableName.valueOf(tableName);
 		this.create = create;
 		this.splitBits = splitBits;
@@ -309,7 +311,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 			FederatedServiceResolver fsr) {
 		this.hConnection = null;
 		this.hConnectionIsShared = false;
-		this.config = config;
+		this.config = Objects.requireNonNull(config);
 		this.tableName = null;
 		this.create = false;
 		this.splitBits = -1;
@@ -491,8 +493,8 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		};
 		statistics = new HalyardEvaluationStatistics(spcalcFactory, srvStatsProvider);
 
-		SpinFunctionInterpreter.registerSpinParsingFunctions(spinParser, pushStrategy ? functionRegistry : FunctionRegistry.getInstance(), pushStrategy ? tupleFunctionRegistry : TupleFunctionRegistry.getInstance());
-		SpinMagicPropertyInterpreter.registerSpinParsingTupleFunctions(spinParser, pushStrategy ? tupleFunctionRegistry : TupleFunctionRegistry.getInstance());
+		SpinFunctionInterpreter.registerSpinParsingFunctions(spinParser, functionRegistry, pushStrategy ? tupleFunctionRegistry : TupleFunctionRegistry.getInstance());
+		SpinMagicPropertyInterpreter.registerSpinParsingTupleFunctions(spinParser, tupleFunctionRegistry);
 
 		if (esSettings != null) {
 			RestClientBuilder restClientBuilder = RestClient.builder(new HttpHost(esSettings.host, esSettings.port != -1 ? esSettings.port : 9200, esSettings.protocol));
@@ -565,28 +567,20 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		}
 	}
 
-	public FunctionRegistry getFunctionRegistry() {
-		return functionRegistry;
+	public Configuration getConfiguration() {
+		return config;
 	}
 
-	public void setFunctionRegistry(FunctionRegistry registry) {
-		this.functionRegistry = registry;
+	public FunctionRegistry getFunctionRegistry() {
+		return functionRegistry;
 	}
 
 	public TupleFunctionRegistry getTupleFunctionRegistry() {
 		return tupleFunctionRegistry;
 	}
 
-	public void setTupleFunctionRegistry(TupleFunctionRegistry registry) {
-		this.tupleFunctionRegistry = registry;
-	}
-
 	public FederatedServiceResolver getFederatedServiceResolver() {
 		return federatedServiceResolver;
-	}
-
-	public void setFederatedServiceResolver(FederatedServiceResolver resolver) {
-		this.federatedServiceResolver = resolver;
 	}
 
 	public void addQueryContextInitializer(QueryContextInitializer initializer) {
@@ -599,10 +593,6 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 
 	public SpinParser getSpinParser() {
 		return spinParser;
-	}
-
-	public void setSpinParser(SpinParser parser) {
-		this.spinParser = parser;
 	}
 
 	public RDFFactory getRDFFactory() {

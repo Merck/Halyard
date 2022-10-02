@@ -95,6 +95,7 @@ import org.eclipse.rdf4j.query.algebra.UpdateExpr;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
+import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.parser.ParsedBooleanQuery;
 import org.eclipse.rdf4j.query.parser.ParsedDescribeQuery;
@@ -135,11 +136,11 @@ public class SpinRenderer {
 	private final Function<String, IRI> wellKnownFunctions;
 
 	public SpinRenderer() {
-		this(Output.TEXT_AND_RDF);
+		this(Output.TEXT_AND_RDF, FunctionRegistry.getInstance());
 	}
 
-	public SpinRenderer(Output output) {
-		this(output, SpinWellKnownVars.INSTANCE::getURI, SpinWellKnownFunctions.INSTANCE::getURI,
+	public SpinRenderer(Output output, FunctionRegistry funcReg) {
+		this(output, SpinWellKnownVars.INSTANCE::getURI, new SpinWellKnownFunctions(funcReg)::getURI,
 				SimpleValueFactory.getInstance());
 	}
 

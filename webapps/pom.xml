@@ -181,6 +181,11 @@
 									<version>3.2.2</version>
 								</artifactItem>
 								<artifactItem>
+									<groupId>commons-beanutils</groupId>
+									<artifactId>commons-beanutils</artifactId>
+									<version>1.8.0</version>
+								</artifactItem>
+								<artifactItem>
 									<groupId>net.sf.ezmorph</groupId>
 									<artifactId>ezmorph</artifactId>
 									<version>1.0.6</version>
@@ -203,31 +208,29 @@
 							<target>
 								<unzip src="${project.build.directory}/rdf4j-server.war" dest="${project.build.directory}/rdf4j-server-patch" overwrite="true">
 									<patternset>
-										<include name="WEB-INF/rdf4j-http-server-servlet.xml" />
-										<include name="WEB-INF/lib/rdf4j-http-server-spring-${rdf4j.version}.jar" />
+										<exclude name="WEB-INF/lib/rdf4j-spin-${rdf4j.version}.jar" />
 									</patternset>
 								</unzip>
 								<replace file="${project.build.directory}/rdf4j-server-patch/WEB-INF/rdf4j-http-server-servlet.xml" token="org.eclipse.rdf4j.repository.manager.LocalRepositoryManager" value="com.msd.gin.halyard.repository.HBaseRepositoryManager" />
 								<zip destfile="${project.build.directory}/rdf4j-server-patch/WEB-INF/lib/rdf4j-http-server-spring-${rdf4j.version}.jar" update="true">
 									<fileset dir="${project.build.directory}/classes" includes="org/eclipse/rdf4j/common/webapp/**" />
 								</zip>
-								<zip destfile="${project.build.directory}/rdf4j-server.war" update="true">
-									<fileset dir="src/main/patches/rdf4j-server" />
+								<zip destfile="${project.build.directory}/rdf4j-server.war">
 									<fileset dir="${project.build.directory}/rdf4j-server-patch" />
+									<fileset dir="src/main/patches/rdf4j-server" />
 									<zipfileset dir="${project.build.directory}" includes="halyard-webapps-${project.version}.jar" prefix="WEB-INF/lib" />
 									<zipfileset dir="../common/target" includes="halyard-common-${project.version}.jar" prefix="WEB-INF/lib" />
 									<zipfileset dir="../strategy/target" includes="halyard-strategy-${project.version}.jar" prefix="WEB-INF/lib" />
 									<zipfileset dir="../sail/target" includes="halyard-sail-${project.version}.jar" prefix="WEB-INF/lib" />
+									<zipfileset dir="../spin/target" includes="halyard-spin-${project.version}.jar" prefix="WEB-INF/lib" />
 									<zipfileset dir="../rio/target" includes="halyard-rio-${project.version}.jar" prefix="WEB-INF/lib" />
 									<zipfileset dir="../sdk/target" includes="rdf4j-repository-api-${rdf4j.version}.jar" prefix="WEB-INF/lib" />
 									<zipfileset dir="${project.build.directory}/extra-libs" includes="*.jar" prefix="WEB-INF/lib" />
 								</zip>
+
 								<unzip src="${project.build.directory}/rdf4j-workbench.war" dest="${project.build.directory}/rdf4j-workbench-patch" overwrite="true">
 									<patternset>
-										<include name="transformations/create.xsl" />
-										<include name="locale/messages.xsl" />
-										<include name="WEB-INF/web.xml" />
-										<include name="WEB-INF/lib/rdf4j-http-workbench-${rdf4j.version}.jar" />
+										<exclude name="WEB-INF/lib/rdf4j-spin-${rdf4j.version}.jar" />
 									</patternset>
 								</unzip>
 								<replace file="${project.build.directory}/rdf4j-workbench-patch/transformations/create.xsl" token="&lt;select id=&quot;type&quot; name=&quot;type&quot;&gt;" value="&lt;select id=&quot;type&quot; name=&quot;type&quot;&gt;&lt;option value=&quot;hbase&quot;&gt;Halyard HBase Store&lt;/option&gt;" />
@@ -236,12 +239,13 @@
 								<zip destfile="${project.build.directory}/rdf4j-workbench-patch/WEB-INF/lib/rdf4j-http-workbench-${rdf4j.version}.jar" update="true">
 									<fileset dir="${project.build.directory}/classes" includes="org/eclipse/rdf4j/workbench/**" />
 								</zip>
-								<zip destfile="${project.build.directory}/rdf4j-workbench.war" update="true">
-									<fileset dir="src/main/patches/rdf4j-workbench" />
+								<zip destfile="${project.build.directory}/rdf4j-workbench.war">
 									<fileset dir="${project.build.directory}/rdf4j-workbench-patch" />
+									<fileset dir="src/main/patches/rdf4j-workbench" />
 									<zipfileset dir="../common/target" includes="halyard-common-${project.version}.jar" prefix="WEB-INF/lib" />
 									<zipfileset dir="../strategy/target" includes="halyard-strategy-${project.version}.jar" prefix="WEB-INF/lib" />
 									<zipfileset dir="../sail/target" includes="halyard-sail-${project.version}.jar" prefix="WEB-INF/lib" />
+									<zipfileset dir="../spin/target" includes="halyard-spin-${project.version}.jar" prefix="WEB-INF/lib" />
 									<zipfileset dir="../rio/target" includes="halyard-rio-${project.version}.jar" prefix="WEB-INF/lib" />
 									<zipfileset dir="../sdk/target" includes="rdf4j-repository-api-${rdf4j.version}.jar" prefix="WEB-INF/lib" />
 									<zipfileset dir="${project.build.directory}/extra-libs" includes="*.jar" prefix="WEB-INF/lib" />

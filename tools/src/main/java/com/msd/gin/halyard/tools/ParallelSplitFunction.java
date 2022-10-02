@@ -88,17 +88,22 @@ public final class ParallelSplitFunction implements Function {
         public void meet(FunctionCall node) throws IllegalArgumentException {
             if (PARALLEL_SPLIT_FUNCTION.stringValue().equals(node.getURI())) {
                 List<ValueExpr> args = node.getArgs();
-                if (args.size() < 2) throw new IllegalArgumentException(PARALLEL_SPLIT_FUNCTION.getLocalName() + " function has at least two mandatory arguments: <constant number of parallel forks> and <binding variable(s) to filter by>");
+                if (args.size() < 2) {
+                	throw new IllegalArgumentException(PARALLEL_SPLIT_FUNCTION.getLocalName() + " function has at least two mandatory arguments: <constant number of parallel forks> and <binding variable(s) to filter by>");
+                }
+                int num;
                 try {
-                    int num = Integer.parseInt(((ValueConstant)args.get(0)).getValue().stringValue());
-                    if (num < 1) throw new NullPointerException();
-                    if (forks == 0) {
-                        forks = num;
-                    } else if (forks != num) {
-                        throw new IllegalArgumentException(PARALLEL_SPLIT_FUNCTION.getLocalName() + " function is used twice with different first argument (number of forks)");
+                    num = Integer.parseInt(((ValueConstant)args.get(0)).getValue().stringValue());
+                    if (num < 1) {
+                    	throw new IllegalArgumentException();
                     }
-                } catch (ClassCastException | NullPointerException | NumberFormatException ex) {
-                    throw new IllegalArgumentException(PARALLEL_SPLIT_FUNCTION.getLocalName() + " function first argument (number of forks) must be integer constant >0");
+                } catch (ClassCastException | IllegalArgumentException ex) {
+                    throw new IllegalArgumentException(PARALLEL_SPLIT_FUNCTION.getLocalName() + " function first argument (number of forks) must be integer constant > 0");
+                }
+                if (forks == 0) {
+                    forks = num;
+                } else if (forks != num) {
+                    throw new IllegalArgumentException(PARALLEL_SPLIT_FUNCTION.getLocalName() + " function is used twice with different first argument (number of forks)");
                 }
             }
         }

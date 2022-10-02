@@ -56,7 +56,6 @@ import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.Update;
 import org.eclipse.rdf4j.query.algebra.UpdateExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
-import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.parser.ParsedUpdate;
 import org.eclipse.rdf4j.query.parser.QueryParserUtil;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
@@ -132,72 +131,72 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                 context.setStatus("Execution of: " + name + " stage #" + stage);
                 final AtomicLong addedKvs = new AtomicLong();
                 final AtomicLong removedKvs = new AtomicLong();
+				final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, new HBaseSail.Ticker() {
+                    @Override
+                    public void tick() {
+                        context.progress();
+                    }
+				}, new HBaseSail.SailConnectionFactory() {
+					@Override
+					public HBaseSailConnection createConnection(HBaseSail sail) throws IOException {
+						return new HBaseSailConnection(sail) {
+							private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
+
+							@Override
+							protected void put(KeyValue kv) throws IOException {
+								rowKey.set(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength());
+								try {
+									context.write(rowKey, kv);
+								} catch (InterruptedException ex) {
+									throw new IOException(ex);
+								}
+								long added = addedKvs.incrementAndGet();
+								if (added % 1000l == 0) {
+									context.getCounter(Counters.ADDED_KVS).setValue(added);
+									long removed = removedKvs.get();
+									context.setStatus(name + " - " + added + " added " + removed + " removed");
+									LOG.info("{} KeyValues added and {} removed", added, removed);
+								}
+							}
+
+							@Override
+							protected void delete(KeyValue kv) throws IOException {
+								rowKey.set(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength());
+								try {
+									context.write(rowKey, kv);
+								} catch (InterruptedException ex) {
+									throw new IOException(ex);
+								}
+								long removed = removedKvs.incrementAndGet();
+								if (removed % 1000l == 0) {
+									context.getCounter(Counters.REMOVED_KVS).setValue(removed);
+									long added = addedKvs.get();
+									context.setStatus(name + " - " + added + " added " + removed + " removed");
+									LOG.info("{} KeyValues added and {} removed", added, removed);
+								}
+							}
+
+							@Override
+							protected long getDefaultTimestamp(boolean delete) {
+								return timestamp;
+							}
+
+							@Override
+							public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
+								try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
+									while (iter.hasNext()) {
+										Statement st = iter.next();
+										removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
+									}
+								}
+							}
+						};
+					}
+				});
+                SailRepository rep = new SailRepository(sail);
                 Function fn = new ParallelSplitFunction(qis.getRepeatIndex());
-                FunctionRegistry.getInstance().add(fn);
+                sail.getFunctionRegistry().add(fn);
                 try {
-					final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, new HBaseSail.Ticker() {
-                        @Override
-                        public void tick() {
-                            context.progress();
-                        }
-					}, new HBaseSail.SailConnectionFactory() {
-						@Override
-						public HBaseSailConnection createConnection(HBaseSail sail) throws IOException {
-							return new HBaseSailConnection(sail) {
-								private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
-
-								@Override
-								protected void put(KeyValue kv) throws IOException {
-									rowKey.set(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength());
-									try {
-										context.write(rowKey, kv);
-									} catch (InterruptedException ex) {
-										throw new IOException(ex);
-									}
-									long added = addedKvs.incrementAndGet();
-									if (added % 1000l == 0) {
-										context.getCounter(Counters.ADDED_KVS).setValue(added);
-										long removed = removedKvs.get();
-										context.setStatus(name + " - " + added + " added " + removed + " removed");
-										LOG.info("{} KeyValues added and {} removed", added, removed);
-									}
-								}
-
-								@Override
-								protected void delete(KeyValue kv) throws IOException {
-									rowKey.set(kv.getRowArray(), kv.getRowOffset(), kv.getRowLength());
-									try {
-										context.write(rowKey, kv);
-									} catch (InterruptedException ex) {
-										throw new IOException(ex);
-									}
-									long removed = removedKvs.incrementAndGet();
-									if (removed % 1000l == 0) {
-										context.getCounter(Counters.REMOVED_KVS).setValue(removed);
-										long added = addedKvs.get();
-										context.setStatus(name + " - " + added + " added " + removed + " removed");
-										LOG.info("{} KeyValues added and {} removed", added, removed);
-									}
-								}
-
-								@Override
-								protected long getDefaultTimestamp(boolean delete) {
-									return timestamp;
-								}
-
-								@Override
-								public void removeStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
-									try (CloseableIteration<? extends Statement, SailException> iter = getStatements(subj, pred, obj, true, contexts)) {
-										while (iter.hasNext()) {
-											Statement st = iter.next();
-											removeStatement(null, st.getSubject(), st.getPredicate(), st.getObject(), st.getContext());
-										}
-									}
-								}
-							};
-						}
-					});
-                    SailRepository rep = new SailRepository(sail);
                     try {
                         rep.init();
                         try(SailRepositoryConnection con = rep.getConnection()) {
@@ -210,7 +209,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                         rep.shutDown();
                     }
                 } finally {
-                    FunctionRegistry.getInstance().remove(fn);
+                	sail.getFunctionRegistry().remove(fn);
                 }
                 context.setStatus(name + " - " + addedKvs.get() + " added " + removedKvs.get() + " removed");
                 LOG.info("Query finished with {} KeyValues added and {} removed", addedKvs.get(), removedKvs.get());

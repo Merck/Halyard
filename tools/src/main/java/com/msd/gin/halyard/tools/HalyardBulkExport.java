@@ -18,8 +18,11 @@ package com.msd.gin.halyard.tools;
 
 import static com.msd.gin.halyard.vocab.HALYARD.*;
 
+import com.msd.gin.halyard.sail.HBaseSail;
+
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 
@@ -36,7 +39,6 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
-import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
@@ -69,31 +71,34 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
             final String bName = dot > 0 ? name.substring(0, dot) : name;
             context.setStatus("Execution of: " + name);
             LOG.info("Execution of {}:\n{}", name, query);
-            Function fn = new ParallelSplitFunction(qis.getRepeatIndex());
-            FunctionRegistry.getInstance().add(fn);
-            try {
-                HalyardExport.StatusLog log = new HalyardExport.StatusLog() {
-                    @Override
-                    public void tick() {
-                        context.progress();
-                    }
-                    @Override
-                    public void logStatus(String status) {
-                        context.setStatus(name + ": " + status);
-                    }
-                };
-                Configuration cfg = context.getConfiguration();
-                String[] props = cfg.getStrings(JDBC_PROPERTIES);
-                if (props != null) {
-                    for (int i=0; i<props.length; i++) {
-                        props[i] = new String(Base64.decodeBase64(props[i]), StandardCharsets.UTF_8);
-                    }
+            HalyardExport.StatusLog log = new HalyardExport.StatusLog() {
+                @Override
+                public void tick() {
+                    context.progress();
                 }
-                HalyardExport.export(cfg, log, cfg.get(SOURCE), query, MessageFormat.format(cfg.get(TARGET), bName, qis.getRepeatIndex()), cfg.get(JDBC_DRIVER), cfg.get(JDBC_CLASSPATH), props, false, cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL));
-            } catch (Exception e) {
+                @Override
+                public void logStatus(String status) {
+                    context.setStatus(name + ": " + status);
+                }
+            };
+            Configuration cfg = context.getConfiguration();
+            String[] props = cfg.getStrings(JDBC_PROPERTIES);
+            if (props != null) {
+                for (int i=0; i<props.length; i++) {
+                    props[i] = new String(Base64.decodeBase64(props[i]), StandardCharsets.UTF_8);
+                }
+            }
+            String source = cfg.get(SOURCE);
+            String elasticIndexURL = cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL);
+        	HBaseSail sail = new HBaseSail(cfg, source, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null);
+            Function fn = new ParallelSplitFunction(qis.getRepeatIndex());
+            sail.getFunctionRegistry().add(fn);
+            try {
+        		HalyardExport.export(sail, log, query, MessageFormat.format(cfg.get(TARGET), bName, qis.getRepeatIndex()), cfg.get(JDBC_DRIVER), cfg.get(JDBC_CLASSPATH), props, false);
+            } catch (HalyardExport.ExportException e) {
                 throw new IOException(e);
             } finally {
-                FunctionRegistry.getInstance().remove(fn);
+            	sail.getFunctionRegistry().remove(fn);
             }
         }
     }
@@ -154,7 +159,7 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
             StringBuilder newCp = new StringBuilder();
             for (int i=0; i<jars.length; i++) {
                 if (i > 0) newCp.append(':');
-                newCp.append(addTmpFile(jars[i])); //append clappspath entris to tmpfiles and trim paths from the classpath
+                newCp.append(addTmpFile(jars[i])); //append classpath entries to tmpfiles and trim paths from the classpath
             }
             getConf().set(JDBC_CLASSPATH, newCp.toString());
         }
