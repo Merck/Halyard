@@ -16,31 +16,30 @@
  */
 package com.msd.gin.halyard.strategy.aggregators;
 
+import com.msd.gin.halyard.strategy.QueryValueStepEvaluator;
+
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
-import org.eclipse.rdf4j.query.algebra.Sample;
-import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
+import org.eclipse.rdf4j.query.parser.sparql.aggregate.AggregateFunction;
 
-public class SampleAggregator extends Aggregator {
+public class SampleAggregateFunction extends AggregateFunction<SampleCollector,Value> {
 
-	private final AtomicReference<Value> sample = new AtomicReference<>();
-
-	public SampleAggregator(Sample op, EvaluationStrategy strategy) {
-		super(op, strategy);
+	public SampleAggregateFunction(QueryValueStepEvaluator evaluator) {
+		super(evaluator);
 	}
 
 	@Override
-	public void process(BindingSet bs) {
+	public void processAggregate(BindingSet bs, Predicate<Value> distinctPredicate, SampleCollector col) {
 		// we flip a coin to determine if we keep the current value or set a
 		// new value to report.
 		Optional<Value> newValue = null;
-		if (sample.get() == null) {
+		if (!col.hasSample()) {
 			newValue = Optional.ofNullable(evaluate(bs));
-			if (newValue.isPresent() && sample.compareAndSet(null, newValue.get())) {
+			if (newValue.isPresent() && col.setInitial(newValue.get())) {
 				return;
 			}
 		}
@@ -49,12 +48,7 @@ public class SampleAggregator extends Aggregator {
 			if (newValue == null) {
 				newValue = Optional.ofNullable(evaluate(bs));
 			}
-			newValue.ifPresent(sample::set);
+			newValue.ifPresent(col::setSample);
 		}
-	}
-
-	@Override
-	public Value getValue() {
-		return sample.get();
 	}
 }

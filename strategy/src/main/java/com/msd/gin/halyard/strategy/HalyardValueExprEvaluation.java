@@ -818,7 +818,7 @@ class HalyardValueExprEvaluation {
         Value leftVal = precompile(node.getLeftArg()).evaluate(bindings);
         Value rightVal = precompile(node.getRightArg()).evaluate(bindings);
 		return BooleanLiteral.valueOf(
-				QueryEvaluationUtil.compare(leftVal, rightVal, node.getOperator(), false));
+				QueryEvaluationUtil.compare(leftVal, rightVal, node.getOperator(), parentStrategy.isStrict()));
     }
 
     /**

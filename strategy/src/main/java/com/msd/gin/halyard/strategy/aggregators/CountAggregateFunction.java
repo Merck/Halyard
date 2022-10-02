@@ -16,37 +16,25 @@
  */
 package com.msd.gin.halyard.strategy.aggregators;
 
-import java.util.concurrent.atomic.AtomicReference;
+import com.msd.gin.halyard.strategy.QueryValueStepEvaluator;
+
+import java.util.function.Predicate;
 
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
-import org.eclipse.rdf4j.query.algebra.Min;
-import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
+import org.eclipse.rdf4j.query.parser.sparql.aggregate.AggregateFunction;
 
-public class MinAggregator extends Aggregator {
+public final class CountAggregateFunction extends AggregateFunction<LongCollector,Value> {
 
-	private final AtomicReference<Value> min = new AtomicReference<>();
-
-	public MinAggregator(Min op, EvaluationStrategy strategy) {
-		super(op, strategy);
+	public CountAggregateFunction(QueryValueStepEvaluator evaluator) {
+		super(evaluator);
 	}
 
 	@Override
-	public void process(BindingSet bs) {
-		Value v = evaluate(bs);
-		if (v != null && distinctValue(v)) {
-			min.accumulateAndGet(v, (current,next) -> {
-				if (current == null || comparator.compare(next, current) < 0) {
-					return next;
-				} else {
-					return current;
-				}
-			});
+	public void processAggregate(BindingSet bs, Predicate<Value> distinctPredicate, LongCollector col) {
+		Value value = evaluate(bs);
+		if (value != null && distinctPredicate.test(value)) {
+			col.increment();
 		}
-	}
-
-	@Override
-	public Value getValue() {
-		return min.get();
 	}
 }

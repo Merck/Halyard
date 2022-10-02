@@ -16,37 +16,25 @@
  */
 package com.msd.gin.halyard.strategy.aggregators;
 
-import java.util.concurrent.atomic.AtomicReference;
+import com.msd.gin.halyard.strategy.QueryValueStepEvaluator;
+
+import java.util.function.Predicate;
 
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
-import org.eclipse.rdf4j.query.algebra.Max;
-import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
+import org.eclipse.rdf4j.query.parser.sparql.aggregate.AggregateFunction;
 
-public class MaxAggregator extends Aggregator {
+public final class MinAggregateFunction extends AggregateFunction<ValueCollector,Value> {
 
-	private final AtomicReference<Value> max = new AtomicReference<>();
-
-	public MaxAggregator(Max op, EvaluationStrategy strategy) {
-		super(op, strategy);
+	public MinAggregateFunction(QueryValueStepEvaluator evaluator) {
+		super(evaluator);
 	}
 
 	@Override
-	public void process(BindingSet bs) {
+	public void processAggregate(BindingSet bs, Predicate<Value> distinctPredicate, ValueCollector col) {
 		Value v = evaluate(bs);
-		if (v != null && distinctValue(v)) {
-			max.accumulateAndGet(v, (current,next) -> {
-				if (current == null || comparator.compare(next, current) > 0) {
-					return next;
-				} else {
-					return current;
-				}
-			});
+		if (v != null && distinctPredicate.test(v)) {
+			col.min(v);
 		}
-	}
-
-	@Override
-	public Value getValue() {
-		return max.get();
 	}
 }

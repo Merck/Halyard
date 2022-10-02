@@ -74,7 +74,9 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
      */
     private final HalyardValueExprEvaluation valueEval;
 
-	/** Track the results size that each node in the query plan produces during execution. */
+    private final boolean isStrict = false;
+
+    /** Track the results size that each node in the query plan produces during execution. */
 	boolean trackResultSize;
 
 	/** Track the exeution time of each node in the plan. */
@@ -127,6 +129,10 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 	@Override
 	public void setTrackTime(boolean trackTime) {
 		this.trackTime = trackTime;
+	}
+
+	boolean isStrict() {
+		return isStrict;
 	}
 
 	String getSourceString() {
