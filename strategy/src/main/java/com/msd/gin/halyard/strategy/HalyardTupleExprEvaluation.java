@@ -1441,7 +1441,7 @@ final class HalyardTupleExprEvaluation {
         if (leftJoin.hasCondition()) {
             leftJoin.getCondition().visit(optionalVarCollector);
         }
-        final Set<String> problemVars = optionalVarCollector.getVarNames();
+        final Set<String> problemVars = new HashSet<>(optionalVarCollector.getVarNames());
         problemVars.removeAll(leftJoin.getLeftArg().getBindingNames());
         problemVars.retainAll(bindings.getBindingNames());
         final Set<String> scopeBindingNames = leftJoin.getBindingNames();

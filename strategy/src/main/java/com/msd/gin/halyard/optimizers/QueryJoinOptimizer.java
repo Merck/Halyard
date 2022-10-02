@@ -423,9 +423,9 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 			int currentJoinSize = -1;
 			for (TupleExpr candidate : joinArgs) {
 				if (!currentList.contains(candidate)) {
+
 					Set<String> names = candidate.getBindingNames();
-					names.retainAll(currentListNames);
-					int joinSize = names.size();
+					int joinSize = getJoinSize(currentListNames, names);
 
 					Set<String> candidateBindingNames = candidate.getBindingNames();
 					int unionSize = getUnionSize(currentListNames, candidateBindingNames);

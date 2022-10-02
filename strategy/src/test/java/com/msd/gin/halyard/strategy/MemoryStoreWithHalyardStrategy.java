@@ -30,11 +30,11 @@ import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Triple;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
-import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.sail.NotifyingSailConnection;
@@ -76,9 +76,9 @@ public class MemoryStoreWithHalyardStrategy extends MemoryStore {
             	HalyardEvaluationStatistics stats = new HalyardEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY, null);
             	HalyardEvaluationStrategy evalStrat = new HalyardEvaluationStrategy(new MockTripleSource(tripleSource), dataset, null, stats) {
             		@Override
-            		public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) throws QueryEvaluationException {
+            		public QueryEvaluationStep precompile(TupleExpr expr) {
             			queryHistory.add(expr);
-            			return super.evaluate(expr, bindings);
+            			return super.precompile(expr);
             		}
             		@Override
             		protected JoinAlgorithmOptimizer getJoinAlgorithmOptimizer() {
