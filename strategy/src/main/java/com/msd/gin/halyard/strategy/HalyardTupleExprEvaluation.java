@@ -129,6 +129,7 @@ import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
@@ -144,7 +145,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration
 import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.TupleExprs;
-import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
+import org.eclipse.rdf4j.query.algebra.helpers.collectors.VarNameCollector;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
 
 /**
@@ -185,50 +186,47 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Returns an iteration of binding sets.
+     * Precompiles the given expression.
      * @param expr supplied by HalyardEvaluationStrategy
-     * @param bindings supplied by HalyardEvaluationStrategy
-     * @return an iteration of binding sets
+     * @return a QueryEvaluationStep
      */
-    CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) {
-    	return executor.pushAndPull(pipe -> evaluateTupleExpr(pipe, expr, bindings), expr, parentStrategy);
+    QueryEvaluationStep precompile(TupleExpr expr) {
+    	BindingSetPipeEvaluationStep step = precompileTupleExpr(expr);
+    	return (bs) -> executor.pushAndPull(pipe -> step.evaluate(pipe, bs), expr, parentStrategy);
     }
 
     /**
-     * Switch logic appropriate for each type of {@link TupleExpr} query model node, sending each type to it's appropriate evaluation method. For example,
-     * {@code UnaryTupleOperator} is sent to {@link evaluateUnaryTupleOperator()}.
-     * @param parent
-     * @param expr
-     * @param bindings
+     * Switch logic appropriate for each type of {@link TupleExpr} query model node, sending each type to it's appropriate precompile method. For example,
+     * {@code UnaryTupleOperator} is sent to {@link precompileUnaryTupleOperator()}.
      */
-    private void evaluateTupleExpr(BindingSetPipe parent, TupleExpr expr, BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileTupleExpr(TupleExpr expr) {
         if (expr instanceof StatementPattern) {
-            evaluateStatementPattern(parent, (StatementPattern) expr, bindings);
+            return (parent, bindings) -> evaluateStatementPattern(parent, (StatementPattern) expr, bindings);
         } else if (expr instanceof UnaryTupleOperator) {
-            evaluateUnaryTupleOperator(parent, (UnaryTupleOperator) expr, bindings);
+        	return precompileUnaryTupleOperator((UnaryTupleOperator) expr);
         } else if (expr instanceof BinaryTupleOperator) {
-            evaluateBinaryTupleOperator(parent, (BinaryTupleOperator) expr, bindings);
+        	return precompileBinaryTupleOperator((BinaryTupleOperator) expr);
         } else if (expr instanceof StarJoin) {
-        	evaluateStarJoin(parent, (StarJoin) expr, bindings);
+        	return (parent, bindings) -> evaluateStarJoin(parent, (StarJoin) expr, bindings);
         } else if (expr instanceof SingletonSet) {
-            evaluateSingletonSet(parent, (SingletonSet) expr, bindings);
+        	return (parent, bindings) -> evaluateSingletonSet(parent, (SingletonSet) expr, bindings);
         } else if (expr instanceof EmptySet) {
-            evaluateEmptySet(parent, (EmptySet) expr, bindings);
+        	return (parent, bindings) -> evaluateEmptySet(parent, (EmptySet) expr, bindings);
         } else if (expr instanceof ZeroLengthPath) {
-            evaluateZeroLengthPath(parent, (ZeroLengthPath) expr, bindings);
+        	return (parent, bindings) -> evaluateZeroLengthPath(parent, (ZeroLengthPath) expr, bindings);
         } else if (expr instanceof ArbitraryLengthPath) {
-            evaluateArbitraryLengthPath(parent, (ArbitraryLengthPath) expr, bindings);
+        	return (parent, bindings) -> evaluateArbitraryLengthPath(parent, (ArbitraryLengthPath) expr, bindings);
         } else if (expr instanceof BindingSetAssignment) {
-            evaluateBindingSetAssignment(parent, (BindingSetAssignment) expr, bindings);
+        	return (parent, bindings) -> evaluateBindingSetAssignment(parent, (BindingSetAssignment) expr, bindings);
         } else if (expr instanceof TripleRef) {
-        	evaluateTripleRef(parent, (TripleRef) expr, bindings);
+        	return (parent, bindings) -> evaluateTripleRef(parent, (TripleRef) expr, bindings);
 		} else if (expr instanceof TupleFunctionCall) {
 			// all TupleFunctionCalls are expected to be ExtendedTupleFunctionCalls
-			evaluateTupleFunctionCall(parent, (ExtendedTupleFunctionCall) expr, bindings);
+			return (parent, bindings) -> evaluateTupleFunctionCall(parent, (ExtendedTupleFunctionCall) expr, bindings);
         } else if (expr == null) {
-            parent.handleException(new IllegalArgumentException("expr must not be null"));
+            throw new IllegalArgumentException("expr must not be null");
         } else {
-            parent.handleException(new QueryEvaluationException("Unsupported tuple expr type: " + expr.getClass()));
+            throw new QueryEvaluationException("Unsupported tuple expr type: " + expr.getClass());
         }
     }
 
@@ -665,41 +663,38 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Switch logic for evaluation of any instance of a {@link UnaryTupleOperator} query model node
-     * @param parent
-     * @param expr
-     * @param bindings
+     * Switch logic for precompilation of any instance of a {@link UnaryTupleOperator} query model node
      */
-    private void evaluateUnaryTupleOperator(BindingSetPipe parent, UnaryTupleOperator expr, BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileUnaryTupleOperator(UnaryTupleOperator expr) {
         if (expr instanceof Projection) {
-            evaluateProjection(parent, (Projection) expr, bindings);
+        	return (parent, bindings) -> evaluateProjection(parent, (Projection) expr, bindings);
         } else if (expr instanceof MultiProjection) {
-            evaluateMultiProjection(parent, (MultiProjection) expr, bindings);
+        	return (parent, bindings) -> evaluateMultiProjection(parent, (MultiProjection) expr, bindings);
         } else if (expr instanceof Filter) {
-            evaluateFilter(parent, (Filter) expr, bindings);
+        	return (parent, bindings) -> evaluateFilter(parent, (Filter) expr, bindings);
         } else if (expr instanceof Service) {
-            evaluateService(parent, (Service) expr, bindings);
+        	return (parent, bindings) -> evaluateService(parent, (Service) expr, bindings);
         } else if (expr instanceof Slice) {
-            evaluateSlice(parent, (Slice) expr, bindings);
+        	return (parent, bindings) -> evaluateSlice(parent, (Slice) expr, bindings);
         } else if (expr instanceof Extension) {
-            evaluateExtension(parent, (Extension) expr, bindings);
+        	return (parent, bindings) -> evaluateExtension(parent, (Extension) expr, bindings);
         } else if (expr instanceof Distinct) {
-            evaluateDistinct(parent, (Distinct) expr, bindings);
+        	return (parent, bindings) -> evaluateDistinct(parent, (Distinct) expr, bindings);
         } else if (expr instanceof Reduced) {
-            evaluateReduced(parent, (Reduced) expr, bindings);
+        	return (parent, bindings) -> evaluateReduced(parent, (Reduced) expr, bindings);
         } else if (expr instanceof Group) {
-            evaluateGroup(parent, (Group) expr, bindings);
+        	return (parent, bindings) -> evaluateGroup(parent, (Group) expr, bindings);
         } else if (expr instanceof Order) {
-            evaluateOrder(parent, (Order) expr, bindings);
+        	return (parent, bindings) -> evaluateOrder(parent, (Order) expr, bindings);
         } else if (expr instanceof QueryRoot) {
             parentStrategy.sharedValueOfNow = null;
-            evaluateTupleExpr(parent, ((QueryRoot) expr).getArg(), bindings);
+            return precompileTupleExpr(((QueryRoot) expr).getArg());
         } else if (expr instanceof DescribeOperator) {
-            evaluateDescribeOperator(parent, (DescribeOperator) expr, bindings);
+        	return (parent, bindings) -> evaluateDescribeOperator(parent, (DescribeOperator) expr, bindings);
         } else if (expr == null) {
-            parent.handleException(new IllegalArgumentException("expr must not be null"));
+            throw new IllegalArgumentException("expr must not be null");
         } else {
-            parent.handleException(new QueryEvaluationException("Unknown unary tuple operator type: " + expr.getClass()));
+            throw new QueryEvaluationException("Unknown unary tuple operator type: " + expr.getClass());
         }
     }
 
@@ -732,7 +727,8 @@ final class HalyardTupleExprEvaluation {
             pushDownBindings = bindings;
         }
 
-        evaluateTupleExpr(new BindingSetPipe(parent) {
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(projection.getArg());
+        step.evaluate(new BindingSetPipe(parent) {
             @Override
             protected boolean next(BindingSet bs) throws InterruptedException {
                 return parent.push(ProjectionIterator.project(projection.getProjectionElemList(), bs, bindings, includeAll));
@@ -741,7 +737,7 @@ final class HalyardTupleExprEvaluation {
             public String toString() {
             	return "ProjectionBindingSetPipe";
             }
-        }, projection.getArg(), pushDownBindings);
+        }, pushDownBindings);
     }
 
     /**
@@ -751,7 +747,8 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateMultiProjection(BindingSetPipe parent, final MultiProjection multiProjection, final BindingSet bindings) {
-        evaluateTupleExpr(new BindingSetPipe(parent) {
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(multiProjection.getArg());
+        step.evaluate(new BindingSetPipe(parent) {
             final List<ProjectionElemList> projections = multiProjection.getProjections();
             final BindingSet prev[] = new BindingSet[projections.size()];
 
@@ -779,7 +776,7 @@ final class HalyardTupleExprEvaluation {
             public String toString() {
             	return "MultiProjectionBindingSetPipe";
             }
-        }, multiProjection.getArg(), bindings);
+        }, bindings);
     }
 
     /**
@@ -790,43 +787,46 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateFilter(BindingSetPipe parent, final Filter filter, final BindingSet bindings) {
         parentStrategy.initTracking(filter);
-        evaluateTupleExpr(new BindingSetPipe(parent) {
-            final Set<String> scopeBindingNames = filter.getBindingNames();
+        BindingSetPipeEvaluationStep argStep = precompileTupleExpr(filter.getArg());
+        BindingSetPipeEvaluationStep step = (pipe, bs) ->
+            argStep.evaluate(new BindingSetPipe(parent) {
+                final Set<String> scopeBindingNames = filter.getBindingNames();
 
-            @Override
-            protected boolean next(BindingSet bs) throws InterruptedException {
-                try {
-                    if (accept(bs)) {
-                        parentStrategy.incrementResultSizeActual(filter);
-                        return parent.push(bs); //push results that pass the filter.
-                    } else {
-                        return true; //nothing passes the filter but processing continues.
+                @Override
+                protected boolean next(BindingSet bs) throws InterruptedException {
+                    try {
+                        if (accept(bs)) {
+                            parentStrategy.incrementResultSizeActual(filter);
+                            return parent.push(bs); //push results that pass the filter.
+                        } else {
+                            return true; //nothing passes the filter but processing continues.
+                        }
+                    } catch (QueryEvaluationException e) {
+                        return handleException(e);
                     }
-                } catch (QueryEvaluationException e) {
-                    return handleException(e);
                 }
-            }
-            private boolean accept(BindingSet bindings) throws QueryEvaluationException {
-                try {
-                    // Limit the bindings to the ones that are in scope for this filter
-                    QueryBindingSet scopeBindings = new QueryBindingSet(bindings);
-                    // FIXME J1 scopeBindingNames should include bindings from superquery if the filter
-                    // is part of a subquery. This is a workaround: we should fix the settings of scopeBindingNames,
-                    // rather than skipping the limiting of bindings.
-                    if (!isPartOfSubQuery(filter)) {
-                        scopeBindings.retainAll(scopeBindingNames);
+                private boolean accept(BindingSet bindings) throws QueryEvaluationException {
+                    try {
+                        // Limit the bindings to the ones that are in scope for this filter
+                        QueryBindingSet scopeBindings = new QueryBindingSet(bindings);
+                        // FIXME J1 scopeBindingNames should include bindings from superquery if the filter
+                        // is part of a subquery. This is a workaround: we should fix the settings of scopeBindingNames,
+                        // rather than skipping the limiting of bindings.
+                        if (!isPartOfSubQuery(filter)) {
+                            scopeBindings.retainAll(scopeBindingNames);
+                        }
+                        return parentStrategy.isTrue(filter.getCondition(), scopeBindings);
+                    } catch (ValueExprEvaluationException e) {
+                        // failed to evaluate condition
+                        return false;
                     }
-                    return parentStrategy.isTrue(filter.getCondition(), scopeBindings);
-                } catch (ValueExprEvaluationException e) {
-                    // failed to evaluate condition
-                    return false;
                 }
-            }
-            @Override
-            public String toString() {
-            	return "FilterBindingSetPipe";
-            }
-        }, filter.getArg(), bindings);
+                @Override
+                public String toString() {
+                	return "FilterBindingSetPipe";
+                }
+            }, bindings);
+        step.evaluate(parent, bindings);
     }
 
     /**
@@ -836,7 +836,7 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateDescribeOperator(BindingSetPipe parent, DescribeOperator operator, BindingSet bindings) {
-    	executor.pullAndPushAsync(parent, new DescribeIteration(evaluate(operator.getArg(), bindings), parentStrategy,
+    	executor.pullAndPushAsync(parent, new DescribeIteration(precompile(operator.getArg()).evaluate(bindings), parentStrategy,
 				operator.getBindingNames(), bindings), operator, parentStrategy);
     }
 
@@ -903,7 +903,8 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateOrder(final BindingSetPipe parent, final Order order, BindingSet bindings) {
         final Sorter<ComparableBindingSetWrapper> sorter = new Sorter<>(getLimit(order), isReducedOrDistinct(order));
-        evaluateTupleExpr(new BindingSetPipe(parent) {
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(order.getArg());
+        step.evaluate(new BindingSetPipe(parent) {
             final AtomicLong minorOrder = new AtomicLong();
 
             @Override
@@ -943,7 +944,7 @@ final class HalyardTupleExprEvaluation {
             public String toString() {
             	return "OrderBindingSetPipe";
             }
-        }, order.getArg(), bindings);
+        }, bindings);
     }
 
     /**
@@ -956,7 +957,8 @@ final class HalyardTupleExprEvaluation {
     	parentStrategy.initTracking(group);
     	if (group.getGroupBindingNames().isEmpty()) {
     		// no GROUP BY present
-    		evaluateTupleExpr(new BindingSetPipe(parent) {
+            BindingSetPipeEvaluationStep step = precompileTupleExpr(group.getArg());
+    		step.evaluate(new BindingSetPipe(parent) {
     			final GroupValue aggregators = createGroupValue(group, bindings);
 				@Override
 				protected boolean next(BindingSet bs) throws InterruptedException {
@@ -974,9 +976,10 @@ final class HalyardTupleExprEvaluation {
 				public String toString() {
 					return "AggregateBindingSetPipe-noGroupBy";
 				}
-    		}, group.getArg(), bindings);
+    		}, bindings);
     	} else {
-    		evaluateTupleExpr(new BindingSetPipe(parent) {
+            BindingSetPipeEvaluationStep step = precompileTupleExpr(group.getArg());
+    		step.evaluate(new BindingSetPipe(parent) {
     			final Map<BindingSetValues,GroupValue> groupByMap = new ConcurrentHashMap<>();
     			final String[] groupNames = toStringArray(group.getGroupBindingNames());
 				@Override
@@ -1016,7 +1019,7 @@ final class HalyardTupleExprEvaluation {
 				public String toString() {
 					return "AggregateBindingSetPipe";
 				}
-    		}, group.getArg(), bindings);
+    		}, bindings);
     	}
     }
 
@@ -1094,7 +1097,8 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateReduced(BindingSetPipe parent, Reduced reduced, BindingSet bindings) {
     	parentStrategy.initTracking(reduced);
-        evaluateTupleExpr(new BindingSetPipe(parent) {
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(reduced.getArg());
+        step.evaluate(new BindingSetPipe(parent) {
             private BindingSet previous = null;
 
             @Override
@@ -1112,7 +1116,7 @@ final class HalyardTupleExprEvaluation {
             public String toString() {
             	return "ReducedBindingSetPipe";
             }
-        }, reduced.getArg(), bindings);
+        }, bindings);
     }
 
     /**
@@ -1123,7 +1127,8 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateDistinct(BindingSetPipe parent, final Distinct distinct, BindingSet bindings) {
     	parentStrategy.initTracking(distinct);
-        evaluateTupleExpr(new BindingSetPipe(parent) {
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(distinct.getArg());
+        step.evaluate(new BindingSetPipe(parent) {
             private final BigHashSet<BindingSet> set = BigHashSet.create();
             @Override
             protected boolean handleException(Throwable e) {
@@ -1151,7 +1156,7 @@ final class HalyardTupleExprEvaluation {
             public String toString() {
             	return "DistinctBindingSetPipe";
             }
-        }, distinct.getArg(), bindings);
+        }, bindings);
     }
 
 	/**
@@ -1161,7 +1166,8 @@ final class HalyardTupleExprEvaluation {
 	 * @param bindings
 	 */
     private void evaluateExtension(BindingSetPipe parent, final Extension extension, BindingSet bindings) {
-        evaluateTupleExpr(new BindingSetPipe(parent) {
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(extension.getArg());
+        step.evaluate(new BindingSetPipe(parent) {
             @Override
             protected boolean next(BindingSet bs) throws InterruptedException {
                 QueryBindingSet targetBindings = new QueryBindingSet(bs);
@@ -1194,7 +1200,7 @@ final class HalyardTupleExprEvaluation {
             public String toString() {
             	return "ExtensionBindingSetPipe";
             }
-        }, extension.getArg(), bindings);
+        }, bindings);
     }
 
     /**
@@ -1206,7 +1212,8 @@ final class HalyardTupleExprEvaluation {
     private void evaluateSlice(BindingSetPipe parent, Slice slice, BindingSet bindings) {
         final long offset = slice.hasOffset() ? slice.getOffset() : 0;
         final long limit = slice.hasLimit() ? offset + slice.getLimit() : Long.MAX_VALUE;
-        evaluateTupleExpr(new BindingSetPipe(parent) {
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(slice.getArg());
+        step.evaluate(new BindingSetPipe(parent) {
             private final AtomicLong ll = new AtomicLong(0);
             @Override
             protected boolean next(BindingSet bs) throws InterruptedException {
@@ -1225,7 +1232,7 @@ final class HalyardTupleExprEvaluation {
             public String toString() {
             	return "SliceBindingSetPipe";
             }
-        }, slice.getArg(), bindings);
+        }, bindings);
     }
 
     /**
@@ -1308,46 +1315,42 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Evaluate {@link BinaryTupleOperator} query model nodes
-     * @param parent
-     * @param expr
-     * @param bindings
+     * Precompiles {@link BinaryTupleOperator} query model nodes
      */
-    private void evaluateBinaryTupleOperator(BindingSetPipe parent, BinaryTupleOperator expr, BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileBinaryTupleOperator(BinaryTupleOperator expr) {
         if (expr instanceof Join) {
-            evaluateJoin(parent, (Join) expr, bindings);
+            return precompileJoin((Join) expr);
         } else if (expr instanceof LeftJoin) {
-            evaluateLeftJoin(parent, (LeftJoin) expr, bindings);
+        	return precompileLeftJoin((LeftJoin) expr);
         } else if (expr instanceof Union) {
-            evaluateUnion(parent, (Union) expr, bindings);
+        	return (parent, bindings) -> evaluateUnion(parent, (Union) expr, bindings);
         } else if (expr instanceof Intersection) {
-            evaluateIntersection(parent, (Intersection) expr, bindings);
+        	return (parent, bindings) -> evaluateIntersection(parent, (Intersection) expr, bindings);
         } else if (expr instanceof Difference) {
-            evaluateDifference(parent, (Difference) expr, bindings);
+        	return (parent, bindings) -> evaluateDifference(parent, (Difference) expr, bindings);
         } else if (expr == null) {
-            parent.handleException(new IllegalArgumentException("expr must not be null"));
+            throw new IllegalArgumentException("expr must not be null");
         } else {
-            parent.handleException(new QueryEvaluationException("Unsupported binary tuple operator type: " + expr.getClass()));
+            throw new QueryEvaluationException("Unsupported binary tuple operator type: " + expr.getClass());
         }
     }
 
     /**
-     * Evaluate {@link Join} query model nodes.
-     * @param topPipe
-     * @param join
-     * @param bindings
+     * Precompiles {@link Join} query model nodes.
      */
-    private void evaluateJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileJoin(Join join) {
+    	BindingSetPipeEvaluationStep step;
     	String algorithm = join.getAlgorithmName();
     	if (isOutOfScopeForLeftArgBindings(join.getRightArg())) {
     		algorithm = Algorithms.HASH_JOIN;
     	}
 
     	if (Algorithms.HASH_JOIN.equals(algorithm)) {
-    		evaluateHashJoin(topPipe, join, bindings);
+    		step = (pipe, bs) -> evaluateHashJoin(pipe, join, bs);
     	} else {
-    		evaluateNestedLoopsJoin(topPipe, join, bindings);
+    		step = (pipe, bs) -> evaluateNestedLoopsJoin(pipe, join, bs);
     	}
+    	return step;
     }
 
     private static boolean isOutOfScopeForLeftArgBindings(TupleExpr expr) {
@@ -1356,17 +1359,17 @@ final class HalyardTupleExprEvaluation {
 
     private void evaluateNestedLoopsJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
     	join.setAlgorithm(Algorithms.NESTED_LOOPS);
-    	TupleExpr outerExpr = join.getLeftArg();
-    	TupleExpr innerExpr = join.getRightArg();
+        BindingSetPipeEvaluationStep outerStep = precompileTupleExpr(join.getLeftArg());
+        BindingSetPipeEvaluationStep innerStep = precompileTupleExpr(join.getRightArg());
     	parentStrategy.initTracking(join);
-        evaluateTupleExpr(new BindingSetPipe(topPipe) {
+        outerStep.evaluate(new BindingSetPipe(topPipe) {
         	final AtomicLong joinsInProgress = new AtomicLong();
         	final AtomicBoolean joinsFinished = new AtomicBoolean();
 
             @Override
             protected boolean next(BindingSet bs) throws InterruptedException {
             	joinsInProgress.incrementAndGet();
-                evaluateTupleExpr(new BindingSetPipe(parent) {
+                innerStep.evaluate(new BindingSetPipe(parent) {
                 	@Override
                 	protected boolean next(BindingSet bs) throws InterruptedException {
                         parentStrategy.incrementResultSizeActual(join);
@@ -1383,7 +1386,7 @@ final class HalyardTupleExprEvaluation {
                     public String toString() {
                     	return "JoinBindingSetPipe(inner)";
                     }
-                }, innerExpr, bs);
+                }, bs);
                 return true;
             }
             @Override
@@ -1397,7 +1400,7 @@ final class HalyardTupleExprEvaluation {
             public String toString() {
             	return "JoinBindingSetPipe(outer)";
             }
-        }, outerExpr, bindings);
+        }, bindings);
     }
 
     private void evaluateHashJoin(BindingSetPipe topPipe, final Join join, final BindingSet bindings) {
@@ -1405,22 +1408,21 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Evaluate {@link LeftJoin} query model nodes
-     * @param parentPipe
-     * @param leftJoin
-     * @param bindings
+     * Precompiles {@link LeftJoin} query model nodes
      */
-    private void evaluateLeftJoin(BindingSetPipe parentPipe, final LeftJoin leftJoin, final BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileLeftJoin(LeftJoin leftJoin) {
+    	BindingSetPipeEvaluationStep step;
     	String algorithm = leftJoin.getAlgorithmName();
     	if (TupleExprs.containsSubquery(leftJoin.getRightArg())) {
     		algorithm = Algorithms.HASH_JOIN;
     	}
 
     	if (Algorithms.HASH_JOIN.equals(algorithm)) {
-    		evaluateHashLeftJoin(parentPipe, leftJoin, bindings);
+    		step = (pipe, bs) -> evaluateHashLeftJoin(pipe, leftJoin, bs);
     	} else {
-    		evaluateNestedLoopsLeftJoin(parentPipe, leftJoin, bindings);
+    		step = (pipe, bs) -> evaluateNestedLoopsLeftJoin(pipe, leftJoin, bs);
     	}
+    	return step;
     }
 
     private static QueryBindingSet getFilteredBindings(BindingSet bindings, Set<String> problemVars) {
@@ -1471,14 +1473,16 @@ final class HalyardTupleExprEvaluation {
             	return "LeftJoinBindingSetPipe(top)";
             }
         };
-        evaluateTupleExpr(new BindingSetPipe(topPipe) {
+        BindingSetPipeEvaluationStep leftStep = precompileTupleExpr(leftJoin.getLeftArg());
+        BindingSetPipeEvaluationStep rightStep = precompileTupleExpr(leftJoin.getRightArg());
+        leftStep.evaluate(new BindingSetPipe(topPipe) {
         	final AtomicLong joinsInProgress = new AtomicLong();
         	final AtomicBoolean joinsFinished = new AtomicBoolean();
 
         	@Override
             protected boolean next(final BindingSet leftBindings) throws InterruptedException {
             	joinsInProgress.incrementAndGet();
-                evaluateTupleExpr(new BindingSetPipe(parent) {
+                rightStep.evaluate(new BindingSetPipe(parent) {
                     private boolean failed = true;
                     @Override
                     protected boolean next(BindingSet rightBindings) throws InterruptedException {
@@ -1521,7 +1525,7 @@ final class HalyardTupleExprEvaluation {
                     public String toString() {
                     	return "LeftJoinBindingSetPipe(right)";
                     }
-                }, leftJoin.getRightArg(), leftBindings);
+                }, leftBindings);
                 return true;
             }
             @Override
@@ -1535,7 +1539,7 @@ final class HalyardTupleExprEvaluation {
             public String toString() {
             	return "LeftJoinBindingSetPipe(left)";
             }
-        }, leftJoin.getLeftArg(), problemVars.isEmpty() ? bindings : getFilteredBindings(bindings, problemVars));
+        }, problemVars.isEmpty() ? bindings : getFilteredBindings(bindings, problemVars));
     }
 
     private void evaluateHashLeftJoin(BindingSetPipe parentPipe, final LeftJoin leftJoin, final BindingSet bindings) {
@@ -1559,7 +1563,8 @@ final class HalyardTupleExprEvaluation {
     private void buildHashTable(AbstractHashTableJoiner joiner, final BindingSet bindings, final int hashJoinLimit) {
     	joiner.join.setAlgorithm(Algorithms.HASH_JOIN);
     	parentStrategy.initTracking(joiner.join);
-		evaluateTupleExpr(new BindingSetPipe(null) {
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(joiner.buildExpr);
+		step.evaluate(new BindingSetPipe(null) {
 	    	HashJoinTable hashTable = joiner.createHashTable();
             @Override
             protected boolean next(BindingSet buildBs) throws InterruptedException {
@@ -1591,7 +1596,7 @@ final class HalyardTupleExprEvaluation {
             public String toString() {
             	return "HashTableBindingSetPipe";
             }
-    	}, joiner.buildExpr, bindings);
+    	}, bindings);
     }
 
 
@@ -1708,7 +1713,8 @@ final class HalyardTupleExprEvaluation {
             		joinsFinished.set(true);
     			}
     			// NB: this part may execute asynchronously
-            	evaluateTupleExpr(createPipe(parent, hashTablePartition), join.getLeftArg(), bindings);
+    	        BindingSetPipeEvaluationStep step = precompileTupleExpr(join.getLeftArg());
+            	step.evaluate(createPipe(parent, hashTablePartition), bindings);
     		}
     	}
 
@@ -1930,8 +1936,10 @@ final class HalyardTupleExprEvaluation {
             	return "UnionBindingSetPipe";
             }
         };
-        evaluateTupleExpr(pipe, union.getLeftArg(), bindings);
-        evaluateTupleExpr(pipe, union.getRightArg(), bindings);
+        BindingSetPipeEvaluationStep leftStep = precompileTupleExpr(union.getLeftArg());
+        BindingSetPipeEvaluationStep rightStep = precompileTupleExpr(union.getRightArg());
+        leftStep.evaluate(pipe, bindings);
+        rightStep.evaluate(pipe, bindings);
     }
 
     /**
@@ -1941,7 +1949,9 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateIntersection(final BindingSetPipe topPipe, final Intersection intersection, final BindingSet bindings) {
-        evaluateTupleExpr(new BindingSetPipe(topPipe) {
+        BindingSetPipeEvaluationStep rightStep = precompileTupleExpr(intersection.getRightArg());
+        BindingSetPipeEvaluationStep leftStep = precompileTupleExpr(intersection.getLeftArg());
+        rightStep.evaluate(new BindingSetPipe(topPipe) {
             private final BigHashSet<BindingSet> secondSet = BigHashSet.create();
             @Override
             protected boolean handleException(Throwable e) {
@@ -1959,7 +1969,7 @@ final class HalyardTupleExprEvaluation {
             }
             @Override
             public void close() throws InterruptedException {
-                evaluateTupleExpr(new BindingSetPipe(parent) {
+                leftStep.evaluate(new BindingSetPipe(parent) {
                     @Override
                     protected boolean next(BindingSet bs) throws InterruptedException {
                         try {
@@ -1977,13 +1987,13 @@ final class HalyardTupleExprEvaluation {
                     public String toString() {
                     	return "IntersectionBindingSetPipe(left)";
                     }
-                }, intersection.getLeftArg(), bindings);
+                }, bindings);
             }
             @Override
             public String toString() {
             	return "IntersectionBindingSetPipe(right)";
             }
-        }, intersection.getRightArg(), bindings);
+        }, bindings);
     }
 
     /**
@@ -1993,7 +2003,9 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateDifference(final BindingSetPipe topPipe, final Difference difference, final BindingSet bindings) {
-        evaluateTupleExpr(new BindingSetPipe(topPipe) {
+        BindingSetPipeEvaluationStep rightStep = precompileTupleExpr(difference.getRightArg());
+        BindingSetPipeEvaluationStep leftStep = precompileTupleExpr(difference.getLeftArg());
+        rightStep.evaluate(new BindingSetPipe(topPipe) {
             private final BigHashSet<BindingSet> excludeSet = BigHashSet.create();
             @Override
             protected boolean handleException(Throwable e) {
@@ -2011,7 +2023,7 @@ final class HalyardTupleExprEvaluation {
             }
             @Override
             public void close() throws InterruptedException {
-                evaluateTupleExpr(new BindingSetPipe(parent) {
+                leftStep.evaluate(new BindingSetPipe(parent) {
                     @Override
                     protected boolean next(BindingSet bs) throws InterruptedException {
                         for (BindingSet excluded : excludeSet) {
@@ -2043,13 +2055,13 @@ final class HalyardTupleExprEvaluation {
                     public String toString() {
                     	return "DifferenceBindingSetPipe(left)";
                     }
-                }, difference.getLeftArg(), bindings);
+                }, bindings);
             }
             @Override
             public String toString() {
             	return "DifferenceBindingSetPipe(right)";
             }
-        }, difference.getRightArg(), bindings);
+        }, bindings);
     }
 
     private void evaluateStarJoin(BindingSetPipe parent, StarJoin starJoin, BindingSet bindings) {
@@ -2059,7 +2071,8 @@ final class HalyardTupleExprEvaluation {
     	if (algoOpt != null) {
     		algoOpt.optimize(topJoin, null, null);
     	}
-    	evaluateTupleExpr(parent, topJoin, bindings);
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(topJoin);
+    	step.evaluate(parent, bindings);
     }
 
     /**
@@ -2292,7 +2305,8 @@ final class HalyardTupleExprEvaluation {
 		TupleFunction func = tupleFunctionRegistry.get(tfc.getURI())
 				.orElseThrow(() -> new QueryEvaluationException("Unknown tuple function '" + tfc.getURI() + "'"));
 
-		evaluateTupleExpr(new BindingSetPipe(topPipe) {
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(tfc.getDependentExpression());
+		step.evaluate(new BindingSetPipe(topPipe) {
 			@Override
 			protected boolean next(BindingSet bs) throws InterruptedException {
 				try {
@@ -2328,7 +2342,7 @@ final class HalyardTupleExprEvaluation {
 			public String toString() {
 				return "TupleFunctionCallBindingSetPipe";
 			}
-		}, tfc.getDependentExpression(), bindings);
+		}, bindings);
 	}
 
 	/**

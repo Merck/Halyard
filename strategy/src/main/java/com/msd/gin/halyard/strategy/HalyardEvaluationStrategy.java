@@ -35,6 +35,7 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizerPipeline;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryValueEvaluationStep;
@@ -45,7 +46,8 @@ import org.eclipse.rdf4j.query.algebra.evaluation.federation.FederatedServiceRes
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.EvaluationStatistics;
-import org.eclipse.rdf4j.query.algebra.evaluation.util.EvaluationStrategies;
+import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryEvaluationContext;
+import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtility;
 
 /**
  * Provides an efficient asynchronous parallel push {@code EvaluationStrategy} implementation for query evaluation in Halyard. This is the default strategy
@@ -109,7 +111,6 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 				dataset);
 		this.valueEval = new HalyardValueExprEvaluation(this, queryContext, functionRegistry, tripleSource);
 		this.pipeline = new HalyardQueryOptimizerPipeline(this, tripleSource.getValueFactory(), statistics);
-		EvaluationStrategies.register(this);
 	}
 
 	public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset,
@@ -174,13 +175,18 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
         throw new UnsupportedOperationException();
     }
 
-	/**
+    @Override
+    public QueryEvaluationStep precompile(TupleExpr expr) {
+    	QueryEvaluationStep step = tupleEval.precompile(expr);
+    	return (bindings) -> track(step.evaluate(bindings), expr);
+    }
+
+    /**
 	 * Called by RDF4J to evaluate a tuple expression
 	 */
 	@Override
 	public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr expr, BindingSet bindings) throws QueryEvaluationException {
-		CloseableIteration<BindingSet, QueryEvaluationException> iter = tupleEval.evaluate(expr, bindings);
-		return track(iter, expr);
+		return precompile(expr).evaluate(bindings);
 	}
 
 	CloseableIteration<BindingSet, QueryEvaluationException> track(CloseableIteration<BindingSet, QueryEvaluationException> iter, TupleExpr expr) {
@@ -212,12 +218,17 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 		}
 	}
 
+    @Override
+    public QueryValueEvaluationStep precompile(ValueExpr expr, QueryEvaluationContext context) {
+    	return valueEval.precompile(expr);
+    }
+
 	/**
      * Called by RDF4J to evaluate a value expression
      */
     @Override
     public Value evaluate(ValueExpr expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        return valueEval.evaluate(expr, bindings);
+        return valueEval.precompile(expr).evaluate(bindings);
     }
 
     /**
@@ -225,12 +236,13 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
      */
     @Override
     public boolean isTrue(ValueExpr expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        return valueEval.isTrue(expr, bindings);
+    	return isTrue(valueEval.precompile(expr), bindings);
     }
 
 	@Override
 	public boolean isTrue(QueryValueEvaluationStep expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-		return valueEval.isTrue(expr, bindings);
+		Value value = expr.evaluate(bindings);
+		return QueryEvaluationUtility.getEffectiveBooleanValue(value).orElse(false);
 	}
 
     @Override

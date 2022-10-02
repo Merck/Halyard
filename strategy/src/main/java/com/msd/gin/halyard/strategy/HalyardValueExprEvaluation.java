@@ -104,101 +104,77 @@ class HalyardValueExprEvaluation {
     }
 
     /**
-     * Determines the "effective boolean value" of the {@link Value} returned by evaluating the expression.
-     * See {@link QueryEvaluationUtil#getEffectiveBooleanValue(Value)} for the definition of "effective boolean value.
-     * @param expr expression to evaluate
-     * @param bindings the set of named value bindings
-     * @return the boolean value that the expression evaluates to
-     * @throws ValueExprEvaluationException
-     * @throws QueryEvaluationException
+     * Precompiles the given {@link ValueExpr}
      */
-    boolean isTrue(ValueExpr expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value value = evaluate(expr, bindings);
-        return QueryEvaluationUtility.getEffectiveBooleanValue(value).orElse(false);
-    }
-
-	boolean isTrue(QueryValueEvaluationStep expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-		Value value = expr.evaluate(bindings);
-		return QueryEvaluationUtility.getEffectiveBooleanValue(value).orElse(false);
-	}
-
-    /**
-     * Determines which evaluate method to call based on the type of {@link ValueExpr}
-     * @param expr the expression to evaluate
-     * @param bindings the set of named value bindings the set of named value bindings
-     * @return the {@link Value} resulting from the evaluation
-     * @throws ValueExprEvaluationException
-     * @throws QueryEvaluationException
-     */
-    Value evaluate(ValueExpr expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
+	QueryValueEvaluationStep precompile(ValueExpr expr) throws ValueExprEvaluationException, QueryEvaluationException {
         if (expr instanceof Var) {
-            return evaluate((Var) expr, bindings);
+            return bindings -> evaluate((Var) expr, bindings);
         } else if (expr instanceof ValueConstant) {
-            return evaluate((ValueConstant) expr, bindings);
+            return bindings -> evaluate((ValueConstant) expr, bindings);
         } else if (expr instanceof BNodeGenerator) {
-            return evaluate((BNodeGenerator) expr, bindings);
+            return bindings -> evaluate((BNodeGenerator) expr, bindings);
         } else if (expr instanceof Bound) {
-            return evaluate((Bound) expr, bindings);
+            return bindings -> evaluate((Bound) expr, bindings);
         } else if (expr instanceof Str) {
-            return evaluate((Str) expr, bindings);
+            return bindings -> evaluate((Str) expr, bindings);
         } else if (expr instanceof Label) {
-            return evaluate((Label) expr, bindings);
+            return bindings -> evaluate((Label) expr, bindings);
         } else if (expr instanceof Lang) {
-            return evaluate((Lang) expr, bindings);
+            return bindings -> evaluate((Lang) expr, bindings);
         } else if (expr instanceof LangMatches) {
-            return evaluate((LangMatches) expr, bindings);
+            return bindings -> evaluate((LangMatches) expr, bindings);
         } else if (expr instanceof Datatype) {
-            return evaluate((Datatype) expr, bindings);
+            return bindings -> evaluate((Datatype) expr, bindings);
         } else if (expr instanceof Namespace) {
-            return evaluate((Namespace) expr, bindings);
+            return bindings -> evaluate((Namespace) expr, bindings);
         } else if (expr instanceof LocalName) {
-            return evaluate((LocalName) expr, bindings);
+            return bindings -> evaluate((LocalName) expr, bindings);
         } else if (expr instanceof IsResource) {
-            return evaluate((IsResource) expr, bindings);
+            return bindings -> evaluate((IsResource) expr, bindings);
         } else if (expr instanceof IsURI) {
-            return evaluate((IsURI) expr, bindings);
+            return bindings -> evaluate((IsURI) expr, bindings);
         } else if (expr instanceof IsBNode) {
-            return evaluate((IsBNode) expr, bindings);
+            return bindings -> evaluate((IsBNode) expr, bindings);
         } else if (expr instanceof IsLiteral) {
-            return evaluate((IsLiteral) expr, bindings);
+            return bindings -> evaluate((IsLiteral) expr, bindings);
         } else if (expr instanceof IsNumeric) {
-            return evaluate((IsNumeric) expr, bindings);
+            return bindings -> evaluate((IsNumeric) expr, bindings);
         } else if (expr instanceof IRIFunction) {
-            return evaluate((IRIFunction) expr, bindings);
+            return bindings -> evaluate((IRIFunction) expr, bindings);
         } else if (expr instanceof Regex) {
-            return evaluate((Regex) expr, bindings);
+            return bindings -> evaluate((Regex) expr, bindings);
         } else if (expr instanceof Coalesce) {
-            return evaluate((Coalesce) expr, bindings);
+            return bindings -> evaluate((Coalesce) expr, bindings);
         } else if (expr instanceof Like) {
-            return evaluate((Like) expr, bindings);
+            return bindings -> evaluate((Like) expr, bindings);
         } else if (expr instanceof FunctionCall) {
-            return evaluate((FunctionCall) expr, bindings);
+            return precompileFunctionCall((FunctionCall) expr);
         } else if (expr instanceof And) {
-            return evaluate((And) expr, bindings);
+            return bindings -> evaluate((And) expr, bindings);
         } else if (expr instanceof Or) {
-            return evaluate((Or) expr, bindings);
+            return bindings -> evaluate((Or) expr, bindings);
         } else if (expr instanceof Not) {
-            return evaluate((Not) expr, bindings);
+            return bindings -> evaluate((Not) expr, bindings);
         } else if (expr instanceof SameTerm) {
-            return evaluate((SameTerm) expr, bindings);
+            return bindings -> evaluate((SameTerm) expr, bindings);
         } else if (expr instanceof Compare) {
-            return evaluate((Compare) expr, bindings);
+            return bindings -> evaluate((Compare) expr, bindings);
         } else if (expr instanceof MathExpr) {
-            return evaluate((MathExpr) expr, bindings);
+            return bindings -> evaluate((MathExpr) expr, bindings);
         } else if (expr instanceof In) {
-            return evaluate((In) expr, bindings);
+            return bindings -> evaluate((In) expr, bindings);
         } else if (expr instanceof CompareAny) {
-            return evaluate((CompareAny) expr, bindings);
+            return bindings -> evaluate((CompareAny) expr, bindings);
         } else if (expr instanceof CompareAll) {
-            return evaluate((CompareAll) expr, bindings);
+            return bindings -> evaluate((CompareAll) expr, bindings);
         } else if (expr instanceof Exists) {
-            return evaluate((Exists) expr, bindings);
+            return bindings -> evaluate((Exists) expr, bindings);
         } else if (expr instanceof If) {
-            return evaluate((If) expr, bindings);
+            return bindings -> evaluate((If) expr, bindings);
         } else if (expr instanceof ListMemberOperator) {
-            return evaluate((ListMemberOperator) expr, bindings);
+            return bindings -> evaluate((ListMemberOperator) expr, bindings);
 		} else if (expr instanceof ValueExprTripleRef) {
-			return evaluate((ValueExprTripleRef) expr, bindings);
+			return bindings -> evaluate((ValueExprTripleRef) expr, bindings);
         } else if (expr == null) {
             throw new IllegalArgumentException("expr must not be null");
         } else {
@@ -248,7 +224,7 @@ class HalyardValueExprEvaluation {
     private Value evaluate(BNodeGenerator node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         ValueExpr nodeIdExpr = node.getNodeIdExpr();
         if (nodeIdExpr != null) {
-            Value nodeId = evaluate(nodeIdExpr, bindings);
+            Value nodeId = precompile(nodeIdExpr).evaluate(bindings);
             if (nodeId instanceof Literal) {
                 String nodeLabel = ((Literal) nodeId).getLabel() + (bindings.toString().hashCode());
                 return valueFactory.createBNode(nodeLabel);
@@ -284,7 +260,7 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(Str node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         if (argValue instanceof IRI) {
             return valueFactory.createLiteral(argValue.toString());
         } else if (argValue instanceof Literal) {
@@ -309,7 +285,7 @@ class HalyardValueExprEvaluation {
      */
     private Value evaluate(Label node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         // FIXME: deprecate Label in favour of Str(?)
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         if (argValue instanceof Literal) {
             Literal literal = (Literal) argValue;
             if (QueryEvaluationUtil.isSimpleLiteral(literal)) {
@@ -332,7 +308,7 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(Lang node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         if (argValue instanceof Literal) {
             Literal literal = (Literal) argValue;
             Optional<String> langTag = literal.getLanguage();
@@ -353,7 +329,7 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(Datatype node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value v = evaluate(node.getArg(), bindings);
+        Value v = precompile(node.getArg()).evaluate(bindings);
         if (v instanceof Literal) {
             Literal literal = (Literal) v;
             if (literal.getDatatype() != null) {
@@ -378,7 +354,7 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(Namespace node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         if (argValue instanceof IRI) {
             IRI uri = (IRI) argValue;
             return valueFactory.createIRI(uri.getNamespace());
@@ -396,7 +372,7 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(LocalName node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         if (argValue instanceof IRI) {
             IRI uri = (IRI) argValue;
             return valueFactory.createLiteral(uri.getLocalName());
@@ -412,7 +388,7 @@ class HalyardValueExprEvaluation {
      * otherwise.
      */
     private Value evaluate(IsResource node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         return BooleanLiteral.valueOf(argValue instanceof Resource);
     }
 
@@ -423,7 +399,7 @@ class HalyardValueExprEvaluation {
      * otherwise.
      */
     private Value evaluate(IsURI node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         return BooleanLiteral.valueOf(argValue instanceof IRI);
     }
 
@@ -434,7 +410,7 @@ class HalyardValueExprEvaluation {
      * otherwise.
      */
     private Value evaluate(IsBNode node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         return BooleanLiteral.valueOf(argValue instanceof BNode);
     }
 
@@ -445,7 +421,7 @@ class HalyardValueExprEvaluation {
      * otherwise.
      */
     private Value evaluate(IsLiteral node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         return BooleanLiteral.valueOf(argValue instanceof Literal);
     }
 
@@ -457,7 +433,7 @@ class HalyardValueExprEvaluation {
      * <tt>false</tt> otherwise.
      */
     private Value evaluate(IsNumeric node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         if (argValue instanceof Literal) {
             Literal lit = (Literal) argValue;
             IRI datatype = lit.getDatatype();
@@ -477,7 +453,7 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private IRI evaluate(IRIFunction node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         if (argValue instanceof Literal) {
             final Literal lit = (Literal) argValue;
             String uriString = lit.getLabel();
@@ -515,12 +491,12 @@ class HalyardValueExprEvaluation {
      * <tt>regex</tt> operator, <tt>false</tt> otherwise.
      */
     private Value evaluate(Regex node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value arg = evaluate(node.getArg(), bindings);
-        Value parg = evaluate(node.getPatternArg(), bindings);
+        Value arg = precompile(node.getArg()).evaluate(bindings);
+        Value parg = precompile(node.getPatternArg()).evaluate(bindings);
         Value farg = null;
         ValueExpr flagsArg = node.getFlagsArg();
         if (flagsArg != null) {
-            farg = evaluate(flagsArg, bindings);
+            farg = precompile(flagsArg).evaluate(bindings);
         }
         if (QueryEvaluationUtil.isStringLiteral(arg) && QueryEvaluationUtil.isSimpleLiteral(parg)
                 && (farg == null || QueryEvaluationUtil.isSimpleLiteral(farg))) {
@@ -573,8 +549,8 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(LangMatches node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value langTagValue = evaluate(node.getLeftArg(), bindings);
-        Value langRangeValue = evaluate(node.getRightArg(), bindings);
+        Value langTagValue = precompile(node.getLeftArg()).evaluate(bindings);
+        Value langRangeValue = precompile(node.getRightArg()).evaluate(bindings);
         if (QueryEvaluationUtil.isSimpleLiteral(langTagValue)
                 && QueryEvaluationUtil.isSimpleLiteral(langRangeValue)) {
             String langTag = ((Literal) langTagValue).getLabel();
@@ -603,7 +579,7 @@ class HalyardValueExprEvaluation {
      * operator, <tt>false</tt> otherwise.
      */
     private Value evaluate(Like node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value val = evaluate(node.getArg(), bindings);
+        Value val = precompile(node.getArg()).evaluate(bindings);
         String strVal = null;
         if (val instanceof IRI) {
             strVal = ((IRI) val).stringValue();
@@ -673,27 +649,34 @@ class HalyardValueExprEvaluation {
     /**
      * Evaluates a function.
      */
-    private Value evaluate(FunctionCall node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
+    private QueryValueEvaluationStep precompileFunctionCall(FunctionCall node) throws ValueExprEvaluationException, QueryEvaluationException {
 		Function function = functionRegistry.get(node.getURI()).orElseThrow(() -> new QueryEvaluationException(String.format("Unknown function '%s'", node.getURI())));
 
 		// the NOW function is a special case as it needs to keep a shared return
         // value for the duration of the query.
         if (function instanceof Now) {
-            return evaluate((Now) function, bindings);
+            return (bs) -> evaluate((Now) function, bs);
         }
+
         List<ValueExpr> args = node.getArgs();
-        Value[] argValues = new Value[args.size()];
+        QueryValueEvaluationStep[] argSteps = new QueryValueEvaluationStep[args.size()];
         for (int i = 0; i < args.size(); i++) {
-            argValues[i] = evaluate(args.get(i), bindings);
+            argSteps[i] = precompile(args.get(i));
         }
-        Value result;
-        queryContext.begin();
-        try {
-        	result = function.evaluate(tripleSource, argValues);
-        } finally {
-        	queryContext.end();
-        }
-        return result;
+        return (bs) -> {
+	        Value result;
+	        queryContext.begin();
+	        try {
+	        	Value[] argValues = new Value[argSteps.length];
+	        	for (int i = 0; i < argSteps.length; i++) {
+	        		argValues[i] = argSteps[i].evaluate(bs);
+	        	}
+	        	result = function.evaluate(tripleSource, argValues);
+	        } finally {
+	        	queryContext.end();
+	        }
+	        return result;
+        };
     }
 
     /**
@@ -706,7 +689,7 @@ class HalyardValueExprEvaluation {
      */
     private Value evaluate(And node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         try {
-            Value leftValue = evaluate(node.getLeftArg(), bindings);
+            Value leftValue = precompile(node.getLeftArg()).evaluate(bindings);
             if (QueryEvaluationUtil.getEffectiveBooleanValue(leftValue) == false) {
                 // Left argument evaluates to false, we don't need to look any
                 // further
@@ -715,7 +698,7 @@ class HalyardValueExprEvaluation {
         } catch (ValueExprEvaluationException e) {
             // Failed to evaluate the left argument. Result is 'false' when
             // the right argument evaluates to 'false', failure otherwise.
-            Value rightValue = evaluate(node.getRightArg(), bindings);
+            Value rightValue = precompile(node.getRightArg()).evaluate(bindings);
             if (QueryEvaluationUtil.getEffectiveBooleanValue(rightValue) == false) {
                 return BooleanLiteral.FALSE;
             } else {
@@ -724,7 +707,7 @@ class HalyardValueExprEvaluation {
         }
         // Left argument evaluated to 'true', result is determined
         // by the evaluation of the right argument.
-        Value rightValue = evaluate(node.getRightArg(), bindings);
+        Value rightValue = precompile(node.getRightArg()).evaluate(bindings);
         return BooleanLiteral.valueOf(QueryEvaluationUtil.getEffectiveBooleanValue(rightValue));
     }
 
@@ -738,7 +721,7 @@ class HalyardValueExprEvaluation {
      */
     private Value evaluate(Or node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         try {
-            Value leftValue = evaluate(node.getLeftArg(), bindings);
+            Value leftValue = precompile(node.getLeftArg()).evaluate(bindings);
             if (QueryEvaluationUtil.getEffectiveBooleanValue(leftValue) == true) {
                 // Left argument evaluates to true, we don't need to look any
                 // further
@@ -747,7 +730,7 @@ class HalyardValueExprEvaluation {
         } catch (ValueExprEvaluationException e) {
             // Failed to evaluate the left argument. Result is 'true' when
             // the right argument evaluates to 'true', failure otherwise.
-            Value rightValue = evaluate(node.getRightArg(), bindings);
+            Value rightValue = precompile(node.getRightArg()).evaluate(bindings);
             if (QueryEvaluationUtil.getEffectiveBooleanValue(rightValue) == true) {
                 return BooleanLiteral.TRUE;
             } else {
@@ -756,7 +739,7 @@ class HalyardValueExprEvaluation {
         }
         // Left argument evaluated to 'false', result is determined
         // by the evaluation of the right argument.
-        Value rightValue = evaluate(node.getRightArg(), bindings);
+        Value rightValue = precompile(node.getRightArg()).evaluate(bindings);
         return BooleanLiteral.valueOf(QueryEvaluationUtil.getEffectiveBooleanValue(rightValue));
     }
 
@@ -769,7 +752,7 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(Not node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = evaluate(node.getArg(), bindings);
+        Value argValue = precompile(node.getArg()).evaluate(bindings);
         boolean argBoolean = QueryEvaluationUtil.getEffectiveBooleanValue(argValue);
         return BooleanLiteral.valueOf(!argBoolean);
     }
@@ -798,8 +781,8 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(SameTerm node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value leftVal = evaluate(node.getLeftArg(), bindings);
-        Value rightVal = evaluate(node.getRightArg(), bindings);
+        Value leftVal = precompile(node.getLeftArg()).evaluate(bindings);
+        Value rightVal = precompile(node.getRightArg()).evaluate(bindings);
         return BooleanLiteral.valueOf(leftVal != null && leftVal.equals(rightVal));
     }
 
@@ -813,7 +796,7 @@ class HalyardValueExprEvaluation {
     private Value evaluate(Coalesce node, BindingSet bindings) throws ValueExprEvaluationException {
         for (ValueExpr expr : node.getArguments()) {
             try {
-                Value result = evaluate(expr, bindings);
+                Value result = precompile(expr).evaluate(bindings);
                 if (result != null) return result;
                 // return first result that does not produce an error on evaluation.
             } catch (QueryEvaluationException ignore) {
@@ -832,8 +815,8 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(Compare node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value leftVal = evaluate(node.getLeftArg(), bindings);
-        Value rightVal = evaluate(node.getRightArg(), bindings);
+        Value leftVal = precompile(node.getLeftArg()).evaluate(bindings);
+        Value rightVal = precompile(node.getRightArg()).evaluate(bindings);
 		return BooleanLiteral.valueOf(
 				QueryEvaluationUtil.compare(leftVal, rightVal, node.getOperator(), false));
     }
@@ -848,8 +831,8 @@ class HalyardValueExprEvaluation {
      */
     private Value evaluate(MathExpr node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         // Do the math
-        Value leftVal = evaluate(node.getLeftArg(), bindings);
-        Value rightVal = evaluate(node.getRightArg(), bindings);
+        Value leftVal = precompile(node.getLeftArg()).evaluate(bindings);
+        Value rightVal = precompile(node.getRightArg()).evaluate(bindings);
         if (leftVal instanceof Literal && rightVal instanceof Literal) {
 			return XMLDatatypeMathUtil.compute((Literal)leftVal, (Literal)rightVal, node.getOperator());
         }
@@ -867,7 +850,7 @@ class HalyardValueExprEvaluation {
         Value result;
         boolean conditionIsTrue;
         try {
-            Value value = evaluate(node.getCondition(), bindings);
+            Value value = precompile(node.getCondition()).evaluate(bindings);
             conditionIsTrue = QueryEvaluationUtil.getEffectiveBooleanValue(value);
         } catch (ValueExprEvaluationException e) {
             // in case of type error, if-construction should result in empty
@@ -875,9 +858,9 @@ class HalyardValueExprEvaluation {
             return null;
         }
         if (conditionIsTrue) {
-            result = evaluate(node.getResult(), bindings);
+            result = precompile(node.getResult()).evaluate(bindings);
         } else {
-            result = evaluate(node.getAlternative(), bindings);
+            result = precompile(node.getAlternative()).evaluate(bindings);
         }
         return result;
     }
@@ -891,7 +874,7 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(In node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value leftValue = evaluate(node.getArg(), bindings);
+        Value leftValue = precompile(node.getArg()).evaluate(bindings);
         // Result is false until a match has been found
         boolean result = false;
         // Use first binding name from tuple expr to compare values
@@ -917,13 +900,13 @@ class HalyardValueExprEvaluation {
      */
     private Value evaluate(ListMemberOperator node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
         List<ValueExpr> args = node.getArguments();
-        Value leftValue = evaluate(args.get(0), bindings);
+        Value leftValue = precompile(args.get(0)).evaluate(bindings);
         boolean result = false;
         ValueExprEvaluationException typeError = null;
         for (int i = 1; i < args.size(); i++) {
             ValueExpr arg = args.get(i);
             try {
-                Value rightValue = evaluate(arg, bindings);
+                Value rightValue = precompile(arg).evaluate(bindings);
                 result = leftValue == null && rightValue == null;
                 if (!result) {
                     result = QueryEvaluationUtil.compare(leftValue, rightValue, Compare.CompareOp.EQ);
@@ -953,7 +936,7 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(CompareAny node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value leftValue = evaluate(node.getArg(), bindings);
+        Value leftValue = precompile(node.getArg()).evaluate(bindings);
         // Result is false until a match has been found
         boolean result = false;
         // Use first binding name from tuple expr to compare values
@@ -981,7 +964,7 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private Value evaluate(CompareAll node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value leftValue = evaluate(node.getArg(), bindings);
+        Value leftValue = precompile(node.getArg()).evaluate(bindings);
         // Result is true until a mismatch has been found
         boolean result = true;
         // Use first binding name from tuple expr to compare values
