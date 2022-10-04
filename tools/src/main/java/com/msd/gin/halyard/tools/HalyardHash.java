@@ -9,8 +9,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.MessageFormat;
 import java.util.HashSet;
-import java.util.Random;
 import java.util.Set;
+import java.util.SplittableRandom;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
@@ -56,7 +56,7 @@ public final class HalyardHash extends AbstractHalyardTool {
 	static final class HashMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, ImmutableBytesWritable> {
 		private final ImmutableBytesWritable outputKey = new ImmutableBytesWritable();
 		private final ImmutableBytesWritable outputValue = new ImmutableBytesWritable();
-		private final Random random = new Random(0);
+		private final SplittableRandom random = new SplittableRandom(0);
 		private ByteBuffer kbb;
 		private ByteBuffer vbb;
 		private int decimationFactor;

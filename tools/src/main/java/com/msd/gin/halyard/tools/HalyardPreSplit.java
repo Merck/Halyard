@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
+import java.util.SplittableRandom;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
@@ -67,12 +67,14 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
     private static final String OVERWRITE_PROPERTY = confProperty(TOOL_NAME, "overwrite");
     private static final String MAX_VERSIONS_PROPERTY = confProperty(TOOL_NAME, "max-versions");
 
-    private static final long DEFAULT_SPLIT_LIMIT = 40000000000l;
+    private static final long DEFAULT_SPLIT_LIMIT = 55000000000l;
     private static final int DEFAULT_DECIMATION_FACTOR = 1000;
     private static final int DEFAULT_MAX_VERSIONS = 1;
 
     enum Counters {
-    	STATEMENTS_PROCESSED,
+    	SAMPLED_KEYS,
+    	TOTAL_KEYS,
+    	TOTAL_STATEMENTS,
     	TOTAL_SPLITS
     }
 
@@ -83,19 +85,19 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 
         private final ImmutableBytesWritable rowKey = new ImmutableBytesWritable();
         private final LongWritable keyValueLength = new LongWritable();
-        private final Random random = new Random(0);
+        private final SplittableRandom random = new SplittableRandom(0);
         private StatementIndices stmtIndices;
-        private long counter = 0, next = 0;
-        private int maxIncrement;
-        private long stmtCount = 0L;
+        private int decimationFactor;
+        private long sampleCount = 0L;
+        private long totalKeys = 0L;
+        private long totalStmts = 0L;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             RDFFactory rdfFactory = RDFFactory.create(conf);
             stmtIndices = new StatementIndices(conf, rdfFactory);
-            int decimationFactor = conf.getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
-            maxIncrement = 2*decimationFactor - 1;
+            decimationFactor = conf.getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
             // prefix splits
             for (byte b = 1; b < StatementIndex.Name.values().length; b++) {
                 context.write(new ImmutableBytesWritable(new byte[] {b}), new LongWritable(1));
@@ -104,27 +106,31 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 
         @Override
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
-            if (counter++ == next) {
-                next = counter + random.nextInt(maxIncrement);
-                for (KeyValue keyValue: HalyardTableUtils.insertKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), 0, stmtIndices)) {
+            List<? extends KeyValue> kvs = HalyardTableUtils.insertKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), 0, stmtIndices);
+            for (KeyValue keyValue: kvs) {
+            	if (decimationFactor == 0 || random.nextInt(decimationFactor) == 0) {
                     rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                     keyValueLength.set(keyValue.getLength());
                     context.write(rowKey, keyValueLength);
+                    sampleCount++;
                 }
-                stmtCount++;
             }
+            totalKeys += kvs.size();
+            totalStmts++;
         }
 
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
-        	context.getCounter(Counters.STATEMENTS_PROCESSED).increment(stmtCount);
+        	context.getCounter(Counters.SAMPLED_KEYS).increment(sampleCount);
+        	context.getCounter(Counters.TOTAL_KEYS).increment(totalKeys);
+        	context.getCounter(Counters.TOTAL_STATEMENTS).increment(totalStmts);
         }
     }
 
     static final class PreSplitReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
 
         private final List<byte[]> splits = new ArrayList<>();
-        private long size = 0, splitLimit;
+        private long splitSize = 0, splitLimit;
         private int decimationFactor;
         private byte lastRegion = 0;
 
@@ -137,16 +143,19 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         @Override
         public void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
             byte region = key.get()[key.getOffset()];
-            if (lastRegion != region || size > splitLimit) {
-                byte[] split = lastRegion != region ? new byte[]{region} : key.copyBytes();
+            boolean isNewRegion = (lastRegion != region);
+            if (isNewRegion || splitSize > splitLimit) {
+                byte[] split = isNewRegion ? new byte[]{region} : key.copyBytes();
                 splits.add(split);
                 context.setStatus("#" + splits.size() + " " + Arrays.toString(split));
                 lastRegion = key.get()[key.getOffset()];
-                size = 0;
+                splitSize = 0;
             }
+            long sampledSize = 0L;
             for (LongWritable val : values) {
-                size += val.get() * decimationFactor;
+            	sampledSize += val.get();
             }
+            splitSize += sampledSize * decimationFactor;
         }
 
         @Override
@@ -186,7 +195,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         addOption("g", "default-named-graph", "named_graph", DEFAULT_CONTEXT_PROPERTY, "Optionally specify default target named graph", false, true);
         addOption("o", "named-graph-override", null, OVERRIDE_CONTEXT_PROPERTY, "Optionally override named graph also for quads, named graph is stripped from quads if --default-named-graph option is not specified", false, false);
         addOption("d", "decimation-factor", "decimation_factor", DECIMATION_FACTOR_PROPERTY, String.format("Optionally overide pre-split random decimation factor (default is %d)", DEFAULT_DECIMATION_FACTOR), false, true);
-        addOption("l", "split-limit-size", "size", SPLIT_LIMIT_PROPERTY, String.format("Optionally override calculated split size (default is %d)", DEFAULT_SPLIT_LIMIT), false, true);
+        addOption("l", "split-limit-splitSize", "splitSize", SPLIT_LIMIT_PROPERTY, String.format("Optionally override calculated split splitSize (default is %d)", DEFAULT_SPLIT_LIMIT), false, true);
         addOption("f", "force", null, OVERWRITE_PROPERTY, "Overwrite existing table", false, false);
         addOption("n", "max-versions", "versions", MAX_VERSIONS_PROPERTY, String.format("Optionally set the maximum number of versions for the table (default is %d)", DEFAULT_MAX_VERSIONS), false, true);
     }

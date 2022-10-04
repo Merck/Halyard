@@ -42,8 +42,8 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
+import java.util.SplittableRandom;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.compress.compressors.CompressorException;
@@ -118,7 +118,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
         private final ImmutableBytesWritable outputKey = new ImmutableBytesWritable();
         private final LongWritable outputValue = new LongWritable();
-        private final Random random = new Random(0);
+        private final SplittableRandom random = new SplittableRandom(0);
         private int decimationFactor;
 
         @Override
@@ -254,7 +254,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
 
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
-            if (random.nextInt(decimationFactor) == 0) {
+            if (decimationFactor == 0 || random.nextInt(decimationFactor) == 0) {
                 statementChange(output, HalyardTableUtils.parseStatement(null, null, null, null, value.rawCells()[0], valueReader, stmtIndices));
             }
             if (++counter % 10000 == 0) {

@@ -17,7 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Random;
+import java.util.SplittableRandom;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
@@ -60,7 +60,7 @@ public final class HalyardKeys extends AbstractHalyardTool {
 	static final class KeyColumnMapper extends TableMapper<ImmutableBytesWritable, LongWritable> {
 		private final ImmutableBytesWritable outputKey = new ImmutableBytesWritable();
 		private final LongWritable outputValue = new LongWritable();
-		private final Random random = new Random(0);
+		private final SplittableRandom random = new SplittableRandom(0);
 		private int decimationFactor;
 		private long counter = 0;
 
