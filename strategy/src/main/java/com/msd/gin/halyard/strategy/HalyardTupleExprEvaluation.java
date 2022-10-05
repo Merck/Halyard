@@ -1932,7 +1932,7 @@ final class HalyardTupleExprEvaluation {
 			}
 			@Override
 			protected boolean next(BindingSet probeBs) throws InterruptedException {
-				if (probeBs.size() == 0) {
+				if (probeBs.isEmpty()) {
 					// the empty binding set should be merged with all binding sets in the hash table
 					Collection<? extends List<BindingSetValues>> hashValues = hashTablePartition.all();
 					for (List<BindingSetValues> hashValue : hashValues) {
@@ -1989,7 +1989,7 @@ final class HalyardTupleExprEvaluation {
 			}
 			@Override
 			protected boolean next(BindingSet probeBs) throws InterruptedException {
-				if (probeBs.size() == 0) {
+				if (probeBs.isEmpty()) {
 					// the empty binding set should be merged with all binding sets in the hash table
 					Collection<? extends List<BindingSetValues>> hashValues = hashTablePartition.all();
 					for (List<BindingSetValues> hashValue : hashValues) {
@@ -2411,7 +2411,7 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateBindingSetAssignment(BindingSetPipe parent, BindingSetAssignment bsa, BindingSet bindings) {
-        if (bindings.size() == 0) { // empty binding set
+        if (bindings.isEmpty()) {
         	try {
         		try {
 		        	for (BindingSet b : bsa.getBindingSets()) {
@@ -2430,7 +2430,7 @@ final class HalyardTupleExprEvaluation {
         		try {
 		        	for (BindingSet assignedBindings : bsa.getBindingSets()) {
 	                    QueryBindingSet result;
-	                    if (assignedBindings.size() == 0) {
+	                    if (assignedBindings.isEmpty()) {
 	                    	result = new QueryBindingSet(bindings);
 	                    } else {
 	                    	result = null;

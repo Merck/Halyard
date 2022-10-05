@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.rdf4j.common.exception.RDF4JException;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
+import org.eclipse.rdf4j.common.iteration.ReducedIteration;
 import org.eclipse.rdf4j.common.iteration.TimeLimitIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -49,7 +50,7 @@ import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
-import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
+import org.eclipse.rdf4j.query.algebra.helpers.collectors.StatementPatternCollector;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
 import org.eclipse.rdf4j.query.parser.ParsedUpdate;
@@ -162,7 +163,7 @@ public class HBaseUpdate extends SailUpdate {
 				}
 
 				TimestampedUpdateContext tsUc = new TimestampedUpdateContext(uc.getUpdateExpr(), uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
-				try (CloseableIteration<? extends BindingSet, QueryEvaluationException> sourceBindings = evaluateWhereClause(whereClause, uc, maxExecutionTime)) {
+				try (CloseableIteration<? extends BindingSet, QueryEvaluationException> sourceBindings = new ReducedIteration<BindingSet, QueryEvaluationException>(evaluateWhereClause(whereClause, uc, maxExecutionTime))) {
 					while (sourceBindings.hasNext()) {
 						BindingSet sourceBinding = sourceBindings.next();
 						deleteBoundTriples(sourceBinding, deleteInfo, tsUc);
@@ -201,29 +202,25 @@ public class HBaseUpdate extends SailUpdate {
 		}
 
 		private CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluateWhereClause(final TupleExpr whereClause, final UpdateContext uc, final int maxExecutionTime) throws SailException, QueryEvaluationException {
-			CloseableIteration<? extends BindingSet, QueryEvaluationException> sourceBindings1 = null;
-			CloseableIteration<? extends BindingSet, QueryEvaluationException> sourceBindings2 = null;
-			ConvertingIteration<BindingSet, BindingSet, QueryEvaluationException> result = null;
-			boolean allGood = false;
+			CloseableIteration<? extends BindingSet, QueryEvaluationException> result = null;
 			try {
-				sourceBindings1 = con.evaluate(whereClause, uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
+				result = con.evaluate(whereClause, uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
 
 				if (maxExecutionTime > 0) {
-					sourceBindings2 = new TimeLimitIteration<BindingSet, QueryEvaluationException>(sourceBindings1, 1000L * maxExecutionTime) {
+					result = new TimeLimitIteration<BindingSet, QueryEvaluationException>(result, TimeUnit.SECONDS.toMillis(maxExecutionTime)) {
 
 						@Override
 						protected void throwInterruptedException() throws QueryEvaluationException {
 							throw new QueryInterruptedException("execution took too long");
 						}
 					};
-				} else {
-					sourceBindings2 = sourceBindings1;
 				}
 
-				result = new ConvertingIteration<BindingSet, BindingSet, QueryEvaluationException>(sourceBindings2) {
+				result = new ConvertingIteration<BindingSet, BindingSet, QueryEvaluationException>(result) {
+					private final boolean isEmptyWhere = Algebra.isEmpty(whereClause);
 
 					protected BindingSet convert(BindingSet sourceBinding) throws QueryEvaluationException {
-						if (whereClause instanceof SingletonSet && sourceBinding instanceof EmptyBindingSet && uc.getBindingSet() != null) {
+						if (isEmptyWhere && sourceBinding.isEmpty() && uc.getBindingSet() != null) {
 							// in the case of an empty WHERE clause, we use the
 							// supplied
 							// bindings to produce triples to DELETE/INSERT
@@ -248,26 +245,12 @@ public class HBaseUpdate extends SailUpdate {
 						}
 					}
 				};
-				allGood = true;
 				return result;
-			} finally {
-				if (!allGood) {
-					try {
-						if (result != null) {
-							result.close();
-						}
-					} finally {
-						try {
-							if (sourceBindings2 != null) {
-								sourceBindings2.close();
-							}
-						} finally {
-							if (sourceBindings1 != null) {
-								sourceBindings1.close();
-							}
-						}
-					}
+			} catch (Exception e) {
+				if (result != null) {
+					result.close();
 				}
+				throw e;
 			}
 		}
 
