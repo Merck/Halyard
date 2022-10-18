@@ -95,7 +95,7 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
 
         File root = createTempDir("test_stats");
 
-        assertEquals(0, run(new String[]{"-s", "statsTable", "-t", root.toURI().toURL().toString() + "stats{0}.trig", "-r", "100", "-o", "http://whatever/myStats"}));
+        assertEquals(0, run(new String[]{"-s", "statsTable", "-t", root.toURI().toURL().toString() + "stats{0}.trig", "-R", "100", "-r", "100", "-o", "http://whatever/myStats"}));
 
         File stats = new File(root, "stats0.trig");
         assertTrue(stats.isFile());
@@ -164,7 +164,7 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
         Sail sail = createData("statsTable2");
 
 		// update stats
-		assertEquals(0, run(new String[] { "-s", "statsTable2", "-r", "100" }));
+		assertEquals(0, run(new String[] { "-s", "statsTable2", "-R", "100", "-r", "100" }));
 
 		// verify with golden file
 		try (SailConnection conn = sail.getConnection()) {
@@ -193,7 +193,7 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
 		}
 
 		// update stats only for graph1
-		assertEquals(0, run(new String[] { "-s", "statsTable2", "-r", "100", "-g", "http://whatever/graph1" }));
+		assertEquals(0, run(new String[] { "-s", "statsTable2", "-R", "100", "-r", "100", "-g", "http://whatever/graph1" }));
 
 		// verify with golden file
 		try (SailConnection conn = sail.getConnection()) {
@@ -218,7 +218,7 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
 
         File root = createTempDir("test_stats");
 
-        assertEquals(0, run(new String[]{"-s", "statsTable3", "-t", root.toURI().toURL().toString() + "stats{0}.trig", "-r", "100", "-o", "http://whatever/myStats", "-g", "http://whatever/graph0"}));
+        assertEquals(0, run(new String[]{"-s", "statsTable3", "-t", root.toURI().toURL().toString() + "stats{0}.trig", "-R", "100", "-r", "100", "-o", "http://whatever/myStats", "-g", "http://whatever/graph0"}));
 
         File stats = new File(root, "stats0.trig");
         assertTrue(stats.isFile());
@@ -247,7 +247,7 @@ public class HalyardStatsTest extends AbstractHalyardToolTest {
 
         File root = createTempDir("test_stats_snapshot");
         File restoredSnapshot = getTempSnapshotDir("restored_snapshot");
-        assertEquals(0, run(new String[]{"-s", snapshot, "-t", root.toURI().toURL().toString() + "stats{0}_snapshot.trig", "-r", "100", "-o", "http://whatever/myStats", "-u", restoredSnapshot.toURI().toURL().toString()}));
+        assertEquals(0, run(new String[]{"-s", snapshot, "-t", root.toURI().toURL().toString() + "stats{0}_snapshot.trig", "-R", "100", "-r", "100", "-o", "http://whatever/myStats", "-u", restoredSnapshot.toURI().toURL().toString()}));
 
         File stats = new File(root, "stats0_snapshot.trig");
         assertTrue(stats.isFile());

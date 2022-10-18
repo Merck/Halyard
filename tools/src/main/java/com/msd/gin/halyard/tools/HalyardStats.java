@@ -94,7 +94,8 @@ public final class HalyardStats extends AbstractHalyardTool {
 	private static final String TOOL_NAME = "stats";
 
     private static final String TARGET = confProperty(TOOL_NAME, "target");
-    private static final String THRESHOLD = confProperty(TOOL_NAME, "threshold");
+    private static final String GRAPH_THRESHOLD = confProperty(TOOL_NAME, "graph-threshold");
+    private static final String PARTITION_THRESHOLD = confProperty(TOOL_NAME, "partition-threshold");
     private static final String STATS_GRAPH = confProperty(TOOL_NAME, "stats-graph");
     private static final String NAMED_GRAPH_PROPERTY = confProperty(TOOL_NAME, "named-graph");
 
@@ -109,7 +110,7 @@ public final class HalyardStats extends AbstractHalyardTool {
     	RDFPredicate RDF_TYPE_PREDICATE;
     	byte[] POS_TYPE_HASH;
     	byte[] CPOS_TYPE_HASH;
-        IRI statsContext, graphContext;
+        IRI statsContext, namedGraphContext;
         byte[] cspoStatsContextHash;
     	StatementIndex<SPOC.S,SPOC.P,SPOC.O,SPOC.C> spo;
     	StatementIndex<SPOC.P,SPOC.O,SPOC.S,SPOC.C> pos;
@@ -135,7 +136,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         long distinctIRIReferenceSubjects, distinctIRIReferenceObjects, distinctBlankNodeObjects, distinctBlankNodeSubjects, distinctLiterals;
         IRI subsetType;
 		Value subsetId;
-        long threshold, setCounter, subsetCounter;
+        long setThreshold, setCounter, subsetThreshold, subsetCounter;
         HBaseSail sail;
 		SailConnection conn;
 
@@ -163,12 +164,13 @@ public final class HalyardStats extends AbstractHalyardTool {
         	POS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(pos);
         	CPOS_TYPE_HASH = RDF_TYPE_PREDICATE.getKeyHash(cpos);
             update = conf.get(TARGET) == null;
-            threshold = conf.getLong(THRESHOLD, DEFAULT_THRESHOLD);
+            setThreshold = conf.getLong(GRAPH_THRESHOLD, DEFAULT_THRESHOLD);
+            subsetThreshold = conf.getLong(PARTITION_THRESHOLD, DEFAULT_THRESHOLD);
             ValueFactory vf = IdValueFactory.INSTANCE;
             statsContext = vf.createIRI(conf.get(STATS_GRAPH));
-            String gc = conf.get(NAMED_GRAPH_PROPERTY);
-            if (gc != null) {
-            	graphContext = vf.createIRI(gc);
+            String namedGraph = conf.get(NAMED_GRAPH_PROPERTY);
+            if (namedGraph != null) {
+            	namedGraphContext = vf.createIRI(namedGraph);
             }
 			cspoStatsContextHash = rdfFactory.createContext(statsContext).getKeyHash(cspo);
         }
@@ -186,11 +188,13 @@ public final class HalyardStats extends AbstractHalyardTool {
         }
 
         private boolean matchingGraphContext(Resource subject) {
-            return graphContext == null
-                || subject.equals(graphContext)
-                || subject.stringValue().startsWith(graphContext.stringValue() + "_subject_")
-                || subject.stringValue().startsWith(graphContext.stringValue() + "_property_")
-                || subject.stringValue().startsWith(graphContext.stringValue() + "_object_");
+        	String subjValue = subject.stringValue();
+            String namedGraph = namedGraphContext.stringValue();
+            return namedGraphContext == null
+                || subject.equals(namedGraphContext)
+                || subjValue.startsWith(namedGraph + "_subject_")
+                || subjValue.startsWith(namedGraph + "_property_")
+                || subjValue.startsWith(namedGraph + "_object_");
         }
 
         @Override
@@ -319,7 +323,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         }
 
 		private void report(Context output, IRI property, Value partitionId, long count) throws IOException, InterruptedException {
-            if (count > 0 && (graphContext == null || graphContext.equals(graph))) {
+            if (count > 0 && (namedGraphContext == null || namedGraphContext.equals(graph))) {
             	baos.reset();
                 try (DataOutputStream dos = new DataOutputStream(baos)) {
                     dos.writeUTF(graph.stringValue());
@@ -342,7 +346,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         }
 
 		private void reset(Context output) throws IOException, InterruptedException {
-            if (graph == HALYARD.STATS_ROOT_NODE || setCounter >= threshold) {
+            if (graph == HALYARD.STATS_ROOT_NODE || setCounter >= setThreshold) {
                 report(output, VOID.TRIPLES, null, triples);
                 report(output, VOID.DISTINCT_SUBJECTS, null, distinctSubjects);
                 report(output, VOID.PROPERTIES, null, properties);
@@ -371,7 +375,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 		}
 
 		private void resetSubset(Context output) throws IOException, InterruptedException {
-            if (subsetCounter >= threshold) {
+            if (subsetCounter >= subsetThreshold) {
                 report(output, subsetType, subsetId, subsetCounter);
             }
             subsetCounter = 0;
@@ -481,7 +485,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                 dis.readFully(partitionId.array(), partitionId.arrayOffset(), partitionId.limit());
             }
 
-            if (SD.NAMED_GRAPH_PROPERTY.stringValue().equals(predicate)) { //workaround to at least count all small named graph that are below the treshold
+            if (SD.NAMED_GRAPH_PROPERTY.stringValue().equals(predicate)) { //workaround to at least count all small named graph that are below the threshold
                 writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, vf.createIRI(graph));
             } else {
                 IRI graphNode;
@@ -554,7 +558,8 @@ public final class HalyardStats extends AbstractHalyardTool {
             "Example: halyard stats -s my_dataset [-g 'http://whatever/mystats'] [-t hdfs:/my_folder/my_stats.trig]");
         addOption("s", "source-dataset", "dataset_table", SOURCE_NAME_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-file", "target_url", TARGET, "Optional target file to export the statistics (instead of update) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]", false, true);
-        addOption("r", "threshold", "size", THRESHOLD, "Optional minimal size of a named graph to calculate statistics for (default is 1000)", false, true);
+        addOption("R", "graph-threshold", "size", GRAPH_THRESHOLD, "Optional minimal size of a named graph to calculate statistics for (default is 1000)", false, true);
+        addOption("r", "partition-threshold", "size", PARTITION_THRESHOLD, "Optional minimal size of a graph partition to calculate statistics for (default is 1000)", false, true);
         addOption("g", "named-graph", "named_graph", NAMED_GRAPH_PROPERTY, "Optional restrict stats calculation to the given named graph only", false, true);
         addOption("o", "stats-named-graph", "target_graph", STATS_GRAPH, "Optional target named graph of the exported statistics (default value is '" + HALYARD.STATS_GRAPH_CONTEXT.stringValue() + "'), modification is recomended only for external export as internal Halyard optimizers expect the default value", false, true);
         addOption("u", "restore-dir", "restore_folder", SNAPSHOT_PATH_PROPERTY, "If specified then -s is a snapshot name and this is the restore folder on HDFS", false, true);
@@ -570,6 +575,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         configureIRI(cmd, 'g', null);
         configureIRI(cmd, 'o', HALYARD.STATS_GRAPH_CONTEXT.stringValue());
         configureString(cmd, 'u', null);
+        configureLong(cmd, 'R', DEFAULT_THRESHOLD);
         configureLong(cmd, 'r', DEFAULT_THRESHOLD);
         String source = getConf().get(SOURCE_NAME_PROPERTY);
         String target = getConf().get(TARGET);
