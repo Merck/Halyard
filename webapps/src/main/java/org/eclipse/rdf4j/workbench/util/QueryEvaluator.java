@@ -57,7 +57,7 @@ public final class QueryEvaluator {
 	 * @param xslPath   style sheet path
 	 * @param con       connection to repository
 	 * @param queryText the query text, having been pulled using
-	 *                  {@link org.eclipse.rdf4j.workbench.commands.QueryServlet} from one of three request parameters:
+	 *                  org.eclipse.rdf4j.workbench.commands.QueryServlet from one of three request parameters:
 	 *                  "query", "queryhash" or "saved"
 	 * @param req       the request object
 	 * @param cookies   used to deal with browser cookies

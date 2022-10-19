@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.pulquero.halyard</groupId>
     <artifactId>halyard</artifactId>
-    <version>4.2-SNAPSHOT</version>
+    <version>4.2</version>
     <packaging>pom</packaging>
     <name>Halyard-star</name>
     <description>A fork of Halyard with support for RDF-star</description>
@@ -415,7 +415,7 @@
 				            <goal>sign</goal>
 				          </goals>
 				          <configuration>
-				          	<keyname>BB4486F3D7EF68D6</keyname>
+				          	<keyname>3C1AA179E35EBEF3</keyname>
 				          </configuration>
 				        </execution>
 				      </executions>

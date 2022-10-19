@@ -83,7 +83,7 @@ public class CookieHandler {
 	 *
 	 * @param req  the request object
 	 * @param resp the response object
-	 * @value the value to give the cookie
+	 * @param value the value to give the cookie
 	 */
 	public void addTotalResultCountCookie(WorkbenchRequest req, HttpServletResponse resp, int value) {
 		addCookie(req, resp, "total_result_count", String.valueOf(value));
