@@ -42,10 +42,11 @@ public class ConstrainedValueStrategyTest {
         con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral("foo"));
         con.add(vf.createIRI("http://whatever/c"), vf.createIRI("http://whatever/val"), vf.createLiteral("bar", "en"));
     	String q ="SELECT ?s { ?s ?p ?o filter(datatype(?o)=xsd:int) }";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
-        assertTrue(res.hasNext());
-        BindingSet bs = res.next();
-        assertEquals("a", ((IRI)bs.getValue("s")).getLocalName());
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertTrue(res.hasNext());
+	        BindingSet bs = res.next();
+	        assertEquals("a", ((IRI)bs.getValue("s")).getLocalName());
+        }
     }
 
     @Test
@@ -54,10 +55,11 @@ public class ConstrainedValueStrategyTest {
         con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));
         con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral("foo"));
     	String q ="SELECT ?s { ?s ?p ?o filter(datatype(?o)!=xsd:int) }";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
-        assertTrue(res.hasNext());
-        BindingSet bs = res.next();
-        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertTrue(res.hasNext());
+	        BindingSet bs = res.next();
+	        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
+        }
     }
 
     @Test
@@ -67,10 +69,11 @@ public class ConstrainedValueStrategyTest {
         con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral("foo"));
         con.add(vf.createIRI("http://whatever/c"), vf.createIRI("http://whatever/val"), vf.createLiteral("bar", "en"));
     	String q ="SELECT ?s { ?s ?p ?o filter(lang(?o)='en') }";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
-        assertTrue(res.hasNext());
-        BindingSet bs = res.next();
-        assertEquals("c", ((IRI)bs.getValue("s")).getLocalName());
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertTrue(res.hasNext());
+	        BindingSet bs = res.next();
+	        assertEquals("c", ((IRI)bs.getValue("s")).getLocalName());
+        }
     }
 
     @Test
@@ -80,10 +83,11 @@ public class ConstrainedValueStrategyTest {
         con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral("bar", "fr"));
         con.add(vf.createIRI("http://whatever/c"), vf.createIRI("http://whatever/val"), vf.createLiteral("bar", "en"));
     	String q ="SELECT ?s { ?s ?p ?o filter(lang(?o)>'en') }";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
-        assertTrue(res.hasNext());
-        BindingSet bs = res.next();
-        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertTrue(res.hasNext());
+	        BindingSet bs = res.next();
+	        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
+        }
     }
 
     @Test
@@ -92,10 +96,11 @@ public class ConstrainedValueStrategyTest {
         con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));
         con.add(vf.createBNode(), vf.createIRI("http://whatever/val"), vf.createLiteral("foo"));
     	String q ="SELECT ?s { ?s ?p ?o filter(isIRI(?s)) }";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
-        assertTrue(res.hasNext());
-        BindingSet bs = res.next();
-        assertTrue(bs.getValue("s").isIRI());
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertTrue(res.hasNext());
+	        BindingSet bs = res.next();
+	        assertTrue(bs.getValue("s").isIRI());
+        }
     }
 
     @Test
@@ -104,10 +109,11 @@ public class ConstrainedValueStrategyTest {
         con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));
         con.add(vf.createBNode(), vf.createIRI("http://whatever/val"), vf.createLiteral("foo"));
     	String q ="SELECT ?s { ?s ?p ?o filter(isBlank(?s)) }";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
-        assertTrue(res.hasNext());
-        BindingSet bs = res.next();
-        assertTrue(bs.getValue("s").isBNode());
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertTrue(res.hasNext());
+	        BindingSet bs = res.next();
+	        assertTrue(bs.getValue("s").isBNode());
+        }
     }
 
     @Test
@@ -116,10 +122,11 @@ public class ConstrainedValueStrategyTest {
         con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createBNode());
         con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral("foo", GEO.WKT_LITERAL));
     	String q ="SELECT ?s { ?s ?p ?o filter(isLiteral(?o)) }";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
-        assertTrue(res.hasNext());
-        BindingSet bs = res.next();
-        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertTrue(res.hasNext());
+	        BindingSet bs = res.next();
+	        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
+        }
     }
 
     @Test
@@ -128,10 +135,11 @@ public class ConstrainedValueStrategyTest {
         con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));
         con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral("foo"));
     	String q ="SELECT ?s { ?s ?p ?o filter(isNumeric(?o)) }";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
-        assertTrue(res.hasNext());
-        BindingSet bs = res.next();
-        assertEquals("a", ((IRI)bs.getValue("s")).getLocalName());
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertTrue(res.hasNext());
+	        BindingSet bs = res.next();
+	        assertEquals("a", ((IRI)bs.getValue("s")).getLocalName());
+        }
     }
 
     @Test
@@ -139,9 +147,10 @@ public class ConstrainedValueStrategyTest {
         ValueFactory vf = con.getValueFactory();
         con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createTriple(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral(1)));
     	String q = "SELECT ?s { <http://whatever/a> <http://whatever/val> << ?s ?p ?o >> }";
-        TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate();
-        assertTrue(res.hasNext());
-        BindingSet bs = res.next();
-        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertTrue(res.hasNext());
+	        BindingSet bs = res.next();
+	        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
+        }
     }
 }
