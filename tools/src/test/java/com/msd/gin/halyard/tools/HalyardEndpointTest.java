@@ -34,7 +34,8 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
-import static org.junit.Assert.assertTrue;
+
+import static org.junit.Assert.*;
 
 /**
  * Class for testing the tool HalyardEndpoint.
@@ -42,7 +43,7 @@ import static org.junit.Assert.assertTrue;
  * @author sykorjan
  */
 public class HalyardEndpointTest {
-    private static final String TABLE = "exporttesttable";
+    private static final String TABLE = "endpointTestTable";
     private static String ROOT;
 
     @Rule
@@ -130,21 +131,31 @@ public class HalyardEndpointTest {
      */
     @Test
     public void testSelect() throws Exception {
-        File script = new File(this.getClass().getResource("testScript.sh").getPath());
+        File script = new File(this.getClass().getResource("testScript-select.sh").getPath());
         script.setExecutable(true);
         Path path = Paths.get(ROOT + name.getMethodName());
-        runEndpoint("-s", TABLE, "--verbose", script.getPath(), path.toString());
+        runEndpoint("-s", TABLE, script.getPath(), path.toString());
         assertTrue(Files.exists(path));
         assertTrue(Files.lines(path).count() >= 10);
     }
 
     @Test
-    public void testStoredQueries() throws Exception {
-        File queries = new File(this.getClass().getResource("test.properties").getPath());
-        File script = new File(this.getClass().getResource("testScript2.sh").getPath());
+    public void testUpdate() throws Exception {
+        File script = new File(this.getClass().getResource("testScript-update.sh").getPath());
         script.setExecutable(true);
         Path path = Paths.get(ROOT + name.getMethodName());
-        runEndpoint("-s", TABLE, "-q", queries.getPath(), "--verbose", script.getPath(), path.toString());
+        runEndpoint("-s", TABLE, script.getPath(), path.toString());
+        assertTrue(Files.exists(path));
+        assertEquals("true", Files.readString(path));
+    }
+
+    @Test
+    public void testStoredQueries() throws Exception {
+        File queries = new File(this.getClass().getResource("test.properties").getPath());
+        File script = new File(this.getClass().getResource("testScript-storedQueries.sh").getPath());
+        script.setExecutable(true);
+        Path path = Paths.get(ROOT + name.getMethodName());
+        runEndpoint("-s", TABLE, "-q", queries.getPath(), script.getPath(), path.toString());
         assertTrue(Files.exists(path));
         assertTrue(Files.lines(path).count() >= 20);
     }
@@ -152,7 +163,7 @@ public class HalyardEndpointTest {
     @Test(expected = RuntimeException.class)
     public void testStoredQueriesMissingFile() throws Exception {
         File queries = new File(this.getClass().getResource("testFail.properties").getPath());
-        runEndpoint("-s", TABLE, "-q", queries.getPath(), "--verbose");
+        runEndpoint("-s", TABLE, "-q", queries.getPath());
     }
 
     /**

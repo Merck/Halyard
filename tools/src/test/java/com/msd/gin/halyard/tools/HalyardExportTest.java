@@ -58,7 +58,7 @@ import static org.junit.Assert.*;
  */
 public class HalyardExportTest extends AbstractHalyardToolTest {
 
-    private static final String TABLE = "exporttesttable";
+    private static final String TABLE = "exportTestTable";
     private static final String TUPLE_QUERY = "select * where {?s ?p ?o}";
     private static final String GRAPH_QUERY = "construct {?s ?p ?o} where {?s ?p ?o}";
     private static String ROOT;

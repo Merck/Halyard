@@ -27,6 +27,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -56,7 +57,9 @@ import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.GraphQuery;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
+import org.eclipse.rdf4j.query.algebra.UpdateExpr;
 import org.eclipse.rdf4j.query.impl.SimpleDataset;
+import org.eclipse.rdf4j.query.parser.ParsedUpdate;
 import org.eclipse.rdf4j.query.resultio.BooleanQueryResultFormat;
 import org.eclipse.rdf4j.query.resultio.BooleanQueryResultWriter;
 import org.eclipse.rdf4j.query.resultio.BooleanQueryResultWriterRegistry;
@@ -64,12 +67,10 @@ import org.eclipse.rdf4j.query.resultio.QueryResultFormat;
 import org.eclipse.rdf4j.query.resultio.TupleQueryResultFormat;
 import org.eclipse.rdf4j.query.resultio.TupleQueryResultWriter;
 import org.eclipse.rdf4j.query.resultio.TupleQueryResultWriterRegistry;
-import org.eclipse.rdf4j.repository.sail.SailBooleanQuery;
-import org.eclipse.rdf4j.repository.sail.SailGraphQuery;
 import org.eclipse.rdf4j.repository.sail.SailQuery;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
-import org.eclipse.rdf4j.repository.sail.SailTupleQuery;
+import org.eclipse.rdf4j.repository.sail.SailUpdate;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.RDFWriterRegistry;
@@ -81,13 +82,15 @@ import org.slf4j.LoggerFactory;
 /**
  * Handles HTTP requests containing SPARQL queries.
  *
- * <p> Supported are only SPARQL queries. SPARQL updates are <b>not</b> supported. One request <b>must</b> include
+ * <p> Supported are only SPARQL queries. One request <b>must</b> include
  * exactly one SPARQL query string. Supported are only HTTP GET and HTTP POST methods. For each detailed HTTP method
  * specification see <a href="https://www.w3.org/TR/sparql11-protocol/#protocol">SPARQL Protocol Operations</a></p>
  *
  * @author sykorjan
  */
 public final class HttpSparqlHandler implements HttpHandler {
+    private static final Logger LOGGER = LoggerFactory.getLogger(HttpSparqlHandler.class);
+
     private static final String AND_DELIMITER = "&";
     private static final String CHARSET = StandardCharsets.UTF_8.name();
     private static final ValueFactory SVF = SimpleValueFactory.getInstance();
@@ -98,41 +101,28 @@ public final class HttpSparqlHandler implements HttpHandler {
     private static final String QUERY_PREFIX = "query=";
     private static final String DEFAULT_GRAPH_PREFIX = "default-graph-uri=";
     private static final String NAMED_GRAPH_PREFIX = "named-graph-uri=";
+    private static final String UPDATE_PREFIX = "update=";
+    private static final String USING_GRAPH_URI_PREFIX = "using-graph-uri=";
+    private static final String USING_NAMED_GRAPH_PREFIX = "using-named-graph-uri=";
 
     // Request content type (only for POST requests)
-    private static final String ENCODED_CONTENT = "application/x-www-form-urlencoded";
-    private static final String UNENCODED_CONTENT = "application/sparql-query";
+    static final String ENCODED_CONTENT = "application/x-www-form-urlencoded";
+    static final String UNENCODED_QUERY_CONTENT = "application/sparql-query";
+    static final String UNENCODED_UPDATE_CONTENT = "application/sparql-update";
 
 
-    // Service successfully executes the query
-    private static final int HTTP_OK_STATUS = 200;
-    // Client does not provide a correct request, including incorrect request parameter content (e.g. illegal request
-    // parameters or illegal sequence of query characters defined by the SPARQL query grammar)
-    private static final int HTTP_BAD_REQUEST = 400;
-    // Client provides a correct request but service fails to process it (e.g. server failed to send the response)
-    private static final int HTTP_INTERNAL_SERVER_ERROR = 500;
-
-    // Sail repository
     private final SailRepository repository;
-    // Stored SPARQL queries
     private final Properties storedQueries;
-    // Writer config
     private final WriterConfig writerConfig;
-    private final boolean verbose;
-    // Logger
-    private static final Logger LOGGER = LoggerFactory.getLogger(HttpSparqlHandler.class);
 
     /**
      * @param rep              Sail repository
      * @param storedQueries    pre-defined stored SPARQL query templates
      * @param writerProperties RDF4J RIO WriterConfig properties
-     * @param verbose          true when verbose mode enabled, otherwise false
      */
     @SuppressWarnings("unchecked")
-    public HttpSparqlHandler(SailRepository rep, Properties storedQueries, Properties writerProperties, boolean verbose) {
+    public HttpSparqlHandler(SailRepository rep, Properties storedQueries, Properties writerProperties) {
         this.repository = rep;
-        // Verbose mode disabled --> logs with level lower than WARNING will be discarded
-        this.verbose = verbose;
         this.storedQueries = storedQueries;
         this.writerConfig = new WriterConfig();
         if (writerProperties != null) {
@@ -173,20 +163,26 @@ public final class HttpSparqlHandler implements HttpHandler {
         try {
             SparqlQuery sparqlQuery = retrieveQuery(exchange);
         	try(SailRepositoryConnection connection = repository.getConnection()) {
-        		evaluateQuery(connection, sparqlQuery, exchange);
+        		if (sparqlQuery.getQuery() != null) {
+        			evaluateQuery(connection, sparqlQuery, exchange);
+        		} else if (sparqlQuery.getUpdate() != null) {
+        			evaluateUpdate(connection, sparqlQuery, exchange);
+        		}
         	}
         } catch (IllegalArgumentException | RDF4JException e) {
             StringWriter sw = new StringWriter();
-            PrintWriter w = new PrintWriter(sw);
-            e.printStackTrace(w);
+            try (PrintWriter w = new PrintWriter(sw)) {
+                e.printStackTrace(w);
+            }
             LOGGER.warn(sw.toString());
-            sendResponse(exchange, HTTP_BAD_REQUEST, sw.toString());
+            sendResponse(exchange, HttpURLConnection.HTTP_BAD_REQUEST, sw.toString());
         } catch (IOException | RuntimeException e) {
             StringWriter sw = new StringWriter();
-            PrintWriter w = new PrintWriter(sw);
-            e.printStackTrace(w);
+            try (PrintWriter w = new PrintWriter(sw)) {
+                e.printStackTrace(w);
+            }
             LOGGER.warn(sw.toString());
-            sendResponse(exchange, HTTP_INTERNAL_SERVER_ERROR, sw.toString());
+            sendResponse(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR, sw.toString());
         }
 
     }
@@ -203,7 +199,6 @@ public final class HttpSparqlHandler implements HttpHandler {
         String requestMethod = exchange.getRequestMethod();
         SparqlQuery sparqlQuery = new SparqlQuery();
         // Help variable for checking for multiple query parameters
-        int queryCount = 0;
         String path = exchange.getRequestURI().getPath();
         // retrieve query from stored queries based on non-root request URL path
         if (path != null && path.length() > 1) {
@@ -219,7 +214,6 @@ public final class HttpSparqlHandler implements HttpHandler {
                 throw new IllegalArgumentException("No stored query for path: " + path);
             }
             sparqlQuery.setQuery(query);
-            queryCount++;
         }
         if ("GET".equalsIgnoreCase(requestMethod)) {
             // Retrieve from the request URI parameter query and optional parameters defaultGraphs and namedGraphs
@@ -229,9 +223,15 @@ public final class HttpSparqlHandler implements HttpHandler {
             if (requestQueryRaw != null) {
                 StringTokenizer stk = new StringTokenizer(requestQueryRaw, AND_DELIMITER);
                 while (stk.hasMoreTokens()) {
-                    queryCount += parseParameter(stk.nextToken(), sparqlQuery);
+                    parseQueryParameter(stk.nextToken(), sparqlQuery);
                 }
             }
+
+            String query = sparqlQuery.getQuery();
+            if (query == null || query.isEmpty()) {
+                throw new IllegalArgumentException("Missing parameter: query");
+            }
+
             try (InputStream requestBody = exchange.getRequestBody()) {
                 if (requestBody.available() > 0) {
                     throw new IllegalArgumentException("Request via GET must not include a message body");
@@ -263,13 +263,25 @@ public final class HttpSparqlHandler implements HttpHandler {
                 if (baseType.equals(ENCODED_CONTENT)) {
                     // Retrieve from the message body parameter query and optional parameters defaultGraphs and
                     // namedGraphs
-                    try (InputStream requestBody = exchange.getRequestBody()) {
-                        Scanner requestBodyScanner = new Scanner(requestBody, CHARSET).useDelimiter(AND_DELIMITER);
+                    try (Scanner requestBodyScanner = new Scanner(exchange.getRequestBody(), CHARSET).useDelimiter(AND_DELIMITER)) {
                         while (requestBodyScanner.hasNext()) {
-                            queryCount += parseParameter(requestBodyScanner.next(), sparqlQuery);
+                            String keyValue = requestBodyScanner.next();
+                            parseQueryParameter(keyValue, sparqlQuery);
+                            parseUpdateParameter(keyValue, sparqlQuery);
                         }
                     }
-                } else if (baseType.equals(UNENCODED_CONTENT)) {
+
+                    String query = sparqlQuery.getQuery();
+                    String update = sparqlQuery.getUpdate();
+                    if ((query == null || query.isEmpty()) && (update == null || update.isEmpty())) {
+                        throw new IllegalArgumentException("Missing parameter: query/update");
+                    }
+                } else if (baseType.equals(UNENCODED_QUERY_CONTENT)) {
+                    // Retrieve from the message body parameter query
+                    try (Scanner requestBodyScanner = new Scanner(exchange.getRequestBody(), CHARSET).useDelimiter("\\A")) {
+                        sparqlQuery.setQuery(requestBodyScanner.next());
+                    }
+
                     // Retrieve from the request URI optional parameters defaultGraphs and namedGraphs
                     // Cannot apply directly exchange.getRequestURI().getQuery() since getQuery() method
                     // automatically decodes query (requestQuery must remain unencoded due to parsing by '&' delimiter)
@@ -277,17 +289,27 @@ public final class HttpSparqlHandler implements HttpHandler {
                     if (requestQueryRaw != null) {
                         StringTokenizer stk = new StringTokenizer(requestQueryRaw, AND_DELIMITER);
                         while (stk.hasMoreTokens()) {
-                            queryCount += parseParameter(stk.nextToken(), sparqlQuery);
+                            parseQueryParameter(stk.nextToken(), sparqlQuery);
                         }
                     }
-
+                } else if (baseType.equals(UNENCODED_UPDATE_CONTENT)) {
                     // Retrieve from the message body parameter query
-                    try (InputStream requestBody = exchange.getRequestBody()) {
-                        sparqlQuery.setQuery(new Scanner(requestBody, CHARSET).useDelimiter("\\A").next());
+                    try (Scanner requestBodyScanner = new Scanner(exchange.getRequestBody(), CHARSET).useDelimiter("\\A")) {
+                        sparqlQuery.setUpdate(requestBodyScanner.next());
+                    }
+
+                    // Retrieve from the request URI optional parameters defaultGraphs and namedGraphs
+                    // Cannot apply directly exchange.getRequestURI().getQuery() since getQuery() method
+                    // automatically decodes query (requestQuery must remain unencoded due to parsing by '&' delimiter)
+                    String requestQueryRaw = exchange.getRequestURI().getRawQuery();
+                    if (requestQueryRaw != null) {
+                        StringTokenizer stk = new StringTokenizer(requestQueryRaw, AND_DELIMITER);
+                        while (stk.hasMoreTokens()) {
+                            parseUpdateParameter(stk.nextToken(), sparqlQuery);
+                        }
                     }
                 } else {
-                    throw new IllegalArgumentException("Content-Type of POST request has to be either " + ENCODED_CONTENT
-                            + " or " + UNENCODED_CONTENT);
+                    throw new IllegalArgumentException("Content-Type of POST request has to be one of " + Arrays.asList(ENCODED_CONTENT, UNENCODED_QUERY_CONTENT, UNENCODED_UPDATE_CONTENT));
                 }
             } catch (MimeTypeParseException e) {
                 throw new IllegalArgumentException("Illegal Content-Type header content");
@@ -297,17 +319,19 @@ public final class HttpSparqlHandler implements HttpHandler {
         }
 
         String query = sparqlQuery.getQuery();
-        if (query == null || query.length() <= 0) {
-            throw new IllegalArgumentException("Missing parameter query");
+        if (query != null) {
+            Matcher m = UNRESOLVED_PARAMETERS.matcher(query);
+            if (m.find()) {
+                throw new IllegalArgumentException("Missing query parameter: " + m.group(1));
+            }
         }
 
-        Matcher m = UNRESOLVED_PARAMETERS.matcher(query);
-        if (m.find()) {
-            throw new IllegalArgumentException("Missing query parameter: " + m.group(1));
-        }
-
-        if (queryCount > 1) {
-            throw new IllegalArgumentException("Cannot invoke query operation with more than one query string");
+        String update = sparqlQuery.getUpdate();
+        if (update != null) {
+            Matcher m = UNRESOLVED_PARAMETERS.matcher(update);
+            if (m.find()) {
+                throw new IllegalArgumentException("Missing update parameter: " + m.group(1));
+            }
         }
 
         return sparqlQuery;
@@ -319,12 +343,9 @@ public final class HttpSparqlHandler implements HttpHandler {
      * @param param       single raw String parameter
      * @param sparqlQuery SparqlQuery to fill from the parsed parameter
      * @throws UnsupportedEncodingException which never happens
-     * @returns number of found SPARQL queries
      */
-    private static int parseParameter(String param, SparqlQuery sparqlQuery) throws UnsupportedEncodingException {
-        int queryCount = 0;
+    private static void parseQueryParameter(String param, SparqlQuery sparqlQuery) throws UnsupportedEncodingException {
         if (param.startsWith(QUERY_PREFIX)) {
-            queryCount++;
             sparqlQuery.setQuery(URLDecoder.decode(param.substring(QUERY_PREFIX.length()),
                     CHARSET));
         } else if (param.startsWith(DEFAULT_GRAPH_PREFIX)) {
@@ -341,7 +362,26 @@ public final class HttpSparqlHandler implements HttpHandler {
                 throw new IllegalArgumentException("Invalid request parameter: " + param);
             }
         }
-        return queryCount;
+    }
+
+    private static void parseUpdateParameter(String param, SparqlQuery sparqlQuery) throws UnsupportedEncodingException {
+        if (param.startsWith(UPDATE_PREFIX)) {
+            sparqlQuery.setUpdate(URLDecoder.decode(param.substring(UPDATE_PREFIX.length()),
+                    CHARSET));
+        } else if (param.startsWith(USING_GRAPH_URI_PREFIX)) {
+            sparqlQuery.addDefaultGraph(SVF.createIRI(
+                    URLDecoder.decode(param.substring(USING_GRAPH_URI_PREFIX.length()), CHARSET)));
+        } else if (param.startsWith(USING_NAMED_GRAPH_PREFIX)) {
+            sparqlQuery.addNamedGraph(SVF.createIRI(
+                    URLDecoder.decode(param.substring(USING_NAMED_GRAPH_PREFIX.length()), CHARSET)));
+        } else {
+            int i = param.indexOf("=");
+            if (i >= 0) {
+                sparqlQuery.addParameter(URLDecoder.decode(param.substring(0, i), CHARSET), URLDecoder.decode(param.substring(i + 1), CHARSET));
+            } else {
+                throw new IllegalArgumentException("Invalid request parameter: " + param);
+            }
+        }
     }
 
     /**
@@ -353,7 +393,8 @@ public final class HttpSparqlHandler implements HttpHandler {
      * @throws RDF4JException If an error occurs due to illegal SPARQL query (e.g. incorrect syntax)
      */
     private void evaluateQuery(SailRepositoryConnection connection, SparqlQuery sparqlQuery, HttpExchange exchange) throws IOException, RDF4JException {
-        SailQuery query = connection.prepareQuery(QueryLanguage.SPARQL, sparqlQuery.getQuery(), null);
+        String queryString = sparqlQuery.getQuery();
+        SailQuery query = connection.prepareQuery(QueryLanguage.SPARQL, queryString, null);
         Dataset dataset = sparqlQuery.getDataset();
         if (!dataset.getDefaultGraphs().isEmpty() || !dataset.getNamedGraphs().isEmpty()) {
             // This will include default graphs and named graphs from  the request parameters but default graphs and
@@ -365,46 +406,61 @@ public final class HttpSparqlHandler implements HttpHandler {
         if (acceptHeaders != null) for (String header : acceptHeaders) {
             acceptedMimeTypes.addAll(parseAcceptHeader(header));
         }
-        if (query instanceof SailTupleQuery) {
-        	if (verbose) {
-        		LOGGER.info("Evaluating tuple query: {}", sparqlQuery.getQuery());
-        	}
-            QueryResultFormat format = getFormat(TupleQueryResultWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
+        if (query instanceof TupleQuery) {
+            LOGGER.info("Evaluating tuple query: {}", queryString);
+            TupleQueryResultWriterRegistry registry = TupleQueryResultWriterRegistry.getInstance();
+            QueryResultFormat format = getFormat(registry, exchange.getRequestURI().getPath(),
                     acceptedMimeTypes, TupleQueryResultFormat.CSV, exchange.getResponseHeaders());
-            exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
+            exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
-                TupleQueryResultWriter w = TupleQueryResultWriterRegistry.getInstance().get(format).get().getWriter(response);
+                TupleQueryResultWriter w = registry.get(format).orElseThrow(() -> new IOException("Format not supported: "+format)).getWriter(response);
                 w.setWriterConfig(writerConfig);
                 ((TupleQuery) query).evaluate(w);
             }
-        } else if (query instanceof SailGraphQuery) {
-        	if (verbose) {
-        		LOGGER.info("Evaluating graph query: {}", sparqlQuery.getQuery());
-        	}
-            RDFFormat format = getFormat(RDFWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
+        } else if (query instanceof GraphQuery) {
+            LOGGER.info("Evaluating graph query: {}", queryString);
+            RDFWriterRegistry registry = RDFWriterRegistry.getInstance();
+            RDFFormat format = getFormat(registry, exchange.getRequestURI().getPath(),
                     acceptedMimeTypes, RDFFormat.NTRIPLES, exchange.getResponseHeaders());
-            exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
+            exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
-                RDFWriter w = RDFWriterRegistry.getInstance().get(format).get().getWriter(response);
+                RDFWriter w = registry.get(format).orElseThrow(() -> new IOException("Format not supported: "+format)).getWriter(response);
                 w.setWriterConfig(writerConfig);
                 ((GraphQuery) query).evaluate(w);
             }
-        } else if (query instanceof SailBooleanQuery) {
-        	if (verbose) {
-        		LOGGER.info("Evaluating boolean query: {}", sparqlQuery.getQuery());
-        	}
-            QueryResultFormat format = getFormat(BooleanQueryResultWriterRegistry.getInstance(), exchange.getRequestURI().getPath(),
+        } else if (query instanceof BooleanQuery) {
+            LOGGER.info("Evaluating boolean query: {}", queryString);
+            BooleanQueryResultWriterRegistry registry = BooleanQueryResultWriterRegistry.getInstance();
+            QueryResultFormat format = getFormat(registry, exchange.getRequestURI().getPath(),
                     acceptedMimeTypes, BooleanQueryResultFormat.JSON, exchange.getResponseHeaders());
-            exchange.sendResponseHeaders(HTTP_OK_STATUS, 0);
+            exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
-                BooleanQueryResultWriter w = BooleanQueryResultWriterRegistry.getInstance().get(format).get().getWriter(response);
+                BooleanQueryResultWriter w = registry.get(format).orElseThrow(() -> new IOException("Format not supported: "+format)).getWriter(response);
                 w.setWriterConfig(writerConfig);
                 w.handleBoolean(((BooleanQuery) query).evaluate());
             }
         }
-        if (verbose) {
-        	LOGGER.info("Request successfully processed");
+       	LOGGER.info("Query successfully processed");
+    }
+
+    private void evaluateUpdate(SailRepositoryConnection connection, SparqlQuery sparqlQuery, HttpExchange exchange) throws IOException, RDF4JException {
+        String updateString = sparqlQuery.getUpdate();
+        SailUpdate update = (SailUpdate) connection.prepareUpdate(QueryLanguage.SPARQL, updateString, null);
+        Dataset dataset = sparqlQuery.getDataset();
+        if (!dataset.getDefaultGraphs().isEmpty() || !dataset.getNamedGraphs().isEmpty()) {
+            // This will include default graphs and named graphs from  the request parameters
+        	ParsedUpdate parsedUpdate = update.getParsedUpdate();
+        	if (!parsedUpdate.getDatasetMapping().isEmpty()) {
+        		throw new IllegalArgumentException("Can't provide graph-uri parameters for queries containing USING, USING NAMED or WITH clauses");
+        	}
+        	for (UpdateExpr expr : parsedUpdate.getUpdateExprs()) {
+        		parsedUpdate.map(expr, dataset);
+        	}
         }
+        LOGGER.info("Executing update: {}", updateString);
+        update.execute();
+        exchange.sendResponseHeaders(HttpURLConnection.HTTP_NO_CONTENT, 0);
+       	LOGGER.info("Update successfully processed");
     }
 
     /**
@@ -489,20 +545,13 @@ public final class HttpSparqlHandler implements HttpHandler {
      * Help class for retrieving the whole SPARQL query, including optional parameters defaultGraphs and namedGraphs,
      * from the HTTP request.
      */
-    private static class SparqlQuery {
+    private static final class SparqlQuery {
         // SPARQL query string, has to be exactly one
-        private String query;
+        private String query, update;
         // SPARQL query template parameters for substitution
-        private final List<String> parameterNames, parameterValues;
+        private final List<String> parameterNames = new ArrayList<>(), parameterValues = new ArrayList<>();
         // Dataset containing default graphs and named graphs
-        private final SimpleDataset dataset;
-
-        public SparqlQuery() {
-            query = null;
-            parameterNames = new ArrayList<>();
-            parameterValues = new ArrayList<>();
-            dataset = new SimpleDataset();
-        }
+        private final SimpleDataset dataset = new SimpleDataset();
 
         public String getQuery() {
             //replace all tokens matchig {{parameterName}} inside the SPARQL query with corresponding parameterValues
@@ -510,7 +559,28 @@ public final class HttpSparqlHandler implements HttpHandler {
         }
 
         public void setQuery(String query) {
+        	if (this.update != null) {
+                throw new IllegalArgumentException("Unexpected update string encountered");
+        	}
+        	if (this.query != null) {
+                throw new IllegalArgumentException("Multiple query strings encountered");
+        	}
             this.query = query;
+        }
+
+        public String getUpdate() {
+            //replace all tokens matchig {{parameterName}} inside the SPARQL query with corresponding parameterValues
+            return StringUtils.replaceEach(update, parameterNames.toArray(new String[parameterNames.size()]), parameterValues.toArray(new String[parameterValues.size()]));
+        }
+
+        public void setUpdate(String update) {
+        	if (this.query != null) {
+                throw new IllegalArgumentException("Unexpected query string encountered");
+        	}
+        	if (this.update != null) {
+                throw new IllegalArgumentException("Multiple update strings encountered");
+        	}
+            this.update = update;
         }
 
         public void addDefaultGraph(IRI defaultGraph) {

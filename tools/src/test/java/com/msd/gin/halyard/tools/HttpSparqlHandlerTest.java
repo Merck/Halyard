@@ -16,6 +16,25 @@
  */
 package com.msd.gin.halyard.tools;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
+
+import org.apache.commons.io.IOUtils;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
@@ -23,31 +42,18 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
-import org.junit.*;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
+import org.junit.Test;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.xpath.*;
-import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-import org.apache.commons.io.IOUtils;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 /**
  * Test handling GET and POST requests which contain SPARQL query to be executed towards a Sail repository.
- * Only ASK and SELECT queries are supported (UPDATE queries are not supported).
  * Tests are inspired by the SPARQL 1.0 and 1.1 protocol test suit.
  *
  * @author sykorjan
@@ -60,10 +66,6 @@ public class HttpSparqlHandlerTest {
     private static final String SERVER_CONTEXT = "/";
     private static final int PORT = 0;
     private static final String CHARSET = "UTF-8";
-
-    // Request content type (only for POST requests)
-    private static final String ENCODED_CONTENT = "application/x-www-form-urlencoded";
-    private static final String UNENCODED_CONTENT = "application/sparql-query";
 
     // Response content type
     private static final String XML_CONTENT = "application/sparql-results+xml";
@@ -93,7 +95,6 @@ public class HttpSparqlHandlerTest {
     private static final Resource NON_EXISTING_CONTEXT = factory.createIRI("http://broccoli/");
 
     private static SimpleHttpServer server;
-    private static SailRepositoryConnection repositoryConnection;
     // SimpleHttpServer URL
     private static String SERVER_URL;
 
@@ -126,7 +127,7 @@ public class HttpSparqlHandlerTest {
         writerCfg.put("org.eclipse.rdf4j.rio.helpers.JSONLDSettings.JSONLD_MODE", "org.eclipse.rdf4j.rio.helpers.JSONLDMode.COMPACT");
 
         // Create handler with the repositoryConnection to the sail repository
-        HttpSparqlHandler handler = new HttpSparqlHandler(repository, storedQueries, writerCfg, true);
+        HttpSparqlHandler handler = new HttpSparqlHandler(repository, storedQueries, writerCfg);
 
         // Create and start http server
         server = new SimpleHttpServer(PORT, SERVER_CONTEXT, handler);
@@ -325,7 +326,7 @@ public class HttpSparqlHandlerTest {
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
         urlConnection.setRequestProperty("Accept", XML_CONTENT);
-        urlConnection.setRequestProperty("Content-Type", ENCODED_CONTENT);
+        urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.ENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("query=ASK%20%7B%7D");
         out.close();
@@ -375,7 +376,7 @@ public class HttpSparqlHandlerTest {
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
         urlConnection.setRequestProperty("Accept", XML_CONTENT);
-        urlConnection.setRequestProperty("Content-Type", ENCODED_CONTENT);
+        urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.ENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("test_parameter1=" + URLEncoder.encode(SUBJ.stringValue(), CHARSET) + "&test_parameter2=" + URLEncoder.encode(PRED.stringValue(), CHARSET));
         out.close();
@@ -407,7 +408,7 @@ public class HttpSparqlHandlerTest {
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
         urlConnection.setRequestProperty("Accept", XML_CONTENT);
-        urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
+        urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.UNENCODED_QUERY_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("ASK {}");
         out.close();
@@ -426,7 +427,7 @@ public class HttpSparqlHandlerTest {
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
         urlConnection.setRequestProperty("Accept", XML_CONTENT);
-        urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
+        urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.UNENCODED_QUERY_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("SELECT (1 AS ?value) {}");
         out.close();
@@ -444,7 +445,7 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
+        urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.UNENCODED_QUERY_CONTENT);
         urlConnection.setRequestProperty("Accept", JSONLD_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("prefix w: <http://whatever/> construct {w:a w:b 1.} where {}");
@@ -512,7 +513,7 @@ public class HttpSparqlHandlerTest {
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
         urlConnection.setRequestProperty("Accept", XML_CONTENT);
-        urlConnection.setRequestProperty("Content-Type", UNENCODED_CONTENT);
+        urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.UNENCODED_QUERY_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write(
                 "SELECT (COUNT(*) AS ?count) " +
@@ -533,7 +534,7 @@ public class HttpSparqlHandlerTest {
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
         urlConnection.setRequestProperty("Accept", XML_CONTENT);
-        urlConnection.setRequestProperty("Content-Type", ENCODED_CONTENT);
+        urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.ENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write(
                 "query=" + URLEncoder.encode("SELECT (COUNT(*) AS ?count) WHERE { ?x ?y ?z  GRAPH ?g { ?s ?p ?o } }",
@@ -594,6 +595,19 @@ public class HttpSparqlHandlerTest {
         urlConnection.setRequestMethod("GET");
         urlConnection.setRequestProperty("Accept", XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+    }
+
+    @Test
+    public void testUpdatePostDirect() throws IOException {
+        URL url = new URL(SERVER_URL);
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setDoOutput(true);
+        urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.UNENCODED_UPDATE_CONTENT);
+        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
+        out.write("INSERT DATA { <http://whatever/newSubj> <http://whatever/newPred> <http://whatever/newObj>. }");
+        out.close();
+        assertEquals(HttpURLConnection.HTTP_NO_CONTENT, urlConnection.getResponseCode());
     }
 
     /**

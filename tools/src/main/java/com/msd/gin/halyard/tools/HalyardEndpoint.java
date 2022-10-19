@@ -80,9 +80,6 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                 "Each property name is fully qualified class.field name of WriterSetting and property value is fully qualified " +
                 " class.field or enum name with the value to set. For example: " +
                 "\"org.eclipse.rdf4j.rio.helpers.JSONLDSettings.JSONLD_MODE=org.eclipse.rdf4j.rio.helpers.JSONLDMode.COMPACT\"", false, true);
-        // cannot use short option 'v' due to conflict with the super "--version" option
-        addOption(null, "verbose", null, "Logging mode that records all logging information (by default only " +
-                "important informative and error messages are printed)", false, false);
     }
 
     /**
@@ -101,11 +98,6 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
             int port = parsePort(cmd);
             String table = cmd.getOptionValue('s');
             String elasticIndexURL = cmd.getOptionValue('i');
-
-            boolean verbose = false;
-            if (cmd.hasOption("verbose")) {
-                verbose = true;
-            }
 
             // Any left-over non-recognized options and arguments are considered as part of user's custom commands
             // that are to be run by this tool
@@ -135,7 +127,7 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                         writerConfig.load(in);
                     }
                 }
-                HttpSparqlHandler handler = new HttpSparqlHandler(rep, storedQueries, writerConfig, verbose);
+                HttpSparqlHandler handler = new HttpSparqlHandler(rep, storedQueries, writerConfig);
                 SimpleHttpServer server = new SimpleHttpServer(port, CONTEXT, handler);
                 server.start();
                 try {
