@@ -69,7 +69,7 @@ public class SearchTest {
 	}
 
 	private Repository createRepo(String tableName, ServerSocket esServer) throws Exception {
-		HBaseSail hbaseSail = new HBaseSail(conf, tableName, true, 0, true, 10, new URL("http", InetAddress.getLoopbackAddress().getHostAddress(), esServer.getLocalPort(), "/" + INDEX), null);
+		HBaseSail hbaseSail = new HBaseSail(conf, tableName, true, 0, true, 10, HBaseSail.ElasticSettings.from(new URL("http", InetAddress.getLoopbackAddress().getHostAddress(), esServer.getLocalPort(), "/" + INDEX), null), null);
 		Repository hbaseRepo = new SailRepository(hbaseSail);
 		hbaseRepo.init();
 		return hbaseRepo;

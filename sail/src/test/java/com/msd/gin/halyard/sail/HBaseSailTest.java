@@ -146,7 +146,7 @@ public class HBaseSailTest {
 
     @Test
 	public void testInitializeAndShutDownWithElastic() throws Exception {
-		HBaseSail.ElasticSettings esSettings = HBaseSail.ElasticSettings.from(new URL("http://elastic:9200/index"));
+		HBaseSail.ElasticSettings esSettings = HBaseSail.ElasticSettings.from(new URL("http://elastic:9200/index"), null);
 		esSettings.username = "elastic";
 		esSettings.password = "f00bar";
 		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), useTable("whatevertable"), true, 0, usePushStrategy, 10, esSettings);

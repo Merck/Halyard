@@ -25,7 +25,6 @@ import com.msd.gin.halyard.sail.HBaseSailConnection;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
-import java.net.URL;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.cli.CommandLine;
@@ -80,11 +79,6 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
     public static final String DECIMATE_FUNCTION_NAME = "decimateBy";
 
     /**
-     * Property defining optional ElasticSearch index URL
-     */
-    public static final String ELASTIC_INDEX_URL = "halyard.elastic.index.url";
-
-    /**
      * Full URI of a custom SPARQL function to decimate parallel evaluation based on Mapper index
      */
     public static final String DECIMATE_FUNCTION_URI = HALYARD.NAMESPACE + DECIMATE_FUNCTION_NAME;
@@ -102,7 +96,6 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
     public static final class SPARQLUpdateMapper extends Mapper<NullWritable, Void, ImmutableBytesWritable, KeyValue> {
 
         private String tableName;
-        private String elasticIndexURL;
         private long timestamp;
         private int stage;
 
@@ -110,7 +103,6 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         public void run(Context context) throws IOException, InterruptedException {
             Configuration conf = context.getConfiguration();
             tableName = conf.get(TABLE_NAME_PROPERTY);
-            elasticIndexURL = conf.get(ELASTIC_INDEX_URL);
             timestamp = conf.getLong(TIMESTAMP_PROPERTY, System.currentTimeMillis());
             stage = conf.getInt(STAGE_PROPERTY, 0);
             final QueryInputFormat.QueryInputSplit qis = (QueryInputFormat.QueryInputSplit)context.getInputSplit();
@@ -131,7 +123,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                 context.setStatus("Execution of: " + name + " stage #" + stage);
                 final AtomicLong addedKvs = new AtomicLong();
                 final AtomicLong removedKvs = new AtomicLong();
-				final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, new HBaseSail.Ticker() {
+				final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, getElasticSettings(conf), new HBaseSail.Ticker() {
                     @Override
                     public void tick() {
                         context.progress();
@@ -229,7 +221,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         addOption("q", "update-operations", "sparql_update_operations", "folder or path pattern with SPARQL update operations", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
         addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all updated records (default is actual time of the operation)", false, true);
-        addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
     }
 
 
@@ -237,9 +229,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         String source = cmd.getOptionValue('s');
         String queryFiles = cmd.getOptionValue('q');
         String workdir = cmd.getOptionValue('w');
-        if (cmd.hasOption('i')) {
-        	getConf().set(ELASTIC_INDEX_URL, cmd.getOptionValue('i'));
-        }
+        configureString(cmd, 'i', null);
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                NTriplesUtil.class,
                Rio.class,

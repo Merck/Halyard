@@ -359,19 +359,9 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
         }
     }
 
-    private void configureSSL(HttpsURLConnection https) throws IOException, GeneralSecurityException {
-    	String keyLoc = getConf().get("es.net.ssl.keystore.location");
-    	String keyPass = getConf().get("es.net.ssl.keystore.pass");
-    	String trustLoc = getConf().get("es.net.ssl.truststore.location");
-    	String trustPass = getConf().get("es.net.ssl.truststore.pass");
-    	SSLSettings sslSettings = new SSLSettings();
-    	sslSettings.keyStoreLocation = (keyLoc != null && !keyLoc.isEmpty()) ? new URL(keyLoc) : null;
-    	sslSettings.keyStoreType = getConf().get("es.net.ssl.keystore.type", "jks");
-    	sslSettings.keyStorePassword = (keyPass != null && !keyPass.isEmpty()) ? keyPass.toCharArray() : null;
-    	sslSettings.trustStoreLocation = (trustLoc != null && !trustLoc.isEmpty()) ? new URL(trustLoc) : null;
-    	sslSettings.trustStorePassword = (trustPass != null && !trustPass.isEmpty()) ? trustPass.toCharArray() : null;
-    	sslSettings.sslProtocol = getConf().get("es.net.ssl.protocol", "TLS");
-    	SSLContext sslContext = sslSettings.createSSLContext();
-    	https.setSSLSocketFactory(sslContext.getSocketFactory());
-    }
+	private void configureSSL(HttpsURLConnection https) throws IOException, GeneralSecurityException {
+		SSLSettings sslSettings = SSLSettings.from(getConf());
+		SSLContext sslContext = sslSettings.createSSLContext();
+		https.setSSLSocketFactory(sslContext.getSocketFactory());
+	}
 }

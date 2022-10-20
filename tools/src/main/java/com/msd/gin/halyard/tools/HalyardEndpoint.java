@@ -16,9 +16,10 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.sail.HBaseSail;
+
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -28,8 +29,6 @@ import java.util.Properties;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-
-import com.msd.gin.halyard.sail.HBaseSail;
 
 /**
  * @author sykorjan
@@ -66,7 +65,7 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                 "p", "port", "http_server_port", "HTTP server port number. If no port number is specified, system " +
                         "will automatically select a new port number", false, true);
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
-        addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
         addOption("t", "timeout", "evaluation_timeout", "Timeout in seconds for each query evaluation (default is " +
                 "unlimited timeout)", false, true);
         addOption("q", "stored-queries", "property_file", "Optional property file with pre-defined stored queries. " +
@@ -97,14 +96,14 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
             int timeout = parseTimeout(cmd);
             int port = parsePort(cmd);
             String table = cmd.getOptionValue('s');
-            String elasticIndexURL = cmd.getOptionValue('i');
+            configureString(cmd, 'i', null);
 
             // Any left-over non-recognized options and arguments are considered as part of user's custom commands
             // that are to be run by this tool
             List<String> cmdArgs = Arrays.asList(cmd.getArgs());
 
             SailRepository rep = new SailRepository(
-                    new HBaseSail(getConf(), table, false, 0, true, timeout, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null));
+                    new HBaseSail(getConf(), table, false, 0, true, timeout, getElasticSettings(getConf())));
             rep.init();
             try {
                 Properties storedQueries = new Properties();

@@ -580,15 +580,15 @@ public final class HalyardExport extends AbstractHalyardTool {
         addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
         addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name, mandatory for JDBC export", false, true);
         addOption("r", "trim", null, "Trim target table before export (apply for JDBC only)", false, false);
-        addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
     }
 
     @Override
     protected int run(CommandLine cmd) throws Exception {
     	String source = cmd.getOptionValue('s');
     	String query = cmd.getOptionValue('q');
-    	String elasticIndexURL = cmd.getOptionValue('i');
-    	HBaseSail sail = new HBaseSail(getConf(), source, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null);
+        configureString(cmd, 'i', null);
+    	HBaseSail sail = new HBaseSail(getConf(), source, false, 0, true, 0, getElasticSettings(getConf()), null);
     	export(sail, new StatusLog() {
             @Override
             public void tick() {}

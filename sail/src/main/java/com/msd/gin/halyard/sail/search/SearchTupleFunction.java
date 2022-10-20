@@ -53,6 +53,10 @@ public class SearchTupleFunction implements TupleFunction {
 		StatementIndices indices = (StatementIndices) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_INDICES_ATTRIBUTE);
 		RDFFactory rdfFactory = indices.getRDFFactory();
 		SearchClient searchClient = (SearchClient) QueryContext.getQueryContext().getAttribute(HBaseSailConnection.QUERY_CONTEXT_SEARCH_ATTRIBUTE);
+		if (searchClient == null) {
+			throw new QueryEvaluationException("Search index not configured");
+		}
+
 		try {
 			SearchResponse<SearchDocument> searchResults = searchClient.search(query, limit, fuzziness, phraseSlop);
 			List<List<Hit<SearchDocument>>> results;

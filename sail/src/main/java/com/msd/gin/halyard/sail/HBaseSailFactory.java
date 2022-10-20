@@ -63,7 +63,7 @@ public final class HBaseSailFactory implements SailFactory {
 			if (hasValue(hconfig.getTableName()) && (hasValue(hconfig.getSnapshotName()) || hasValue(hconfig.getSnapshotRestorePath()))) {
 				throw new SailConfigException("Invalid sail configuration: cannot specify both table and snapshot");
 			}
-			ElasticSettings elasticSettings = ElasticSettings.from(hconfig.getElasticIndexURL());
+			ElasticSettings elasticSettings = ElasticSettings.from(hconfig.getElasticIndexURL(), null);
 			if (elasticSettings != null) {
 				elasticSettings.username = hconfig.getElasticUsername();
 				elasticSettings.password = hconfig.getElasticPassword();

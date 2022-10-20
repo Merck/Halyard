@@ -22,7 +22,6 @@ import com.msd.gin.halyard.sail.HBaseSail;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 
@@ -89,8 +88,7 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
                 }
             }
             String source = cfg.get(SOURCE);
-            String elasticIndexURL = cfg.get(HalyardBulkUpdate.ELASTIC_INDEX_URL);
-        	HBaseSail sail = new HBaseSail(cfg, source, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null);
+        	HBaseSail sail = new HBaseSail(cfg, source, false, 0, true, 0, getElasticSettings(cfg), null);
             Function fn = new ParallelSplitFunction(qis.getRepeatIndex());
             sail.getFunctionRegistry().add(fn);
             try {
@@ -117,7 +115,7 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
         addOption("p", "jdbc-property", "property=value", "JDBC connection property", false, false);
         addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
         addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name", false, true);
-        addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
     }
 
     @Override
@@ -142,7 +140,7 @@ public final class HalyardBulkExport extends AbstractHalyardTool {
             }
             getConf().setStrings(JDBC_PROPERTIES, props);
         }
-        if (cmd.hasOption('i')) getConf().set(HalyardBulkUpdate.ELASTIC_INDEX_URL, cmd.getOptionValue('i'));
+        configureString(cmd, 'i', null);
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                NTriplesUtil.class,
                Rio.class,

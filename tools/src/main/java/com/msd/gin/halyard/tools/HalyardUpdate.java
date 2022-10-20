@@ -16,15 +16,13 @@
  */
 package com.msd.gin.halyard.tools;
 
-import java.net.URL;
+import com.msd.gin.halyard.sail.HBaseSail;
 
 import org.apache.commons.cli.CommandLine;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.Update;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-
-import com.msd.gin.halyard.sail.HBaseSail;
 
 /**
  * Command line tool executing SPARQL Update query on Halyard dataset directly
@@ -40,15 +38,15 @@ public final class HalyardUpdate extends AbstractHalyardTool {
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "update-operation", "sparql_update_operation", "SPARQL update operation to be executed", true, true);
-        addOption("i", "elastic-index", "elastic_index_url", "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
     }
 
 
     public int run(CommandLine cmd) throws Exception {
         String source = cmd.getOptionValue('s');
         String query = cmd.getOptionValue('q');
-    	String elasticIndexURL = cmd.getOptionValue('i');
-		SailRepository rep = new SailRepository(new HBaseSail(getConf(), source, false, 0, true, 0, elasticIndexURL != null ? new URL(elasticIndexURL) : null, null));
+        configureString(cmd, 'i', null);
+		SailRepository rep = new SailRepository(new HBaseSail(getConf(), source, false, 0, true, 0, getElasticSettings(getConf()), null));
         rep.init();
         try {
         	try(RepositoryConnection conn = rep.getConnection()) {

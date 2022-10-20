@@ -144,7 +144,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 			return indexName;
 		}
 
-		static ElasticSettings from(URL esIndexUrl) {
+		public static ElasticSettings from(URL esIndexUrl, SSLSettings sslSettings) {
 			if (esIndexUrl == null) {
 				return null;
 			}
@@ -153,6 +153,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 			settings.host = esIndexUrl.getHost();
 			settings.port = esIndexUrl.getPort();
 			settings.indexName = esIndexUrl.getPath().substring(1);
+			settings.sslSettings = sslSettings;
 			return settings;
 		}
 	}
@@ -246,9 +247,8 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	private final Queue<QueryInfo> queryHistory = new ArrayBlockingQueue<>(10, true);
 
 
-	HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings) {
-		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, null, HBaseSailConnection.Factory.INSTANCE,
-				new HBaseFederatedServiceResolver(null, config, tableName, evaluationTimeout, null));
+	public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings) {
+		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, null, HBaseSailConnection.Factory.INSTANCE);
 	}
 
 	/**
@@ -285,7 +285,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	}
 
 	public HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL) {
-		this(config, snapshotName, snapshotRestorePath, pushStrategy, evaluationTimeout, ElasticSettings.from(elasticIndexURL));
+		this(config, snapshotName, snapshotRestorePath, pushStrategy, evaluationTimeout, ElasticSettings.from(elasticIndexURL, null));
 	}
 
 	HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings) {
@@ -325,13 +325,22 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		this.federatedServiceResolver = fsr;
 	}
 
-	private HBaseSail(@Nullable Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
-		this(conn, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, ElasticSettings.from(elasticIndexURL), ticker, connFactory,
+	private HBaseSail(@Nullable Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker,
+			SailConnectionFactory connFactory) {
+		this(conn, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, ticker, connFactory,
 				new HBaseFederatedServiceResolver(conn, config, tableName, evaluationTimeout, null));
 	}
 
 	public HBaseSail(@Nonnull Connection conn, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker) {
-		this(conn, conn.getConfiguration(), tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE);
+		this(conn, conn.getConfiguration(), tableName, create, splitBits, pushStrategy, evaluationTimeout, ElasticSettings.from(elasticIndexURL, null), ticker, HBaseSailConnection.Factory.INSTANCE);
+	}
+
+	public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker, SailConnectionFactory connFactory) {
+		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, ticker, connFactory);
+	}
+
+	public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker) {
+		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, ticker, HBaseSailConnection.Factory.INSTANCE);
 	}
 
     /**
@@ -349,12 +358,8 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	 * @param connFactory {@link SailConnectionFactory} for creating connections
 	 */
     public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
-		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, connFactory);
+		this(config, tableName, create, splitBits, pushStrategy, evaluationTimeout, ElasticSettings.from(elasticIndexURL, null), ticker, connFactory);
     }
-
-	public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker) {
-		this(config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticIndexURL, ticker, HBaseSailConnection.Factory.INSTANCE);
-	}
 
 	@Override
 	public boolean isPushStrategyEnabled() {
