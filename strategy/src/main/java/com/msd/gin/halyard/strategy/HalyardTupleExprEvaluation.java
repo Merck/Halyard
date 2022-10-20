@@ -208,7 +208,7 @@ final class HalyardTupleExprEvaluation {
      */
     QueryEvaluationStep precompile(TupleExpr expr) {
     	BindingSetPipeEvaluationStep step = precompileTupleExpr(expr);
-    	return (bs) -> executor.pushAndPull(pipe -> step.evaluate(pipe, bs), expr, parentStrategy);
+    	return (bs) -> executor.pushAndPull(pipe -> step.evaluate(pipe, bs), expr, bs, parentStrategy);
     }
 
     /**
@@ -491,7 +491,7 @@ final class HalyardTupleExprEvaluation {
 
                 return result;
             }
-		}, sp, parentStrategy);
+		}, sp, bindings, parentStrategy);
     }
 
     private boolean isUnbound(Var var, BindingSet bindings) {
@@ -658,7 +658,7 @@ final class HalyardTupleExprEvaluation {
 
 			};
 		} // else standard reification iteration
-		executor.pullAndPushAsync(parent, results, ref, parentStrategy);
+		executor.pullAndPushAsync(parent, results, ref, bindings, parentStrategy);
 	}
 
     /**
@@ -853,7 +853,7 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateDescribeOperator(BindingSetPipe parent, DescribeOperator operator, BindingSet bindings) {
     	executor.pullAndPushAsync(parent, new DescribeIteration(precompile(operator.getArg()).evaluate(bindings), parentStrategy,
-				operator.getBindingNames(), bindings), operator, parentStrategy);
+				operator.getBindingNames(), bindings), operator, bindings, parentStrategy);
     }
 
 	/**
@@ -1472,7 +1472,7 @@ final class HalyardTupleExprEvaluation {
                 }
                 // otherwise: perform a SELECT query
                 CloseableIteration<BindingSet, QueryEvaluationException> result = fs.select(service, freeVars, bindings, baseUri);
-                executor.pullAndPushAsync(parent, service.isSilent() ? new SilentIteration<>(result) : result, service, parentStrategy);
+                executor.pullAndPushAsync(parent, service.isSilent() ? new SilentIteration<>(result) : result, service, bindings, parentStrategy);
             } catch (QueryEvaluationException e) {
                 // suppress exceptions if silent
                 if (service.isSilent()) {
@@ -2398,7 +2398,7 @@ final class HalyardTupleExprEvaluation {
                     return parentStrategy.evaluate(expr, bindings);
                 }
 
-            }, scope, subjectVar, pathExpression, objVar, contextVar, minLength, bindings), alp, parentStrategy);
+            }, scope, subjectVar, pathExpression, objVar, contextVar, minLength, bindings), alp, bindings, parentStrategy);
         } catch (QueryEvaluationException e) {
             parent.handleException(e);
         }

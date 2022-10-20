@@ -206,8 +206,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
      */
 	void pullAndPushAsync(BindingSetPipe pipe,
 			CloseableIteration<BindingSet, QueryEvaluationException> iter,
-			TupleExpr node, HalyardEvaluationStrategy strategy) {
-		executor.execute(new IterateAndPipeTask(pipe, iter, node, strategy));
+			TupleExpr node, BindingSet bs, HalyardEvaluationStrategy strategy) {
+		executor.execute(new IterateAndPipeTask(pipe, iter, node, bs, strategy));
     }
 
     /**
@@ -216,9 +216,9 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
      * @param node an implementation of any {@TupleExpr} sub-type
      * @return iteration of binding sets to pull from.
      */
-	CloseableIteration<BindingSet, QueryEvaluationException> pushAndPull(Consumer<BindingSetPipe> pushAction, TupleExpr node, HalyardEvaluationStrategy strategy) {
+	CloseableIteration<BindingSet, QueryEvaluationException> pushAndPull(Consumer<BindingSetPipe> pushAction, TupleExpr node, BindingSet bs, HalyardEvaluationStrategy strategy) {
         BindingSetPipeQueue queue = new BindingSetPipeQueue();
-        executor.execute(new PipeAndQueueTask(queue.pipe, pushAction, node, strategy));
+        executor.execute(new PipeAndQueueTask(queue.pipe, pushAction, node, bs, strategy));
         return queue.iteration;
 	}
 
@@ -301,17 +301,23 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     	static final int MIN_SUB_PRIORITY = 0;
     	static final int MAX_SUB_PRIORITY = 999;
     	final TupleExpr queryNode;
+    	final BindingSet bindingSet;
     	final int queryPriority;
     	final HalyardEvaluationStrategy strategy;
 
-    	PrioritizedTask(TupleExpr queryNode, HalyardEvaluationStrategy strategy) {
+    	PrioritizedTask(TupleExpr queryNode, BindingSet bs, HalyardEvaluationStrategy strategy) {
     		this.queryNode = queryNode;
+    		this.bindingSet = bs;
     		this.queryPriority = getPriorityForNode(queryNode);
     		this.strategy = strategy;
     	}
 
     	public final TupleExpr getQueryNode() {
     		return queryNode;
+    	}
+
+    	public final BindingSet getBindingSet() {
+    		return bindingSet;
     	}
 
     	public final int getTaskPriority() {
@@ -332,7 +338,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
     	@Override
     	public String toString() {
-    		return super.toString() + "[queryNode = " + queryNode.getSignature() + "[cost = " + queryNode.getCostEstimate() + ", cardinality = " + queryNode.getResultSizeEstimate() + ", count = " + queryNode.getResultSizeActual() + ", time = " + queryNode.getTotalTimeNanosActual() + "], priority = " + getTaskPriority() + ", strategy = " + strategy + "]";
+    		return super.toString() + "[queryNode = " + queryNode.getSignature() + "[cost = " + queryNode.getCostEstimate() + ", cardinality = " + queryNode.getResultSizeEstimate() + ", count = " + queryNode.getResultSizeActual() + ", time = " + queryNode.getTotalTimeNanosActual() + "], bindingSet = " + getBindingSet() + ", priority = " + getTaskPriority() + ", strategy = " + strategy + "]";
     	}
     }
 
@@ -351,8 +357,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
          */
 		IterateAndPipeTask(BindingSetPipe pipe,
 				CloseableIteration<BindingSet, QueryEvaluationException> iter,
-				TupleExpr expr, HalyardEvaluationStrategy strategy) {
-			super(expr, strategy);
+				TupleExpr expr, BindingSet bs, HalyardEvaluationStrategy strategy) {
+			super(expr, bs, strategy);
             this.pipe = pipe;
             this.iter = strategy.track(iter, expr);
         }
@@ -403,8 +409,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
         private final BindingSetPipe pipe;
         private final Consumer<BindingSetPipe> pushAction;
 
-		PipeAndQueueTask(BindingSetPipe pipe, Consumer<BindingSetPipe> pushAction, TupleExpr expr, HalyardEvaluationStrategy strategy) {
-			super(expr, strategy);
+		PipeAndQueueTask(BindingSetPipe pipe, Consumer<BindingSetPipe> pushAction, TupleExpr expr, BindingSet bs, HalyardEvaluationStrategy strategy) {
+			super(expr, bs, strategy);
 			this.pipe = pipe;
 			this.pushAction = pushAction;
 		}
