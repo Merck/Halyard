@@ -79,6 +79,7 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                 "Each property name is fully qualified class.field name of WriterSetting and property value is fully qualified " +
                 " class.field or enum name with the value to set. For example: " +
                 "\"org.eclipse.rdf4j.rio.helpers.JSONLDSettings.JSONLD_MODE=org.eclipse.rdf4j.rio.helpers.JSONLDMode.COMPACT\"", false, true);
+        addOption(null, "pull", null, "Use a pull-based evaluation strategy", false, false);
     }
 
     /**
@@ -97,13 +98,14 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
             int port = parsePort(cmd);
             String table = cmd.getOptionValue('s');
             configureString(cmd, 'i', null);
+            boolean usePush = !cmd.hasOption("pull");
 
             // Any left-over non-recognized options and arguments are considered as part of user's custom commands
             // that are to be run by this tool
             List<String> cmdArgs = Arrays.asList(cmd.getArgs());
 
             SailRepository rep = new SailRepository(
-                    new HBaseSail(getConf(), table, false, 0, true, timeout, getElasticSettings(getConf())));
+                    new HBaseSail(getConf(), table, false, 0, usePush, timeout, getElasticSettings(getConf())));
             rep.init();
             try {
                 Properties storedQueries = new Properties();
