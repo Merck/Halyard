@@ -36,13 +36,16 @@ import javax.management.ObjectName;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
+import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.Service;
+import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
+import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.slf4j.Logger;
@@ -338,11 +341,63 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
     	@Override
     	public String toString() {
-    		return super.toString() + "[queryNode = " + queryNode.getSignature() + "[cost = " + queryNode.getCostEstimate() + ", cardinality = " + queryNode.getResultSizeEstimate() + ", count = " + queryNode.getResultSizeActual() + ", time = " + queryNode.getTotalTimeNanosActual() + "], bindingSet = " + getBindingSet() + ", priority = " + getTaskPriority() + ", strategy = " + strategy + "]";
+    		return super.toString() + "[queryNode = " + printQueryNode(queryNode, bindingSet) + ", priority = " + getTaskPriority() + ", strategy = " + strategy + "]";
     	}
-    }
+	}
 
-    /**
+	static String printQueryNode(TupleExpr queryNode, BindingSet bs) {
+		final class NodePrinter extends AbstractQueryModelVisitor<RuntimeException> {
+			final StringBuilder sb = new StringBuilder(128);
+			@Override
+			public void meetNode(QueryModelNode node) {
+				sb.append(node.getSignature());
+				appendStats(node);
+			}
+			@Override
+			public void meet(StatementPattern node) {
+				sb.append(node.getSignature());
+				sb.append("(");
+				appendVar(node.getSubjectVar());
+				sb.append(" ");
+				appendVar(node.getPredicateVar());
+				sb.append(" ");
+				appendVar(node.getObjectVar());
+				if (node.getContextVar() != null) {
+					sb.append(" ");
+					appendVar(node.getContextVar());
+				}
+				sb.append(")");
+				appendStats(node);
+			}
+			void appendVar(Var var) {
+				if (!var.isConstant()) {
+					sb.append("?").append(var.getName()).append("=");
+				}
+				Value v = var.getValue();
+				if (v == null) {
+					v = bs.getValue(var.getName());
+				}
+				sb.append(v);
+			}
+			void appendStats(QueryModelNode node) {
+				sb.append("[");
+				sb.append("cost = ").append(node.getCostEstimate()).append(", ");
+				sb.append("cardinality = ").append(node.getResultSizeEstimate()).append(", ");
+				sb.append("count = ").append(node.getResultSizeActual()).append(", ");
+				sb.append("time = ").append(node.getTotalTimeNanosActual());
+				sb.append("]");
+			}
+			@Override
+			public String toString() {
+				return sb.toString();
+			}
+		}
+		NodePrinter nodePrinter = new NodePrinter();
+		queryNode.visit(nodePrinter);
+		return nodePrinter.toString();
+	}
+
+	/**
      * A holder for the BindingSetPipe and the iterator over a tree of query sub-parts
      */
     final class IterateAndPipeTask extends PrioritizedTask {
@@ -438,13 +493,13 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
         final BindingSetPipeIteration iteration = new BindingSetPipeIteration();
         final QueueingBindingSetPipe pipe = new QueueingBindingSetPipe();
 
-    	@Override
+        @Override
         public String toString() {
-        	return "Queue "+Integer.toHexString(queue.hashCode());
+        	return "Queue "+Integer.toHexString(queue.hashCode())+" for pipe "+Integer.toHexString(pipe.hashCode())+" and iteration "+Integer.toHexString(iteration.hashCode());
         }
 
         final class BindingSetPipeIteration extends LookAheadIteration<BindingSet, QueryEvaluationException> {
-        	final long jitteredTimeout;
+        	private final long jitteredTimeout;
 
         	BindingSetPipeIteration() {
         		// add some jitter to avoid threads timing out at the same time (-5%, +5%)
@@ -457,27 +512,26 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     			try {
                     for (int retries = 0; bs == null && !isClosed(); retries++) {
     					bs = queue.poll(jitteredTimeout, TimeUnit.MILLISECONDS);
-    					Throwable thr = exception;
-    					if (thr != null) {
-	    					if (thr instanceof RuntimeException) {
-	    						throw (RuntimeException) thr;
-	    					} else {
-	                        	throw new QueryEvaluationException(thr);
-	                        }
-    					}
-
 						if (bs == null) {
+							// no data available - check for exception
+	    					Throwable thr = exception;
+	    					if (thr != null) {
+		    					if (thr instanceof RuntimeException) {
+		    						throw (RuntimeException) thr;
+		    					} else {
+		                        	throw new QueryEvaluationException(thr);
+		                        }
+	    					}
 							if(checkThreads(retries)) {
 								retries = 0;
 							}
-						} else {
-							resetThreads();
 						}
                     }
                 } catch (InterruptedException ex) {
                     throw new QueryEvaluationException(ex);
                 }
-                return bs == END_OF_QUEUE ? null : bs;
+				resetThreads();
+                return (bs == END_OF_QUEUE) ? null : bs;
             }
 
             @Override
@@ -489,13 +543,13 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
             @Override
             public String toString() {
-            	return "Iteration for queue "+Integer.toHexString(queue.hashCode());
+            	return "Iteration "+Integer.toHexString(this.hashCode())+" for queue "+Integer.toHexString(queue.hashCode());
             }
         }
 
         final class QueueingBindingSetPipe extends BindingSetPipe {
-        	private final long jitteredTimeout;
-        	volatile boolean isClosed = false;
+            private final long jitteredTimeout;
+            volatile boolean isClosed = false;
 
             QueueingBindingSetPipe() {
             	super(null);
@@ -550,7 +604,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
             @Override
             public String toString() {
-            	return "Pipe for queue "+Integer.toHexString(queue.hashCode());
+            	return "Pipe "+Integer.toHexString(this.hashCode())+" for queue "+Integer.toHexString(queue.hashCode());
             }
         }
     }
