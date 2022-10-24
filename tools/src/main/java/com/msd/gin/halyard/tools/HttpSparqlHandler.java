@@ -160,14 +160,20 @@ public final class HttpSparqlHandler implements HttpHandler {
      */
     @Override
     public void handle(HttpExchange exchange) throws IOException {
+        String requestMethod = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
         try {
-            SparqlQuery sparqlQuery = retrieveQuery(exchange);
-        	try(SailRepositoryConnection connection = repository.getConnection()) {
-        		if (sparqlQuery.getQuery() != null) {
-        			evaluateQuery(connection, sparqlQuery, exchange);
-        		} else if (sparqlQuery.getUpdate() != null) {
-        			evaluateUpdate(connection, sparqlQuery, exchange);
-        		}
+        	if ("GET".equalsIgnoreCase(requestMethod) && "/_health".equals(path)) {
+                exchange.sendResponseHeaders(HttpURLConnection.HTTP_NO_CONTENT, 0);
+        	} else {
+	            SparqlQuery sparqlQuery = retrieveQuery(exchange);
+	        	try(SailRepositoryConnection connection = repository.getConnection()) {
+	        		if (sparqlQuery.getQuery() != null) {
+	        			evaluateQuery(connection, sparqlQuery, exchange);
+	        		} else if (sparqlQuery.getUpdate() != null) {
+	        			evaluateUpdate(connection, sparqlQuery, exchange);
+	        		}
+	        	}
         	}
         } catch (IllegalArgumentException | RDF4JException e) {
             StringWriter sw = new StringWriter();

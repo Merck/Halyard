@@ -610,6 +610,13 @@ public class HttpSparqlHandlerTest {
         assertEquals(HttpURLConnection.HTTP_NO_CONTENT, urlConnection.getResponseCode());
     }
 
+    @Test
+    public void testHealth() throws IOException {
+        URL url = new URL(SERVER_URL + "/_health");
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        assertEquals(HttpURLConnection.HTTP_NO_CONTENT, urlConnection.getResponseCode());
+    }
+
     /**
      * Help method for checking response content, only boolean value is expected (result of ASK query)
      *
