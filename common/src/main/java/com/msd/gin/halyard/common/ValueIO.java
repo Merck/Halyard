@@ -427,9 +427,9 @@ public class ValueIO {
 		if (defaultValueIO == null) {
 			synchronized (ValueIO.class) {
 				if (defaultValueIO == null) {
-					boolean loadVocabularies = Config.getBoolean("halyard.vocabularies", true);
-					boolean loadLanguages = Config.getBoolean("halyard.languages", true);
-					int stringCompressionThreshold = Config.getInteger("halyard.string.compressionThreshold", 200);
+					boolean loadVocabularies = Boolean.parseBoolean(System.getProperty("halyard.vocabularies", "true"));
+					boolean loadLanguages = Boolean.parseBoolean(System.getProperty("halyard.languages", "true"));
+					int stringCompressionThreshold = Integer.parseInt(System.getProperty("halyard.string.compressionThreshold", "200"));
 					defaultValueIO = new ValueIO(loadVocabularies, loadLanguages, stringCompressionThreshold);
 				}
 			}
@@ -447,6 +447,9 @@ public class ValueIO {
 	private final int stringCompressionThreshold;
 
 	public ValueIO(boolean loadVocabularies, boolean loadLanguages, int stringCompressionThreshold) {
+		if (stringCompressionThreshold < 0) {
+			throw new IllegalArgumentException("String compression threshold must be greater than or equal to zero");
+		}
 		this.stringCompressionThreshold = stringCompressionThreshold;
 
 		if (loadVocabularies) {

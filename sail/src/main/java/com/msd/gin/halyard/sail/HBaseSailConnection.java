@@ -19,7 +19,6 @@ package com.msd.gin.halyard.sail;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.algebra.Algebra;
-import com.msd.gin.halyard.common.Config;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
@@ -102,9 +101,8 @@ public class HBaseSailConnection extends AbstractSailConnection {
 	public static final String QUERY_CONTEXT_KEYSPACE_ATTRIBUTE = KeyspaceConnection.class.getName();
 	public static final String QUERY_CONTEXT_INDICES_ATTRIBUTE = StatementIndices.class.getName();
 	public static final String QUERY_CONTEXT_SEARCH_ATTRIBUTE = SearchClient.class.getName();
-	private static final int MAX_QUERY_CACHE_SIZE = Config.getInteger("hayard.evaluation.maxQueryCacheSize", 100);
 
-	private final Cache<PreparedQueryKey, PreparedQuery> queryCache = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(MAX_QUERY_CACHE_SIZE).expireAfterWrite(1L, TimeUnit.HOURS).build();
+	private final Cache<PreparedQueryKey, PreparedQuery> queryCache;
 
     private final HBaseSail sail;
 	private final SearchClient searchClient;
@@ -115,7 +113,9 @@ public class HBaseSailConnection extends AbstractSailConnection {
 	private boolean lastUpdateWasDelete;
 
 	public HBaseSailConnection(HBaseSail sail) throws IOException {
-    	this.sail = sail;
+		this.sail = sail;
+		int queryCacheMaxSize = sail.getConfiguration().getInt(EvaluationConfig.QUERY_CACHE_MAX_SIZE, 100);
+		queryCache = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(queryCacheMaxSize).expireAfterWrite(1L, TimeUnit.HOURS).build();
 		// tables are lightweight but not thread-safe so get a new instance per sail
 		// connection
 		this.keyspaceConn = sail.keyspace.getConnection();
@@ -183,7 +183,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 		EvaluationStrategy strategy;
 		HalyardEvaluationStatistics stats = getStatistics();
 		if (sail.pushStrategy) {
-			strategy = new HalyardEvaluationStrategy(source, queryContext, sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), dataset, sail.getFederatedServiceResolver(), stats);
+			strategy = new HalyardEvaluationStrategy(sail.getConfiguration(), source, queryContext, sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), dataset, sail.getFederatedServiceResolver(), stats);
 		} else {
 			strategy = new ExtendedEvaluationStrategy(source, dataset, sail.getFederatedServiceResolver(), sail.getTupleFunctionRegistry(), sail.getFunctionRegistry(), 0L, stats);
 			strategy.setOptimizerPipeline(new ExtendedQueryOptimizerPipeline(strategy, source.getValueFactory(), stats));

@@ -12,7 +12,6 @@ import javax.annotation.concurrent.ThreadSafe;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
 import org.eclipse.rdf4j.model.IRI;
@@ -93,28 +92,28 @@ public class RDFFactory {
 
 	private RDFFactory(HalyardConfiguration halyardConfig) {
 		valueIO = new ValueIO(
-			halyardConfig.getBoolean(Config.VOCAB),
-			halyardConfig.getBoolean(Config.LANG),
-			halyardConfig.getInteger(Config.STRING_COMPRESSION)
+			halyardConfig.getBoolean(Config.VOCAB, true),
+			halyardConfig.getBoolean(Config.LANG, true),
+			halyardConfig.getInt(Config.STRING_COMPRESSION, 500)
 		);
-		String confIdAlgo = halyardConfig.getString(Config.ID_HASH);
-		int confIdSize = halyardConfig.getInteger(Config.ID_SIZE);
+		String confIdAlgo = halyardConfig.get(Config.ID_HASH, null);
+		int confIdSize = halyardConfig.getInt(Config.ID_SIZE, -1);
 		int idSize = Hashes.getHash(confIdAlgo, confIdSize).size();
 		LOGGER.info("Identifier hash: {} {}-bit ({} bytes)", confIdAlgo, idSize*Byte.SIZE, idSize);
 
-		int typeIndex = lessThan(lessThanOrEqual(halyardConfig.getInteger(Config.ID_TYPE_INDEX), Short.BYTES), idSize);
-		ValueIdentifier.TypeNibble typeNibble = halyardConfig.getBoolean(Config.ID_TYPE_NIBBLE) ? ValueIdentifier.TypeNibble.LITTLE_NIBBLE : ValueIdentifier.TypeNibble.BIG_NIBBLE;
+		int typeIndex = lessThan(lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInt(Config.ID_TYPE_INDEX, -1), 0), Short.BYTES), idSize);
+		ValueIdentifier.TypeNibble typeNibble = halyardConfig.getBoolean(Config.ID_TYPE_NIBBLE, false) ? ValueIdentifier.TypeNibble.LITTLE_NIBBLE : ValueIdentifier.TypeNibble.BIG_NIBBLE;
 		idFormat = new ValueIdentifier.Format(confIdAlgo, idSize, typeIndex, typeNibble);
 		typeSaltSize = idFormat.getSaltSize();
 
-		int subjectKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.KEY_SIZE_SUBJECT), MIN_KEY_SIZE), idSize);
-		int subjectEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.END_KEY_SIZE_SUBJECT), MIN_KEY_SIZE), idSize);
-		int predicateKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.KEY_SIZE_PREDICATE), MIN_KEY_SIZE), idSize);
-		int predicateEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.END_KEY_SIZE_PREDICATE), MIN_KEY_SIZE), idSize);
-		int objectKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.KEY_SIZE_OBJECT), MIN_KEY_SIZE), idSize);
-		int objectEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.END_KEY_SIZE_OBJECT), MIN_KEY_SIZE), idSize);
-		int contextKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.KEY_SIZE_CONTEXT), MIN_KEY_SIZE), idSize);
-		int contextEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInteger(Config.END_KEY_SIZE_CONTEXT), 0), idSize);
+		int subjectKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInt(Config.KEY_SIZE_SUBJECT, -1), MIN_KEY_SIZE), idSize);
+		int subjectEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInt(Config.END_KEY_SIZE_SUBJECT, -1), MIN_KEY_SIZE), idSize);
+		int predicateKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInt(Config.KEY_SIZE_PREDICATE, -1), MIN_KEY_SIZE), idSize);
+		int predicateEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInt(Config.END_KEY_SIZE_PREDICATE, -1), MIN_KEY_SIZE), idSize);
+		int objectKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInt(Config.KEY_SIZE_OBJECT, -1), MIN_KEY_SIZE), idSize);
+		int objectEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInt(Config.END_KEY_SIZE_OBJECT, -1), MIN_KEY_SIZE), idSize);
+		int contextKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInt(Config.KEY_SIZE_CONTEXT, -1), MIN_KEY_SIZE), idSize);
+		int contextEndKeySize = lessThanOrEqual(greaterThanOrEqual(halyardConfig.getInt(Config.END_KEY_SIZE_CONTEXT, -1), 0), idSize);
 
 		idTripleWriter = valueIO.createWriter(new IdTripleWriter());
 		streamWriter = valueIO.createStreamWriter();

@@ -29,6 +29,9 @@ public final class Hashes {
 	 * @return HashFunction
 	 */
 	public static HashFunction getHash(String algorithm, int size) {
+		if (size < 0) {
+			throw new IllegalArgumentException("Size must be greater than or equal to zero");
+		}
 		switch (algorithm) {
 			case "FarmHash-64":
 				return new GuavaHashFunction(algorithm, Hashing.farmHashFingerprint64(), size);

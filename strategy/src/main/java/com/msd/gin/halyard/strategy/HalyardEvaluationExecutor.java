@@ -16,11 +16,6 @@
  */
 package com.msd.gin.halyard.strategy;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.msd.gin.halyard.algebra.ServiceRoot;
-import com.msd.gin.halyard.common.Config;
-
 import java.lang.management.ManagementFactory;
 import java.util.Hashtable;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -34,6 +29,7 @@ import javax.management.JMException;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
+import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
 import org.eclipse.rdf4j.model.Value;
@@ -51,13 +47,15 @@ import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.algebra.ServiceRoot;
+
 final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean {
 	private static final Logger LOGGER = LoggerFactory.getLogger(HalyardEvaluationExecutor.class);
     private static final BindingSet END_OF_QUEUE = new EmptyBindingSet();
     // high default priority for dynamically created query nodes
     private static final int DEFAULT_PRIORITY = 65535;
-
-	static final HalyardEvaluationExecutor INSTANCE = new HalyardEvaluationExecutor();
 
 	private static TrackingThreadPoolExecutor createExecutor(String groupName, String namePrefix, int threads) {
 		ThreadGroup tg = new ThreadGroup(groupName);
@@ -73,18 +71,19 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 		return executor;
 	}
 
-    private int threads = Config.getInteger("halyard.evaluation.threads", 20);
-    private int maxRetries = Config.getInteger("halyard.evaluation.maxRetries", 3);
-    private int retryLimit = Config.getInteger("halyard.evaluation.retryLimit", 100);
-    private int threadGain = Config.getInteger("halyard.evaluation.threadGain", 5);
-    private int maxThreads = Config.getInteger("halyard.evaluation.maxThreads", 100);
-
-	private final TrackingThreadPoolExecutor executor = createExecutor("Halyard Executors", "Halyard ", threads);
     // a map of query model nodes and their priority
     private final Cache<QueryModelNode, Integer> priorityMapCache = CacheBuilder.newBuilder().weakKeys().build();
 
-    private int maxQueueSize = Config.getInteger("halyard.evaluation.maxQueueSize", 5000);
-	private int pollTimeoutMillis = Config.getInteger("halyard.evaluation.pollTimeoutMillis", 1000);
+    private int threads;
+    private int maxRetries;
+    private int retryLimit;
+    private int threadGain;
+    private int maxThreads;
+
+	private final TrackingThreadPoolExecutor executor;
+
+    private int maxQueueSize;
+	private int pollTimeoutMillis;
 
 	private volatile long previousCompletedTaskCount;
 
@@ -103,13 +102,24 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 		}
 	}
 
-	static {
+	HalyardEvaluationExecutor(Configuration conf) {
+	    threads = conf.getInt("halyard.evaluation.threads", 20);
+	    maxRetries = conf.getInt("halyard.evaluation.maxRetries", 3);
+	    retryLimit = conf.getInt("halyard.evaluation.retryLimit", 100);
+	    threadGain = conf.getInt("halyard.evaluation.threadGain", 5);
+	    maxThreads = conf.getInt("halyard.evaluation.maxThreads", 100);
+		executor = createExecutor("Halyard Executors", "Halyard ", threads);
+
+	    maxQueueSize = conf.getInt("halyard.evaluation.maxQueueSize", 5000);
+		pollTimeoutMillis = conf.getInt("halyard.evaluation.pollTimeoutMillis", 1000);
+
 		MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
 		try {
-			registerMBeans(mbs, INSTANCE);
+			registerMBeans(mbs, this);
 		} catch (JMException e) {
 			throw new AssertionError(e);
 		}
+		
 	}
 
 	@Override
@@ -366,6 +376,14 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 					sb.append(" ");
 					appendVar(node.getContextVar());
 				}
+				sb.append(")");
+				appendStats(node);
+			}
+			@Override
+			public void meet(Service node) {
+				sb.append(node.getSignature());
+				sb.append("(");
+				appendVar(node.getServiceRef());
 				sb.append(")");
 				appendStats(node);
 			}

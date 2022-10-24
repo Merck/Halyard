@@ -4,6 +4,7 @@ import com.msd.gin.halyard.algebra.ServiceRoot;
 
 import java.util.Collections;
 
+import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.Service;
@@ -30,7 +31,7 @@ public class HalyardEvaluationExecutorTest {
 		Join j2 = new Join(sp2, sp3);
 		Join j1 = new Join(sp1, j2);
 		QueryRoot root = new QueryRoot(j1);
-		HalyardEvaluationExecutor executor = new HalyardEvaluationExecutor();
+		HalyardEvaluationExecutor executor = new HalyardEvaluationExecutor(new Configuration());
 		assertEquals(1, executor.getPriorityForNode(j1));
 		assertEquals(2, executor.getPriorityForNode(sp1));
 		assertEquals(6, executor.getPriorityForNode(j2));
@@ -49,7 +50,7 @@ public class HalyardEvaluationExecutorTest {
 		Join j2 = new Join(sp2, service);
 		Join j1 = new Join(sp1, j2);
 		QueryRoot root = new QueryRoot(j1);
-		HalyardEvaluationExecutor executor = new HalyardEvaluationExecutor();
+		HalyardEvaluationExecutor executor = new HalyardEvaluationExecutor(new Configuration());
 		assertEquals(1, executor.getPriorityForNode(j1));
 		assertEquals(2, executor.getPriorityForNode(sp1));
 		assertEquals(6, executor.getPriorityForNode(j2));

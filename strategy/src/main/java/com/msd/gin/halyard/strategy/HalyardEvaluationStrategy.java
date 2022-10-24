@@ -23,6 +23,7 @@ import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.IterationWrapper;
 import org.eclipse.rdf4j.model.Value;
@@ -57,6 +58,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtility;
 public class HalyardEvaluationStrategy implements EvaluationStrategy {
 	public static final String QUERY_CONTEXT_SOURCE_STRING_ATTRIBUTE = "SourceString";
 
+	private final Configuration conf;
     private final Dataset dataset;
 	/**
 	 * Used to allow queries across more than one Halyard datasets
@@ -101,10 +103,11 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 	 * @param serviceResolver {@code FederatedServiceResolver} resolver for any federated services (graphs) required for the evaluation
 	 * @param statistics statistics to use
 	 */
-	public HalyardEvaluationStrategy(TripleSource tripleSource, QueryContext queryContext,
+	public HalyardEvaluationStrategy(Configuration conf, TripleSource tripleSource, QueryContext queryContext,
 			TupleFunctionRegistry tupleFunctionRegistry,
 			FunctionRegistry functionRegistry, Dataset dataset, FederatedServiceResolver serviceResolver,
 			HalyardEvaluationStatistics statistics) {
+		this.conf = conf;
 		this.tripleSource = tripleSource;
 		this.queryContext = queryContext;
 		this.dataset = dataset;
@@ -115,9 +118,9 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 		this.pipeline = new HalyardQueryOptimizerPipeline(this, tripleSource.getValueFactory(), statistics);
 	}
 
-	public HalyardEvaluationStrategy(TripleSource tripleSource, Dataset dataset,
+	public HalyardEvaluationStrategy(Configuration conf, TripleSource tripleSource, Dataset dataset,
 			FederatedServiceResolver serviceResolver, HalyardEvaluationStatistics statistics) {
-		this(tripleSource, new QueryContext(), TupleFunctionRegistry.getInstance(), FunctionRegistry.getInstance(),
+		this(conf, tripleSource, new QueryContext(), TupleFunctionRegistry.getInstance(), FunctionRegistry.getInstance(),
 				dataset, serviceResolver, statistics);
 	}
 
@@ -133,6 +136,10 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 
 	boolean isStrict() {
 		return isStrict;
+	}
+
+	Configuration getConfiguration() {
+		return conf;
 	}
 
 	String getSourceString() {

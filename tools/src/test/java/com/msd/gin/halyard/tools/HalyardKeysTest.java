@@ -41,8 +41,10 @@ public class HalyardKeysTest extends AbstractHalyardToolTest {
 	@BeforeClass
 	public static void createData() throws Exception {
     	Configuration conf = HBaseServerTestInstance.getInstanceConfig();
+    	conf.set(Config.ID_HASH, "SHA-1");
     	conf.setInt(Config.ID_SIZE, 4);
     	conf.setInt(Config.ID_TYPE_INDEX, 0);
+    	conf.setBoolean(Config.ID_TYPE_NIBBLE, true);
     	conf.setInt(Config.KEY_SIZE_SUBJECT, 1);
     	conf.setInt(Config.END_KEY_SIZE_SUBJECT, 1);
     	conf.setInt(Config.KEY_SIZE_PREDICATE, 1);

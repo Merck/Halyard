@@ -17,17 +17,4 @@ public final class Config {
 	public static final String VOCAB = "halyard.vocabularies";
 	public static final String LANG = "halyard.languages";
 	public static final String STRING_COMPRESSION = "halyard.string.compressionThreshold";
-
-	public static String getString(String key, String defaultValue) {
-		return System.getProperty(key, defaultValue);
-	}
-
-	public static boolean getBoolean(String key, boolean defaultValue) {
-		String value = System.getProperty(key);
-		return (value != null) ? Boolean.parseBoolean(value) : defaultValue;
-	}
-
-	public static int getInteger(String key, int defaultValue) {
-		return Integer.getInteger(key, defaultValue);
-	}
 }

@@ -17,6 +17,8 @@
 package com.msd.gin.halyard.strategy;
 
 import static junit.framework.TestCase.*;
+
+import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
@@ -37,7 +39,7 @@ public class HalyardStrategyServiceTest {
 
     @Test
     public void testGetService() {
-        assertNull(new HalyardEvaluationStrategy(getTripleSource(), null, new FederatedServiceResolver() {
+        assertNull(new HalyardEvaluationStrategy(new Configuration(), getTripleSource(), null, new FederatedServiceResolver() {
             @Override
             public FederatedService getService(String serviceUrl) throws QueryEvaluationException {
                 return null;
@@ -47,7 +49,7 @@ public class HalyardStrategyServiceTest {
 
     @Test(expected = UnsupportedOperationException.class)
     public void testServiceEvaluateFail() {
-        new HalyardEvaluationStrategy(getTripleSource(), null, null, null).evaluate(null, null, null);
+        new HalyardEvaluationStrategy(new Configuration(), getTripleSource(), null, null, null).evaluate(null, null, null);
     }
 
     private TripleSource getTripleSource() {

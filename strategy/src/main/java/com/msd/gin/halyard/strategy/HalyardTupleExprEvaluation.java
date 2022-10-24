@@ -173,7 +173,7 @@ final class HalyardTupleExprEvaluation {
 	private static final int DEFAULT_HASH_JOIN_LIMIT = 10000;
 	private static final int MAX_INITIAL_HASH_JOIN_TABLE_SIZE = 5000;
 
-	private final HalyardEvaluationExecutor executor = HalyardEvaluationExecutor.INSTANCE;
+	private final HalyardEvaluationExecutor executor;
     private final HalyardEvaluationStrategy parentStrategy;
 	private final TupleFunctionRegistry tupleFunctionRegistry;
 	private final CustomAggregateFunctionRegistry aggregateFunctionRegistry = CustomAggregateFunctionRegistry.getInstance();
@@ -194,6 +194,7 @@ final class HalyardTupleExprEvaluation {
 	 */
 	HalyardTupleExprEvaluation(HalyardEvaluationStrategy parentStrategy, QueryContext queryContext,
 			TupleFunctionRegistry tupleFunctionRegistry, TripleSource tripleSource, Dataset dataset) {
+		this.executor = new HalyardEvaluationExecutor(parentStrategy.getConfiguration());
         this.parentStrategy = parentStrategy;
 		this.queryContext = queryContext;
 		this.tupleFunctionRegistry = tupleFunctionRegistry;

@@ -22,6 +22,7 @@ import com.msd.gin.halyard.optimizers.SimpleStatementPatternCardinalityCalculato
 
 import java.util.LinkedList;
 
+import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -74,7 +75,7 @@ public class MemoryStoreWithHalyardStrategy extends MemoryStore {
             @Override
             protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, final TripleSource tripleSource) {
             	HalyardEvaluationStatistics stats = new HalyardEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY, null);
-            	HalyardEvaluationStrategy evalStrat = new HalyardEvaluationStrategy(new MockTripleSource(tripleSource), dataset, null, stats) {
+            	HalyardEvaluationStrategy evalStrat = new HalyardEvaluationStrategy(new Configuration(), new MockTripleSource(tripleSource), dataset, null, stats) {
             		@Override
             		public QueryEvaluationStep precompile(TupleExpr expr) {
             			queryHistory.add(expr);

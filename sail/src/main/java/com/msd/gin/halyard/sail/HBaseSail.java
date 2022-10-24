@@ -282,6 +282,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		this.ticker = ticker;
 		this.connFactory = connFactory;
 		this.federatedServiceResolver = fsr;
+		initSettings(config);
 	}
 
 	public HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL) {
@@ -323,6 +324,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		this.ticker = ticker;
 		this.connFactory = connFactory;
 		this.federatedServiceResolver = fsr;
+		initSettings(config);
 	}
 
 	private HBaseSail(@Nullable Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker,
@@ -360,6 +362,11 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
     public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
 		this(config, tableName, create, splitBits, pushStrategy, evaluationTimeout, ElasticSettings.from(elasticIndexURL, null), ticker, connFactory);
     }
+
+	private void initSettings(Configuration config) {
+		trackResultSize = config.getBoolean(EvaluationConfig.TRACK_RESULT_SIZE, false);
+		trackResultTime = config.getBoolean(EvaluationConfig.TRACK_RESULT_TIME, false);
+	}
 
 	@Override
 	public boolean isPushStrategyEnabled() {

@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.SingletonIteration;
 import org.eclipse.rdf4j.model.IRI;
@@ -33,7 +34,8 @@ public class TupleFunctionCallTest {
 	@Test
 	public void testDependency() {
 		ValueFactory vf = SimpleValueFactory.getInstance();
-		HalyardEvaluationStrategy strategy = new HalyardEvaluationStrategy(new EmptyTripleSource(vf),
+		HalyardEvaluationStrategy strategy = new HalyardEvaluationStrategy(new Configuration(),
+				new EmptyTripleSource(vf),
 				new SimpleDataset(),
 				null, new HalyardEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY, null));
 		QueryBindingSet bs1 = new QueryBindingSet();
