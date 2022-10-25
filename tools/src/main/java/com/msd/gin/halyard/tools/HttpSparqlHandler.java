@@ -160,11 +160,10 @@ public final class HttpSparqlHandler implements HttpHandler {
      */
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        String requestMethod = exchange.getRequestMethod();
         String path = exchange.getRequestURI().getPath();
         try {
-        	if ("GET".equalsIgnoreCase(requestMethod) && "/_health".equals(path)) {
-                exchange.sendResponseHeaders(HttpURLConnection.HTTP_NO_CONTENT, 0);
+        	if ("/_health".equals(path)) {
+                exchange.sendResponseHeaders(HttpURLConnection.HTTP_NO_CONTENT, -1);
         	} else {
 	            SparqlQuery sparqlQuery = retrieveQuery(exchange);
 	        	try(SailRepositoryConnection connection = repository.getConnection()) {
@@ -176,21 +175,13 @@ public final class HttpSparqlHandler implements HttpHandler {
 	        	}
         	}
         } catch (IllegalArgumentException | RDF4JException e) {
-            StringWriter sw = new StringWriter();
-            try (PrintWriter w = new PrintWriter(sw)) {
-                e.printStackTrace(w);
-            }
-            LOGGER.warn(sw.toString());
-            sendResponse(exchange, HttpURLConnection.HTTP_BAD_REQUEST, sw.toString());
+            LOGGER.warn("Bad request", e);
+            sendResponse(exchange, HttpURLConnection.HTTP_BAD_REQUEST, e);
         } catch (IOException | RuntimeException e) {
-            StringWriter sw = new StringWriter();
-            try (PrintWriter w = new PrintWriter(sw)) {
-                e.printStackTrace(w);
-            }
-            LOGGER.warn(sw.toString());
-            sendResponse(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR, sw.toString());
+            LOGGER.warn("Internal error", e);
+            sendResponse(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR, e);
         }
-
+        exchange.close();
     }
 
     /**
@@ -415,7 +406,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         if (query instanceof TupleQuery) {
             LOGGER.info("Evaluating tuple query: {}", queryString);
             TupleQueryResultWriterRegistry registry = TupleQueryResultWriterRegistry.getInstance();
-            QueryResultFormat format = getFormat(registry, exchange.getRequestURI().getPath(),
+            QueryResultFormat format = setFormat(registry, exchange.getRequestURI().getPath(),
                     acceptedMimeTypes, TupleQueryResultFormat.CSV, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
@@ -426,7 +417,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         } else if (query instanceof GraphQuery) {
             LOGGER.info("Evaluating graph query: {}", queryString);
             RDFWriterRegistry registry = RDFWriterRegistry.getInstance();
-            RDFFormat format = getFormat(registry, exchange.getRequestURI().getPath(),
+            RDFFormat format = setFormat(registry, exchange.getRequestURI().getPath(),
                     acceptedMimeTypes, RDFFormat.NTRIPLES, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
@@ -437,7 +428,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         } else if (query instanceof BooleanQuery) {
             LOGGER.info("Evaluating boolean query: {}", queryString);
             BooleanQueryResultWriterRegistry registry = BooleanQueryResultWriterRegistry.getInstance();
-            QueryResultFormat format = getFormat(registry, exchange.getRequestURI().getPath(),
+            QueryResultFormat format = setFormat(registry, exchange.getRequestURI().getPath(),
                     acceptedMimeTypes, BooleanQueryResultFormat.JSON, exchange.getResponseHeaders());
             exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
             try (BufferedOutputStream response = new BufferedOutputStream(exchange.getResponseBody())) {
@@ -465,7 +456,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         }
         LOGGER.info("Executing update: {}", updateString);
         update.execute();
-        exchange.sendResponseHeaders(HttpURLConnection.HTTP_NO_CONTENT, 0);
+        exchange.sendResponseHeaders(HttpURLConnection.HTTP_NO_CONTENT, -1);
        	LOGGER.info("Update successfully processed");
     }
 
@@ -474,11 +465,15 @@ public final class HttpSparqlHandler implements HttpHandler {
      *
      * @param exchange HttpExchange wrapper encapsulating response
      * @param code     HTTP code
-     * @param message  Content of the response
+     * @param exception  Content of the response
      * @throws IOException
      */
-    private void sendResponse(HttpExchange exchange, int code, String message) throws IOException {
-        byte[] payload = message.getBytes(CHARSET);
+    private void sendResponse(HttpExchange exchange, int code, Exception exception) throws IOException {
+        StringWriter sw = new StringWriter();
+        try (PrintWriter w = new PrintWriter(sw)) {
+            exception.printStackTrace(w);
+        }
+        byte[] payload = sw.toString().getBytes(CHARSET);
         exchange.sendResponseHeaders(code, payload.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(payload);
@@ -500,7 +495,7 @@ public final class HttpSparqlHandler implements HttpHandler {
      * @param <S>
      * @return
      */
-    private <FF extends FileFormat, S extends Object> FF getFormat(FileFormatServiceRegistry<FF, S> reg,
+    private <FF extends FileFormat, S extends Object> FF setFormat(FileFormatServiceRegistry<FF, S> reg,
                                                                    String path, List<String> mimeTypes,
                                                                    FF defaultFormat, Headers h) {
         if (path != null) {
