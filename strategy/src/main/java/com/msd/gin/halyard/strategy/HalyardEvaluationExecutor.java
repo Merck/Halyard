@@ -57,7 +57,9 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     // high default priority for dynamically created query nodes
     private static final int DEFAULT_PRIORITY = 65535;
 
-	private static TrackingThreadPoolExecutor createExecutor(String groupName, String namePrefix, int threads) {
+    private static volatile HalyardEvaluationExecutor instance;
+
+    private static TrackingThreadPoolExecutor createExecutor(String groupName, String namePrefix, int threads) {
 		ThreadGroup tg = new ThreadGroup(groupName);
 		AtomicInteger threadSeq = new AtomicInteger();
 		ThreadFactory tf = (r) -> {
@@ -100,6 +102,17 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 			attrs.put("id", Integer.toString(executor.executor.hashCode()));
 			mbs.registerMBean(executor.executor, ObjectName.getInstance("com.msd.gin.halyard", attrs));
 		}
+	}
+
+	public static HalyardEvaluationExecutor getInstance(Configuration conf) {
+		if (instance == null) {
+			synchronized (HalyardEvaluationExecutor.class) {
+				if (instance == null) {
+					instance = new HalyardEvaluationExecutor(conf);
+				}
+			}
+		}
+		return instance;
 	}
 
 	HalyardEvaluationExecutor(Configuration conf) {

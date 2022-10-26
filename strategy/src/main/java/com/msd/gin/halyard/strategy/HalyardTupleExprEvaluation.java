@@ -194,7 +194,7 @@ final class HalyardTupleExprEvaluation {
 	 */
 	HalyardTupleExprEvaluation(HalyardEvaluationStrategy parentStrategy, QueryContext queryContext,
 			TupleFunctionRegistry tupleFunctionRegistry, TripleSource tripleSource, Dataset dataset) {
-		this.executor = new HalyardEvaluationExecutor(parentStrategy.getConfiguration());
+		this.executor = HalyardEvaluationExecutor.getInstance(parentStrategy.getConfiguration());
         this.parentStrategy = parentStrategy;
 		this.queryContext = queryContext;
 		this.tupleFunctionRegistry = tupleFunctionRegistry;
