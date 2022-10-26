@@ -16,7 +16,7 @@
  */
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.common.Config;
+import com.msd.gin.halyard.common.TableConfig;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFFactory;
@@ -146,7 +146,7 @@ public class HBaseSailTest {
 
     @Test
 	public void testInitializeAndShutDownWithElastic() throws Exception {
-		HBaseSail.ElasticSettings esSettings = HBaseSail.ElasticSettings.from(new URL("http://elastic:9200/index"), null);
+		ElasticSettings esSettings = ElasticSettings.from(new URL("http://elastic:9200/index"));
 		esSettings.username = "elastic";
 		esSettings.password = "f00bar";
 		HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), useTable("whatevertable"), true, 0, usePushStrategy, 10, esSettings);
@@ -532,9 +532,9 @@ public class HBaseSailTest {
 	public void testEvaluateSelectService_differentHashes() throws Exception {
 		ValueFactory vf = SimpleValueFactory.getInstance();
 		Configuration conf = hconn.getConfiguration();
-		conf.set(Config.ID_HASH, "Murmur3-128");
-		conf.setInt(Config.ID_SIZE, 6);
-		conf.setInt(Config.ID_TYPE_INDEX, 0);
+		conf.set(TableConfig.ID_HASH, "Murmur3-128");
+		conf.setInt(TableConfig.ID_SIZE, 6);
+		conf.setInt(TableConfig.ID_TYPE_INDEX, 0);
 		HBaseSail sail = new HBaseSail(hconn, useTable("whateverservice"), true, 0, usePushStrategy, 10, null, null);
 		SailRepository rep = new SailRepository(sail);
 		rep.init();
@@ -556,9 +556,9 @@ public class HBaseSailTest {
 		}
 		rep.shutDown();
 
-		conf.set(Config.ID_HASH, "SHA-1");
-		conf.setInt(Config.ID_SIZE, 8);
-		conf.setInt(Config.ID_TYPE_INDEX, 1);
+		conf.set(TableConfig.ID_HASH, "SHA-1");
+		conf.setInt(TableConfig.ID_SIZE, 8);
+		conf.setInt(TableConfig.ID_TYPE_INDEX, 1);
 		sail = new HBaseSail(hconn, useTable("whateverparent"), true, 0, usePushStrategy, 10, null, null);
 		rep = new SailRepository(sail);
 		rep.init();
@@ -848,7 +848,7 @@ public class HBaseSailTest {
 		restorePath.delete();
 		restorePath.deleteOnExit();
 
-		sail = new HBaseSail(hconn.getConfiguration(), snapshot, restorePath.toURI().toURL().toString(), usePushStrategy, 10, (HBaseSail.ElasticSettings) null);
+		sail = new HBaseSail(hconn.getConfiguration(), snapshot, restorePath.toURI().toURL().toString(), usePushStrategy, 10, (ElasticSettings) null);
 		sail.init();
 		try (SailConnection conn = sail.getConnection()) {
 			try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, false)) {

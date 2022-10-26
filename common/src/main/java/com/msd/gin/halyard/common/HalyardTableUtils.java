@@ -143,7 +143,7 @@ public final class HalyardTableUtils {
 		}
 		Table table = conn.getTable(htableName);
 		Configuration conf = conn.getConfiguration();
-		HalyardConfiguration halyardConfig = new HalyardConfiguration(conf);
+		HalyardTableConfiguration halyardConfig = new HalyardTableConfiguration(conf);
 		ByteArrayOutputStream bout = new ByteArrayOutputStream(1024);
 		halyardConfig.writeXml(bout);
 		Put configPut = new Put(CONFIG_ROW_KEY)

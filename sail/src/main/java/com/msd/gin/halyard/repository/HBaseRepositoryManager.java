@@ -16,7 +16,7 @@
  */
 package com.msd.gin.halyard.repository;
 
-import com.msd.gin.halyard.common.Config;
+import com.msd.gin.halyard.common.TableConfig;
 import com.msd.gin.halyard.sail.HBaseSail;
 
 import java.net.MalformedURLException;
@@ -68,7 +68,7 @@ public final class HBaseRepositoryManager extends RepositoryManager {
     }
 
     protected Repository createSystemRepository() throws RepositoryException {
-		config.set(Config.ID_HASH, "Murmur3-128");
+		config.set(TableConfig.ID_HASH, "Murmur3-128");
         SailRepository repo = new SailRepository(new HBaseSail(config, SYSTEM_REPO_ID, true, 0, true, 180, null, null));
         repo.init();
         return repo;

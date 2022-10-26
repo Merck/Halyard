@@ -1,6 +1,6 @@
 package com.msd.gin.halyard.tools;
 
-import com.msd.gin.halyard.common.Config;
+import com.msd.gin.halyard.common.TableConfig;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.sail.HBaseSail;
@@ -41,17 +41,17 @@ public class HalyardKeysTest extends AbstractHalyardToolTest {
 	@BeforeClass
 	public static void createData() throws Exception {
     	Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-    	conf.set(Config.ID_HASH, "SHA-1");
-    	conf.setInt(Config.ID_SIZE, 4);
-    	conf.setInt(Config.ID_TYPE_INDEX, 0);
-    	conf.setBoolean(Config.ID_TYPE_NIBBLE, true);
-    	conf.setInt(Config.KEY_SIZE_SUBJECT, 1);
-    	conf.setInt(Config.END_KEY_SIZE_SUBJECT, 1);
-    	conf.setInt(Config.KEY_SIZE_PREDICATE, 1);
-    	conf.setInt(Config.END_KEY_SIZE_PREDICATE, 1);
-    	conf.setInt(Config.KEY_SIZE_OBJECT, 1);
-    	conf.setInt(Config.END_KEY_SIZE_OBJECT, 1);
-    	conf.setInt(Config.KEY_SIZE_CONTEXT, 1);
+    	conf.set(TableConfig.ID_HASH, "SHA-1");
+    	conf.setInt(TableConfig.ID_SIZE, 4);
+    	conf.setInt(TableConfig.ID_TYPE_INDEX, 0);
+    	conf.setBoolean(TableConfig.ID_TYPE_NIBBLE, true);
+    	conf.setInt(TableConfig.KEY_SIZE_SUBJECT, 1);
+    	conf.setInt(TableConfig.END_KEY_SIZE_SUBJECT, 1);
+    	conf.setInt(TableConfig.KEY_SIZE_PREDICATE, 1);
+    	conf.setInt(TableConfig.END_KEY_SIZE_PREDICATE, 1);
+    	conf.setInt(TableConfig.KEY_SIZE_OBJECT, 1);
+    	conf.setInt(TableConfig.END_KEY_SIZE_OBJECT, 1);
+    	conf.setInt(TableConfig.KEY_SIZE_CONTEXT, 1);
         final HBaseSail sail = new HBaseSail(conf, TABLE_NAME, true, -1, true, 0, null, null);
         sail.init();
 		try (SailConnection conn = sail.getConnection()) {

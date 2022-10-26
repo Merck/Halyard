@@ -75,6 +75,7 @@ import org.eclipse.rdf4j.rio.RDFWriter;
 import org.eclipse.rdf4j.rio.RDFWriterRegistry;
 import org.eclipse.rdf4j.rio.Rio;
 
+import com.msd.gin.halyard.sail.ElasticSettings;
 import com.msd.gin.halyard.sail.HBaseSail;
 
 /**
@@ -580,7 +581,7 @@ public final class HalyardExport extends AbstractHalyardTool {
         addOption("l", "jdbc-driver-classpath", "driver_classpath", "JDBC driver classpath delimited by ':'", false, true);
         addOption("c", "jdbc-driver-class", "driver_class", "JDBC driver class name, mandatory for JDBC export", false, true);
         addOption("r", "trim", null, "Trim target table before export (apply for JDBC only)", false, false);
-        addOption("i", "elastic-index", "elastic_index_url", ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", HBaseSail.ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
     }
 
     @Override
@@ -588,7 +589,7 @@ public final class HalyardExport extends AbstractHalyardTool {
     	String source = cmd.getOptionValue('s');
     	String query = cmd.getOptionValue('q');
         configureString(cmd, 'i', null);
-    	HBaseSail sail = new HBaseSail(getConf(), source, false, 0, true, 0, getElasticSettings(getConf()), null);
+    	HBaseSail sail = new HBaseSail(getConf(), source, false, 0, true, 0, ElasticSettings.from(getConf()), null);
     	export(sail, new StatusLog() {
             @Override
             public void tick() {}

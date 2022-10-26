@@ -17,7 +17,6 @@
 package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.common.SSLSettings;
-import com.msd.gin.halyard.sail.HBaseSail.ElasticSettings;
 
 import java.net.URL;
 
@@ -63,7 +62,7 @@ public final class HBaseSailFactory implements SailFactory {
 			if (hasValue(hconfig.getTableName()) && (hasValue(hconfig.getSnapshotName()) || hasValue(hconfig.getSnapshotRestorePath()))) {
 				throw new SailConfigException("Invalid sail configuration: cannot specify both table and snapshot");
 			}
-			ElasticSettings elasticSettings = ElasticSettings.from(hconfig.getElasticIndexURL(), null);
+			ElasticSettings elasticSettings = ElasticSettings.from(hconfig.getElasticIndexURL());
 			if (elasticSettings != null) {
 				elasticSettings.username = hconfig.getElasticUsername();
 				elasticSettings.password = hconfig.getElasticPassword();

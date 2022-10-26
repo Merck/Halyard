@@ -21,7 +21,6 @@ import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.Keyspace;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.SSLSettings;
 import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.function.DynamicFunctionRegistry;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
@@ -35,7 +34,6 @@ import com.msd.gin.halyard.vocab.HALYARD;
 import java.io.File;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
-import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -117,45 +115,6 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	 */
 	public interface SailConnectionFactory {
 		HBaseSailConnection createConnection(HBaseSail sail) throws IOException;
-	}
-
-	public static final class ElasticSettings {
-		String protocol;
-		String host;
-		int port;
-		String username;
-		String password;
-		String indexName;
-		SSLSettings sslSettings;
-
-		public String getProtocol() {
-			return protocol;
-		}
-
-		public String getHost() {
-			return host;
-		}
-
-		public int getPort() {
-			return port;
-		}
-
-		public String getIndexName() {
-			return indexName;
-		}
-
-		public static ElasticSettings from(URL esIndexUrl, SSLSettings sslSettings) {
-			if (esIndexUrl == null) {
-				return null;
-			}
-			ElasticSettings settings = new ElasticSettings();
-			settings.protocol = esIndexUrl.getProtocol();
-			settings.host = esIndexUrl.getHost();
-			settings.port = esIndexUrl.getPort();
-			settings.indexName = esIndexUrl.getPath().substring(1);
-			settings.sslSettings = sslSettings;
-			return settings;
-		}
 	}
 
 	public static final class ScanSettings {
@@ -246,6 +205,11 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	ObjectInstance mxInst;
 	private final Queue<QueryInfo> queryHistory = new ArrayBlockingQueue<>(10, true);
 
+	/**
+	 * Property defining optional ElasticSearch index URL
+	 */
+	public static final String ELASTIC_INDEX_URL = "halyard.elastic.index.url";
+
 
 	public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings) {
 		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, null, HBaseSailConnection.Factory.INSTANCE);
@@ -283,10 +247,6 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 		this.connFactory = connFactory;
 		this.federatedServiceResolver = fsr;
 		initSettings(config);
-	}
-
-	public HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL) {
-		this(config, snapshotName, snapshotRestorePath, pushStrategy, evaluationTimeout, ElasticSettings.from(elasticIndexURL, null));
 	}
 
 	HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings) {
@@ -333,12 +293,8 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 				new HBaseFederatedServiceResolver(conn, config, tableName, evaluationTimeout, null));
 	}
 
-	public HBaseSail(@Nonnull Connection conn, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker) {
-		this(conn, conn.getConfiguration(), tableName, create, splitBits, pushStrategy, evaluationTimeout, ElasticSettings.from(elasticIndexURL, null), ticker, HBaseSailConnection.Factory.INSTANCE);
-	}
-
-	public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker, SailConnectionFactory connFactory) {
-		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, ticker, connFactory);
+	public HBaseSail(@Nonnull Connection conn, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker) {
+		this(conn, conn.getConfiguration(), tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, ticker, HBaseSailConnection.Factory.INSTANCE);
 	}
 
 	public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker) {
@@ -355,12 +311,12 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	 * @param pushStrategy boolean option to use {@link com.msd.gin.halyard.strategy.HalyardEvaluationStrategy} instead of
 	 * {@link org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy}
 	 * @param evaluationTimeout int timeout in seconds for each query evaluation, negative values mean no timeout
-	 * @param elasticIndexURL String optional ElasticSearch index URL
+	 * @param elasticSettings optional ElasticSearch settings
 	 * @param ticker optional Ticker callback for keep-alive notifications
 	 * @param connFactory {@link SailConnectionFactory} for creating connections
 	 */
-    public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, URL elasticIndexURL, Ticker ticker, SailConnectionFactory connFactory) {
-		this(config, tableName, create, splitBits, pushStrategy, evaluationTimeout, ElasticSettings.from(elasticIndexURL, null), ticker, connFactory);
+	public HBaseSail(Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker, SailConnectionFactory connFactory) {
+		this(null, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, ticker, connFactory);
     }
 
 	private void initSettings(Configuration config) {

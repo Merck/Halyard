@@ -20,6 +20,7 @@ import static com.msd.gin.halyard.tools.HalyardBulkLoad.*;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.repository.HBaseUpdate;
+import com.msd.gin.halyard.sail.ElasticSettings;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 import com.msd.gin.halyard.vocab.HALYARD;
@@ -123,7 +124,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
                 context.setStatus("Execution of: " + name + " stage #" + stage);
                 final AtomicLong addedKvs = new AtomicLong();
                 final AtomicLong removedKvs = new AtomicLong();
-				final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, getElasticSettings(conf), new HBaseSail.Ticker() {
+				final HBaseSail sail = new HBaseSail(context.getConfiguration(), tableName, false, 0, true, 0, ElasticSettings.from(conf), new HBaseSail.Ticker() {
                     @Override
                     public void tick() {
                         context.progress();
@@ -221,7 +222,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
         addOption("q", "update-operations", "sparql_update_operations", "folder or path pattern with SPARQL update operations", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
         addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all updated records (default is actual time of the operation)", false, true);
-        addOption("i", "elastic-index", "elastic_index_url", ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", HBaseSail.ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
     }
 
 

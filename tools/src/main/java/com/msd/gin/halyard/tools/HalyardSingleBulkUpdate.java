@@ -3,6 +3,7 @@ package com.msd.gin.halyard.tools;
 import static com.msd.gin.halyard.tools.HalyardBulkUpdate.*;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.tools.HalyardBulkUpdate.SPARQLUpdateMapper;
 
 import org.apache.commons.cli.CommandLine;
@@ -43,7 +44,7 @@ public final class HalyardSingleBulkUpdate extends AbstractHalyardTool {
         addOption("q", "update-operation", "sparql_update_operation", "SPARQL update operation to be executed", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
         addOption("e", "target-timestamp", "timestamp", "Optionally specify timestamp of all updated records (default is actual time of the operation)", false, true);
-        addOption("i", "elastic-index", "elastic_index_url", ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", HBaseSail.ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
     }
 
     public int run(CommandLine cmd) throws Exception {

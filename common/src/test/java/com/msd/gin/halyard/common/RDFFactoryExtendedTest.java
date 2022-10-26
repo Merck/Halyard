@@ -34,12 +34,12 @@ public class RDFFactoryExtendedTest {
 	@Parameterized.Parameters
 	public static Collection<Object[]> data() {
 		Configuration littleNibbleConf = new Configuration();
-		littleNibbleConf.setInt(Config.ID_TYPE_INDEX, 0);
-		littleNibbleConf.setBoolean(Config.ID_TYPE_NIBBLE, true);
+		littleNibbleConf.setInt(TableConfig.ID_TYPE_INDEX, 0);
+		littleNibbleConf.setBoolean(TableConfig.ID_TYPE_NIBBLE, true);
 
 		Configuration bigNibbleConf = new Configuration();
-		bigNibbleConf.setInt(Config.ID_TYPE_INDEX, 1);
-		bigNibbleConf.setBoolean(Config.ID_TYPE_NIBBLE, false);
+		bigNibbleConf.setInt(TableConfig.ID_TYPE_INDEX, 1);
+		bigNibbleConf.setBoolean(TableConfig.ID_TYPE_NIBBLE, false);
 
 		return Arrays.<Object[]>asList(
 			new Object[] {littleNibbleConf},

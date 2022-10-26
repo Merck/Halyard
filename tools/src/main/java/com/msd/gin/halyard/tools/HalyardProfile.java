@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.sail.ElasticSettings;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 
@@ -60,7 +61,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "query", "sparql_query", "SPARQL query to profile", true, true);
-        addOption("i", "elastic-index", "elastic_index_url", ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", HBaseSail.ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
     }
 
     @Override
@@ -68,7 +69,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
     	String queryString = cmd.getOptionValue('q');
     	String table = cmd.getOptionValue('s');
         configureString(cmd, 'i', null);
-		SailRepository repo = new SailRepository(new HBaseSail(getConf(), table, false, 0, true, 0, getElasticSettings(getConf()), null, new HBaseSail.SailConnectionFactory() {
+		SailRepository repo = new SailRepository(new HBaseSail(getConf(), table, false, 0, true, 0, ElasticSettings.from(getConf()), null, new HBaseSail.SailConnectionFactory() {
 			@Override
 			public HBaseSailConnection createConnection(HBaseSail sail) throws IOException {
 				return new HBaseSailConnection(sail) {

@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.sail.ElasticSettings;
 import com.msd.gin.halyard.sail.HBaseSail;
 
 import org.apache.commons.cli.CommandLine;
@@ -38,7 +39,7 @@ public final class HalyardUpdate extends AbstractHalyardTool {
         );
         addOption("s", "source-dataset", "dataset_table", "Source HBase table with Halyard RDF store", true, true);
         addOption("q", "update-operation", "sparql_update_operation", "SPARQL update operation to be executed", true, true);
-        addOption("i", "elastic-index", "elastic_index_url", ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
+        addOption("i", "elastic-index", "elastic_index_url", HBaseSail.ELASTIC_INDEX_URL, "Optional ElasticSearch index URL", false, true);
     }
 
 
@@ -46,7 +47,7 @@ public final class HalyardUpdate extends AbstractHalyardTool {
         String source = cmd.getOptionValue('s');
         String query = cmd.getOptionValue('q');
         configureString(cmd, 'i', null);
-		SailRepository rep = new SailRepository(new HBaseSail(getConf(), source, false, 0, true, 0, getElasticSettings(getConf()), null));
+		SailRepository rep = new SailRepository(new HBaseSail(getConf(), source, false, 0, true, 0, ElasticSettings.from(getConf()), null));
         rep.init();
         try {
         	try(RepositoryConnection conn = rep.getConnection()) {

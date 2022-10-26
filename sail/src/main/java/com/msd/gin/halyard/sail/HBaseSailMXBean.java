@@ -1,6 +1,5 @@
 package com.msd.gin.halyard.sail;
 
-import com.msd.gin.halyard.sail.HBaseSail.ElasticSettings;
 import com.msd.gin.halyard.sail.HBaseSail.QueryInfo;
 import com.msd.gin.halyard.sail.HBaseSail.ScanSettings;
 

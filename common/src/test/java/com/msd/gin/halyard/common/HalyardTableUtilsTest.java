@@ -58,8 +58,8 @@ public class HalyardTableUtilsTest {
     @BeforeAll
     public static void setup() throws Exception {
 		Configuration conf = HBaseServerTestInstance.getInstanceConfig();
-		conf.setInt(Config.ID_SIZE, ID_SIZE);
-		conf.setInt(Config.KEY_SIZE_OBJECT, OBJECT_KEY_SIZE);
+		conf.setInt(TableConfig.ID_SIZE, ID_SIZE);
+		conf.setInt(TableConfig.KEY_SIZE_OBJECT, OBJECT_KEY_SIZE);
 		conn = HalyardTableUtils.getConnection(conf);
 		table = HalyardTableUtils.getTable(conn, "testUtils", true, -1);
 		keyspaceConn = new TableKeyspace.TableKeyspaceConnection(table);

@@ -273,19 +273,13 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 }
             }
             HttpURLConnection http = (HttpURLConnection)targetUrl.openConnection();
+            configureAuth(http);
             if (http instanceof HttpsURLConnection) {
             	configureSSL((HttpsURLConnection) http);
             }
             http.setRequestMethod("PUT");
             http.setDoOutput(true);
             http.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-            String esUser = getConf().get("es.net.http.auth.user");
-            if (esUser != null) {
-            	String esPassword = getConf().get("es.net.http.auth.pass");
-            	String userPass = esUser + ':' + esPassword;
-            	String basicAuth = "Basic " + Base64.getEncoder().encodeToString(userPass.getBytes(StandardCharsets.UTF_8));
-            	http.setRequestProperty("Authorization", basicAuth);
-            }
             String alias = getConf().get(ALIAS_PROPERTY);
             byte b[] = Bytes.toBytes(getMappingConfig("", Integer.toString(shards), Integer.toString(replicas), alias));
             http.setFixedLengthStreamingMode(b.length);
@@ -356,6 +350,16 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 	        }
         } finally {
         	keyspace.destroy();
+        }
+    }
+
+    private void configureAuth(HttpURLConnection http) {
+        String esUser = getConf().get("es.net.http.auth.user");
+        if (esUser != null) {
+        	String esPassword = getConf().get("es.net.http.auth.pass");
+        	String userPass = esUser + ':' + esPassword;
+        	String basicAuth = "Basic " + Base64.getEncoder().encodeToString(userPass.getBytes(StandardCharsets.UTF_8));
+        	http.setRequestProperty("Authorization", basicAuth);
         }
     }
 

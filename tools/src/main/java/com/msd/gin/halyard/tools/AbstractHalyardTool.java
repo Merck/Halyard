@@ -21,17 +21,13 @@ import com.msd.gin.halyard.common.IdValueFactory;
 import com.msd.gin.halyard.common.Keyspace;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.SSLSettings;
 import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.common.ValueIO;
-import com.msd.gin.halyard.sail.HBaseSail;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -68,11 +64,6 @@ public abstract class AbstractHalyardTool implements Tool {
     protected static final String SOURCE_PATHS_PROPERTY = confProperty(SOURCE_PROPERTIES, "paths");
     protected static final String SOURCE_NAME_PROPERTY = confProperty(SOURCE_PROPERTIES, "name");
     protected static final String SNAPSHOT_PATH_PROPERTY = confProperty(SOURCE_PROPERTIES, "snapshot");
-
-    /**
-     * Property defining optional ElasticSearch index URL
-     */
-    protected static final String ELASTIC_INDEX_URL = "halyard.elastic.index.url";
 
     private Configuration conf;
     final String name, header, footer;
@@ -127,19 +118,6 @@ public abstract class AbstractHalyardTool implements Tool {
 			}
     	}
     	return iris;
-    }
-
-    protected static HBaseSail.ElasticSettings getElasticSettings(Configuration conf) throws MalformedURLException {
-        HBaseSail.ElasticSettings esSettings;
-    	String elasticIndexURL = conf.get(ELASTIC_INDEX_URL);
-        if (elasticIndexURL != null) {
-        	URL url = new URL(elasticIndexURL);
-        	SSLSettings sslSettings = "https".equals(url.getProtocol()) ? SSLSettings.from(conf) : null;
-        	esSettings = HBaseSail.ElasticSettings.from(url, sslSettings);
-        } else {
-        	esSettings = null;
-        }
-        return esSettings;
     }
 
     protected void configureIRI(CommandLine cmd, char opt, String defaultValue) throws ParseException {

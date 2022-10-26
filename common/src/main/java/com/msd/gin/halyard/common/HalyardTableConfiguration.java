@@ -4,12 +4,18 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 
-public class HalyardConfiguration extends Configuration {
-	public HalyardConfiguration(Configuration conf) {
+/**
+ * Persistable configuration only.
+ */
+final class HalyardTableConfiguration extends Configuration {
+	public HalyardTableConfiguration(Configuration conf) {
 		super(false);
-		addResource(Config.class.getResource("default-config.xml"));
+		addResource(TableConfig.class.getResource("default-config.xml"));
 		for (Map.Entry<String, String> entry : conf.getPropsWithPrefix("halyard.").entrySet()) {
-			set("halyard." + entry.getKey(), entry.getValue());
+			String prop = "halyard." + entry.getKey();
+			if (TableConfig.contains(prop)) {
+				set(prop, entry.getValue());
+			}
 		}
 	}
 
@@ -26,7 +32,7 @@ public class HalyardConfiguration extends Configuration {
 		if (other == null || this.getClass() != other.getClass()) {
 			return false;
 		}
-		HalyardConfiguration that = (HalyardConfiguration) other;
+		HalyardTableConfiguration that = (HalyardTableConfiguration) other;
 		return this.getProps().equals(that.getProps());
 	}
 }
