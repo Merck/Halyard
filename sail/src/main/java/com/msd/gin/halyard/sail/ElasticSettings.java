@@ -40,6 +40,10 @@ public final class ElasticSettings {
 	}
 
 	public static ElasticSettings from(URL esIndexUrl) {
+		if (esIndexUrl == null) {
+			return null;
+		}
+
 		ElasticSettings settings = new ElasticSettings();
 		settings.protocol = esIndexUrl.getProtocol();
 		settings.host = esIndexUrl.getHost();
