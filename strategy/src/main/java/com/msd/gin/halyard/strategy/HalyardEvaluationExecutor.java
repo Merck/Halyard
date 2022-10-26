@@ -402,13 +402,18 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 			}
 			void appendVar(Var var) {
 				if (!var.isConstant()) {
-					sb.append("?").append(var.getName()).append("=");
+					sb.append("?").append(var.getName());
 				}
 				Value v = var.getValue();
 				if (v == null) {
 					v = bs.getValue(var.getName());
 				}
-				sb.append(v);
+				if (!var.isConstant() && v != null) {
+					sb.append("=");
+				}
+				if (v != null) {
+					sb.append(v);
+				}
 			}
 			void appendStats(QueryModelNode node) {
 				sb.append("[");
