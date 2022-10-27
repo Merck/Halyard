@@ -59,6 +59,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
+import java.util.function.Function;
 
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -228,7 +229,7 @@ final class HalyardTupleExprEvaluation {
      */
     private BindingSetPipeEvaluationStep precompileTupleExpr(TupleExpr expr) {
         if (expr instanceof StatementPattern) {
-            return (parent, bindings) -> evaluateStatementPattern(parent, (StatementPattern) expr, bindings);
+            return precompileStatementPattern((StatementPattern) expr);
         } else if (expr instanceof UnaryTupleOperator) {
         	return precompileUnaryTupleOperator((UnaryTupleOperator) expr);
         } else if (expr instanceof BinaryTupleOperator) {
@@ -255,6 +256,10 @@ final class HalyardTupleExprEvaluation {
         } else {
             throw new QueryEvaluationException("Unsupported tuple expr type: " + expr.getClass());
         }
+    }
+
+    private BindingSetPipeEvaluationStep precompileStatementPattern(StatementPattern sp) {
+    	return (parent, bindings) -> evaluateStatementPattern(parent, sp, bindings);
     }
 
     /**
@@ -322,187 +327,197 @@ final class HalyardTupleExprEvaluation {
 		if (ts == null) {
 			ts = tripleSource;
 		}
-    	evaluateStatementPattern(parent, sp, bindings, ts);
+
+		try {
+			Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory = evaluateStatementPattern(sp, bindings, ts);
+			if (iterFactory != null) {
+		        executor.pullAndPushAsync(parent, iterFactory, sp, bindings, parentStrategy);
+			} else {
+				parent.empty();
+			}
+        } catch (QueryEvaluationException e) {
+            parent.handleException(e);
+        }
     }
 
-    private void evaluateStatementPattern(final BindingSetPipe parent, final StatementPattern sp, final BindingSet bindings, TripleSource tripleSource) {
+    private Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> evaluateStatementPattern(final StatementPattern sp, final BindingSet bindings, TripleSource tripleSource) {
         final Var subjVar = sp.getSubjectVar(); //subject
         final Var predVar = sp.getPredicateVar(); //predicate
         final Var objVar = sp.getObjectVar(); //object
         final Var conVar = sp.getContextVar(); //graph or target context
 
-        final Value subjValue = getVarValue(subjVar, bindings);
-        final Value predValue = getVarValue(predVar, bindings);
-        final Value objValue = getVarValue(objVar, bindings);
-        final Value contextValue = getVarValue(conVar, bindings);
-
-        CloseableIteration<? extends Statement, QueryEvaluationException> stIter = null;
-        try {
-	        if (isUnbound(subjVar, bindings) || isUnbound(predVar, bindings) || isUnbound(objVar, bindings) || isUnbound(conVar, bindings)) {
-	            // the variable must remain unbound for this solution see https://www.w3.org/TR/sparql11-query/#assignment
-	            parent.empty();
-	            return;
-	        }
-	
-	    	try {
-	            final Set<IRI> graphs;
-	            final boolean emptyGraph;
-	            if (dataset != null) {
-	                if (sp.getScope() == StatementPattern.Scope.DEFAULT_CONTEXTS) { //evaluate against the default graph(s)
-	                    graphs = dataset.getDefaultGraphs();
-	                    emptyGraph = graphs.isEmpty() && !dataset.getNamedGraphs().isEmpty();
-	                } else { //evaluate against the named graphs
-	                    graphs = dataset.getNamedGraphs();
-	                    emptyGraph = graphs.isEmpty() && !dataset.getDefaultGraphs().isEmpty();
-	                }
-	            } else {
-	            	graphs = null;
-	            	emptyGraph = false;
-	            }
-	
-	            final Resource[] contexts;
-	            if (emptyGraph) {
-	                // Search zero contexts
-	                parent.empty(); //no results from this statement pattern
-	                return;
-	            } else if (graphs == null || graphs.isEmpty()) {
-	                // store default behaviour
-	                if (contextValue != null) {
-						if (RDF4J.NIL.equals(contextValue) || SESAME.NIL.equals(contextValue)) {
-							contexts = new Resource[] { (Resource) null };
-						} else {
-							contexts = new Resource[] { (Resource) contextValue };
-						}
-	                }
-					/*
-					 * TODO activate this to have an exclusive (rather than inclusive) interpretation of the default
-					 * graph in SPARQL querying. else if (statementPattern.getScope() == Scope.DEFAULT_CONTEXTS ) {
-					 * contexts = new Resource[] { (Resource)null }; }
-					 */
-					else {
-						contexts = new Resource[0];
-					}
-	            } else if (contextValue != null) {
-	                if (graphs.contains(contextValue)) {
-	                    contexts = new Resource[]{(Resource) contextValue};
-	                } else {
-	                    // Statement pattern specifies a context that is not part of
-	                    // the dataset
-	                    parent.empty(); //no results possible because the context is not available
-	                    return;
-	                }
-	            } else {
-	                contexts = new Resource[graphs.size()];
-	                int i = 0;
-	                for (IRI graph : graphs) {
-	                    IRI context;
-						if (RDF4J.NIL.equals(graph) || SESAME.NIL.equals(graph)) {
-	                        context = null;
-	                    } else {
-	                    	context = graph;
-	                    }
-	                    contexts[i++] = context;
-	                }
-	            }
-
-	            //get an iterator over all triple statements that match the s, p, o specification in the contexts
-	            stIter = tripleSource.getStatements((Resource) subjValue, (IRI) predValue, objValue, contexts);
-
-	            if (contexts.length == 0 && sp.getScope() == StatementPattern.Scope.NAMED_CONTEXTS) {
-	                // Named contexts are matched by retrieving all statements from
-	                // the store and filtering out the statements that do not have a context.
-	                stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
-	
-	                    @Override
-	                    protected boolean accept(Statement st) {
-	                        return st.getContext() != null;
-	                    }
-	
-	                }; // end anonymous class
-	            }
-	        } catch (ClassCastException e) {
-	            // Invalid value type for subject, predicate and/or context
-	            parent.empty();
-	            return;
-	        }
-        } catch (QueryEvaluationException e) {
-            parent.handleException(e);
-            return;
+        final Resource subjValue;
+        final IRI predValue;
+        final Value objValue;
+        final Resource contextValue;
+    	try {
+	        subjValue = (Resource) getVarValue(subjVar, bindings);
+	        predValue = (IRI) getVarValue(predVar, bindings);
+	        objValue = getVarValue(objVar, bindings);
+	        contextValue = (Resource) getVarValue(conVar, bindings);
+        } catch (ClassCastException e) {
+            // Invalid value type for subject, predicate and/or context
+            return null;
         }
 
-        // The same variable might have been used multiple times in this
-        // StatementPattern, verify value equality in those cases.
-        int distinctVarCount = sp.getBindingNames().size();
-        boolean allVarsDistinct = (conVar != null && distinctVarCount == 4) || (conVar == null && distinctVarCount == 3);
-        if (!allVarsDistinct) {
-	        stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
+        if (isUnbound(subjVar, bindings) || isUnbound(predVar, bindings) || isUnbound(objVar, bindings) || isUnbound(conVar, bindings)) {
+            // the variable must remain unbound for this solution see https://www.w3.org/TR/sparql11-query/#assignment
+            return null;
+        }
+
+        final Set<IRI> graphs;
+        final boolean emptyGraph;
+        if (dataset != null) {
+            if (sp.getScope() == StatementPattern.Scope.DEFAULT_CONTEXTS) { //evaluate against the default graph(s)
+                graphs = dataset.getDefaultGraphs();
+                emptyGraph = graphs.isEmpty() && !dataset.getNamedGraphs().isEmpty();
+            } else { //evaluate against the named graphs
+                graphs = dataset.getNamedGraphs();
+                emptyGraph = graphs.isEmpty() && !dataset.getDefaultGraphs().isEmpty();
+            }
+        } else {
+        	graphs = null;
+        	emptyGraph = false;
+        }
+
+        final Resource[] contexts;
+        if (emptyGraph) {
+            // Search zero contexts
+            contexts = null; //no results from this statement pattern
+        } else if (graphs == null || graphs.isEmpty()) {
+            // store default behaviour
+            if (contextValue != null) {
+				if (RDF4J.NIL.equals(contextValue) || SESAME.NIL.equals(contextValue)) {
+					contexts = new Resource[] { null };
+				} else {
+					contexts = new Resource[] { contextValue };
+				}
+            }
+			/*
+			 * TODO activate this to have an exclusive (rather than inclusive) interpretation of the default
+			 * graph in SPARQL querying. else if (statementPattern.getScope() == Scope.DEFAULT_CONTEXTS ) {
+			 * contexts = new Resource[] { null }; }
+			 */
+			else {
+				contexts = new Resource[0];
+			}
+        } else if (contextValue != null) {
+            if (graphs.contains(contextValue)) {
+                contexts = new Resource[]{contextValue};
+            } else {
+                // Statement pattern specifies a context that is not part of
+                // the dataset
+            	contexts = null; //no results possible because the context is not available
+            }
+        } else {
+            contexts = new Resource[graphs.size()];
+            int i = 0;
+            for (IRI graph : graphs) {
+                IRI context;
+				if (RDF4J.NIL.equals(graph) || SESAME.NIL.equals(graph)) {
+                    context = null;
+                } else {
+                	context = graph;
+                }
+                contexts[i++] = context;
+            }
+        }
+
+        if (contexts == null) {
+        	return null;
+        }
+
+        return bs -> {
+	        //get an iterator over all triple statements that match the s, p, o specification in the contexts
+	        CloseableIteration<? extends Statement, QueryEvaluationException> stIter = tripleSource.getStatements(subjValue, predValue, objValue, contexts);
+	
+	        if (contexts.length == 0 && sp.getScope() == StatementPattern.Scope.NAMED_CONTEXTS) {
+	            // Named contexts are matched by retrieving all statements from
+	            // the store and filtering out the statements that do not have a context.
+	            stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
+	
+	                @Override
+	                protected boolean accept(Statement st) {
+	                    return st.getContext() != null;
+	                }
+	
+	            }; // end anonymous class
+	        }
+	
+	        // The same variable might have been used multiple times in this
+	        // StatementPattern, verify value equality in those cases.
+	        int distinctVarCount = sp.getBindingNames().size();
+	        boolean allVarsDistinct = (conVar != null && distinctVarCount == 4) || (conVar == null && distinctVarCount == 3);
+	        if (!allVarsDistinct) {
+		        stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
+		
+		            @Override
+		            protected boolean accept(Statement st) {
+		                Resource subj = st.getSubject();
+		                IRI pred = st.getPredicate();
+		                Value obj = st.getObject();
+		                Resource context = st.getContext();
+		
+		                if (subjVar != null && subjValue == null) {
+		                    if (subjVar.equals(predVar) && !subj.equals(pred)) {
+		                        return false;
+		                    }
+		                    if (subjVar.equals(objVar) && !subj.equals(obj)) {
+		                        return false;
+		                    }
+		                    if (subjVar.equals(conVar) && !subj.equals(context)) {
+		                        return false;
+		                    }
+		                }
+		
+		                if (predVar != null && predValue == null) {
+		                    if (predVar.equals(objVar) && !pred.equals(obj)) {
+		                        return false;
+		                    }
+		                    if (predVar.equals(conVar) && !pred.equals(context)) {
+		                        return false;
+		                    }
+		                }
+		
+		                if (objVar != null && objValue == null) {
+		                    if (objVar.equals(conVar) && !obj.equals(context)) {
+		                        return false;
+		                    }
+		                }
+		
+		                return true;
+		            }
+		        };
+	        }
+	
+	        // Return an iterator that converts the RDF statements (triples) to var bindings
+	        return new ConvertingIteration<Statement, BindingSet, QueryEvaluationException>(stIter) {
 	
 	            @Override
-	            protected boolean accept(Statement st) {
-	                Resource subj = st.getSubject();
-	                IRI pred = st.getPredicate();
-	                Value obj = st.getObject();
-	                Resource context = st.getContext();
-	
-	                if (subjVar != null && subjValue == null) {
-	                    if (subjVar.equals(predVar) && !subj.equals(pred)) {
-	                        return false;
-	                    }
-	                    if (subjVar.equals(objVar) && !subj.equals(obj)) {
-	                        return false;
-	                    }
-	                    if (subjVar.equals(conVar) && !subj.equals(context)) {
-	                        return false;
+	            protected BindingSet convert(Statement st) {
+	                QueryBindingSet result = new QueryBindingSet(bs);
+	                if (subjVar != null && !subjVar.isConstant() && !result.hasBinding(subjVar.getName())) {
+	                    result.addBinding(subjVar.getName(), st.getSubject());
+	                }
+	                if (predVar != null && !predVar.isConstant() && !result.hasBinding(predVar.getName())) {
+	                    result.addBinding(predVar.getName(), st.getPredicate());
+	                }
+	                if (objVar != null && !objVar.isConstant()) {
+	                    Value val = result.getValue(objVar.getName());
+	                    // override Halyard search type object literals with real object value from the statement
+	                    if (!result.hasBinding(objVar.getName()) || ((val instanceof Literal) && HALYARD.SEARCH.equals(((Literal)val).getDatatype()))) {
+	                        result.setBinding(objVar.getName(), st.getObject());
 	                    }
 	                }
-	
-	                if (predVar != null && predValue == null) {
-	                    if (predVar.equals(objVar) && !pred.equals(obj)) {
-	                        return false;
-	                    }
-	                    if (predVar.equals(conVar) && !pred.equals(context)) {
-	                        return false;
-	                    }
+	                if (conVar != null && !conVar.isConstant() && !result.hasBinding(conVar.getName())
+	                        && st.getContext() != null) {
+	                    result.addBinding(conVar.getName(), st.getContext());
 	                }
 	
-	                if (objVar != null && objValue == null) {
-	                    if (objVar.equals(conVar) && !obj.equals(context)) {
-	                        return false;
-	                    }
-	                }
-	
-	                return true;
+	                return result;
 	            }
-	        };
-        }
-
-        // Return an iterator that converts the RDF statements (triples) to var bindings
-        executor.pullAndPushAsync(parent, new ConvertingIteration<Statement, BindingSet, QueryEvaluationException>(stIter) {
-
-            @Override
-            protected BindingSet convert(Statement st) {
-                QueryBindingSet result = new QueryBindingSet(bindings);
-                if (subjVar != null && !subjVar.isConstant() && !result.hasBinding(subjVar.getName())) {
-                    result.addBinding(subjVar.getName(), st.getSubject());
-                }
-                if (predVar != null && !predVar.isConstant() && !result.hasBinding(predVar.getName())) {
-                    result.addBinding(predVar.getName(), st.getPredicate());
-                }
-                if (objVar != null && !objVar.isConstant()) {
-                    Value val = result.getValue(objVar.getName());
-                    // override Halyard search type object literals with real object value from the statement
-                    if (!result.hasBinding(objVar.getName()) || ((val instanceof Literal) && HALYARD.SEARCH.equals(((Literal)val).getDatatype()))) {
-                        result.setBinding(objVar.getName(), st.getObject());
-                    }
-                }
-                if (conVar != null && !conVar.isConstant() && !result.hasBinding(conVar.getName())
-                        && st.getContext() != null) {
-                    result.addBinding(conVar.getName(), st.getContext());
-                }
-
-                return result;
-            }
-		}, sp, bindings, parentStrategy);
+			};
+        };
     }
 
     private boolean isUnbound(Var var, BindingSet bindings) {
@@ -520,10 +535,10 @@ final class HalyardTupleExprEvaluation {
 	private void evaluateTripleRef(BindingSetPipe parent, TripleRef ref, BindingSet bindings) {
 		// Naive implementation that walks over all statements matching (x rdf:type rdf:Statement)
 		// and filter those that do not match the bindings for subject, predicate and object vars (if bound)
-		final org.eclipse.rdf4j.query.algebra.Var subjVar = ref.getSubjectVar();
-		final org.eclipse.rdf4j.query.algebra.Var predVar = ref.getPredicateVar();
-		final org.eclipse.rdf4j.query.algebra.Var objVar = ref.getObjectVar();
-		final org.eclipse.rdf4j.query.algebra.Var extVar = ref.getExprVar();
+		final Var subjVar = ref.getSubjectVar();
+		final Var predVar = ref.getPredicateVar();
+		final Var objVar = ref.getObjectVar();
+		final Var extVar = ref.getExprVar();
 
 		final Value subjValue = getVarValue(subjVar, bindings);
 		final Value predValue = getVarValue(predVar, bindings);
@@ -549,127 +564,130 @@ final class HalyardTupleExprEvaluation {
 		// whether the TripleSouce support access to RDF star
 		final boolean sourceSupportsRdfStar = tripleSource instanceof RDFStarTripleSource;
 
-		final CloseableIteration<BindingSet, QueryEvaluationException> results;
+		final Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory;
 		// in case the
 		if (sourceSupportsRdfStar) {
-			CloseableIteration<? extends Triple, QueryEvaluationException> sourceIter = ((RDFStarTripleSource) tripleSource)
-					.getRdfStarTriples((Resource) subjValue, (IRI) predValue, objValue);
-
-			FilterIteration<Triple, QueryEvaluationException> filterIter = new FilterIteration<Triple, QueryEvaluationException>(
-					sourceIter) {
-				@Override
-				protected boolean accept(Triple triple) throws QueryEvaluationException {
-					if (subjValue != null && !subjValue.equals(triple.getSubject())) {
-						return false;
-					}
-					if (predValue != null && !predValue.equals(triple.getPredicate())) {
-						return false;
-					}
-					if (objValue != null && !objValue.equals(triple.getObject())) {
-						return false;
-					}
-					if (extValue != null && !extValue.equals(triple)) {
-						return false;
-					}
-					return true;
-				}
-			};
-
-			results = new ConvertingIteration<Triple, BindingSet, QueryEvaluationException>(filterIter) {
-				@Override
-				protected BindingSet convert(Triple triple) {
-					QueryBindingSet result = new QueryBindingSet(bindings);
-					if (subjValue == null) {
-						result.addBinding(subjVar.getName(), triple.getSubject());
-					}
-					if (predValue == null) {
-						result.addBinding(predVar.getName(), triple.getPredicate());
-					}
-					if (objValue == null) {
-						result.addBinding(objVar.getName(), triple.getObject());
-					}
-					// add the extVar binding if we do not have a value bound.
-					if (extValue == null) {
-						result.addBinding(extVar.getName(), triple);
-					}
-					return result;
-				}
-			};
-		} else {
-			// standard reification iteration
-			// 1. walk over resources used as subjects of (x rdf:type rdf:Statement)
-			final CloseableIteration<? extends Resource, QueryEvaluationException> iter = new ConvertingIteration<Statement, Resource, QueryEvaluationException>(
-					tripleSource.getStatements((Resource) extValue, RDF.TYPE, RDF.STATEMENT)) {
-
-				@Override
-				protected Resource convert(Statement sourceObject) {
-					return sourceObject.getSubject();
-				}
-			};
-			// for each reification node, fetch and check the subject, predicate and object values against
-			// the expected values from TripleRef pattern and supplied bindings collection
-			results = new LookAheadIteration<BindingSet, QueryEvaluationException>() {
-				@Override
-				protected void handleClose()
-						throws QueryEvaluationException {
-					super.handleClose();
-					iter.close();
-				}
-
-				@Override
-				protected BindingSet getNextElement()
-						throws QueryEvaluationException {
-					while (iter.hasNext()) {
-						Resource theNode = iter.next();
-						QueryBindingSet result = new QueryBindingSet(bindings);
-						// does it match the subjectValue/subjVar
-						if (!matchValue(theNode, subjValue, subjVar, result, RDF.SUBJECT)) {
-							continue;
+			iterFactory = bs -> {
+				CloseableIteration<? extends Triple, QueryEvaluationException> sourceIter = ((RDFStarTripleSource) tripleSource)
+						.getRdfStarTriples((Resource) subjValue, (IRI) predValue, objValue);
+	
+				FilterIteration<Triple, QueryEvaluationException> filterIter = new FilterIteration<Triple, QueryEvaluationException>(
+						sourceIter) {
+					@Override
+					protected boolean accept(Triple triple) throws QueryEvaluationException {
+						if (subjValue != null && !subjValue.equals(triple.getSubject())) {
+							return false;
 						}
-						// the predicate, if not, remove the binding that hass been added
-						// when the subjValue has been checked and its value added to the solution
-						if (!matchValue(theNode, predValue, predVar, result, RDF.PREDICATE)) {
-							continue;
+						if (predValue != null && !predValue.equals(triple.getPredicate())) {
+							return false;
 						}
-						// check the object, if it do not match
-						// remove the bindings added for subj and pred
-						if (!matchValue(theNode, objValue, objVar, result, RDF.OBJECT)) {
-							continue;
+						if (objValue != null && !objValue.equals(triple.getObject())) {
+							return false;
+						}
+						if (extValue != null && !extValue.equals(triple)) {
+							return false;
+						}
+						return true;
+					}
+				};
+	
+				return new ConvertingIteration<Triple, BindingSet, QueryEvaluationException>(filterIter) {
+					@Override
+					protected BindingSet convert(Triple triple) {
+						QueryBindingSet result = new QueryBindingSet(bs);
+						if (subjValue == null) {
+							result.addBinding(subjVar.getName(), triple.getSubject());
+						}
+						if (predValue == null) {
+							result.addBinding(predVar.getName(), triple.getPredicate());
+						}
+						if (objValue == null) {
+							result.addBinding(objVar.getName(), triple.getObject());
 						}
 						// add the extVar binding if we do not have a value bound.
 						if (extValue == null) {
-							result.addBinding(extVar.getName(), theNode);
-						} else if (!extValue.equals(theNode)) {
-							// the extVar value do not match theNode
-							continue;
+							result.addBinding(extVar.getName(), triple);
 						}
 						return result;
 					}
-					return null;
-				}
-
-				private boolean matchValue(Resource theNode, Value value, Var var, QueryBindingSet result,
-						IRI predicate) {
-					try (CloseableIteration<? extends Statement, QueryEvaluationException> valueiter = tripleSource
-							.getStatements(theNode, predicate, null)) {
-						while (valueiter.hasNext()) {
-							Statement valueStatement = valueiter.next();
-							if (theNode.equals(valueStatement.getSubject())) {
-								if (value == null || value.equals(valueStatement.getObject())) {
-									if (value == null) {
-										result.addBinding(var.getName(), valueStatement.getObject());
+				};
+			};
+		} else {
+			// standard reification iteration
+			iterFactory = bs -> {
+				// 1. walk over resources used as subjects of (x rdf:type rdf:Statement)
+				final CloseableIteration<? extends Resource, QueryEvaluationException> iter = new ConvertingIteration<Statement, Resource, QueryEvaluationException>(
+						tripleSource.getStatements((Resource) extValue, RDF.TYPE, RDF.STATEMENT)) {
+	
+					@Override
+					protected Resource convert(Statement sourceObject) {
+						return sourceObject.getSubject();
+					}
+				};
+				// for each reification node, fetch and check the subject, predicate and object values against
+				// the expected values from TripleRef pattern and supplied bindings collection
+				return new LookAheadIteration<BindingSet, QueryEvaluationException>() {
+					@Override
+					protected void handleClose()
+							throws QueryEvaluationException {
+						super.handleClose();
+						iter.close();
+					}
+	
+					@Override
+					protected BindingSet getNextElement()
+							throws QueryEvaluationException {
+						while (iter.hasNext()) {
+							Resource theNode = iter.next();
+							QueryBindingSet result = new QueryBindingSet(bs);
+							// does it match the subjectValue/subjVar
+							if (!matchValue(theNode, subjValue, subjVar, result, RDF.SUBJECT)) {
+								continue;
+							}
+							// the predicate, if not, remove the binding that hass been added
+							// when the subjValue has been checked and its value added to the solution
+							if (!matchValue(theNode, predValue, predVar, result, RDF.PREDICATE)) {
+								continue;
+							}
+							// check the object, if it do not match
+							// remove the bindings added for subj and pred
+							if (!matchValue(theNode, objValue, objVar, result, RDF.OBJECT)) {
+								continue;
+							}
+							// add the extVar binding if we do not have a value bound.
+							if (extValue == null) {
+								result.addBinding(extVar.getName(), theNode);
+							} else if (!extValue.equals(theNode)) {
+								// the extVar value do not match theNode
+								continue;
+							}
+							return result;
+						}
+						return null;
+					}
+	
+					private boolean matchValue(Resource theNode, Value value, Var var, QueryBindingSet result,
+							IRI predicate) {
+						try (CloseableIteration<? extends Statement, QueryEvaluationException> valueiter = tripleSource
+								.getStatements(theNode, predicate, null)) {
+							while (valueiter.hasNext()) {
+								Statement valueStatement = valueiter.next();
+								if (theNode.equals(valueStatement.getSubject())) {
+									if (value == null || value.equals(valueStatement.getObject())) {
+										if (value == null) {
+											result.addBinding(var.getName(), valueStatement.getObject());
+										}
+										return true;
 									}
-									return true;
 								}
 							}
+							return false;
 						}
-						return false;
 					}
-				}
-
+				};
 			};
 		} // else standard reification iteration
-		executor.pullAndPushAsync(parent, results, ref, bindings, parentStrategy);
+		executor.pullAndPushAsync(parent, iterFactory, ref, bindings, parentStrategy);
 	}
 
     /**
@@ -863,8 +881,8 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateDescribeOperator(BindingSetPipe parent, DescribeOperator operator, BindingSet bindings) {
-    	executor.pullAndPushAsync(parent, new DescribeIteration(precompile(operator.getArg()).evaluate(bindings), parentStrategy,
-				operator.getBindingNames(), bindings), operator, bindings, parentStrategy);
+    	executor.pullAndPushAsync(parent, bs -> new DescribeIteration(precompile(operator.getArg()).evaluate(bs), parentStrategy,
+				operator.getBindingNames(), bs), operator, bindings, parentStrategy);
     }
 
 	/**
@@ -1500,8 +1518,14 @@ final class HalyardTupleExprEvaluation {
 
                 }
                 // otherwise: perform a SELECT query
-                CloseableIteration<BindingSet, QueryEvaluationException> result = fs.select(service, freeVars, bindings, baseUri);
-                executor.pullAndPushAsync(parent, service.isSilent() ? new SilentIteration<>(result) : result, service, bindings, parentStrategy);
+                Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory = bs -> {
+            		CloseableIteration<BindingSet, QueryEvaluationException> result = fs.select(service, freeVars, bs, baseUri);
+            		if (service.isSilent()) {
+            			result = new SilentIteration<>(result);
+            		}
+            		return result;
+                };
+                executor.pullAndPushAsync(parent, iterFactory, service, bindings, parentStrategy);
             } catch (QueryEvaluationException e) {
                 // suppress exceptions if silent
                 if (service.isSilent()) {
@@ -2405,7 +2429,7 @@ final class HalyardTupleExprEvaluation {
         //temporary solution using copy of the original iterator
         //re-writing this to push model is a bit more complex task
         try {
-        	executor.pullAndPushAsync(parent, new PathIteration(new StrictEvaluationStrategy(null, null) {
+        	executor.pullAndPushAsync(parent, bs -> new PathIteration(new StrictEvaluationStrategy(null, null) {
                 @Override
                 public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(ZeroLengthPath zlp, BindingSet bindings) throws QueryEvaluationException {
                     zlp.setParentNode(alp);
@@ -2418,7 +2442,7 @@ final class HalyardTupleExprEvaluation {
                     return parentStrategy.evaluate(expr, bindings);
                 }
 
-            }, scope, subjectVar, pathExpression, objVar, contextVar, minLength, bindings), alp, bindings, parentStrategy);
+            }, scope, subjectVar, pathExpression, objVar, contextVar, minLength, bs), alp, bindings, parentStrategy);
         } catch (QueryEvaluationException e) {
             parent.handleException(e);
         }

@@ -16,6 +16,10 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.algebra.ServiceRoot;
+
 import java.lang.management.ManagementFactory;
 import java.util.Hashtable;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -24,6 +28,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import javax.management.JMException;
 import javax.management.MBeanServer;
@@ -46,10 +51,6 @@ import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.msd.gin.halyard.algebra.ServiceRoot;
 
 final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean {
 	private static final Logger LOGGER = LoggerFactory.getLogger(HalyardEvaluationExecutor.class);
@@ -231,9 +232,9 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
      * @param node an implementation of any {@TupleExpr} sub-type
      */
 	void pullAndPushAsync(BindingSetPipe pipe,
-			CloseableIteration<BindingSet, QueryEvaluationException> iter,
+			Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory,
 			TupleExpr node, BindingSet bs, HalyardEvaluationStrategy strategy) {
-		executor.execute(new IterateAndPipeTask(pipe, iter, node, bs, strategy));
+		executor.execute(new IterateAndPipeTask(pipe, iterFactory, node, bs, strategy));
     }
 
     /**
@@ -438,44 +439,51 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
      */
     final class IterateAndPipeTask extends PrioritizedTask {
         private final BindingSetPipe pipe;
-        private final CloseableIteration<BindingSet, QueryEvaluationException> iter;
+        private final Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory;
         private final AtomicInteger pushPriority = new AtomicInteger();
+        private CloseableIteration<BindingSet, QueryEvaluationException> iter;
 
         /**
          * Constructor for the class with the supplied variables
          * @param pipe The pipe to return evaluations to
-         * @param iter The iterator over the evaluation tree
+         * @param iterFactory The supplier for the iterator over the evaluation tree
          */
 		IterateAndPipeTask(BindingSetPipe pipe,
-				CloseableIteration<BindingSet, QueryEvaluationException> iter,
+				Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory,
 				TupleExpr expr, BindingSet bs, HalyardEvaluationStrategy strategy) {
 			super(expr, bs, strategy);
             this.pipe = pipe;
-            this.iter = strategy.track(iter, expr);
+            this.iterFactory = iterFactory;
         }
 
 		boolean pushNext() {
         	try {
             	if (!pipe.isClosed()) {
-                	if(iter.hasNext()) {
-                        BindingSet bs = iter.next();
-                        if (pipe.push(bs)) { //true indicates more data is expected from this binding set, put it on the queue
-                           	return true;
-                        } else {
-                        	iter.close();
-                        	pipe.close();
-                        }
-                	} else {
-            			iter.close();
-            			pipe.close();
+            		if (iter == null) {
+                        iter = strategy.track(iterFactory.apply(bindingSet), queryNode);
+            		} else {
+	                	if(iter.hasNext()) {
+	                        BindingSet bs = iter.next();
+	                        if (pipe.push(bs)) { //true indicates more data is expected from this binding set, put it on the queue
+	                           	return true;
+	                        } else {
+	                        	iter.close();
+	                        	pipe.close();
+	                        }
+	                	} else {
+	            			iter.close();
+	            			pipe.close();
+	            		}
             		}
-            	} else {
+            	} else if (iter != null) {
             		iter.close();
             	}
             } catch (Throwable e) {
-            	try {
-                    iter.close();
-            	} catch (QueryEvaluationException ignore) {
+            	if (iter != null) {
+	            	try {
+	                    iter.close();
+	            	} catch (QueryEvaluationException ignore) {
+	            	}
             	}
                 return pipe.handleException(e);
             }
