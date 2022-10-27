@@ -62,6 +62,7 @@ import java.util.function.Predicate;
 
 import javax.annotation.concurrent.ThreadSafe;
 
+import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
 import org.eclipse.rdf4j.common.iteration.FilterIteration;
@@ -170,7 +171,6 @@ final class HalyardTupleExprEvaluation {
 	private static final String ANON_SUBJECT_VAR = "__subj";
 	private static final String ANON_PREDICATE_VAR = "__pred";
 	private static final String ANON_OBJECT_VAR = "__obj";
-	private static final int DEFAULT_HASH_JOIN_LIMIT = 10000;
 	private static final int MAX_INITIAL_HASH_JOIN_TABLE_SIZE = 5000;
 
 	private final HalyardEvaluationExecutor executor;
@@ -181,6 +181,8 @@ final class HalyardTupleExprEvaluation {
 	private final QueryContext queryContext;
     private final Dataset dataset;
     private final QueryEvaluationContext evalContext = null;
+    private final int hashJoinLimit;
+    private final int collectionMemoryThreshold;
 
     /**
 	 * Constructor used by {@link HalyardEvaluationStrategy} to create this helper class
@@ -200,6 +202,14 @@ final class HalyardTupleExprEvaluation {
 		this.tupleFunctionRegistry = tupleFunctionRegistry;
 		this.tripleSource = tripleSource;
 		this.dataset = dataset;
+		Configuration conf = parentStrategy.getConfiguration();
+		JoinAlgorithmOptimizer algoOpt = parentStrategy.getJoinAlgorithmOptimizer();
+    	if (algoOpt != null) {
+    		hashJoinLimit = algoOpt.getHashJoinLimit();
+    	} else {
+    		hashJoinLimit = conf.getInt(StrategyConfig.HASH_JOIN_LIMIT, StrategyConfig.DEFAULT_HASH_JOIN_LIMIT);
+    	}
+    	collectionMemoryThreshold = conf.getInt(StrategyConfig.MEMORY_THRESHOLD, StrategyConfig.DEFAULT_MEMORY_THRESHOLD);
     }
 
     /**
@@ -919,7 +929,7 @@ final class HalyardTupleExprEvaluation {
      * @param bindings
      */
     private void evaluateOrder(final BindingSetPipe parent, final Order order, BindingSet bindings) {
-        final Sorter<ComparableBindingSetWrapper> sorter = new Sorter<>(getLimit(order), isReducedOrDistinct(order));
+        final Sorter<ComparableBindingSetWrapper> sorter = new Sorter<>(getLimit(order), isReducedOrDistinct(order), collectionMemoryThreshold);
         BindingSetPipeEvaluationStep step = precompileTupleExpr(order.getArg());
         step.evaluate(new BindingSetPipe(parent) {
             final AtomicLong minorOrder = new AtomicLong();
@@ -1110,27 +1120,27 @@ final class HalyardTupleExprEvaluation {
 			Count count = (Count) operator;
 			if (count.getArg() != null) {
 				QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(count.getArg(), evalContext));
-				Predicate<Value> distinct = isDistinct ? new DistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
+				Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 				return Aggregator.create(new CountAggregateFunction(eval), distinct, new LongCollector(tripleSource.getValueFactory()));
 			} else {
-				Predicate<BindingSet> distinct = isDistinct ? new DistinctBindingSets() : (Predicate<BindingSet>) ALWAYS_TRUE;
+				Predicate<BindingSet> distinct = isDistinct ? createDistinctBindingSets() : (Predicate<BindingSet>) ALWAYS_TRUE;
 				return Aggregator.create(new WildcardCountAggregateFunction(), distinct, new LongCollector(tripleSource.getValueFactory()));
 			}
 		} else if (operator instanceof Min) {
 			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(((Min)operator).getArg(), evalContext));
-			Predicate<Value> distinct = isDistinct ? new DistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
+			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			return Aggregator.create(new MinAggregateFunction(eval), distinct, new ValueCollector(parentStrategy.isStrict()));
 		} else if (operator instanceof Max) {
 			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(((Max)operator).getArg(), evalContext));
-			Predicate<Value> distinct = isDistinct ? new DistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
+			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			return Aggregator.create(new MaxAggregateFunction(eval), distinct, new ValueCollector(parentStrategy.isStrict()));
 		} else if (operator instanceof Sum) {
 			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(((Sum)operator).getArg(), evalContext));
-			Predicate<Value> distinct = isDistinct ? new DistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
+			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			return Aggregator.create(new SumAggregateFunction(eval), distinct, new NumberCollector());
 		} else if (operator instanceof Avg) {
 			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(((Avg)operator).getArg(), evalContext));
-			Predicate<Value> distinct = isDistinct ? new DistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
+			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			return Aggregator.create(new AvgAggregateFunction(eval), distinct, new AvgCollector(tripleSource.getValueFactory()));
 		} else if (operator instanceof Sample) {
 			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(((Sample)operator).getArg(), evalContext));
@@ -1139,7 +1149,7 @@ final class HalyardTupleExprEvaluation {
 		} else if (operator instanceof GroupConcat) {
 			GroupConcat grpConcat = (GroupConcat) operator;
 			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(grpConcat.getArg(), evalContext));
-			Predicate<Value> distinct = isDistinct ? new DistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
+			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			String sep;
 			ValueExpr sepExpr = grpConcat.getSeparator();
 			if (sepExpr != null) {
@@ -1154,7 +1164,7 @@ final class HalyardTupleExprEvaluation {
 				.orElseThrow(() -> new QueryEvaluationException("Unknown aggregate function '" + aggFuncCall.getIRI() + "'"));
 			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(aggFuncCall.getArg(), evalContext));
 			AggregateFunction aggFunc = aggFuncFactory.buildFunction(eval);
-			Predicate<Value> distinct = isDistinct ? new DistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
+			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			if (aggFunc.getClass().getAnnotation(ThreadSafe.class) != null) {
 				return Aggregator.create(aggFunc, distinct, aggFuncFactory.getCollector());
 			} else {
@@ -1165,7 +1175,15 @@ final class HalyardTupleExprEvaluation {
 		}
     }
 
-    private static class Aggregator<T extends AggregateCollector, D> implements AutoCloseable {
+	private DistinctValues createDistinctValues() {
+		return new DistinctValues(collectionMemoryThreshold);
+	}
+
+	private DistinctBindingSets createDistinctBindingSets() {
+		return new DistinctBindingSets(collectionMemoryThreshold);
+	}
+
+	private static class Aggregator<T extends AggregateCollector, D> implements AutoCloseable {
     	private final Predicate<D> distinctPredicate;
     	private final AggregateFunction<T, D> aggFunc;
     	private final T valueCollector;
@@ -1224,12 +1242,17 @@ final class HalyardTupleExprEvaluation {
     }
 
 	private static class DistinctValues implements Predicate<Value>, AutoCloseable {
+		private final int threshold;
 		private BigHashSet<Value> distinctValues;
+
+		DistinctValues(int threshold) {
+			this.threshold = threshold;
+		}
 
 		@Override
 		public boolean test(Value v) {
 			if (distinctValues == null) {
-				distinctValues = BigHashSet.create();
+				distinctValues = BigHashSet.create(threshold);
 			}
 			try {
 				return distinctValues.add(v);
@@ -1248,12 +1271,17 @@ final class HalyardTupleExprEvaluation {
 	}
 
 	private static class DistinctBindingSets implements Predicate<BindingSet>, AutoCloseable {
+		private final int threshold;
 		private BigHashSet<BindingSet> distinctBindingSets;
+
+		DistinctBindingSets(int threshold) {
+			this.threshold = threshold;
+		}
 
 		@Override
 		public boolean test(BindingSet v) {
 			if (distinctBindingSets == null) {
-				distinctBindingSets = BigHashSet.create();
+				distinctBindingSets = BigHashSet.create(threshold);
 			}
 			try {
 				return distinctBindingSets.add(v);
@@ -1311,7 +1339,7 @@ final class HalyardTupleExprEvaluation {
     	parentStrategy.initTracking(distinct);
         BindingSetPipeEvaluationStep step = precompileTupleExpr(distinct.getArg());
         step.evaluate(new BindingSetPipe(parent) {
-            private final BigHashSet<BindingSet> set = BigHashSet.create();
+            private final BigHashSet<BindingSet> set = BigHashSet.create(collectionMemoryThreshold);
             @Override
             protected boolean handleException(Throwable e) {
                 set.close();
@@ -1729,15 +1757,6 @@ final class HalyardTupleExprEvaluation {
     }
 
     private void evaluateHashJoin(BindingSetPipe topPipe, final BinaryTupleOperator join, final BindingSet bindings, boolean isLeftJoin) {
-    	final int hashJoinLimit;
-    	{
-    		JoinAlgorithmOptimizer algoOpt = parentStrategy.getJoinAlgorithmOptimizer();
-        	if (algoOpt != null) {
-        		hashJoinLimit = algoOpt.getHashJoinLimit();
-        	} else {
-        		hashJoinLimit = DEFAULT_HASH_JOIN_LIMIT;
-        	}
-    	}
     	AbstractHashTableJoiner joiner = isLeftJoin ? new LeftHashTableJoiner(topPipe, join, bindings) : new HashTableJoiner(topPipe, join, bindings);
     	buildHashTable(joiner, bindings, isLeftJoin ? Integer.MAX_VALUE : hashJoinLimit);
     }
@@ -2134,7 +2153,7 @@ final class HalyardTupleExprEvaluation {
         BindingSetPipeEvaluationStep rightStep = precompileTupleExpr(intersection.getRightArg());
         BindingSetPipeEvaluationStep leftStep = precompileTupleExpr(intersection.getLeftArg());
         rightStep.evaluate(new BindingSetPipe(topPipe) {
-            private final BigHashSet<BindingSet> secondSet = BigHashSet.create();
+            private final BigHashSet<BindingSet> secondSet = BigHashSet.create(collectionMemoryThreshold);
             @Override
             protected boolean handleException(Throwable e) {
                 secondSet.close();
@@ -2188,7 +2207,7 @@ final class HalyardTupleExprEvaluation {
         BindingSetPipeEvaluationStep rightStep = precompileTupleExpr(difference.getRightArg());
         BindingSetPipeEvaluationStep leftStep = precompileTupleExpr(difference.getLeftArg());
         rightStep.evaluate(new BindingSetPipe(topPipe) {
-            private final BigHashSet<BindingSet> excludeSet = BigHashSet.create();
+            private final BigHashSet<BindingSet> excludeSet = BigHashSet.create(collectionMemoryThreshold);
             @Override
             protected boolean handleException(Throwable e) {
                 excludeSet.close();
@@ -2314,7 +2333,7 @@ final class HalyardTupleExprEvaluation {
 				sp = new StatementPattern(allSubjVar, allPredVar, allObjVar);
 			}
 			evaluateStatementPattern(new BindingSetPipe(parent) {
-				private final BigHashSet<Value> set = BigHashSet.create();
+				private final BigHashSet<Value> set = BigHashSet.create(collectionMemoryThreshold);
 				@Override
 				protected boolean next(BindingSet bs) throws InterruptedException {
 					Value ctx = (contextVar != null) ? bs.getValue(contextVar.getName()) : null;

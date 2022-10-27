@@ -37,14 +37,16 @@ public class BigHashSet<E extends Serializable> implements Iterable<E>, Closeabl
 
     private static final String SET_NAME = "temp";
 
+    private final int memoryThreshold;
     private Set<E> set;
     private DB db;
 
-    public static <E extends Serializable> BigHashSet<E> create() {
-    	return new BigHashSet<>();
+    public static <E extends Serializable> BigHashSet<E> create(int memoryThreshold) {
+    	return new BigHashSet<>(memoryThreshold);
     }
 
-    private BigHashSet() {
+    private BigHashSet(int memoryThreshold) {
+    	this.memoryThreshold = memoryThreshold;
     	this.set = new HashSet<>(1024);
     }
 
@@ -59,7 +61,7 @@ public class BigHashSet<E extends Serializable> implements Iterable<E>, Closeabl
     		throw new IOException("Already closed");
     	}
 
-    	if (db == null && set.size() > 100000) {
+    	if (db == null && set.size() > memoryThreshold) {
     		swapToDisk();
     	}
 

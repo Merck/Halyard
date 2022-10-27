@@ -30,7 +30,7 @@ public class SorterTest {
 
     @Test
     public void testNoLimitNoDistinct() throws Exception {
-        Sorter<String> s = new Sorter<>(Long.MAX_VALUE, false);
+        Sorter<String> s = new Sorter<>(Long.MAX_VALUE, false, 10);
         s.add("C");
         s.add("C");
         s.add("A");
@@ -47,7 +47,7 @@ public class SorterTest {
 
     @Test
     public void testNoLimitDistinct() throws Exception {
-        Sorter<String> s = new Sorter<>(Long.MAX_VALUE, true);
+        Sorter<String> s = new Sorter<>(Long.MAX_VALUE, true, 10);
         s.add("C");
         s.add("C");
         s.add("A");
@@ -64,7 +64,7 @@ public class SorterTest {
 
     @Test
     public void testLimitNoDistinct() throws Exception {
-        Sorter<String> s = new Sorter<>(3, false);
+        Sorter<String> s = new Sorter<>(3, false, 10);
         s.add("C");
         s.add("C");
         s.add("A");
@@ -82,7 +82,7 @@ public class SorterTest {
 
     @Test
     public void testLimitDistinct() throws Exception {
-        Sorter<String> s = new Sorter<>(2, true);
+        Sorter<String> s = new Sorter<>(2, true, 10);
         s.add("C");
         s.add("C");
         s.add("A");
@@ -105,7 +105,7 @@ public class SorterTest {
 
     @Test(expected = IOException.class)
     public void testFailAdd() throws Exception {
-        Sorter<String> s = new Sorter<>(Long.MAX_VALUE, false);
+        Sorter<String> s = new Sorter<>(Long.MAX_VALUE, false, 10);
         s.close();
         s.add("hi");
     }

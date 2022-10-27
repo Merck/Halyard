@@ -38,6 +38,7 @@ public class Sorter <E extends Comparable<E> & Serializable> implements Iterable
 
     private static final String MAP_NAME = "temp";
 
+    private final int memoryThreshold;
     private NavigableMap<E, Long> map;
     private DB db;
     private final long limit;
@@ -49,10 +50,11 @@ public class Sorter <E extends Comparable<E> & Serializable> implements Iterable
      * @param limit long limit, where Long.MAXLONG means no limit
      * @param distinct optional boolean switch to do not preserve multiple equal elements
      */
-    public Sorter(long limit, boolean distinct) {
+    public Sorter(long limit, boolean distinct, int memoryThreshold) {
         this.map = new TreeMap<>();
         this.limit = limit;
         this.distinct = distinct;
+        this.memoryThreshold = memoryThreshold;
     }
 
     /**
@@ -66,7 +68,7 @@ public class Sorter <E extends Comparable<E> & Serializable> implements Iterable
     		throw new IOException("Already closed");
     	}
 
-    	if (db == null && map.size() > 100000) {
+    	if (db == null && map.size() > memoryThreshold) {
     		swapToDisk();
     	}
 
@@ -83,8 +85,9 @@ public class Sorter <E extends Comparable<E> & Serializable> implements Iterable
 	            while (size > limit) {
 	                // Discard key(s) that are currently sorted last
 	                Map.Entry<E, Long> last = map.lastEntry();
-	                if (last.getValue() > size - limit) {
-	                    map.put(last.getKey(), last.getValue() + limit - size);
+	                long surplus = size - limit;
+	                if (last.getValue() > surplus) {
+	                    map.put(last.getKey(), last.getValue() - surplus);
 	                    size = limit;
 	                } else {
 	                    map.remove(last.getKey());

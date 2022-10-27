@@ -116,15 +116,15 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 	}
 
 	HalyardEvaluationExecutor(Configuration conf) {
-	    threads = conf.getInt("halyard.evaluation.threads", 20);
-	    maxRetries = conf.getInt("halyard.evaluation.maxRetries", 3);
-	    retryLimit = conf.getInt("halyard.evaluation.retryLimit", 100);
-	    threadGain = conf.getInt("halyard.evaluation.threadGain", 5);
-	    maxThreads = conf.getInt("halyard.evaluation.maxThreads", 100);
+	    threads = conf.getInt(StrategyConfig.HALYARD_EVALUATION_THREADS, 20);
+	    maxRetries = conf.getInt(StrategyConfig.HALYARD_EVALUATION_MAX_RETRIES, 3);
+	    retryLimit = conf.getInt(StrategyConfig.HALYARD_EVALUATION_RETRY_LIMIT, 100);
+	    threadGain = conf.getInt(StrategyConfig.HALYARD_EVALUATION_THREAD_GAIN, 5);
+	    maxThreads = conf.getInt(StrategyConfig.HALYARD_EVALUATION_MAX_THREADS, 100);
 		executor = createExecutor("Halyard Executors", "Halyard ", threads);
 
-	    maxQueueSize = conf.getInt("halyard.evaluation.maxQueueSize", 5000);
-		pollTimeoutMillis = conf.getInt("halyard.evaluation.pollTimeoutMillis", 1000);
+	    maxQueueSize = conf.getInt(StrategyConfig.HALYARD_EVALUATION_MAX_QUEUE_SIZE, 5000);
+		pollTimeoutMillis = conf.getInt(StrategyConfig.HALYARD_EVALUATION_POLL_TIMEOUT_MILLIS, 1000);
 
 		MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
 		try {

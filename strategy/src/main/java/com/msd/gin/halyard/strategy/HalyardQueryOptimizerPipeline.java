@@ -51,20 +51,17 @@ import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.UnionScopeChangeOpti
 * @author Adam Sotona
 */
 public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeline {
-
 	private final ExtendedEvaluationStatistics statistics;
 	private final EvaluationStrategy strategy;
 	private final ValueFactory valueFactory;
 	private final JoinAlgorithmOptimizer joinAlgoOptimizer;
 
-	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory, ExtendedEvaluationStatistics statistics) {
-		this(strategy, valueFactory, statistics, 50000, 2.0f);
-	}
-
-	public HalyardQueryOptimizerPipeline(EvaluationStrategy strategy, ValueFactory valueFactory, ExtendedEvaluationStatistics statistics, int hashJoinLimit, float costRatio) {
+	public HalyardQueryOptimizerPipeline(HalyardEvaluationStrategy strategy, ValueFactory valueFactory, ExtendedEvaluationStatistics statistics) {
 		this.strategy = strategy;
 		this.valueFactory = valueFactory;
 		this.statistics = statistics;
+		int hashJoinLimit = strategy.getConfiguration().getInt(StrategyConfig.HASH_JOIN_LIMIT, StrategyConfig.DEFAULT_HASH_JOIN_LIMIT);
+		float costRatio = strategy.getConfiguration().getFloat(StrategyConfig.HASH_JOIN_COST_RATIO, 2.0f);
 		this.joinAlgoOptimizer = new JoinAlgorithmOptimizer(statistics, hashJoinLimit, costRatio);
 	}
 
