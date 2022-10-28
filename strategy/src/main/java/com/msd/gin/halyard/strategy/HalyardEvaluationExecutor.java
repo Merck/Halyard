@@ -217,11 +217,18 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     }
 
 	private void resetThreads() {
-		if (executor.getCorePoolSize() > threads) {
-			executor.setCorePoolSize(threads);
-		}
-		if (executor.getMaximumPoolSize() > threads) {
-			executor.setMaximumPoolSize(threads);
+		if (executor.getCompletedTaskCount() - previousCompletedTaskCount > 100) {
+			synchronized (this) {
+				int corePoolSize = executor.getCorePoolSize();
+				if (corePoolSize > threads) {
+					executor.setCorePoolSize(corePoolSize - 1);
+				}
+				int maxPoolSize = executor.getMaximumPoolSize();
+				if (maxPoolSize > threads) {
+					executor.setMaximumPoolSize(maxPoolSize - 1);
+				}
+			}
+	    	previousCompletedTaskCount = executor.getCompletedTaskCount();
 		}
 	}
 
