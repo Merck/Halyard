@@ -970,7 +970,7 @@ final class HalyardTupleExprEvaluation {
             }
 
             @Override
-            public void close() throws InterruptedException {
+            protected void doClose() throws InterruptedException {
                 try {
                     for (Map.Entry<ComparableBindingSetWrapper, Long> me : sorter) {
                         for (long i = me.getValue(); i > 0; i--) {
@@ -1011,7 +1011,7 @@ final class HalyardTupleExprEvaluation {
 					return true;
 				}
 				@Override
-				public void close() throws InterruptedException {
+				protected void doClose() throws InterruptedException {
 					QueryBindingSet result = new QueryBindingSet(bindings);
 					aggregators.bindResult(result);
 					parentStrategy.incrementResultSizeActual(group);
@@ -1035,7 +1035,7 @@ final class HalyardTupleExprEvaluation {
 					return true;
 				}
 				@Override
-				public void close() throws InterruptedException {
+				protected void doClose() throws InterruptedException {
 					if (!groupByMap.isEmpty()) {
 						for(Map.Entry<BindingSetValues,GroupValue> aggEntry : groupByMap.entrySet()) {
 							BindingSetValues groupKey = aggEntry.getKey();
@@ -1376,7 +1376,7 @@ final class HalyardTupleExprEvaluation {
                 return parent.push(bs);
             }
             @Override
-            public void close() throws InterruptedException {
+			protected void doClose() throws InterruptedException {
                	set.close();
                 parent.close();
             }
@@ -1610,7 +1610,7 @@ final class HalyardTupleExprEvaluation {
                 		return parent.push(bs);
                 	}
                     @Override
-                    public void close() throws InterruptedException {
+    				protected void doClose() throws InterruptedException {
                     	joinsInProgress.decrementAndGet();
                     	if (joinsFinished.get() && joinsInProgress.compareAndSet(0L, -1L)) {
                     		parent.close();
@@ -1624,7 +1624,7 @@ final class HalyardTupleExprEvaluation {
                 return true;
             }
             @Override
-            public void close() throws InterruptedException {
+			protected void doClose() throws InterruptedException {
             	joinsFinished.set(true);
             	if(joinsInProgress.compareAndSet(0L, -1L)) {
             		parent.close();
@@ -1745,7 +1745,7 @@ final class HalyardTupleExprEvaluation {
                 		return parent.push(bs);
                 	}
                     @Override
-                    public void close() throws InterruptedException {
+    				protected void doClose() throws InterruptedException {
                         if (failed) {
                             // Join failed, return left arg's bindings
                         	pushToParent(leftBindings);
@@ -1763,7 +1763,7 @@ final class HalyardTupleExprEvaluation {
                 return true;
             }
             @Override
-            public void close() throws InterruptedException {
+			protected void doClose() throws InterruptedException {
             	joinsFinished.set(true);
             	if(joinsInProgress.compareAndSet(0L, -1L)) {
             		parent.close();
@@ -1809,7 +1809,7 @@ final class HalyardTupleExprEvaluation {
             	return true;
             }
             @Override
-            public void close() throws InterruptedException {
+			protected void doClose() throws InterruptedException {
             	synchronized (this) {
             		if (hashTable != null) {
                    		joiner.doJoin(hashTable, true);
@@ -1956,7 +1956,7 @@ final class HalyardTupleExprEvaluation {
         		return parent.push(bs);
         	}
             @Override
-        	public void close() throws InterruptedException {
+			protected void doClose() throws InterruptedException {
             	joinsInProgress.decrementAndGet();
             	if (joinsFinished.get() && joinsInProgress.compareAndSet(0L, -1L)) {
             		parent.close();
@@ -2143,15 +2143,18 @@ final class HalyardTupleExprEvaluation {
      */
     private void evaluateUnion(BindingSetPipe parent, Union union, BindingSet bindings) {
     	parentStrategy.initTracking(union);
-        BindingSetPipe pipe = new BindingSetPipe(parent) {
-            final AtomicInteger args = new AtomicInteger(2);
+        final AtomicInteger args = new AtomicInteger(2);
+        final class UnionBindingSetPipe extends BindingSetPipe {
+        	UnionBindingSetPipe(BindingSetPipe parent) {
+        		super(parent);
+        	}
         	@Override
         	protected boolean next(BindingSet bs) throws InterruptedException {
                 parentStrategy.incrementResultSizeActual(union);
         		return parent.push(bs);
         	}
             @Override
-            public void close() throws InterruptedException {
+			protected void doClose() throws InterruptedException {
                 if (args.decrementAndGet() == 0) {
                     parent.close();
                 }
@@ -2163,8 +2166,8 @@ final class HalyardTupleExprEvaluation {
         };
         BindingSetPipeEvaluationStep leftStep = precompileTupleExpr(union.getLeftArg());
         BindingSetPipeEvaluationStep rightStep = precompileTupleExpr(union.getRightArg());
-        leftStep.evaluate(pipe, bindings);
-        rightStep.evaluate(pipe, bindings);
+        leftStep.evaluate(new UnionBindingSetPipe(parent), bindings);
+        rightStep.evaluate(new UnionBindingSetPipe(parent), bindings);
     }
 
     /**
@@ -2193,7 +2196,7 @@ final class HalyardTupleExprEvaluation {
                 }
             }
             @Override
-            public void close() throws InterruptedException {
+			protected void doClose() throws InterruptedException {
                 leftStep.evaluate(new BindingSetPipe(parent) {
                     @Override
                     protected boolean next(BindingSet bs) throws InterruptedException {
@@ -2204,7 +2207,7 @@ final class HalyardTupleExprEvaluation {
                         }
                     }
                     @Override
-                    public void close() throws InterruptedException {
+    				protected void doClose() throws InterruptedException {
                         secondSet.close();
                         parent.close();
                     }
@@ -2247,7 +2250,7 @@ final class HalyardTupleExprEvaluation {
                 }
             }
             @Override
-            public void close() throws InterruptedException {
+			protected void doClose() throws InterruptedException {
                 leftStep.evaluate(new BindingSetPipe(parent) {
                     @Override
                     protected boolean next(BindingSet bs) throws InterruptedException {
@@ -2272,7 +2275,7 @@ final class HalyardTupleExprEvaluation {
                         return parent.push(bs);
                     }
                     @Override
-                    public void close() throws InterruptedException {
+    				protected void doClose() throws InterruptedException {
                         excludeSet.close();
                         parent.close();
                     }

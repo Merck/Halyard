@@ -468,23 +468,21 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             	if (!pipe.isClosed()) {
             		if (iter == null) {
                         iter = strategy.track(iterFactory.apply(bindingSet), queryNode);
+                        return true;
             		} else {
 	                	if(iter.hasNext()) {
 	                        BindingSet bs = iter.next();
 	                        if (pipe.push(bs)) { //true indicates more data is expected from this binding set, put it on the queue
 	                           	return true;
-	                        } else {
-	                        	iter.close();
-	                        	pipe.close();
 	                        }
-	                	} else {
-	            			iter.close();
-	            			pipe.close();
 	            		}
             		}
-            	} else if (iter != null) {
+            	}
+            	if (iter != null) {
             		iter.close();
             	}
+            	pipe.close();
+            	return false;
             } catch (Throwable e) {
             	if (iter != null) {
 	            	try {
@@ -494,7 +492,6 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             	}
                 return pipe.handleException(e);
             }
-        	return false;
 		}
 
 		@Override
@@ -539,6 +536,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     final class BindingSetPipeQueue {
 
         private final LinkedBlockingQueue<BindingSet> queue = new LinkedBlockingQueue<>(maxQueueSize);
+        private volatile boolean done;
         private volatile Throwable exception;
 
         final BindingSetPipeIteration iteration = new BindingSetPipeIteration();
@@ -563,16 +561,16 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     			try {
                     for (int retries = 0; bs == null && !isClosed(); retries++) {
     					bs = queue.poll(jitteredTimeout, TimeUnit.MILLISECONDS);
+    					Throwable thr = exception;
+    					if (thr != null) {
+	    					if (thr instanceof RuntimeException) {
+	    						throw (RuntimeException) thr;
+	    					} else {
+	                        	throw new QueryEvaluationException(thr);
+	                        }
+    					}
 						if (bs == null) {
-							// no data available - check for exception
-	    					Throwable thr = exception;
-	    					if (thr != null) {
-		    					if (thr instanceof RuntimeException) {
-		    						throw (RuntimeException) thr;
-		    					} else {
-		                        	throw new QueryEvaluationException(thr);
-		                        }
-	    					}
+							// no data available
 							if(checkThreads(retries)) {
 								retries = 0;
 							}
@@ -588,8 +586,11 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             @Override
             protected void handleClose() throws QueryEvaluationException {
                 super.handleClose();
-                pipe.isClosed = true;
-                queue.clear();
+                done = true;
+                try {
+                	pipe.close();
+                } catch (InterruptedException ignore) {
+                }
             }
 
             @Override
@@ -600,7 +601,6 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
         final class QueueingBindingSetPipe extends BindingSetPipe {
             private final long jitteredTimeout;
-            volatile boolean isClosed = false;
 
             QueueingBindingSetPipe() {
             	super(null);
@@ -610,7 +610,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
             private boolean addToQueue(BindingSet bs) throws InterruptedException {
             	boolean added = false;
-            	for (int retries = 0; !added && !isClosed(); retries++) {
+            	for (int retries = 0; !added && !done; retries++) {
             		added = queue.offer(bs, jitteredTimeout, TimeUnit.MILLISECONDS);
 
 					if (!added) {
@@ -630,11 +630,9 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             }
 
             @Override
-            public void close() throws InterruptedException {
-            	if(!isClosed) {
-	                addToQueue(END_OF_QUEUE);
-	                isClosed = true;
-            	}
+            protected void doClose() throws InterruptedException {
+        		addToQueue(END_OF_QUEUE);
+        		done = true;
             }
 
             @Override
@@ -644,13 +642,11 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
                 	e.addSuppressed(lastEx);
                 }
                 exception = e;
-                isClosed = true;
+                try {
+                	close();
+                } catch (InterruptedException ignore) {
+                }
                 return false;
-            }
-
-            @Override
-            protected boolean isClosed() {
-                return isClosed || iteration.isClosed();
             }
 
             @Override

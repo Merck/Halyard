@@ -26,6 +26,7 @@ import org.eclipse.rdf4j.query.QueryEvaluationException;
 abstract class BindingSetPipe {
 
     protected final BindingSetPipe parent;
+    private volatile boolean closed;
 
     /**
      * Create a pipe
@@ -49,7 +50,7 @@ abstract class BindingSetPipe {
      * @throws QueryEvaluationException
      */
     public final boolean push(BindingSet bs) throws InterruptedException {
-    	if (!isClosed()) {
+    	if (!closed) {
         	return next(bs);
     	} else {
     		return false;
@@ -60,7 +61,14 @@ abstract class BindingSetPipe {
     	return parent.push(bs);
     }
 
-    public void close() throws InterruptedException {
+    public final void close() throws InterruptedException {
+    	if (!closed) {
+    		closed = true;
+    		doClose();
+    	}
+    }
+
+    protected void doClose() throws InterruptedException {
     	if (parent != null) {
     		parent.close();
     	}
@@ -83,12 +91,8 @@ abstract class BindingSetPipe {
         }
     }
 
-    protected boolean isClosed() {
-        if (parent != null) {
-            return parent.isClosed();
-        } else {
-            return false;
-        }
+    public final boolean isClosed() {
+    	return closed;
     }
 
     public final void empty() {
