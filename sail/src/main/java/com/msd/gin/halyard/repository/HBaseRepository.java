@@ -1,6 +1,7 @@
 package com.msd.gin.halyard.repository;
 
 import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.sail.HBaseSailConnection;
 
 import org.eclipse.rdf4j.repository.RepositoryException;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
@@ -19,7 +20,7 @@ public class HBaseRepository extends SailRepository {
 			init();
 		}
 		try {
-			return new HBaseRepositoryConnection(this, getSail().getConnection());
+			return new HBaseRepositoryConnection(this, (HBaseSailConnection) getSail().getConnection());
 		} catch (SailException e) {
 			throw new RepositoryException(e);
 		}

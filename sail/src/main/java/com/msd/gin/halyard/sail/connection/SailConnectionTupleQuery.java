@@ -7,6 +7,8 @@
  *******************************************************************************/
 package com.msd.gin.halyard.sail.connection;
 
+import com.msd.gin.halyard.sail.ExtendedSailConnection;
+
 import java.util.ArrayList;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -58,7 +60,13 @@ public class SailConnectionTupleQuery extends SailConnectionQuery implements Tup
 	@Override
 	public void evaluate(TupleQueryResultHandler handler)
 			throws QueryEvaluationException, TupleQueryResultHandlerException {
-		TupleQueryResult queryResult = evaluate();
-		QueryResults.report(queryResult, handler);
+		SailConnection sailCon = getSailConnection();
+		if (sailCon instanceof ExtendedSailConnection) {
+			TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
+			((ExtendedSailConnection) sailCon).evaluate(handler, tupleExpr, getActiveDataset(), getBindings(), getIncludeInferred());
+		} else {
+			TupleQueryResult queryResult = evaluate();
+			QueryResults.report(queryResult, handler);
+		}
 	}
 }

@@ -76,7 +76,7 @@ public abstract class AbstractSailConnection implements SailConnection {
 
 	private boolean runQueryForExplain(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred, int timeoutSeconds) {
 
-		AtomicBoolean timedOut = new AtomicBoolean(false);
+		final AtomicBoolean timedOut = new AtomicBoolean();
 
 		Thread currentThread = Thread.currentThread();
 

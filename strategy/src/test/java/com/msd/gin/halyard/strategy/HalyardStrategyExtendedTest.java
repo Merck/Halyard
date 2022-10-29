@@ -78,6 +78,15 @@ public class HalyardStrategyExtendedTest {
     }
 
     @Test
+    public void testServicePushOnly() {
+        String sparql = "SELECT * WHERE {SERVICE <repository:pushOnly> { VALUES ?s {1} }}";
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate()) {
+            res.hasNext();
+	        assertEquals(1, ((Literal) res.next().getValue("s")).intValue());
+        }
+    }
+
+    @Test
     public void testReduced() throws Exception {
         String sparql = "SELECT REDUCED ?a WHERE {VALUES ?a {0 0 1 1 0 0 1 1}}";
         try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate()) {

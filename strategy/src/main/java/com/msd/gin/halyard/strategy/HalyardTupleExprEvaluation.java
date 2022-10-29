@@ -24,6 +24,7 @@ import com.msd.gin.halyard.algebra.StarJoin;
 import com.msd.gin.halyard.common.LiteralConstraint;
 import com.msd.gin.halyard.common.ValueConstraint;
 import com.msd.gin.halyard.common.ValueType;
+import com.msd.gin.halyard.federation.ExtendedFederatedService;
 import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
 import com.msd.gin.halyard.strategy.aggregators.AvgAggregateFunction;
@@ -58,8 +59,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Predicate;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -79,12 +80,17 @@ import org.eclipse.rdf4j.model.impl.BooleanLiteral;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.RDF4J;
 import org.eclipse.rdf4j.model.vocabulary.SESAME;
+import org.eclipse.rdf4j.query.AbstractTupleQueryResultHandler;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.MutableBindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
+import org.eclipse.rdf4j.query.QueryInterruptedException;
+import org.eclipse.rdf4j.query.QueryResultHandlerException;
 import org.eclipse.rdf4j.query.QueryResults;
+import org.eclipse.rdf4j.query.TupleQueryResultHandler;
+import org.eclipse.rdf4j.query.TupleQueryResultHandlerException;
 import org.eclipse.rdf4j.query.algebra.AggregateFunctionCall;
 import org.eclipse.rdf4j.query.algebra.AggregateOperator;
 import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
@@ -140,7 +146,6 @@ import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
-import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
@@ -218,9 +223,19 @@ final class HalyardTupleExprEvaluation {
      * @param expr supplied by HalyardEvaluationStrategy
      * @return a QueryEvaluationStep
      */
-    QueryEvaluationStep precompile(TupleExpr expr) {
+	QueryBindingSetPipeEvaluationStep precompile(TupleExpr expr) {
     	BindingSetPipeEvaluationStep step = precompileTupleExpr(expr);
-    	return (bs) -> executor.pushAndPull(pipe -> step.evaluate(pipe, bs), expr, bs, parentStrategy);
+    	return new QueryBindingSetPipeEvaluationStep() {
+			@Override
+			public void evaluate(BindingSetPipe parent, BindingSet bindings) {
+				step.evaluate(parent, bindings);
+			}
+
+			@Override
+			public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(BindingSet bindings) {
+				return executor.pushAndPull(pipe -> step.evaluate(pipe, bindings), expr, bindings, parentStrategy);
+			}
+    	};
     }
 
     /**
@@ -1465,11 +1480,11 @@ final class HalyardTupleExprEvaluation {
 
     /**
      * Evaluate {@link Service} query model nodes
-     * @param parent
+     * @param topPipe
      * @param service
      * @param bindings
      */
-    private void evaluateService(BindingSetPipe parent, Service service, BindingSet bindings) {
+    private void evaluateService(final BindingSetPipe topPipe, Service service, BindingSet bindings) {
         Var serviceRef = service.getServiceRef();
         String serviceUri;
         if (serviceRef.hasValue()) {
@@ -1477,11 +1492,11 @@ final class HalyardTupleExprEvaluation {
         } else if (bindings != null && bindings.getValue(serviceRef.getName()) != null) {
             serviceUri = bindings.getBinding(serviceRef.getName()).getValue().stringValue();
         } else {
-            throw new QueryEvaluationException("SERVICE variables must be bound at evaluation time.");
+            topPipe.handleException(new QueryEvaluationException("SERVICE variables must be bound at evaluation time."));
+            return;
         }
         try {
             try {
-                FederatedService fs = parentStrategy.getService(serviceUri);
                 // create a copy of the free variables, and remove those for which
                 // bindings are available (we can set them as constraints!)
                 Set<String> freeVars = new HashSet<>(service.getServiceVars());
@@ -1506,45 +1521,82 @@ final class HalyardTupleExprEvaluation {
                 }
                 bindings = allBindings;
                 String baseUri = service.getBaseURI();
+                FederatedService fs = parentStrategy.getService(serviceUri);
                 // special case: no free variables => perform ASK query
                 if (freeVars.isEmpty()) {
                     boolean exists = fs.ask(service, bindings, baseUri);
                     // check if triples are available (with inserted bindings)
                     if (exists) {
-                        parent.push(bindings);
+                        topPipe.push(bindings);
                     }
-                    parent.close();
+                    topPipe.close();
                     return;
 
                 }
                 // otherwise: perform a SELECT query
-                Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory = bs -> {
-            		CloseableIteration<BindingSet, QueryEvaluationException> result = fs.select(service, freeVars, bs, baseUri);
-            		if (service.isSilent()) {
-            			result = new SilentIteration<>(result);
-            		}
-            		return result;
-                };
-                executor.pullAndPushAsync(parent, iterFactory, service, bindings, parentStrategy);
+                BindingSetPipe pipe;
+            	if (service.isSilent()) {
+            		pipe = new BindingSetPipe(topPipe) {
+            			@Override
+            			protected boolean handleException(Throwable thr) {
+            				try {
+            					close();
+            				} catch (InterruptedException ignore) {
+            				}
+            				return false;
+            			}
+            			@Override
+            			public String toString() {
+            				return "SilentBindingSetPipe";
+            			}
+            		};
+            	} else {
+            		pipe = topPipe;
+            	}
+                if (fs instanceof ExtendedFederatedService) {
+                	TupleQueryResultHandler handler = new AbstractTupleQueryResultHandler() {
+						@Override
+						public void handleSolution(BindingSet bindingSet) throws TupleQueryResultHandlerException {
+							try {
+								pipe.push(bindingSet);
+							} catch (InterruptedException e) {
+								pipe.handleException(e);
+							}
+						}
+
+						@Override
+						public void endQueryResult() throws TupleQueryResultHandlerException {
+							try {
+								pipe.close();
+							} catch (InterruptedException e) {
+								pipe.handleException(e);
+							}
+						}
+                	};
+                	((ExtendedFederatedService)fs).select(handler, service, freeVars, bindings, baseUri);
+                } else {
+	                Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory = bs -> fs.select(service, freeVars, bs, baseUri);
+	                executor.pullAndPushAsync(pipe, iterFactory, service, bindings, parentStrategy);
+                }
             } catch (QueryEvaluationException e) {
                 // suppress exceptions if silent
                 if (service.isSilent()) {
-                    parent.pushLast(bindings);
+                    topPipe.pushLast(bindings);
                 } else {
-                    throw e;
+                    topPipe.handleException(e);
                 }
             } catch (RuntimeException e) {
                 // suppress special exceptions (e.g. UndeclaredThrowable with
                 // wrapped
                 // QueryEval) if silent
                 if (service.isSilent()) {
-                    parent.pushLast(bindings);
+                    topPipe.pushLast(bindings);
                 } else {
-                    throw e;
+                    topPipe.handleException(e);
                 }
             }
         } catch (InterruptedException ie) {
-            parent.handleException(ie);
+            topPipe.handleException(ie);
         }
     }
 

@@ -66,6 +66,7 @@ public class HalyardKeysTest extends AbstractHalyardToolTest {
 				}).parse(ref, "");
 			}
 		}
+		sail.shutDown();
 	}
 
 	@Test

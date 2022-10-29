@@ -2,14 +2,24 @@ package com.msd.gin.halyard.repository;
 
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
+import com.msd.gin.halyard.sail.TimeLimitTupleQueryResultHandler;
+
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.MalformedQueryException;
 import org.eclipse.rdf4j.query.Operation;
+import org.eclipse.rdf4j.query.Query;
+import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryLanguage;
+import org.eclipse.rdf4j.query.TupleQueryResultHandler;
+import org.eclipse.rdf4j.query.TupleQueryResultHandlerException;
 import org.eclipse.rdf4j.query.Update;
+import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.impl.AbstractParserQuery;
 import org.eclipse.rdf4j.query.impl.AbstractParserUpdate;
+import org.eclipse.rdf4j.query.parser.ParsedTupleQuery;
 import org.eclipse.rdf4j.query.parser.ParsedUpdate;
 import org.eclipse.rdf4j.query.parser.QueryParserUtil;
 import org.eclipse.rdf4j.repository.RepositoryException;
@@ -19,12 +29,12 @@ import org.eclipse.rdf4j.repository.sail.SailQuery;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailTupleQuery;
 import org.eclipse.rdf4j.repository.sail.SailUpdate;
-import org.eclipse.rdf4j.sail.SailConnection;
+import org.eclipse.rdf4j.sail.SailException;
 
 public class HBaseRepositoryConnection extends SailRepositoryConnection {
 	private final HBaseSail sail;
 
-	protected HBaseRepositoryConnection(HBaseRepository repository, SailConnection sailConnection) {
+	protected HBaseRepositoryConnection(HBaseRepository repository, HBaseSailConnection sailConnection) {
 		super(repository, sailConnection);
 		this.sail = (HBaseSail) repository.getSail();
 	}
@@ -53,7 +63,22 @@ public class HBaseRepositoryConnection extends SailRepositoryConnection {
 
 	@Override
 	public SailTupleQuery prepareTupleQuery(QueryLanguage ql, String queryString, String baseURI) throws MalformedQueryException {
-		SailTupleQuery query = super.prepareTupleQuery(ql, queryString, baseURI);
+		Optional<TupleExpr> sailTupleExpr = getSailConnection().prepareQuery(ql, Query.QueryType.TUPLE, queryString, baseURI);
+
+		ParsedTupleQuery parsedQuery = sailTupleExpr.map(expr -> new ParsedTupleQuery(queryString, expr)).orElse(QueryParserUtil.parseTupleQuery(ql, queryString, baseURI));
+		SailTupleQuery query = new SailTupleQuery(parsedQuery, this) {
+			@Override
+			public void evaluate(TupleQueryResultHandler handler) throws QueryEvaluationException, TupleQueryResultHandlerException {
+				TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
+				try {
+					HBaseSailConnection sailCon = (HBaseSailConnection) getConnection().getSailConnection();
+					handler = HBaseRepositoryConnection.enforceMaxQueryTime(handler, getMaxExecutionTime());
+					sailCon.evaluate(handler, tupleExpr, getActiveDataset(), getBindings(), getIncludeInferred());
+				} catch (SailException e) {
+					throw new QueryEvaluationException(e.getMessage(), e);
+				}
+			}
+		};
 		addImplicitBindings(query);
 		return query;
 	}
@@ -79,5 +104,17 @@ public class HBaseRepositoryConnection extends SailRepositoryConnection {
 		SailUpdate update = new HBaseUpdate(parsedUpdate, sail, this);
 		addImplicitBindings(update);
 		return update;
+	}
+
+	private static TupleQueryResultHandler enforceMaxQueryTime(TupleQueryResultHandler handler, int maxTimeSecs) {
+		if (maxTimeSecs > 0) {
+			handler = new TimeLimitTupleQueryResultHandler(handler, TimeUnit.SECONDS.toMillis(maxTimeSecs)) {
+				@Override
+				protected void throwInterruptedException() {
+					throw new TupleQueryResultHandlerException("Query evaluation took too long");
+				}
+			};
+		}
+		return handler;
 	}
 }

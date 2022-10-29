@@ -190,8 +190,18 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 
     @Override
     public QueryEvaluationStep precompile(TupleExpr expr) {
-    	QueryEvaluationStep step = tupleEval.precompile(expr);
-    	return (bindings) -> track(step.evaluate(bindings), expr);
+    	QueryBindingSetPipeEvaluationStep step = tupleEval.precompile(expr);
+    	return new QueryBindingSetPipeEvaluationStep() {
+			@Override
+			public void evaluate(BindingSetPipe parent, BindingSet bindings) {
+				step.evaluate(parent, bindings);
+			}
+
+			@Override
+			public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(BindingSet bindings) {
+				return track(step.evaluate(bindings), expr);
+			}
+    	};
     }
 
     /**

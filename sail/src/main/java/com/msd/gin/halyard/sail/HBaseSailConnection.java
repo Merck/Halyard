@@ -31,6 +31,8 @@ import com.msd.gin.halyard.sail.search.SearchClient;
 import com.msd.gin.halyard.sail.search.SearchInterpreter;
 import com.msd.gin.halyard.spin.SpinFunctionInterpreter;
 import com.msd.gin.halyard.spin.SpinMagicPropertyInterpreter;
+import com.msd.gin.halyard.strategy.BindingSetPipe;
+import com.msd.gin.halyard.strategy.BindingSetPipeEvaluationStep;
 import com.msd.gin.halyard.strategy.ExtendedEvaluationStrategy;
 import com.msd.gin.halyard.strategy.ExtendedQueryOptimizerPipeline;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
@@ -38,11 +40,13 @@ import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -76,6 +80,11 @@ import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
+import org.eclipse.rdf4j.query.QueryInterruptedException;
+import org.eclipse.rdf4j.query.QueryResults;
+import org.eclipse.rdf4j.query.TupleQueryResult;
+import org.eclipse.rdf4j.query.TupleQueryResultHandler;
+import org.eclipse.rdf4j.query.TupleQueryResultHandlerException;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
@@ -86,6 +95,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
+import org.eclipse.rdf4j.query.impl.IteratingTupleQueryResult;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.eclipse.rdf4j.sail.UpdateContext;
@@ -94,7 +104,7 @@ import org.slf4j.LoggerFactory;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 
-public class HBaseSailConnection extends AbstractSailConnection {
+public class HBaseSailConnection extends AbstractSailConnection implements ExtendedSailConnection {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseSailConnection.class);
 
 	public static final String SOURCE_STRING_BINDING = "__source__";
@@ -127,8 +137,8 @@ public class HBaseSailConnection extends AbstractSailConnection {
     }
 
     private BufferedMutator getBufferedMutator() {
-		if (keyspaceConn == null) {
-			throw new SailException("Table closed");
+		if (!isOpen()) {
+			throw new SailException("Connection is closed");
 		}
 		if (mutator == null) {
 			mutator = sail.getBufferedMutator();
@@ -138,7 +148,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 
     @Override
     public boolean isOpen() throws SailException {
-        return keyspaceConn != null;  //if the table exists the table is open
+		return keyspaceConn != null;
     }
 
     @Override
@@ -270,7 +280,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
 						: new TimeLimitIteration<BindingSet, QueryEvaluationException>(iter, TimeUnit.SECONDS.toMillis(sail.evaluationTimeoutSecs)) {
 							@Override
 							protected void throwInterruptedException() {
-								throw new QueryEvaluationException(
+								throw new QueryInterruptedException(
 										String.format("Query evaluation exceeded specified timeout %ds:\n%s", sail.evaluationTimeoutSecs, preparedQuery.getTupleExpression()));
 							}
 						};
@@ -285,6 +295,62 @@ public class HBaseSailConnection extends AbstractSailConnection {
 			}
 		}
     }
+
+	@Override
+	public void evaluate(TupleQueryResultHandler handler, final TupleExpr tupleExpr, final Dataset dataset, final BindingSet bindings, final boolean includeInferred) throws SailException {
+		flush();
+
+		String sourceString = Literals.getLabel(bindings.getValue(SOURCE_STRING_BINDING), null);
+		BindingSet queryBindings = removeImplicitBindings(bindings);
+
+		RDFStarTripleSource tripleSource = createTripleSource();
+		QueryContext queryContext = createQueryContext(tripleSource, includeInferred, sourceString);
+		EvaluationStrategy strategy = createEvaluationStrategy(tripleSource, dataset, queryContext);
+
+		queryContext.begin();
+		try {
+			initQueryContext(queryContext);
+
+			PreparedQuery preparedQuery;
+			if (sourceString != null) {
+				PreparedQueryKey pqkey = new PreparedQueryKey(sourceString, dataset, queryBindings, includeInferred);
+				try {
+					preparedQuery = queryCache.get(pqkey, () -> prepareQuery(tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy));
+				} catch (ExecutionException e) {
+					if (e.getCause() instanceof RuntimeException) {
+						throw (RuntimeException) e.getCause();
+					} else {
+						throw new AssertionError(e);
+					}
+				}
+			} else {
+				preparedQuery = prepareQuery(tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy);
+			}
+
+			try {
+				// evaluate the expression against the TripleSource according to the
+				// EvaluationStrategy.
+				sail.trackQuery(sourceString, tupleExpr, preparedQuery.getTupleExpression());
+				if (sail.evaluationTimeoutSecs > 0) {
+					handler = new TimeLimitTupleQueryResultHandler(handler, TimeUnit.SECONDS.toMillis(sail.evaluationTimeoutSecs)) {
+						@Override
+						protected void throwInterruptedException() {
+							throw new TupleQueryResultHandlerException(String.format("Query evaluation exceeded specified timeout %ds:\n%s", sail.evaluationTimeoutSecs, preparedQuery.getTupleExpression()));
+						}
+					};
+				}
+				evaluateInternal(preparedQuery, handler);
+			} catch (QueryEvaluationException ex) {
+				throw new SailException(ex);
+			}
+		} finally {
+			try {
+				destroyQueryContext(queryContext);
+			} finally {
+				queryContext.end();
+			}
+		}
+	}
 
 	private BindingSet removeImplicitBindings(BindingSet bs) {
 		QueryBindingSet cleaned = new QueryBindingSet();
@@ -311,6 +377,10 @@ public class HBaseSailConnection extends AbstractSailConnection {
 
 	protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(PreparedQuery query) {
 		return query.evaluate();
+	}
+
+	protected void evaluateInternal(PreparedQuery query, TupleQueryResultHandler handler) {
+		query.evaluate(handler);
 	}
 
     @Override
@@ -507,7 +577,7 @@ public class HBaseSailConnection extends AbstractSailConnection {
     }
 
     private void checkWritable() {
-		if (keyspaceConn == null) {
+		if (!isOpen()) {
 			throw new IllegalStateException("Connection is closed");
 		}
 		if (!sail.isWritable()) {
@@ -786,12 +856,57 @@ public class HBaseSailConnection extends AbstractSailConnection {
 			return step.evaluate(EmptyBindingSet.getInstance());
 		}
 
+		public void evaluate(TupleQueryResultHandler handler) {
+			if (step instanceof BindingSetPipeEvaluationStep) {
+				BindingSetPipeTupleQueryResultHandlerAdapter adapter = new BindingSetPipeTupleQueryResultHandlerAdapter(tree.getBindingNames(), handler);
+				((BindingSetPipeEvaluationStep) step).evaluate(adapter, EmptyBindingSet.getInstance());
+				// TupleQueryResultHandlers expect to be used synchronously so need to wait
+				try {
+					adapter.waitUntilClosed();
+				} catch (InterruptedException ie) {
+					throw new SailException(ie);
+				}
+			} else {
+				ExtendedSailConnection.report(tree.getBindingNames(), evaluate(), handler);
+			}
+		}
+
 		public TupleExpr getTupleExpression() {
 			return tree;
 		}
 
 		public QueryEvaluationStep getQueryEvaluationStep() {
 			return step;
+		}
+	}
+
+	static final class BindingSetPipeTupleQueryResultHandlerAdapter extends BindingSetPipe {
+		private final CountDownLatch doneLatch = new CountDownLatch(1);
+		private final TupleQueryResultHandler handler;
+
+		BindingSetPipeTupleQueryResultHandlerAdapter(Set<String> bindingNames, TupleQueryResultHandler handler) {
+			super(null);
+			this.handler = handler;
+			handler.startQueryResult(new ArrayList<>(bindingNames));
+		}
+
+		/**
+		 * NB: BindingSetPipes are designed to be used concurrently but TupleQueryResultHandlers aren't so need to synchronize access.
+		 */
+		@Override
+		protected synchronized boolean next(BindingSet bs) {
+			handler.handleSolution(bs);
+			return true;
+		}
+
+		@Override
+		protected void doClose() {
+			handler.endQueryResult();
+			doneLatch.countDown();
+		}
+
+		public void waitUntilClosed() throws InterruptedException {
+			doneLatch.await();
 		}
 	}
 

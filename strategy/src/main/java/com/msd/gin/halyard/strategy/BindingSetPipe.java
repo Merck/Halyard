@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 
@@ -23,10 +25,10 @@ import org.eclipse.rdf4j.query.QueryEvaluationException;
  * Binding set pipes instances hold {@BindingSet}s (set of evaluated, un-evaluated and intermediate variables) that
  * form part of the query evaluation (a query generates an evaluation tree).
  */
-abstract class BindingSetPipe {
+public abstract class BindingSetPipe {
 
     protected final BindingSetPipe parent;
-    private volatile boolean closed;
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     /**
      * Create a pipe
@@ -50,7 +52,7 @@ abstract class BindingSetPipe {
      * @throws QueryEvaluationException
      */
     public final boolean push(BindingSet bs) throws InterruptedException {
-    	if (!closed) {
+    	if (!closed.get()) {
         	return next(bs);
     	} else {
     		return false;
@@ -58,12 +60,15 @@ abstract class BindingSetPipe {
     }
 
     protected boolean next(BindingSet bs) throws InterruptedException {
-    	return parent.push(bs);
+    	if (parent != null) {
+    		return parent.push(bs);
+    	} else {
+    		return true;
+    	}
     }
 
     public final void close() throws InterruptedException {
-    	if (!closed) {
-    		closed = true;
+    	if (closed.compareAndSet(false, true)) {
     		doClose();
     	}
     }
@@ -92,7 +97,7 @@ abstract class BindingSetPipe {
     }
 
     public final boolean isClosed() {
-    	return closed;
+    	return closed.get();
     }
 
     public final void empty() {

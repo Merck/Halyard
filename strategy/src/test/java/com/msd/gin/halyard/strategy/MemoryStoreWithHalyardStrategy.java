@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.federation.SailFederatedService;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.optimizers.SimpleStatementPatternCardinalityCalculator;
@@ -38,6 +39,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
+import org.eclipse.rdf4j.repository.sparql.federation.SPARQLServiceResolver;
 import org.eclipse.rdf4j.sail.NotifyingSailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
@@ -56,6 +58,9 @@ public class MemoryStoreWithHalyardStrategy extends MemoryStore {
 
 	MemoryStoreWithHalyardStrategy() {
 		this(0, 0, Float.MAX_VALUE);
+		SPARQLServiceResolver fsr = new SPARQLServiceResolver();
+		fsr.registerService("repository:pushOnly", new SailFederatedService(new PushOnlyMemoryStore()));
+		setFederatedServiceResolver(fsr);
 	}
 
 	MemoryStoreWithHalyardStrategy(int optHashJoinLimit, int evalHashJoinLimit, float cardinalityRatio) {
@@ -70,33 +75,36 @@ public class MemoryStoreWithHalyardStrategy extends MemoryStore {
 
 	@Override
     protected NotifyingSailConnection getConnectionInternal() throws SailException {
-        return new MemoryStoreConnection(this) {
-
-            @Override
-            protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, final TripleSource tripleSource) {
-            	HalyardEvaluationStatistics stats = new HalyardEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY, null);
-            	Configuration conf = new Configuration();
-            	conf.setInt(StrategyConfig.HASH_JOIN_LIMIT, optHashJoinLimit);
-            	conf.setFloat(StrategyConfig.HASH_JOIN_COST_RATIO, cardinalityRatio);
-            	HalyardEvaluationStrategy evalStrat = new HalyardEvaluationStrategy(conf, new MockTripleSource(tripleSource), dataset, null, stats) {
-            		@Override
-            		public QueryEvaluationStep precompile(TupleExpr expr) {
-            			queryHistory.add(expr);
-            			return super.precompile(expr);
-            		}
-            		@Override
-            		protected JoinAlgorithmOptimizer getJoinAlgorithmOptimizer() {
-            			return new JoinAlgorithmOptimizer(stats, evalHashJoinLimit, cardinalityRatio);
-            		}
-            	};
-                evalStrat.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(evalStrat, tripleSource.getValueFactory(), stats));
-                evalStrat.setTrackResultSize(true);
-                return evalStrat;
-            }
-
-        };
+        return new MemoryStoreConnectionWithHalyardStrategy(this);
     }
 
+	final class MemoryStoreConnectionWithHalyardStrategy extends MemoryStoreConnection {
+		protected MemoryStoreConnectionWithHalyardStrategy(MemoryStore sail) {
+			super(sail);
+		}
+
+		@Override
+        protected EvaluationStrategy getEvaluationStrategy(Dataset dataset, final TripleSource tripleSource) {
+        	HalyardEvaluationStatistics stats = new HalyardEvaluationStatistics(SimpleStatementPatternCardinalityCalculator.FACTORY, null);
+        	Configuration conf = new Configuration();
+        	conf.setInt(StrategyConfig.HASH_JOIN_LIMIT, optHashJoinLimit);
+        	conf.setFloat(StrategyConfig.HASH_JOIN_COST_RATIO, cardinalityRatio);
+        	HalyardEvaluationStrategy evalStrat = new HalyardEvaluationStrategy(conf, new MockTripleSource(tripleSource), dataset, getFederatedServiceResolver(), stats) {
+        		@Override
+        		public QueryEvaluationStep precompile(TupleExpr expr) {
+        			queryHistory.add(expr);
+        			return super.precompile(expr);
+        		}
+        		@Override
+        		protected JoinAlgorithmOptimizer getJoinAlgorithmOptimizer() {
+        			return new JoinAlgorithmOptimizer(stats, evalHashJoinLimit, cardinalityRatio);
+        		}
+        	};
+            evalStrat.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(evalStrat, tripleSource.getValueFactory(), stats));
+            evalStrat.setTrackResultSize(true);
+            return evalStrat;
+        }
+	}
 
     static class MockTripleSource implements RDFStarTripleSource {
         private final TripleSource tripleSource;

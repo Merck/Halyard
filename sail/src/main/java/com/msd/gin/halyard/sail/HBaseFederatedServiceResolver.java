@@ -3,6 +3,7 @@ package com.msd.gin.halyard.sail;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.common.HalyardTableUtils;
+import com.msd.gin.halyard.federation.SailFederatedService;
 import com.msd.gin.halyard.sail.HBaseSail.Ticker;
 import com.msd.gin.halyard.vocab.HALYARD;
 
