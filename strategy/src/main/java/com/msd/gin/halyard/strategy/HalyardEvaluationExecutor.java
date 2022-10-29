@@ -87,6 +87,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
     private int maxQueueSize;
 	private int pollTimeoutMillis;
+	private int offerTimeoutMillis;
 
 	private volatile long previousCompletedTaskCount;
 
@@ -126,6 +127,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
 	    maxQueueSize = conf.getInt(StrategyConfig.HALYARD_EVALUATION_MAX_QUEUE_SIZE, 5000);
 		pollTimeoutMillis = conf.getInt(StrategyConfig.HALYARD_EVALUATION_POLL_TIMEOUT_MILLIS, 1000);
+		offerTimeoutMillis = conf.getInt(StrategyConfig.HALYARD_EVALUATION_OFFER_TIMEOUT_MILLIS, conf.getInt("hbase.client.scanner.timeout.period", 60000));
 
 		MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
 		try {
@@ -537,7 +539,6 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     final class BindingSetPipeQueue {
 
         private final LinkedBlockingQueue<BindingSet> queue = new LinkedBlockingQueue<>(maxQueueSize);
-        private volatile boolean done;
         private volatile Throwable exception;
 
         final BindingSetPipeIteration iteration = new BindingSetPipeIteration();
@@ -548,20 +549,16 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
         	return "Queue "+Integer.toHexString(queue.hashCode())+" for pipe "+Integer.toHexString(pipe.hashCode())+" and iteration "+Integer.toHexString(iteration.hashCode());
         }
 
+        /**
+         * Used by client to pull data.
+         */
         final class BindingSetPipeIteration extends LookAheadIteration<BindingSet, QueryEvaluationException> {
-        	private final long jitteredTimeout;
-
-        	BindingSetPipeIteration() {
-        		// add some jitter to avoid threads timing out at the same time (-5%, +5%)
-        		jitteredTimeout = pollTimeoutMillis + (hashCode() % (pollTimeoutMillis/20));
-        	}
-
-        	 @Override
+        	@Override
             protected BindingSet getNextElement() throws QueryEvaluationException {
     			BindingSet bs = null;
     			try {
                     for (int retries = 0; bs == null && !isClosed(); retries++) {
-    					bs = queue.poll(jitteredTimeout, TimeUnit.MILLISECONDS);
+    					bs = queue.poll(pollTimeoutMillis, TimeUnit.MILLISECONDS);
     					Throwable thr = exception;
     					if (thr != null) {
 	    					if (thr instanceof RuntimeException) {
@@ -571,7 +568,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 	                        }
     					}
 						if (bs == null) {
-							// no data available
+							// no data available - see if we can improve things
 							if(checkThreads(retries)) {
 								retries = 0;
 							}
@@ -587,7 +584,6 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             @Override
             protected void handleClose() throws QueryEvaluationException {
                 super.handleClose();
-                done = true;
                 try {
                 	pipe.close();
                 } catch (InterruptedException ignore) {
@@ -600,27 +596,18 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             }
         }
 
+        /**
+         * Pushes data to client.
+         */
         final class QueueingBindingSetPipe extends BindingSetPipe {
-            private final long jitteredTimeout;
-
             QueueingBindingSetPipe() {
             	super(null);
-        		// add some jitter to avoid threads timing out at the same time (-5%, +5%)
-        		jitteredTimeout = pollTimeoutMillis + (hashCode() % (pollTimeoutMillis/20));
             }
 
             private boolean addToQueue(BindingSet bs) throws InterruptedException {
-            	boolean added = false;
-            	for (int retries = 0; !added && !done; retries++) {
-            		added = queue.offer(bs, jitteredTimeout, TimeUnit.MILLISECONDS);
-
-					if (!added) {
-						if(checkThreads(retries)) {
-							retries = 0;
-						}
-					} else {
-						resetThreads();
-					}
+            	boolean added = queue.offer(bs, offerTimeoutMillis, TimeUnit.MILLISECONDS);
+            	if (!added && !isClosed()) {
+            		handleException(new QueryEvaluationException("Timed-out waiting for client to consume binding sets"));
             	}
             	return added;
             }
@@ -633,7 +620,6 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             @Override
             protected void doClose() throws InterruptedException {
         		addToQueue(END_OF_QUEUE);
-        		done = true;
             }
 
             @Override
