@@ -26,6 +26,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.io.FileUtils;
@@ -129,16 +130,18 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                         writerConfig.load(in);
                     }
                 }
-                HttpSparqlHandler handler = new HttpSparqlHandler(rep, storedQueries, writerConfig);
-                SimpleHttpServer server = new SimpleHttpServer(port, CONTEXT, handler);
+                CountDownLatch latch = new CountDownLatch(1);
+                SimpleHttpServer server = new SimpleHttpServer(port);
+                HttpSparqlHandler handler = new HttpSparqlHandler(rep, storedQueries, writerConfig, () -> latch.countDown());
+                server.createContext(CONTEXT, handler);
                 server.start();
                 try {
                     if (cmdArgs.size() > 0) {
                         ProcessBuilder pb = new ProcessBuilder(cmdArgs).inheritIO();
                         pb.environment().put("ENDPOINT", HOSTNAME + ":" + server.getAddress().getPort() + "/");
                         return pb.start().waitFor();
-                    } else synchronized (HalyardEndpoint.class) {
-                        HalyardEndpoint.class.wait();
+                    } else {
+                        latch.await();
                         return 0;
                     }
                 } finally {

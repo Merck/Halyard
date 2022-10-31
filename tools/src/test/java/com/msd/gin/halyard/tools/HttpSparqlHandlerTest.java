@@ -25,6 +25,9 @@ import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -97,6 +100,7 @@ public class HttpSparqlHandlerTest {
     private static SimpleHttpServer server;
     // SimpleHttpServer URL
     private static String SERVER_URL;
+    private static final CountDownLatch stopTriggered = new CountDownLatch(1);
 
     /**
      * Create HTTP server, handler and repositoryConnection to Sail repository first
@@ -126,11 +130,11 @@ public class HttpSparqlHandlerTest {
         writerCfg.put("org.eclipse.rdf4j.rio.helpers.JSONLDSettings.COMPACT_ARRAYS", "java.lang.Boolean.FALSE");
         writerCfg.put("org.eclipse.rdf4j.rio.helpers.JSONLDSettings.JSONLD_MODE", "org.eclipse.rdf4j.rio.helpers.JSONLDMode.COMPACT");
 
-        // Create handler with the repositoryConnection to the sail repository
-        HttpSparqlHandler handler = new HttpSparqlHandler(repository, storedQueries, writerCfg);
-
         // Create and start http server
-        server = new SimpleHttpServer(PORT, SERVER_CONTEXT, handler);
+        server = new SimpleHttpServer(PORT);
+        // Create handler with the repositoryConnection to the sail repository
+        HttpSparqlHandler handler = new HttpSparqlHandler(repository, storedQueries, writerCfg, () -> {stopTriggered.countDown();});
+        server.createContext(SERVER_CONTEXT, handler);
         server.start();
         SERVER_URL = "http://localhost:" + server.getAddress().getPort();
     }
@@ -615,6 +619,15 @@ public class HttpSparqlHandlerTest {
         URL url = new URL(SERVER_URL + "/_health");
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         assertEquals(HttpURLConnection.HTTP_NO_CONTENT, urlConnection.getResponseCode());
+    }
+
+    @Test
+    public void testStop() throws IOException, InterruptedException {
+        URL url = new URL(SERVER_URL + "/_stop");
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        assertEquals(HttpURLConnection.HTTP_NO_CONTENT, urlConnection.getResponseCode());
+        // NB: triggered asynchronously
+        assertTrue(stopTriggered.await(1, TimeUnit.SECONDS));
     }
 
     /**

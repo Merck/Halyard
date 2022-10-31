@@ -47,15 +47,18 @@ public class SimpleHttpServer {
      * @param handler handler for handling HTTP requests
      * @throws IOException if could not create the server
      */
-    public SimpleHttpServer(int port, String context, HttpHandler handler) throws IOException {
+    public SimpleHttpServer(int port) throws IOException {
         // Maximum number of incoming TCP connections is set to system default value
         int backlog = 0;
         // Create HTTP server
         httpServer = HttpServer.create(new InetSocketAddress(port), backlog);
-        // Create HTTP context with a given handler
-        httpServer.createContext(context, handler);
         // Create an executor
         httpServer.setExecutor(Executors.newFixedThreadPool(4 * Runtime.getRuntime().availableProcessors()));
+    }
+
+    public void createContext(String context, HttpHandler handler) {
+        // Create HTTP context with a given handler
+        httpServer.createContext(context, handler);
     }
 
     /**

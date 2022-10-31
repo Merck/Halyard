@@ -114,6 +114,7 @@ public final class HttpSparqlHandler implements HttpHandler {
     private final SailRepository repository;
     private final Properties storedQueries;
     private final WriterConfig writerConfig;
+    private final Runnable stopAction;
 
     /**
      * @param rep              Sail repository
@@ -121,7 +122,7 @@ public final class HttpSparqlHandler implements HttpHandler {
      * @param writerProperties RDF4J RIO WriterConfig properties
      */
     @SuppressWarnings("unchecked")
-    public HttpSparqlHandler(SailRepository rep, Properties storedQueries, Properties writerProperties) {
+    public HttpSparqlHandler(SailRepository rep, Properties storedQueries, Properties writerProperties, Runnable stopAction) {
         this.repository = rep;
         this.storedQueries = storedQueries;
         this.writerConfig = new WriterConfig();
@@ -130,6 +131,7 @@ public final class HttpSparqlHandler implements HttpHandler {
                 writerConfig.set((RioSetting) getStaticField(me.getKey().toString()), getStaticField(me.getValue().toString()));
             }
         }
+        this.stopAction = stopAction;
     }
 
     /**
@@ -161,9 +163,13 @@ public final class HttpSparqlHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
+        boolean doStop = false;
         try {
         	if ("/_health".equals(path)) {
                 exchange.sendResponseHeaders(HttpURLConnection.HTTP_NO_CONTENT, -1);
+        	} else if ("/_stop".equals(path) && exchange.getRemoteAddress().getAddress().isLoopbackAddress()) {
+                exchange.sendResponseHeaders(HttpURLConnection.HTTP_NO_CONTENT, -1);
+                doStop = true;
         	} else {
 	            SparqlQuery sparqlQuery = retrieveQuery(exchange);
 	        	try(SailRepositoryConnection connection = repository.getConnection()) {
@@ -182,6 +188,9 @@ public final class HttpSparqlHandler implements HttpHandler {
             sendResponse(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR, e);
         }
         exchange.close();
+        if (doStop) {
+            stopAction.run();
+        }
     }
 
     /**
