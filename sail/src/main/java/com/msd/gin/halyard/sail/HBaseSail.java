@@ -397,8 +397,12 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 
 	void trackQuery(String sourceString, TupleExpr rawExpr, TupleExpr optimizedExpr) {
 		QueryInfo query = new QueryInfo(sourceString, rawExpr, optimizedExpr);
-		while (!queryHistory.offer(query)) {
-			queryHistory.remove();
+		synchronized (queryHistory) {
+			if (!queryHistory.offer(query)) {
+				// full - so remove and add
+				queryHistory.remove();
+				queryHistory.add(query);
+			}
 		}
 	}
 
