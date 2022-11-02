@@ -52,9 +52,10 @@ public final class TrackingThreadPoolExecutor extends ThreadPoolExecutor impleme
 
 	private QueueInfo[] getQueueDump(int n) {
 		// NB: the size is only approximate as the contents of the queue is under constant change!!!
-		List<QueueInfo> dump = new ArrayList<>(runningTasks.size());
-		Iterator<Runnable> iter = getQueue().iterator();
-		for (int i = 0; i < n && iter.hasNext(); ) {
+		BlockingQueue<Runnable> queue = getQueue();
+		List<QueueInfo> dump = new ArrayList<>(queue.size());
+		Iterator<Runnable> iter = queue.iterator();
+		for (int i = 0; i < n && iter.hasNext(); i++) {
 			dump.add(new QueueInfo(iter.next().toString()));
 		}
 
@@ -69,7 +70,7 @@ public final class TrackingThreadPoolExecutor extends ThreadPoolExecutor impleme
 		for (ThreadInfo ti : getThreadDump()) {
 			buf.append("  ").append(ti).append("\n");
 		}
-		buf.append("\nQueue (first " + n + "):\n");
+		buf.append("\nQueue (first " + n + " of ~" + getQueue().size() + "):\n");
 		int i = 0;
 		for (QueueInfo qi : getQueueDump(n)) {
 			buf.append("  ").append(++i).append(": ").append(qi).append("\n");

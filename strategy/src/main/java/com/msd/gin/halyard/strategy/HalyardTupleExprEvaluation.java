@@ -363,10 +363,10 @@ final class HalyardTupleExprEvaluation {
         final Value objValue;
         final Resource contextValue;
     	try {
-	        subjValue = (Resource) getVarValue(subjVar, bindings);
-	        predValue = (IRI) getVarValue(predVar, bindings);
-	        objValue = getVarValue(objVar, bindings);
-	        contextValue = (Resource) getVarValue(conVar, bindings);
+	        subjValue = (Resource) Algebra.getVarValue(subjVar, bindings);
+	        predValue = (IRI) Algebra.getVarValue(predVar, bindings);
+	        objValue = Algebra.getVarValue(objVar, bindings);
+	        contextValue = (Resource) Algebra.getVarValue(conVar, bindings);
         } catch (ClassCastException e) {
             // Invalid value type for subject, predicate and/or context
             return null;
@@ -552,10 +552,10 @@ final class HalyardTupleExprEvaluation {
 		final Var objVar = ref.getObjectVar();
 		final Var extVar = ref.getExprVar();
 
-		final Value subjValue = getVarValue(subjVar, bindings);
-		final Value predValue = getVarValue(predVar, bindings);
-		final Value objValue = getVarValue(objVar, bindings);
-		final Value extValue = getVarValue(extVar, bindings);
+		final Value subjValue = Algebra.getVarValue(subjVar, bindings);
+		final Value predValue = Algebra.getVarValue(predVar, bindings);
+		final Value objValue = Algebra.getVarValue(objVar, bindings);
+		final Value extValue = Algebra.getVarValue(extVar, bindings);
 
 		// case1: when we have a binding for extVar we use it in the reified nodes lookup
 		// case2: in which we have unbound extVar
@@ -701,23 +701,6 @@ final class HalyardTupleExprEvaluation {
 		} // else standard reification iteration
 		executor.pullAndPushAsync(parent, iterFactory, ref, bindings, parentStrategy);
 	}
-
-    /**
-     * Gets a value from a {@code Var} if it has a {@code Value}. If it does not then the method will attempt to get it
-     * from the bindings using the name of the Var
-     * @param var
-     * @param bindings
-     * @return the matching {@code Value} or {@code null} if var is {@code null}
-     */
-    private static Value getVarValue(Var var, BindingSet bindings) {
-        if (var == null) {
-            return null;
-        } else if (var.hasValue()) {
-            return var.getValue();
-        } else {
-            return bindings.getValue(var.getName());
-        }
-    }
 
     /**
      * Switch logic for precompilation of any instance of a {@link UnaryTupleOperator} query model node

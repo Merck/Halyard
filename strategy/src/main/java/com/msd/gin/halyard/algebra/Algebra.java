@@ -2,6 +2,8 @@ package com.msd.gin.halyard.algebra;
 
 import java.util.List;
 
+import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
@@ -81,6 +83,24 @@ public final class Algebra {
 
 	public static Var createAnonVar(String varName) {
 		return new Var(varName, true);
+	}
+
+	/**
+	 * Gets a value from a {@code Var} if it has a {@code Value}. If it does not then the method will attempt to get it
+	 * from the bindings using the name of the Var
+	 * @param var
+	 * @param bindings
+	 * @return the matching {@code Value} or {@code null} if var is {@code null}
+	 */
+	public static Value getVarValue(Var var, BindingSet bindings) {
+	    if (var == null) {
+	        return null;
+	    }
+	    Value v = var.getValue();
+	    if (v == null) {
+	        v = bindings.getValue(var.getName());
+	    }
+	    return v;
 	}
 
 }

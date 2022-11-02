@@ -18,10 +18,14 @@ package com.msd.gin.halyard.strategy;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.ServiceRoot;
 
 import java.lang.management.ManagementFactory;
+import java.util.ArrayDeque;
 import java.util.Hashtable;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadFactory;
@@ -57,6 +61,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     private static final BindingSet END_OF_QUEUE = new EmptyBindingSet();
     // high default priority for dynamically created query nodes
     private static final int DEFAULT_PRIORITY = 65535;
+    private static final Timer TIMER = new Timer("HalyardEvaluationExecutorTimer", true);
 
     private static volatile HalyardEvaluationExecutor instance;
 
@@ -77,6 +82,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     // a map of query model nodes and their priority
     private final Cache<QueryModelNode, Integer> priorityMapCache = CacheBuilder.newBuilder().weakKeys().build();
 
+    private volatile float taskRate;
+
     private int threads;
     private int maxRetries;
     private int retryLimit;
@@ -88,8 +95,6 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     private int maxQueueSize;
 	private int pollTimeoutMillis;
 	private int offerTimeoutMillis;
-
-	private volatile long previousCompletedTaskCount;
 
 	private static void registerMBeans(MBeanServer mbs, HalyardEvaluationExecutor executor) throws JMException {
 		{
@@ -128,6 +133,47 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 	    maxQueueSize = conf.getInt(StrategyConfig.HALYARD_EVALUATION_MAX_QUEUE_SIZE, 5000);
 		pollTimeoutMillis = conf.getInt(StrategyConfig.HALYARD_EVALUATION_POLL_TIMEOUT_MILLIS, 1000);
 		offerTimeoutMillis = conf.getInt(StrategyConfig.HALYARD_EVALUATION_OFFER_TIMEOUT_MILLIS, conf.getInt("hbase.client.scanner.timeout.period", 60000));
+
+		int taskRateUpdateMillis = conf.getInt(StrategyConfig.HALYARD_EVALUATION_TASK_RATE_UPDATE_MILLIS, 100);
+		int taskRateWindowSize = conf.getInt(StrategyConfig.HALYARD_EVALUATION_TASK_RATE_WINDOW_SIZE, 10);
+		TIMER.schedule(new TimerTask() {
+			final float taskRateWindowDuration = taskRateUpdateMillis*taskRateWindowSize;
+			final ArrayDeque<Integer> samples = new ArrayDeque<>(taskRateWindowSize);
+			long previousTaskCount;
+			int windowTaskCount;
+			@Override
+			public void run() {
+				long completedTaskCount = executor.getCompletedTaskCount();
+				int newest = (int) (completedTaskCount - previousTaskCount);
+				previousTaskCount = completedTaskCount;
+				if (samples.size() == taskRateWindowSize) {
+					int oldest = samples.removeFirst();
+					windowTaskCount -= oldest;
+				}
+				samples.addLast(newest);
+				windowTaskCount += newest;
+				taskRate = windowTaskCount/taskRateWindowDuration;
+			}
+		}, 37, taskRateUpdateMillis);
+
+		long threadPoolCheckPeriodSecs = conf.getInt(StrategyConfig.HALYARD_EVALUATION_THREAD_POOL_CHECK_PERIOD_SECS, 5);
+		TIMER.schedule(new TimerTask() {
+			@Override
+			public void run() {
+    			synchronized (executor) {
+    				int corePoolSize = executor.getCorePoolSize();
+    				if (corePoolSize > threads) {
+    					corePoolSize--;
+    					executor.setCorePoolSize(corePoolSize);
+    				}
+    				int maxPoolSize = executor.getMaximumPoolSize();
+    				if (maxPoolSize > threads) {
+    					maxPoolSize--;
+    					executor.setMaximumPoolSize(Math.max(maxPoolSize, corePoolSize));
+    				}
+    			}
+			}
+		}, 1000, TimeUnit.SECONDS.toMillis(threadPoolCheckPeriodSecs));
 
 		MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
 		try {
@@ -179,59 +225,13 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 	}
 
 	@Override
-	public TrackingThreadPoolExecutorMXBean getThreadPoolExecutor() {
-		return executor;
+	public float getTaskRate() {
+		return taskRate;
 	}
 
-	private boolean checkThreads(int retries) {
-		boolean resetRetries;
-		final int maxPoolSize = executor.getMaximumPoolSize();
-		// if we've been consistently blocked and are at full capacity
-		if (retries > maxRetries && executor.getActiveCount() >= maxPoolSize) {
-			// if we are not blocked overall then don't worry about it - might just be taking a long time for results to bubble up the query tree to us
-			resetRetries = (executor.getCompletedTaskCount() > previousCompletedTaskCount);
-			if (!resetRetries) {
-				// we are completely blocked, try adding some emergency threads
-				synchronized (this) {
-					// check thread pool hasn't been modified already in the meantime
-					if (maxPoolSize == executor.getMaximumPoolSize()) {
-						if (maxPoolSize < maxThreads) {
-							LOGGER.warn("All {} threads seem to be blocked - adding {} more\n{}", executor.getPoolSize(), threadGain, executor.toString());
-							executor.setMaximumPoolSize(Math.min(executor.getMaximumPoolSize()+threadGain, maxThreads));
-							executor.setCorePoolSize(Math.min(executor.getCorePoolSize()+threadGain, maxThreads));
-							resetRetries = true;
-						} else {
-							// out of options
-							throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", maxThreads));
-						}
-					} else {
-						resetRetries = true;
-					}
-				}
-			}
-		} else if (retries > retryLimit) {
-			throw new QueryEvaluationException(String.format("Maximum retries exceeded: %d", retries));
-		} else {
-			resetRetries = false;
-		}
-    	previousCompletedTaskCount = executor.getCompletedTaskCount();
-		return resetRetries;
-    }
-
-	private void resetThreads() {
-		if (executor.getCompletedTaskCount() - previousCompletedTaskCount > 100) {
-			synchronized (this) {
-				int corePoolSize = executor.getCorePoolSize();
-				if (corePoolSize > threads) {
-					executor.setCorePoolSize(corePoolSize - 1);
-				}
-				int maxPoolSize = executor.getMaximumPoolSize();
-				if (maxPoolSize > threads) {
-					executor.setMaximumPoolSize(maxPoolSize - 1);
-				}
-			}
-	    	previousCompletedTaskCount = executor.getCompletedTaskCount();
-		}
+	@Override
+	public TrackingThreadPoolExecutorMXBean getThreadPoolExecutor() {
+		return executor;
 	}
 
 	/**
@@ -414,10 +414,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 				if (!var.isConstant()) {
 					sb.append("?").append(var.getName());
 				}
-				Value v = var.getValue();
-				if (v == null) {
-					v = bs.getValue(var.getName());
-				}
+				Value v = Algebra.getVarValue(var, bs);
 				if (!var.isConstant() && v != null) {
 					sb.append("=");
 				}
@@ -569,7 +566,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     					}
 						if (bs == null) {
 							// no data available - see if we can improve things
-							if(checkThreads(retries)) {
+							if (checkThreads(retries)) {
 								retries = 0;
 							}
 						}
@@ -577,8 +574,33 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
                 } catch (InterruptedException ex) {
                     throw new QueryEvaluationException(ex);
                 }
-				resetThreads();
                 return (bs == END_OF_QUEUE) ? null : bs;
+            }
+
+        	private boolean checkThreads(int retries) {
+        		int maxPoolSize = executor.getMaximumPoolSize();
+        		// if we've been consistently blocked and are at full capacity and not making any progress overall
+        		if (retries > maxRetries && executor.getActiveCount() >= maxPoolSize && taskRate == 0.0f) {
+        			// then try adding some emergency threads
+    				synchronized (executor) {
+    					// check thread pool hasn't been modified already in the meantime
+    					if (maxPoolSize == executor.getMaximumPoolSize()) {
+    						if (maxPoolSize < maxThreads) {
+    							LOGGER.warn("All {} threads seem to be blocked - adding {} more\n{}", executor.getPoolSize(), threadGain, executor.toString());
+    							maxPoolSize = Math.min(executor.getMaximumPoolSize()+threadGain, maxThreads);
+    							executor.setMaximumPoolSize(maxPoolSize);
+    							executor.setCorePoolSize(Math.min(executor.getCorePoolSize()+threadGain, maxPoolSize));
+    						} else {
+    							// out of options
+    							throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", maxThreads));
+    						}
+    					}
+    				}
+					return true;
+        		} else if (retries > retryLimit) {
+        			throw new QueryEvaluationException(String.format("Maximum retries exceeded: %d", retries));
+        		}
+        		return false;
             }
 
             @Override
