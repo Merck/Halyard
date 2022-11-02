@@ -50,6 +50,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Delete;
@@ -81,8 +82,6 @@ import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.QueryInterruptedException;
-import org.eclipse.rdf4j.query.QueryResults;
-import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.query.TupleQueryResultHandler;
 import org.eclipse.rdf4j.query.TupleQueryResultHandlerException;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
@@ -95,7 +94,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
-import org.eclipse.rdf4j.query.impl.IteratingTupleQueryResult;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UnknownSailTransactionStateException;
 import org.eclipse.rdf4j.sail.UpdateContext;
@@ -124,7 +122,8 @@ public class HBaseSailConnection extends AbstractSailConnection implements Exten
 
 	public HBaseSailConnection(HBaseSail sail) throws IOException {
 		this.sail = sail;
-		int queryCacheMaxSize = sail.getConfiguration().getInt(EvaluationConfig.QUERY_CACHE_MAX_SIZE, 100);
+		Configuration conf = sail.getConfiguration();
+		int queryCacheMaxSize = conf.getInt(EvaluationConfig.QUERY_CACHE_MAX_SIZE, 100);
 		queryCache = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(queryCacheMaxSize).expireAfterWrite(1L, TimeUnit.HOURS).build();
 		// tables are lightweight but not thread-safe so get a new instance per sail
 		// connection
@@ -375,12 +374,12 @@ public class HBaseSailConnection extends AbstractSailConnection implements Exten
 		}
 	}
 
-	protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(PreparedQuery query) {
+	protected CloseableIteration<BindingSet, QueryEvaluationException> evaluateInternal(PreparedQuery query) throws QueryEvaluationException {
 		return query.evaluate();
 	}
 
-	protected void evaluateInternal(PreparedQuery query, TupleQueryResultHandler handler) {
-		query.evaluate(handler);
+	protected void evaluateInternal(PreparedQuery query, TupleQueryResultHandler handler) throws QueryEvaluationException {
+		query.evaluate(handler, sail.evaluationTimeoutSecs);
 	}
 
     @Override
@@ -852,20 +851,16 @@ public class HBaseSailConnection extends AbstractSailConnection implements Exten
 			this.step = step;
 		}
 
-		public CloseableIteration<BindingSet, QueryEvaluationException> evaluate() {
+		public CloseableIteration<BindingSet, QueryEvaluationException> evaluate() throws QueryEvaluationException {
 			return step.evaluate(EmptyBindingSet.getInstance());
 		}
 
-		public void evaluate(TupleQueryResultHandler handler) {
+		public void evaluate(TupleQueryResultHandler handler, int timeoutSecs) throws QueryEvaluationException {
 			if (step instanceof BindingSetPipeEvaluationStep) {
-				BindingSetPipeTupleQueryResultHandlerAdapter adapter = new BindingSetPipeTupleQueryResultHandlerAdapter(tree.getBindingNames(), handler);
+				BindingSetPipeTupleQueryResultHandlerAdapter adapter = new BindingSetPipeTupleQueryResultHandlerAdapter(tree.getBindingNames(), handler, timeoutSecs);
 				((BindingSetPipeEvaluationStep) step).evaluate(adapter, EmptyBindingSet.getInstance());
 				// TupleQueryResultHandlers expect to be used synchronously so need to wait
-				try {
-					adapter.waitUntilClosed();
-				} catch (InterruptedException ie) {
-					throw new SailException(ie);
-				}
+				adapter.waitUntilClosed();
 			} else {
 				ExtendedSailConnection.report(tree.getBindingNames(), evaluate(), handler);
 			}
@@ -883,10 +878,13 @@ public class HBaseSailConnection extends AbstractSailConnection implements Exten
 	static final class BindingSetPipeTupleQueryResultHandlerAdapter extends BindingSetPipe {
 		private final CountDownLatch doneLatch = new CountDownLatch(1);
 		private final TupleQueryResultHandler handler;
+		private final int timeoutSecs;
+		private volatile Throwable exception;
 
-		BindingSetPipeTupleQueryResultHandlerAdapter(Set<String> bindingNames, TupleQueryResultHandler handler) {
+		BindingSetPipeTupleQueryResultHandlerAdapter(Set<String> bindingNames, TupleQueryResultHandler handler, int timeoutSecs) {
 			super(null);
 			this.handler = handler;
+			this.timeoutSecs = timeoutSecs;
 			handler.startQueryResult(new ArrayList<>(bindingNames));
 		}
 
@@ -900,13 +898,32 @@ public class HBaseSailConnection extends AbstractSailConnection implements Exten
 		}
 
 		@Override
+		protected boolean handleException(Throwable e) {
+			exception = e;
+			doneLatch.countDown();
+			return false;
+		}
+
+		@Override
 		protected void doClose() {
 			handler.endQueryResult();
 			doneLatch.countDown();
 		}
 
-		public void waitUntilClosed() throws InterruptedException {
-			doneLatch.await();
+		public void waitUntilClosed() throws QueryEvaluationException {
+			try {
+				doneLatch.await(timeoutSecs, TimeUnit.SECONDS);
+			} catch (InterruptedException ie) {
+				throw new QueryEvaluationException(ie);
+			}
+			Throwable e = exception;
+			if (e != null) {
+				if (e instanceof RuntimeException) {
+					throw (RuntimeException) e;
+				} else {
+					throw new QueryEvaluationException(e);
+				}
+			}
 		}
 	}
 
