@@ -23,6 +23,7 @@ import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
 import com.msd.gin.halyard.common.StatementIndices;
+import com.msd.gin.halyard.common.TimeLimitTupleQueryResultHandler;
 import com.msd.gin.halyard.common.Timestamped;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.sail.HBaseSail.SailConnectionFactory;
@@ -32,7 +33,7 @@ import com.msd.gin.halyard.sail.search.SearchInterpreter;
 import com.msd.gin.halyard.spin.SpinFunctionInterpreter;
 import com.msd.gin.halyard.spin.SpinMagicPropertyInterpreter;
 import com.msd.gin.halyard.strategy.BindingSetPipe;
-import com.msd.gin.halyard.strategy.BindingSetPipeEvaluationStep;
+import com.msd.gin.halyard.strategy.QueryBindingSetPipeEvaluationStep;
 import com.msd.gin.halyard.strategy.ExtendedEvaluationStrategy;
 import com.msd.gin.halyard.strategy.ExtendedQueryOptimizerPipeline;
 import com.msd.gin.halyard.strategy.HalyardEvaluationStrategy;
@@ -359,7 +360,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Exten
 			}
 		}
 		// canonicalise
-		return (cleaned.size() > 0) ? cleaned : EmptyBindingSet.getInstance();
+		return (!cleaned.isEmpty()) ? cleaned : EmptyBindingSet.getInstance();
 	}
 
 	private void initQueryContext(QueryContext qctx) {
@@ -856,9 +857,9 @@ public class HBaseSailConnection extends AbstractSailConnection implements Exten
 		}
 
 		public void evaluate(TupleQueryResultHandler handler, int timeoutSecs) throws QueryEvaluationException {
-			if (step instanceof BindingSetPipeEvaluationStep) {
+			if (step instanceof QueryBindingSetPipeEvaluationStep) {
 				BindingSetPipeTupleQueryResultHandlerAdapter adapter = new BindingSetPipeTupleQueryResultHandlerAdapter(tree.getBindingNames(), handler, timeoutSecs);
-				((BindingSetPipeEvaluationStep) step).evaluate(adapter, EmptyBindingSet.getInstance());
+				((QueryBindingSetPipeEvaluationStep) step).evaluate(adapter, EmptyBindingSet.getInstance());
 				// TupleQueryResultHandlers expect to be used synchronously so need to wait
 				adapter.waitUntilClosed();
 			} else {
@@ -912,7 +913,11 @@ public class HBaseSailConnection extends AbstractSailConnection implements Exten
 
 		public void waitUntilClosed() throws QueryEvaluationException {
 			try {
-				doneLatch.await(timeoutSecs, TimeUnit.SECONDS);
+				if (timeoutSecs > 0) {
+					doneLatch.await(timeoutSecs, TimeUnit.SECONDS);
+				} else {
+					doneLatch.await();
+				}
 			} catch (InterruptedException ie) {
 				throw new QueryEvaluationException(ie);
 			}

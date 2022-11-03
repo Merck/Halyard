@@ -2,8 +2,11 @@ package com.msd.gin.halyard.repository;
 
 import com.google.common.base.Stopwatch;
 import com.msd.gin.halyard.algebra.Algebra;
+import com.msd.gin.halyard.common.TimeLimitTupleQueryResultHandler;
 import com.msd.gin.halyard.query.EmptyTripleSource;
+import com.msd.gin.halyard.query.TupleQueryResultHandlerWrapper;
 import com.msd.gin.halyard.sail.HBaseSail;
+import com.msd.gin.halyard.sail.HBaseSailConnection;
 import com.msd.gin.halyard.sail.TimestampedUpdateContext;
 import com.msd.gin.halyard.spin.SpinMagicPropertyInterpreter;
 import com.msd.gin.halyard.spin.SpinParser;
@@ -18,10 +21,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.rdf4j.common.exception.RDF4JException;
-import org.eclipse.rdf4j.common.iteration.CloseableIteration;
-import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
-import org.eclipse.rdf4j.common.iteration.ReducedIteration;
-import org.eclipse.rdf4j.common.iteration.TimeLimitIteration;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
@@ -31,16 +30,17 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF4J;
 import org.eclipse.rdf4j.model.vocabulary.SESAME;
 import org.eclipse.rdf4j.model.vocabulary.XSD;
+import org.eclipse.rdf4j.query.AbstractTupleQueryResultHandler;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.QueryInterruptedException;
+import org.eclipse.rdf4j.query.TupleQueryResultHandler;
+import org.eclipse.rdf4j.query.TupleQueryResultHandlerException;
 import org.eclipse.rdf4j.query.UpdateExecutionException;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.Modify;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
-import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
@@ -51,7 +51,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.collectors.StatementPatternCollector;
-import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
 import org.eclipse.rdf4j.query.parser.ParsedUpdate;
 import org.eclipse.rdf4j.repository.RepositoryException;
@@ -59,7 +58,6 @@ import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailUpdate;
 import org.eclipse.rdf4j.repository.sail.helpers.SailUpdateExecutor;
 import org.eclipse.rdf4j.rio.ParserConfig;
-import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.UpdateContext;
 import org.slf4j.Logger;
@@ -82,7 +80,7 @@ public class HBaseUpdate extends SailUpdate {
 		Map<UpdateExpr, Dataset> datasetMapping = parsedUpdate.getDatasetMapping();
 
 		SailRepositoryConnection con = getConnection();
-		HBaseUpdateExecutor executor = new HBaseUpdateExecutor(sail, con.getSailConnection(), con.getValueFactory(), con.getParserConfig());
+		HBaseUpdateExecutor executor = new HBaseUpdateExecutor(sail, (HBaseSailConnection) con.getSailConnection(), con.getValueFactory(), con.getParserConfig());
 
 		boolean localTransaction = false;
 		try {
@@ -131,10 +129,10 @@ public class HBaseUpdate extends SailUpdate {
 
 	static class HBaseUpdateExecutor extends SailUpdateExecutor {
 		final HBaseSail sail;
-		final SailConnection con;
+		final HBaseSailConnection con;
 		final ValueFactory vf;
 
-		public HBaseUpdateExecutor(HBaseSail sail, SailConnection con, ValueFactory vf, ParserConfig loadConfig) {
+		public HBaseUpdateExecutor(HBaseSail sail, HBaseSailConnection con, ValueFactory vf, ParserConfig loadConfig) {
 			super(con, vf, loadConfig);
 			this.sail = sail;
 			this.con = con;
@@ -143,16 +141,18 @@ public class HBaseUpdate extends SailUpdate {
 
 		protected void executeModify(Modify modify, UpdateContext uc, int maxExecutionTime) throws SailException {
 			try {
-				ModifyInfo insertInfo = null;
+				ModifyInfo insertInfo;
 				TupleExpr insertClause = modify.getInsertExpr();
 				if (insertClause != null) {
 					// for inserts, TupleFunctions are expected in the insert clause
 					insertClause = Algebra.ensureRooted(insertClause);
 					insertClause = optimize(insertClause, uc.getDataset(), uc.getBindingSet(), false);
 					insertInfo = InsertCollector.process(insertClause);
+				} else {
+					insertInfo = null;
 				}
 
-				ModifyInfo deleteInfo = null;
+				ModifyInfo deleteInfo;
 				TupleExpr deleteClause = modify.getDeleteExpr();
 				TupleExpr whereClause = modify.getWhereExpr();
 				whereClause = Algebra.ensureRooted(whereClause);
@@ -160,17 +160,24 @@ public class HBaseUpdate extends SailUpdate {
 					// for deletes, TupleFunctions are expected in the where clause
 					whereClause = optimize(whereClause, uc.getDataset(), uc.getBindingSet(), true);
 					deleteInfo = new ModifyInfo(deleteClause, StatementPatternCollector.process(deleteClause), WhereCollector.process(whereClause));
+				} else {
+					deleteInfo = null;
 				}
 
 				TimestampedUpdateContext tsUc = new TimestampedUpdateContext(uc.getUpdateExpr(), uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
-				try (CloseableIteration<? extends BindingSet, QueryEvaluationException> sourceBindings = new ReducedIteration<BindingSet, QueryEvaluationException>(evaluateWhereClause(whereClause, uc, maxExecutionTime))) {
-					while (sourceBindings.hasNext()) {
-						BindingSet sourceBinding = sourceBindings.next();
-						deleteBoundTriples(sourceBinding, deleteInfo, tsUc);
+				TupleQueryResultHandler handler = new AbstractTupleQueryResultHandler() {
+					private BindingSet previous;
+					@Override
+					public void handleSolution(BindingSet next) throws TupleQueryResultHandlerException {
+						if (!next.equals(previous)) { // minimize duplicates
+							previous = next;
+							deleteBoundTriples(next, deleteInfo, tsUc);
 
-						insertBoundTriples(sourceBinding, insertInfo, tsUc);
+							insertBoundTriples(next, insertInfo, tsUc);
+						}
 					}
-				}
+				};
+				evaluateWhereClause(handler, whereClause, uc, maxExecutionTime);
 			} catch (QueryEvaluationException e) {
 				throw new SailException(e);
 			}
@@ -201,57 +208,48 @@ public class HBaseUpdate extends SailUpdate {
 			return tupleExpr;
 		}
 
-		private CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluateWhereClause(final TupleExpr whereClause, final UpdateContext uc, final int maxExecutionTime) throws SailException, QueryEvaluationException {
-			CloseableIteration<? extends BindingSet, QueryEvaluationException> result = null;
-			try {
-				result = con.evaluate(whereClause, uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
-
-				if (maxExecutionTime > 0) {
-					result = new TimeLimitIteration<BindingSet, QueryEvaluationException>(result, TimeUnit.SECONDS.toMillis(maxExecutionTime)) {
-
-						@Override
-						protected void throwInterruptedException() throws QueryEvaluationException {
-							throw new QueryInterruptedException("execution took too long");
-						}
-					};
-				}
-
-				result = new ConvertingIteration<BindingSet, BindingSet, QueryEvaluationException>(result) {
-					private final boolean isEmptyWhere = Algebra.isEmpty(whereClause);
-
-					protected BindingSet convert(BindingSet sourceBinding) throws QueryEvaluationException {
-						if (isEmptyWhere && sourceBinding.isEmpty() && uc.getBindingSet() != null) {
-							// in the case of an empty WHERE clause, we use the
-							// supplied
-							// bindings to produce triples to DELETE/INSERT
-							return uc.getBindingSet();
-						} else {
-							// check if any supplied bindings do not occur in the
-							// bindingset
-							// produced by the WHERE clause. If so, merge.
-							Set<String> uniqueBindings = new HashSet<String>(uc.getBindingSet().getBindingNames());
-							uniqueBindings.removeAll(sourceBinding.getBindingNames());
-							if (uniqueBindings.size() > 0) {
-								MapBindingSet mergedSet = new MapBindingSet();
-								for (String bindingName : sourceBinding.getBindingNames()) {
-									mergedSet.addBinding(sourceBinding.getBinding(bindingName));
-								}
-								for (String bindingName : uniqueBindings) {
-									mergedSet.addBinding(uc.getBindingSet().getBinding(bindingName));
-								}
-								return mergedSet;
+		private void evaluateWhereClause(TupleQueryResultHandler handler, final TupleExpr whereClause, final UpdateContext uc, final int maxExecutionTime) throws SailException {
+			handler = new TupleQueryResultHandlerWrapper(handler) {
+				private final boolean isEmptyWhere = Algebra.isEmpty(whereClause);
+				private final BindingSet ucBinding = uc.getBindingSet();
+				@Override
+				public void handleSolution(BindingSet sourceBinding) throws TupleQueryResultHandlerException {
+					if (isEmptyWhere && sourceBinding.isEmpty() && ucBinding != null) {
+						// in the case of an empty WHERE clause, we use the
+						// supplied
+						// bindings to produce triples to DELETE/INSERT
+						super.handleSolution(ucBinding);
+					} else {
+						// check if any supplied bindings do not occur in the
+						// bindingset
+						// produced by the WHERE clause. If so, merge.
+						Set<String> uniqueBindings = new HashSet<String>(ucBinding.getBindingNames());
+						uniqueBindings.removeAll(sourceBinding.getBindingNames());
+						if (!uniqueBindings.isEmpty()) {
+							MapBindingSet mergedSet = new MapBindingSet(sourceBinding.size() + uniqueBindings.size());
+							for (String bindingName : sourceBinding.getBindingNames()) {
+								mergedSet.addBinding(sourceBinding.getBinding(bindingName));
 							}
-							return sourceBinding;
+							for (String bindingName : uniqueBindings) {
+								mergedSet.addBinding(ucBinding.getBinding(bindingName));
+							}
+							super.handleSolution(mergedSet);
+						} else {
+							super.handleSolution(sourceBinding);
 						}
 					}
-				};
-				return result;
-			} catch (Exception e) {
-				if (result != null) {
-					result.close();
 				}
-				throw e;
+			};
+			if (maxExecutionTime > 0) {
+				handler = new TimeLimitTupleQueryResultHandler(handler, TimeUnit.SECONDS.toMillis(maxExecutionTime)) {
+					@Override
+					protected void throwInterruptedException() throws TupleQueryResultHandlerException {
+						throw new TupleQueryResultHandlerException("execution took too long");
+					}
+				};
 			}
+
+			con.evaluate(handler, whereClause, uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
 		}
 
 		private void deleteBoundTriples(BindingSet whereBinding, ModifyInfo deleteClause, TimestampedUpdateContext uc) throws SailException {
@@ -273,17 +271,17 @@ public class HBaseUpdate extends SailUpdate {
 				Value patternValue;
 				for (StatementPattern deletePattern : deletePatterns) {
 
-					patternValue = getValueForVar(deletePattern.getSubjectVar(), whereBinding);
+					patternValue = Algebra.getVarValue(deletePattern.getSubjectVar(), whereBinding);
 					Resource subject = patternValue instanceof Resource ? (Resource) patternValue : null;
 
-					patternValue = getValueForVar(deletePattern.getPredicateVar(), whereBinding);
+					patternValue = Algebra.getVarValue(deletePattern.getPredicateVar(), whereBinding);
 					IRI predicate = patternValue instanceof IRI ? (IRI) patternValue : null;
 
-					Value object = getValueForVar(deletePattern.getObjectVar(), whereBinding);
+					Value object = Algebra.getVarValue(deletePattern.getObjectVar(), whereBinding);
 
 					Resource context = null;
 					if (deletePattern.getContextVar() != null) {
-						patternValue = getValueForVar(deletePattern.getContextVar(), whereBinding);
+						patternValue = Algebra.getVarValue(deletePattern.getContextVar(), whereBinding);
 						context = patternValue instanceof Resource ? (Resource) patternValue : null;
 					}
 
@@ -369,20 +367,20 @@ public class HBaseUpdate extends SailUpdate {
 			for (TupleFunctionCall tfc : tupleFunctionCalls) {
 				if (HALYARD.TIMESTAMP_PROPERTY.stringValue().equals(tfc.getURI())) {
 					List<ValueExpr> args = tfc.getArgs();
-					Resource tsSubj = (Resource) getValueForVar((Var) args.get(0), bindings);
-					IRI tsPred = (IRI) getValueForVar((Var) args.get(1), bindings);
-					Value tsObj = getValueForVar((Var) args.get(2), bindings);
+					Resource tsSubj = (Resource) Algebra.getVarValue((Var) args.get(0), bindings);
+					IRI tsPred = (IRI) Algebra.getVarValue((Var) args.get(1), bindings);
+					Value tsObj = Algebra.getVarValue((Var) args.get(2), bindings);
 					Statement tsStmt;
 					if (args.size() == 3) {
 						tsStmt = vf.createStatement(tsSubj, tsPred, tsObj);
 					} else if (args.size() == 4) {
-						Resource tsCtx = (Resource) getValueForVar((Var) args.get(3), bindings);
+						Resource tsCtx = (Resource) Algebra.getVarValue((Var) args.get(3), bindings);
 						tsStmt = vf.createStatement(tsSubj, tsPred, tsObj, tsCtx);
 					} else {
 						tsStmt = null;
 					}
 					if (stmt.equals(tsStmt)) {
-						Literal ts = (Literal) getValueForVar(tfc.getResultVars().get(0), bindings);
+						Literal ts = (Literal) Algebra.getVarValue(tfc.getResultVars().get(0), bindings);
 						if (XSD.DATETIME.equals(ts.getDatatype())) {
 							uc.setTimestamp(ts.calendarValue().toGregorianCalendar().getTimeInMillis());
 						} else {
@@ -494,17 +492,6 @@ public class HBaseUpdate extends SailUpdate {
 			}
 			return st;
 		}
-
-		private Value getValueForVar(Var var, BindingSet bindings) throws SailException {
-			Value value = null;
-			if (var.hasValue()) {
-				value = var.getValue();
-			} else {
-				value = bindings.getValue(var.getName());
-			}
-			return value;
-		}
-
 	}
 
 	static class ModifyInfo {

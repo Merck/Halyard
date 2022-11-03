@@ -1,6 +1,7 @@
 package com.msd.gin.halyard.federation;
 
 import com.msd.gin.halyard.algebra.ServiceRoot;
+import com.msd.gin.halyard.query.TupleQueryResultHandlerWrapper;
 import com.msd.gin.halyard.sail.ExtendedSailConnection;
 
 import java.util.ArrayList;
@@ -15,7 +16,6 @@ import org.eclipse.rdf4j.common.iteration.SilentIteration;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.QueryResultHandlerException;
 import org.eclipse.rdf4j.query.TupleQueryResultHandler;
 import org.eclipse.rdf4j.query.TupleQueryResultHandlerException;
 import org.eclipse.rdf4j.query.algebra.Service;
@@ -143,23 +143,12 @@ public class SailFederatedService implements ExtendedFederatedService {
 	}
 
 
-	private static class InsertBindingSetTupleQueryResultHandler implements TupleQueryResultHandler {
-		private final TupleQueryResultHandler delegate;
+	private static class InsertBindingSetTupleQueryResultHandler extends TupleQueryResultHandlerWrapper {
 		private final BindingSet bindingSet;
 
 		InsertBindingSetTupleQueryResultHandler(TupleQueryResultHandler delegate, BindingSet bs) {
-			this.delegate = delegate;
+			super(delegate);
 			this.bindingSet = bs;
-		}
-
-		@Override
-		public void handleBoolean(boolean value) throws QueryResultHandlerException {
-			delegate.handleBoolean(value);
-		}
-
-		@Override
-		public void handleLinks(List<String> linkUrls) throws QueryResultHandlerException {
-			delegate.handleLinks(linkUrls);
 		}
 
 		@Override
@@ -167,7 +156,7 @@ public class SailFederatedService implements ExtendedFederatedService {
 			// preserve order!!!
 			LinkedHashSet<String> allBindingNames = new LinkedHashSet<>(bindingNames);
 			allBindingNames.addAll(bindingSet.getBindingNames());
-			delegate.startQueryResult(new ArrayList<>(allBindingNames));
+			super.startQueryResult(new ArrayList<>(allBindingNames));
 		}
 
 		@Override
@@ -178,12 +167,7 @@ public class SailFederatedService implements ExtendedFederatedService {
 			for (Binding binding : next) {
 				set.setBinding(binding);
 			}
-			delegate.handleSolution(set);
-		}
-
-		@Override
-		public void endQueryResult() throws TupleQueryResultHandlerException {
-			delegate.endQueryResult();
+			super.handleSolution(set);
 		}
 	}
 }

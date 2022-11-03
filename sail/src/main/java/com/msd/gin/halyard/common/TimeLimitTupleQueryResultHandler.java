@@ -1,4 +1,4 @@
-package com.msd.gin.halyard.sail;
+package com.msd.gin.halyard.common;
 
 import java.lang.ref.WeakReference;
 import java.util.List;
@@ -18,6 +18,7 @@ public abstract class TimeLimitTupleQueryResultHandler implements TupleQueryResu
 	private volatile boolean isInterrupted = false;
 
 	public TimeLimitTupleQueryResultHandler(TupleQueryResultHandler handler, long timeLimitMs) {
+		assert timeLimitMs > 0 : "time limit must be a positive number, is: " + timeLimitMs;
 		this.handler = handler;
 		interruptTask = new InterruptTask(this);
 		timer.schedule(interruptTask, timeLimitMs);

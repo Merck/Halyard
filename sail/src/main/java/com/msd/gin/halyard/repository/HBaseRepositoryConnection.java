@@ -1,8 +1,8 @@
 package com.msd.gin.halyard.repository;
 
+import com.msd.gin.halyard.common.TimeLimitTupleQueryResultHandler;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
-import com.msd.gin.halyard.sail.TimeLimitTupleQueryResultHandler;
 
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;

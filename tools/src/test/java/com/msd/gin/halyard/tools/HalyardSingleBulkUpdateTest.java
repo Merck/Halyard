@@ -54,6 +54,9 @@ public class HalyardSingleBulkUpdateTest extends AbstractHalyardToolTest {
         sail.init();
         try {
 			try (SailConnection conn = sail.getConnection()) {
+				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, vf.createIRI("http://whatever/pred"), null, true)) {
+					Assert.assertFalse(iter.hasNext());
+				}
 				int count;
 				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, null, null, true)) {
 					count = 0;
@@ -63,9 +66,6 @@ public class HalyardSingleBulkUpdateTest extends AbstractHalyardToolTest {
 					}
 				}
 				Assert.assertEquals(50, count);
-				try (CloseableIteration<? extends Statement, SailException> iter = conn.getStatements(null, vf.createIRI("http://whatever/pred"), null, true)) {
-					Assert.assertFalse(iter.hasNext());
-				}
 			}
         } finally {
             sail.shutDown();
