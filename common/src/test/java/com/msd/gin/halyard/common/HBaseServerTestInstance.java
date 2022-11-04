@@ -37,8 +37,10 @@ import org.apache.zookeeper.server.ZooKeeperServer;
  * @author Adam Sotona (MSD)
  */
 public final class HBaseServerTestInstance {
+	private static final int HBASE_PORT = 16001;
+	private static final int REGIONSERVER_PORT = 16021;
 
-    private static Configuration conf;
+	private static Configuration conf;
     private static ZooKeeperServer zookeeper;
     private static MiniMRYarnCluster miniCluster;
     private static LocalHBaseCluster cluster;
@@ -77,7 +79,10 @@ public final class HBaseServerTestInstance {
             conf.setInt(HConstants.ZOOKEEPER_CLIENT_PORT, factory.getLocalPort());
             conf.set("hbase.master.hostname", "localhost");
             conf.set("hbase.regionserver.hostname", "localhost");
+            conf.setInt("hbase.master.port", HBASE_PORT);
             conf.setInt("hbase.master.info.port", -1);
+            conf.setInt("hbase.regionserver.port", REGIONSERVER_PORT);
+            conf.setInt("hbase.regionserver.info.port", -1);
             conf.setBoolean("hbase.procedure.store.wal.use.hsync", false);
             conf.setBoolean("hbase.unsafe.stream.capability.enforce", false);
             conf.set("hbase.fs.tmp.dir", new File(System.getProperty("java.io.tmpdir")).toURI().toURL().toString());
