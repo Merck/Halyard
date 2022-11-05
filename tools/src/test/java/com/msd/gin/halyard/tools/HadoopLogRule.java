@@ -25,9 +25,9 @@ public class HadoopLogRule implements TestRule {
 					base.evaluate();
 				} catch(Throwable err) {
 					Pattern errPattern = Pattern.compile("Exception|Error", Pattern.CASE_INSENSITIVE);
-					Path clusterHome = Paths.get("target/testCluster");
+					Path clusterHome = Paths.get("target/test/data/testCluster");
 					if (Files.exists(clusterHome)) {
-						Files.walk(Paths.get("target/testCluster"))
+						Files.walk(clusterHome)
 						.filter(p -> "syslog".equals(p.getFileName().toString()))
 						.forEach(f -> {
 							try(Stream<String> lines = Files.lines(f)) {

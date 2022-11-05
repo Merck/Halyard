@@ -90,6 +90,7 @@
                     <workingDirectory>${test.working.directory}</workingDirectory>
                     <systemPropertyVariables>
                         <TMP>${project.build.directory}</TMP>
+                        <argLine>${argLine}</argLine> <!-- for HBaseServerTestInstance -->
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
