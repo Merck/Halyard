@@ -16,6 +16,7 @@ import java.util.List;
 import javax.script.Bindings;
 import javax.script.Compilable;
 import javax.script.CompiledScript;
+import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 
@@ -94,6 +95,11 @@ public class SpinxFunction implements TransientFunction {
 	public Value evaluate(ValueFactory valueFactory, Value... args) throws ValueExprEvaluationException {
 
 		Bindings bindings = scriptEngine.createBindings();
+		Bindings existingBindings = scriptEngine.getContext().getBindings(ScriptContext.ENGINE_SCOPE);
+		if (existingBindings != null) {
+			bindings.putAll(existingBindings);
+		}
+
 		for (int i = 0; i < args.length; i++) {
 			Argument argument = arguments.get(i);
 			Value arg = args[i];

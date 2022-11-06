@@ -1,0 +1,34 @@
+@prefix sp: <http://spinrdf.org/sp#>.
+@prefix spin: <http://spinrdf.org/spin#> .
+@prefix spl: <http://spinrdf.org/spl#> .
+@prefix spinx: <http://spinrdf.org/spinx#> .
+@prefix distance: <classpath:/test-cases/>.
+
+distance:squareInline
+      a       spin:Function ;
+      rdfs:label "square inline"^^xsd:string ;
+      rdfs:subClassOf spin:Functions ;
+      spin:constraint
+              [ a       spl:Argument ;
+                rdfs:comment "The value to compute the square of"^^xsd:string ;
+                spl:predicate sp:arg1 ;
+                spl:valueType xsd:float
+              ] ;
+      spin:returnType xsd:float ;
+      spinx:javaScriptCode
+              "return arg1 * arg1;"^^xsd:string .
+
+distance:square
+      a       spin:Function ;
+      rdfs:comment "Computes the square of a numeric value, backed by a JavaScript implementation." ;
+      rdfs:label "square"^^xsd:string ;
+      rdfs:subClassOf spin:Functions ;
+      spin:constraint
+              [ a       spl:Argument ;
+                rdfs:comment "The number to compute the square of."^^xsd:string ;
+                spl:predicate sp:arg1 ;
+                spl:valueType rdfs:Literal
+              ] ;
+      spin:returnType xsd:float ;
+      spinx:javaScriptFile
+              "distance.js"^^xsd:string .

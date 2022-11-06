@@ -13,6 +13,7 @@ package com.msd.gin.halyard.spin.function;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,8 @@ import com.msd.gin.halyard.spin.SpinParser;
 
 public class SpinxFunctionParser implements FunctionParser {
 
+	private static final String CLASSPATH_SCHEME = "classpath:/";
+
 	private final SpinParser parser;
 
 	private final ScriptEngineManager scriptManager;
@@ -56,43 +59,79 @@ public class SpinxFunctionParser implements FunctionParser {
 			return null;
 		}
 
-		if (code == null) {
-			code = funcUri.getLocalName();
-		}
-
 		ScriptEngine engine = scriptManager.getEngineByName("javascript");
-
 		if (engine == null) {
 			throw new UnsupportedOperationException("No javascript engine available!");
 		}
 
 		try {
 			if (file != null) {
-				String ns = funcUri.getNamespace();
+				String location;
+				int pos = file.indexOf(':');
+				if (pos == -1) {
+					location = funcUri.getNamespace() + file;
+				} else {
+					location = file;
+				}
+				URL url;
+				if (location.startsWith(CLASSPATH_SCHEME)) {
+					url = Thread.currentThread().getContextClassLoader().getResource(location.substring(CLASSPATH_SCHEME.length()));
+				} else {
+					url = new URL(location);
+				}
 				try (Reader reader = new InputStreamReader(
-						new URL(new URL(ns.substring(0, ns.length() - 1)), file).openStream())) {
+						url.openStream())) {
 					engine.eval(reader);
 				} catch (IOException e) {
 					throw new QueryEvaluationException(e);
 				}
 			}
-		} catch (ScriptException e) {
+		} catch (ScriptException | MalformedURLException e) {
 			throw new QueryEvaluationException(e);
 		}
 
-		Value returnValue = TripleSources.singleValue(funcUri, SPIN.RETURN_TYPE_PROPERTY, store);
-
-		Map<IRI, Argument> templateArgs = parser.parseArguments(funcUri, store);
-
 		SpinxFunction func = new SpinxFunction(funcUri.stringValue());
 		func.setScriptEngine(engine);
-		func.setScript(code);
+		Value returnValue = TripleSources.singleValue(funcUri, SPIN.RETURN_TYPE_PROPERTY, store);
 		func.setReturnType((returnValue instanceof IRI) ? (IRI) returnValue : null);
+
+		Map<IRI, Argument> templateArgs = parser.parseArguments(funcUri, store);
 		List<IRI> orderedArgs = SpinParser.orderArguments(templateArgs.keySet());
-		for (IRI IRI : orderedArgs) {
-			Argument arg = templateArgs.get(IRI);
-			func.addArgument(arg);
+
+		String funcName = funcUri.getLocalName();
+		StringBuilder codeBuf;
+		if (code != null) {
+			// wrap as a function
+			codeBuf = new StringBuilder(code.length() + 100);
+			codeBuf.append("function ");
+			codeBuf.append(funcName);
+			codeBuf.append("(");
+			String sep = "";
+			for (IRI argIri : orderedArgs) {
+				codeBuf.append(sep);
+				codeBuf.append(argIri.getLocalName());
+				sep = ", ";
+			}
+			codeBuf.append(") {\n");
+			codeBuf.append(code);
+			codeBuf.append("\n}\n");
+		} else {
+			codeBuf = new StringBuilder(100);
 		}
+
+		// add function call
+		codeBuf.append(funcName);
+		codeBuf.append("(");
+		String sep = "";
+		for (IRI argIri : orderedArgs) {
+			Argument arg = templateArgs.get(argIri);
+			func.addArgument(arg);
+			codeBuf.append(sep);
+			codeBuf.append(argIri.getLocalName());
+			sep = ", ";
+		}
+		codeBuf.append(");");
+		func.setScript(codeBuf.toString());
 
 		return func;
 	}
