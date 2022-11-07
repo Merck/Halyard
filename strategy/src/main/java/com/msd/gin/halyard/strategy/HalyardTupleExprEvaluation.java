@@ -249,9 +249,9 @@ final class HalyardTupleExprEvaluation {
         } else if (expr instanceof StarJoin) {
         	return (parent, bindings) -> evaluateStarJoin(parent, (StarJoin) expr, bindings);
         } else if (expr instanceof SingletonSet) {
-        	return (parent, bindings) -> evaluateSingletonSet(parent, (SingletonSet) expr, bindings);
+        	return precompileSingletonSet((SingletonSet) expr);
         } else if (expr instanceof EmptySet) {
-        	return (parent, bindings) -> evaluateEmptySet(parent, (EmptySet) expr, bindings);
+        	return precompileEmptySet((EmptySet) expr);
         } else if (expr instanceof ZeroLengthPath) {
         	return (parent, bindings) -> evaluateZeroLengthPath(parent, (ZeroLengthPath) expr, bindings);
         } else if (expr instanceof ArbitraryLengthPath) {
@@ -259,10 +259,10 @@ final class HalyardTupleExprEvaluation {
         } else if (expr instanceof BindingSetAssignment) {
         	return (parent, bindings) -> evaluateBindingSetAssignment(parent, (BindingSetAssignment) expr, bindings);
         } else if (expr instanceof TripleRef) {
-        	return (parent, bindings) -> evaluateTripleRef(parent, (TripleRef) expr, bindings);
+        	return precompileTripleRef((TripleRef) expr);
 		} else if (expr instanceof TupleFunctionCall) {
 			// all TupleFunctionCalls are expected to be ExtendedTupleFunctionCalls
-			return (parent, bindings) -> evaluateTupleFunctionCall(parent, (ExtendedTupleFunctionCall) expr, bindings);
+			return precompileTupleFunctionCall((ExtendedTupleFunctionCall) expr);
         } else if (expr == null) {
             throw new IllegalArgumentException("expr must not be null");
         } else {
@@ -541,165 +541,189 @@ final class HalyardTupleExprEvaluation {
     }
 
 	/**
-	 * evaluates a TripleRef node returning bindingsets from the matched Triple nodes in the dataset (or explore
+	 * Precompiles a TripleRef node returning bindingsets from the matched Triple nodes in the dataset (or explore
 	 * standard reification)
 	 */
-	private void evaluateTripleRef(BindingSetPipe parent, TripleRef ref, BindingSet bindings) {
+	private BindingSetPipeEvaluationStep precompileTripleRef(TripleRef ref) {
 		// Naive implementation that walks over all statements matching (x rdf:type rdf:Statement)
 		// and filter those that do not match the bindings for subject, predicate and object vars (if bound)
 		final Var subjVar = ref.getSubjectVar();
 		final Var predVar = ref.getPredicateVar();
 		final Var objVar = ref.getObjectVar();
 		final Var extVar = ref.getExprVar();
-
-		final Value subjValue = Algebra.getVarValue(subjVar, bindings);
-		final Value predValue = Algebra.getVarValue(predVar, bindings);
-		final Value objValue = Algebra.getVarValue(objVar, bindings);
-		final Value extValue = Algebra.getVarValue(extVar, bindings);
-
-		// case1: when we have a binding for extVar we use it in the reified nodes lookup
-		// case2: in which we have unbound extVar
-		// in both cases:
-		// 1. iterate over all statements matching ((* | extValue), rdf:type, rdf:Statement)
-		// 2. construct a look ahead iteration and filter these solutions that do not match the
-		// bindings for the subject, predicate and object vars (if these are bound)
-		// return set of solution where the values of the statements (extVar, rdf:subject/predicate/object, value)
-		// are bound to the variables of the respective TripleRef variables for subject, predicate, object
-		// NOTE: if the tripleSource is extended to allow for lookup over asserted Triple values in the underlying sail
-		// the evaluation of the TripleRef should be suitably forwarded down the sail and filter/construct
-		// the correct solution out of the results of that call
-		if (extValue != null && !(extValue instanceof Resource)) {
-			parent.empty();
-			return;
-		}
-
 		// whether the TripleSouce support access to RDF star
 		final boolean sourceSupportsRdfStar = tripleSource instanceof RDFStarTripleSource;
-
-		final Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory;
-		// in case the
 		if (sourceSupportsRdfStar) {
-			iterFactory = bs -> {
-				CloseableIteration<? extends Triple, QueryEvaluationException> sourceIter = ((RDFStarTripleSource) tripleSource)
-						.getRdfStarTriples((Resource) subjValue, (IRI) predValue, objValue);
-	
-				FilterIteration<Triple, QueryEvaluationException> filterIter = new FilterIteration<Triple, QueryEvaluationException>(
-						sourceIter) {
-					@Override
-					protected boolean accept(Triple triple) throws QueryEvaluationException {
-						if (subjValue != null && !subjValue.equals(triple.getSubject())) {
-							return false;
+			return (parent, bindings) -> {
+				final Value subjValue = Algebra.getVarValue(subjVar, bindings);
+				final Value predValue = Algebra.getVarValue(predVar, bindings);
+				final Value objValue = Algebra.getVarValue(objVar, bindings);
+				final Value extValue = Algebra.getVarValue(extVar, bindings);
+
+				// case1: when we have a binding for extVar we use it in the reified nodes lookup
+				// case2: in which we have unbound extVar
+				// in both cases:
+				// 1. iterate over all statements matching ((* | extValue), rdf:type, rdf:Statement)
+				// 2. construct a look ahead iteration and filter these solutions that do not match the
+				// bindings for the subject, predicate and object vars (if these are bound)
+				// return set of solution where the values of the statements (extVar, rdf:subject/predicate/object, value)
+				// are bound to the variables of the respective TripleRef variables for subject, predicate, object
+				// NOTE: if the tripleSource is extended to allow for lookup over asserted Triple values in the underlying sail
+				// the evaluation of the TripleRef should be suitably forwarded down the sail and filter/construct
+				// the correct solution out of the results of that call
+				if (extValue != null && !(extValue instanceof Resource)) {
+					parent.empty();
+					return;
+				}
+
+				final Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory;
+				iterFactory = bs -> {
+					CloseableIteration<? extends Triple, QueryEvaluationException> sourceIter = ((RDFStarTripleSource) tripleSource)
+							.getRdfStarTriples((Resource) subjValue, (IRI) predValue, objValue);
+		
+					FilterIteration<Triple, QueryEvaluationException> filterIter = new FilterIteration<Triple, QueryEvaluationException>(
+							sourceIter) {
+						@Override
+						protected boolean accept(Triple triple) throws QueryEvaluationException {
+							if (subjValue != null && !subjValue.equals(triple.getSubject())) {
+								return false;
+							}
+							if (predValue != null && !predValue.equals(triple.getPredicate())) {
+								return false;
+							}
+							if (objValue != null && !objValue.equals(triple.getObject())) {
+								return false;
+							}
+							if (extValue != null && !extValue.equals(triple)) {
+								return false;
+							}
+							return true;
 						}
-						if (predValue != null && !predValue.equals(triple.getPredicate())) {
-							return false;
-						}
-						if (objValue != null && !objValue.equals(triple.getObject())) {
-							return false;
-						}
-						if (extValue != null && !extValue.equals(triple)) {
-							return false;
-						}
-						return true;
-					}
-				};
-	
-				return new ConvertingIteration<Triple, BindingSet, QueryEvaluationException>(filterIter) {
-					@Override
-					protected BindingSet convert(Triple triple) {
-						QueryBindingSet result = new QueryBindingSet(bs);
-						if (subjValue == null) {
-							result.addBinding(subjVar.getName(), triple.getSubject());
-						}
-						if (predValue == null) {
-							result.addBinding(predVar.getName(), triple.getPredicate());
-						}
-						if (objValue == null) {
-							result.addBinding(objVar.getName(), triple.getObject());
-						}
-						// add the extVar binding if we do not have a value bound.
-						if (extValue == null) {
-							result.addBinding(extVar.getName(), triple);
-						}
-						return result;
-					}
-				};
-			};
-		} else {
-			// standard reification iteration
-			iterFactory = bs -> {
-				// 1. walk over resources used as subjects of (x rdf:type rdf:Statement)
-				final CloseableIteration<? extends Resource, QueryEvaluationException> iter = new ConvertingIteration<Statement, Resource, QueryEvaluationException>(
-						tripleSource.getStatements((Resource) extValue, RDF.TYPE, RDF.STATEMENT)) {
-	
-					@Override
-					protected Resource convert(Statement sourceObject) {
-						return sourceObject.getSubject();
-					}
-				};
-				// for each reification node, fetch and check the subject, predicate and object values against
-				// the expected values from TripleRef pattern and supplied bindings collection
-				return new LookAheadIteration<BindingSet, QueryEvaluationException>() {
-					@Override
-					protected void handleClose()
-							throws QueryEvaluationException {
-						super.handleClose();
-						iter.close();
-					}
-	
-					@Override
-					protected BindingSet getNextElement()
-							throws QueryEvaluationException {
-						while (iter.hasNext()) {
-							Resource theNode = iter.next();
+					};
+		
+					return new ConvertingIteration<Triple, BindingSet, QueryEvaluationException>(filterIter) {
+						@Override
+						protected BindingSet convert(Triple triple) {
 							QueryBindingSet result = new QueryBindingSet(bs);
-							// does it match the subjectValue/subjVar
-							if (!matchValue(theNode, subjValue, subjVar, result, RDF.SUBJECT)) {
-								continue;
+							if (subjValue == null) {
+								result.addBinding(subjVar.getName(), triple.getSubject());
 							}
-							// the predicate, if not, remove the binding that hass been added
-							// when the subjValue has been checked and its value added to the solution
-							if (!matchValue(theNode, predValue, predVar, result, RDF.PREDICATE)) {
-								continue;
+							if (predValue == null) {
+								result.addBinding(predVar.getName(), triple.getPredicate());
 							}
-							// check the object, if it do not match
-							// remove the bindings added for subj and pred
-							if (!matchValue(theNode, objValue, objVar, result, RDF.OBJECT)) {
-								continue;
+							if (objValue == null) {
+								result.addBinding(objVar.getName(), triple.getObject());
 							}
 							// add the extVar binding if we do not have a value bound.
 							if (extValue == null) {
-								result.addBinding(extVar.getName(), theNode);
-							} else if (!extValue.equals(theNode)) {
-								// the extVar value do not match theNode
-								continue;
+								result.addBinding(extVar.getName(), triple);
 							}
 							return result;
 						}
-						return null;
-					}
-	
-					private boolean matchValue(Resource theNode, Value value, Var var, QueryBindingSet result,
-							IRI predicate) {
-						try (CloseableIteration<? extends Statement, QueryEvaluationException> valueiter = tripleSource
-								.getStatements(theNode, predicate, null)) {
-							while (valueiter.hasNext()) {
-								Statement valueStatement = valueiter.next();
-								if (theNode.equals(valueStatement.getSubject())) {
-									if (value == null || value.equals(valueStatement.getObject())) {
-										if (value == null) {
-											result.addBinding(var.getName(), valueStatement.getObject());
+					};
+				};
+				executor.pullAndPushAsync(parent, iterFactory, ref, bindings, parentStrategy);
+			};
+		} else {
+			return (parent, bindings) -> {
+				final Value subjValue = Algebra.getVarValue(subjVar, bindings);
+				final Value predValue = Algebra.getVarValue(predVar, bindings);
+				final Value objValue = Algebra.getVarValue(objVar, bindings);
+				final Value extValue = Algebra.getVarValue(extVar, bindings);
+
+				// case1: when we have a binding for extVar we use it in the reified nodes lookup
+				// case2: in which we have unbound extVar
+				// in both cases:
+				// 1. iterate over all statements matching ((* | extValue), rdf:type, rdf:Statement)
+				// 2. construct a look ahead iteration and filter these solutions that do not match the
+				// bindings for the subject, predicate and object vars (if these are bound)
+				// return set of solution where the values of the statements (extVar, rdf:subject/predicate/object, value)
+				// are bound to the variables of the respective TripleRef variables for subject, predicate, object
+				// NOTE: if the tripleSource is extended to allow for lookup over asserted Triple values in the underlying sail
+				// the evaluation of the TripleRef should be suitably forwarded down the sail and filter/construct
+				// the correct solution out of the results of that call
+				if (extValue != null && !(extValue instanceof Resource)) {
+					parent.empty();
+					return;
+				}
+
+				final Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory;
+				// standard reification iteration
+				iterFactory = bs -> {
+					// 1. walk over resources used as subjects of (x rdf:type rdf:Statement)
+					final CloseableIteration<? extends Resource, QueryEvaluationException> iter = new ConvertingIteration<Statement, Resource, QueryEvaluationException>(
+							tripleSource.getStatements((Resource) extValue, RDF.TYPE, RDF.STATEMENT)) {
+		
+						@Override
+						protected Resource convert(Statement sourceObject) {
+							return sourceObject.getSubject();
+						}
+					};
+					// for each reification node, fetch and check the subject, predicate and object values against
+					// the expected values from TripleRef pattern and supplied bindings collection
+					return new LookAheadIteration<BindingSet, QueryEvaluationException>() {
+						@Override
+						protected void handleClose()
+								throws QueryEvaluationException {
+							super.handleClose();
+							iter.close();
+						}
+		
+						@Override
+						protected BindingSet getNextElement()
+								throws QueryEvaluationException {
+							while (iter.hasNext()) {
+								Resource theNode = iter.next();
+								QueryBindingSet result = new QueryBindingSet(bs);
+								// does it match the subjectValue/subjVar
+								if (!matchValue(theNode, subjValue, subjVar, result, RDF.SUBJECT)) {
+									continue;
+								}
+								// the predicate, if not, remove the binding that hass been added
+								// when the subjValue has been checked and its value added to the solution
+								if (!matchValue(theNode, predValue, predVar, result, RDF.PREDICATE)) {
+									continue;
+								}
+								// check the object, if it do not match
+								// remove the bindings added for subj and pred
+								if (!matchValue(theNode, objValue, objVar, result, RDF.OBJECT)) {
+									continue;
+								}
+								// add the extVar binding if we do not have a value bound.
+								if (extValue == null) {
+									result.addBinding(extVar.getName(), theNode);
+								} else if (!extValue.equals(theNode)) {
+									// the extVar value do not match theNode
+									continue;
+								}
+								return result;
+							}
+							return null;
+						}
+		
+						private boolean matchValue(Resource theNode, Value value, Var var, QueryBindingSet result,
+								IRI predicate) {
+							try (CloseableIteration<? extends Statement, QueryEvaluationException> valueiter = tripleSource
+									.getStatements(theNode, predicate, null)) {
+								while (valueiter.hasNext()) {
+									Statement valueStatement = valueiter.next();
+									if (theNode.equals(valueStatement.getSubject())) {
+										if (value == null || value.equals(valueStatement.getObject())) {
+											if (value == null) {
+												result.addBinding(var.getName(), valueStatement.getObject());
+											}
+											return true;
 										}
-										return true;
 									}
 								}
+								return false;
 							}
-							return false;
 						}
-					}
+					};
 				};
+				executor.pullAndPushAsync(parent, iterFactory, ref, bindings, parentStrategy);
 			};
-		} // else standard reification iteration
-		executor.pullAndPushAsync(parent, iterFactory, ref, bindings, parentStrategy);
+		}
 	}
 
     /**
@@ -707,25 +731,25 @@ final class HalyardTupleExprEvaluation {
      */
     private BindingSetPipeEvaluationStep precompileUnaryTupleOperator(UnaryTupleOperator expr) {
         if (expr instanceof Projection) {
-        	return (parent, bindings) -> evaluateProjection(parent, (Projection) expr, bindings);
+        	return precompileProjection((Projection) expr);
         } else if (expr instanceof MultiProjection) {
-        	return (parent, bindings) -> evaluateMultiProjection(parent, (MultiProjection) expr, bindings);
+        	return precompileMultiProjection((MultiProjection) expr);
         } else if (expr instanceof Filter) {
-        	return (parent, bindings) -> evaluateFilter(parent, (Filter) expr, bindings);
+        	return precompileFilter((Filter) expr);
         } else if (expr instanceof Service) {
         	return (parent, bindings) -> evaluateService(parent, (Service) expr, bindings);
         } else if (expr instanceof Slice) {
-        	return (parent, bindings) -> evaluateSlice(parent, (Slice) expr, bindings);
+        	return precompileSlice((Slice) expr);
         } else if (expr instanceof Extension) {
-        	return (parent, bindings) -> evaluateExtension(parent, (Extension) expr, bindings);
+        	return precompileExtension((Extension) expr);
         } else if (expr instanceof Distinct) {
-        	return (parent, bindings) -> evaluateDistinct(parent, (Distinct) expr, bindings);
+        	return precompileDistinct((Distinct) expr);
         } else if (expr instanceof Reduced) {
-        	return (parent, bindings) -> evaluateReduced(parent, (Reduced) expr, bindings);
+        	return precompileReduced((Reduced) expr);
         } else if (expr instanceof Group) {
-        	return (parent, bindings) -> evaluateGroup(parent, (Group) expr, bindings);
+        	return precompileGroup((Group) expr);
         } else if (expr instanceof Order) {
-        	return (parent, bindings) -> evaluateOrder(parent, (Order) expr, bindings);
+        	return precompileOrder((Order) expr);
         } else if (expr instanceof QueryRoot) {
             parentStrategy.sharedValueOfNow = null;
             return precompileTupleExpr(((QueryRoot) expr).getArg());
@@ -739,12 +763,11 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Evaluate a {@link Projection} query model nodes
-     * @param parent
+     * Precompile a {@link Projection} query model nodes
      * @param projection
-     * @param bindings
      */
-    private void evaluateProjection(BindingSetPipe parent, final Projection projection, final BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileProjection(final Projection projection) {
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(projection.getArg());
         boolean outer = true;
         QueryModelNode ancestor = projection;
         while (ancestor.getParentNode() != null) {
@@ -754,119 +777,121 @@ final class HalyardTupleExprEvaluation {
                 }
         }
         final boolean includeAll = !outer;
-        BindingSet pushDownBindings;
-        if (projection.isSubquery() && bindings.size() > 0) {
-            pushDownBindings = new QueryBindingSet();
-            for (ProjectionElem pe : projection.getProjectionElemList().getElements()) {
-                    Value targetValue = bindings.getValue(pe.getSourceName());
-                    if (targetValue != null) {
-                            ((QueryBindingSet)pushDownBindings).setBinding(pe.getTargetName(), targetValue);
-                    }
-            }
-        } else {
-            pushDownBindings = bindings;
-        }
-
-        BindingSetPipeEvaluationStep step = precompileTupleExpr(projection.getArg());
-        step.evaluate(new BindingSetPipe(parent) {
-            @Override
-            protected boolean next(BindingSet bs) throws InterruptedException {
-                return parent.push(ProjectionIterator.project(projection.getProjectionElemList(), bs, bindings, includeAll));
-            }
-            @Override
-            public String toString() {
-            	return "ProjectionBindingSetPipe";
-            }
-        }, pushDownBindings);
+    	return (parent, bindings) -> {
+	        BindingSet pushDownBindings;
+	        if (projection.isSubquery() && bindings.size() > 0) {
+	            pushDownBindings = new QueryBindingSet();
+	            for (ProjectionElem pe : projection.getProjectionElemList().getElements()) {
+	                    Value targetValue = bindings.getValue(pe.getSourceName());
+	                    if (targetValue != null) {
+	                            ((QueryBindingSet)pushDownBindings).setBinding(pe.getTargetName(), targetValue);
+	                    }
+	            }
+	        } else {
+	            pushDownBindings = bindings;
+	        }
+	
+	        step.evaluate(new BindingSetPipe(parent) {
+	            @Override
+	            protected boolean next(BindingSet bs) throws InterruptedException {
+	                return parent.push(ProjectionIterator.project(projection.getProjectionElemList(), bs, bindings, includeAll));
+	            }
+	            @Override
+	            public String toString() {
+	            	return "ProjectionBindingSetPipe";
+	            }
+	        }, pushDownBindings);
+    	};
     }
 
     /**
-     * Evaluate a {@link MultiProjection} query model nodes
-     * @param parent
+     * Precompile a {@link MultiProjection} query model nodes
      * @param multiProjection
-     * @param bindings
      */
-    private void evaluateMultiProjection(BindingSetPipe parent, final MultiProjection multiProjection, final BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileMultiProjection(final MultiProjection multiProjection) {
         BindingSetPipeEvaluationStep step = precompileTupleExpr(multiProjection.getArg());
-        step.evaluate(new BindingSetPipe(parent) {
-            final List<ProjectionElemList> projections = multiProjection.getProjections();
-            final BindingSet prev[] = new BindingSet[projections.size()];
-
-            @Override
-            protected boolean next(BindingSet bs) throws InterruptedException {
-                for (int i=0; i<prev.length; i++) {
-                    BindingSet nb = ProjectionIterator.project(projections.get(i), bs, bindings);
-                    //ignore duplicates
-                    boolean push = false;
-                    synchronized (prev) {
-                        if (!nb.equals(prev[i])) {
-                            prev[i] = nb;
-                            push = true;
-                        }
-                    }
-                    if (push) {
-                        if (!parent.push(nb)) {
-                            return false;
-                        }
-                    }
-                }
-                return true;
-            }
-            @Override
-            public String toString() {
-            	return "MultiProjectionBindingSetPipe";
-            }
-        }, bindings);
+        return (parent, bindings) -> {
+	        step.evaluate(new BindingSetPipe(parent) {
+	            final List<ProjectionElemList> projections = multiProjection.getProjections();
+	            final BindingSet prev[] = new BindingSet[projections.size()];
+	
+	            @Override
+	            protected boolean next(BindingSet bs) throws InterruptedException {
+	                for (int i=0; i<prev.length; i++) {
+	                    BindingSet nb = ProjectionIterator.project(projections.get(i), bs, bindings);
+	                    //ignore duplicates
+	                    boolean push = false;
+	                    synchronized (prev) {
+	                        if (!nb.equals(prev[i])) {
+	                            prev[i] = nb;
+	                            push = true;
+	                        }
+	                    }
+	                    if (push) {
+	                        if (!parent.push(nb)) {
+	                            return false;
+	                        }
+	                    }
+	                }
+	                return true;
+	            }
+	            @Override
+	            public String toString() {
+	            	return "MultiProjectionBindingSetPipe";
+	            }
+	        }, bindings);
+        };
     }
 
     /**
-     * Evaluates filter {@link ExpressionTuple}s query model nodes pushing the result to the parent BindingSetPipe.
-     * @param parent the pipe to which results are pushed
+     * Precompile filter {@link ExpressionTuple}s query model nodes pushing the result to the parent BindingSetPipe.
      * @param filter holds the details of any FILTER expression in a SPARQL query and any sub-chains.
-     * @param bindings
      */
-    private void evaluateFilter(BindingSetPipe parent, final Filter filter, final BindingSet bindings) {
-        parentStrategy.initTracking(filter);
+    private BindingSetPipeEvaluationStep precompileFilter(final Filter filter) {
         BindingSetPipeEvaluationStep argStep = precompileTupleExpr(filter.getArg());
-        BindingSetPipeEvaluationStep step = (pipe, bs) ->
-            argStep.evaluate(new BindingSetPipe(parent) {
-                final Set<String> scopeBindingNames = filter.getBindingNames();
-
-                @Override
-                protected boolean next(BindingSet bs) throws InterruptedException {
-                    try {
-                        if (accept(bs)) {
-                            parentStrategy.incrementResultSizeActual(filter);
-                            return parent.push(bs); //push results that pass the filter.
-                        } else {
-                            return true; //nothing passes the filter but processing continues.
-                        }
-                    } catch (QueryEvaluationException e) {
-                        return handleException(e);
-                    }
-                }
-                private boolean accept(BindingSet bindings) throws QueryEvaluationException {
-                    try {
-                        // Limit the bindings to the ones that are in scope for this filter
-                        QueryBindingSet scopeBindings = new QueryBindingSet(bindings);
-                        // FIXME J1 scopeBindingNames should include bindings from superquery if the filter
-                        // is part of a subquery. This is a workaround: we should fix the settings of scopeBindingNames,
-                        // rather than skipping the limiting of bindings.
-                        if (!isPartOfSubQuery(filter)) {
-                            scopeBindings.retainAll(scopeBindingNames);
-                        }
-                        return parentStrategy.isTrue(filter.getCondition(), scopeBindings);
-                    } catch (ValueExprEvaluationException e) {
-                        // failed to evaluate condition
-                        return false;
-                    }
-                }
-                @Override
-                public String toString() {
-                	return "FilterBindingSetPipe";
-                }
-            }, bindings);
-        step.evaluate(parent, bindings);
+        BindingSetPipeEvaluationStep step = (parent, bindings) -> {
+	        argStep.evaluate(new BindingSetPipe(parent) {
+	            final Set<String> scopeBindingNames = filter.getBindingNames();
+	
+	            @Override
+	            protected boolean next(BindingSet bs) throws InterruptedException {
+	                try {
+	                    if (accept(bs)) {
+	                        parentStrategy.incrementResultSizeActual(filter);
+	                        return parent.push(bs); //push results that pass the filter.
+	                    } else {
+	                        return true; //nothing passes the filter but processing continues.
+	                    }
+	                } catch (QueryEvaluationException e) {
+	                    return handleException(e);
+	                }
+	            }
+	            private boolean accept(BindingSet bs) throws QueryEvaluationException {
+	                try {
+	                    // Limit the bindings to the ones that are in scope for this filter
+	                    QueryBindingSet scopeBindings = new QueryBindingSet(bs);
+	                    // FIXME J1 scopeBindingNames should include bindings from superquery if the filter
+	                    // is part of a subquery. This is a workaround: we should fix the settings of scopeBindingNames,
+	                    // rather than skipping the limiting of bindings.
+	                    if (!isPartOfSubQuery(filter)) {
+	                        scopeBindings.retainAll(scopeBindingNames);
+	                    }
+	                    return parentStrategy.isTrue(filter.getCondition(), scopeBindings);
+	                } catch (ValueExprEvaluationException e) {
+	                    // failed to evaluate condition
+	                    return false;
+	                }
+	            }
+	            @Override
+	            public String toString() {
+	            	return "FilterBindingSetPipe";
+	            }
+	        }, bindings);
+	    };
+        return (parent, bindings) -> {
+            parentStrategy.initTracking(filter);
+	        step.evaluate(parent, bindings);
+        };
     }
 
     /**
@@ -936,139 +961,141 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Evaluate {@link Order} query model nodes
-     * @param parent
+     * Precompile {@link Order} query model nodes
      * @param order
-     * @param bindings
      */
-    private void evaluateOrder(final BindingSetPipe parent, final Order order, BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileOrder(final Order order) {
         final Sorter<ComparableBindingSetWrapper> sorter = new Sorter<>(getLimit(order), isReducedOrDistinct(order), collectionMemoryThreshold);
         BindingSetPipeEvaluationStep step = precompileTupleExpr(order.getArg());
-        step.evaluate(new BindingSetPipe(parent) {
-            final AtomicLong minorOrder = new AtomicLong();
-
-            @Override
-            protected boolean handleException(Throwable e) {
-                sorter.close();
-                return parent.handleException(e);
-            }
-
-            @Override
-            protected boolean next(BindingSet bs) throws InterruptedException {
-                try {
-                    ComparableBindingSetWrapper cbsw = new ComparableBindingSetWrapper(parentStrategy, bs, order.getElements(), minorOrder.getAndIncrement());
-                    sorter.add(cbsw);
-                    return true;
-                } catch (QueryEvaluationException | IOException e) {
-                    return handleException(e);
-                }
-            }
-
-            @Override
-            protected void doClose() throws InterruptedException {
-                try {
-                    for (Map.Entry<ComparableBindingSetWrapper, Long> me : sorter) {
-                        for (long i = me.getValue(); i > 0; i--) {
-                            if (!parent.push(me.getKey().bs)) {
-                                return;
-                            }
-                        }
-                    }
-                    parent.close();
-                } finally {
-                    sorter.close();
-                }
-            }
-
-            @Override
-            public String toString() {
-            	return "OrderBindingSetPipe";
-            }
-        }, bindings);
+        return (parent, bindings) -> {
+	        step.evaluate(new BindingSetPipe(parent) {
+	            final AtomicLong minorOrder = new AtomicLong();
+	
+	            @Override
+	            protected boolean handleException(Throwable e) {
+	                sorter.close();
+	                return parent.handleException(e);
+	            }
+	
+	            @Override
+	            protected boolean next(BindingSet bs) throws InterruptedException {
+	                try {
+	                    ComparableBindingSetWrapper cbsw = new ComparableBindingSetWrapper(parentStrategy, bs, order.getElements(), minorOrder.getAndIncrement());
+	                    sorter.add(cbsw);
+	                    return true;
+	                } catch (QueryEvaluationException | IOException e) {
+	                    return handleException(e);
+	                }
+	            }
+	
+	            @Override
+	            protected void doClose() throws InterruptedException {
+	                try {
+	                    for (Map.Entry<ComparableBindingSetWrapper, Long> me : sorter) {
+	                        for (long i = me.getValue(); i > 0; i--) {
+	                            if (!parent.push(me.getKey().bs)) {
+	                                return;
+	                            }
+	                        }
+	                    }
+	                    parent.close();
+	                } finally {
+	                    sorter.close();
+	                }
+	            }
+	
+	            @Override
+	            public String toString() {
+	            	return "OrderBindingSetPipe";
+	            }
+	        }, bindings);
+        };
     }
 
     /**
-     * Evaluate {@link Group} query model nodes
-     * @param parent
+     * Precompile {@link Group} query model nodes
      * @param group
-     * @param bindings
      */
-    private void evaluateGroup(BindingSetPipe parent, Group group, BindingSet bindings) {
-    	parentStrategy.initTracking(group);
+    private BindingSetPipeEvaluationStep precompileGroup(Group group) {
+        BindingSetPipeEvaluationStep step = precompileTupleExpr(group.getArg());
     	if (group.getGroupBindingNames().isEmpty()) {
     		// no GROUP BY present
-            BindingSetPipeEvaluationStep step = precompileTupleExpr(group.getArg());
-    		step.evaluate(new BindingSetPipe(parent) {
-    			final GroupValue aggregators = createGroupValue(group, bindings);
-				@Override
-				protected boolean next(BindingSet bs) throws InterruptedException {
-					aggregators.addValues(bs);
-					return true;
-				}
-				@Override
-				protected void doClose() throws InterruptedException {
-					QueryBindingSet result = new QueryBindingSet(bindings);
-					aggregators.bindResult(result);
-					parentStrategy.incrementResultSizeActual(group);
-					parent.pushLast(result);
-					aggregators.close();
-				}
-				@Override
-				public String toString() {
-					return "AggregateBindingSetPipe-noGroupBy";
-				}
-    		}, bindings);
-    	} else {
-            BindingSetPipeEvaluationStep step = precompileTupleExpr(group.getArg());
-    		step.evaluate(new BindingSetPipe(parent) {
-    			final Map<BindingSetValues,GroupValue> groupByMap = new ConcurrentHashMap<>();
-    			final String[] groupNames = toStringArray(group.getGroupBindingNames());
-				@Override
-				protected boolean next(BindingSet bs) throws InterruptedException {
-					GroupValue aggregators = groupByMap.computeIfAbsent(BindingSetValues.create(groupNames, bs), k -> createGroupValue(group, bindings));
-					aggregators.addValues(bs);
-					return true;
-				}
-				@Override
-				protected void doClose() throws InterruptedException {
-					if (!groupByMap.isEmpty()) {
-						for(Map.Entry<BindingSetValues,GroupValue> aggEntry : groupByMap.entrySet()) {
-							BindingSetValues groupKey = aggEntry.getKey();
-							GroupValue aggregators = aggEntry.getValue();
-							MutableBindingSet result = groupKey.setBindings(groupNames, bindings);
-							aggregators.bindResult(result);
-							parentStrategy.incrementResultSizeActual(group);
-							parent.push(result);
-							aggregators.close();
-						}
-					} else {
+    		return (parent, bindings) -> {
+    	    	parentStrategy.initTracking(group);
+	    		step.evaluate(new BindingSetPipe(parent) {
+	    			final GroupValue aggregators = createGroupValue(group, bindings);
+					@Override
+					protected boolean next(BindingSet bs) throws InterruptedException {
+						aggregators.addValues(bs);
+						return true;
+					}
+					@Override
+					protected void doClose() throws InterruptedException {
 						QueryBindingSet result = new QueryBindingSet(bindings);
-						for (GroupElem ge : group.getGroupElements()) {
-							Aggregator<?,?> agg = createAggregator(ge.getOperator(), bindings);
-							if (agg != null) {
-								try {
-									Value v = agg.getValue();
-									if (v != null) {
-										result.setBinding(ge.getName(), v);
+						aggregators.bindResult(result);
+						parentStrategy.incrementResultSizeActual(group);
+						parent.pushLast(result);
+						aggregators.close();
+					}
+					@Override
+					public String toString() {
+						return "AggregateBindingSetPipe-noGroupBy";
+					}
+	    		}, bindings);
+    		};
+    	} else {
+    		return (parent, bindings) -> {
+    	    	parentStrategy.initTracking(group);
+	    		step.evaluate(new BindingSetPipe(parent) {
+	    			final Map<BindingSetValues,GroupValue> groupByMap = new ConcurrentHashMap<>();
+	    			final String[] groupNames = toStringArray(group.getGroupBindingNames());
+					@Override
+					protected boolean next(BindingSet bs) throws InterruptedException {
+						GroupValue aggregators = groupByMap.computeIfAbsent(BindingSetValues.create(groupNames, bs), k -> createGroupValue(group, bindings));
+						aggregators.addValues(bs);
+						return true;
+					}
+					@Override
+					protected void doClose() throws InterruptedException {
+						if (!groupByMap.isEmpty()) {
+							for(Map.Entry<BindingSetValues,GroupValue> aggEntry : groupByMap.entrySet()) {
+								BindingSetValues groupKey = aggEntry.getKey();
+								GroupValue aggregators = aggEntry.getValue();
+								MutableBindingSet result = groupKey.setBindings(groupNames, bindings);
+								aggregators.bindResult(result);
+								parentStrategy.incrementResultSizeActual(group);
+								parent.push(result);
+								aggregators.close();
+							}
+						} else {
+							QueryBindingSet result = new QueryBindingSet(bindings);
+							for (GroupElem ge : group.getGroupElements()) {
+								Aggregator<?,?> agg = createAggregator(ge.getOperator(), bindings);
+								if (agg != null) {
+									try {
+										Value v = agg.getValue();
+										if (v != null) {
+											result.setBinding(ge.getName(), v);
+										}
+									} catch (ValueExprEvaluationException ignore) {
+										// There was a type error when calculating the value of the aggregate. We silently ignore the error,
+										// resulting in no result value being bound.
 									}
-								} catch (ValueExprEvaluationException ignore) {
-									// There was a type error when calculating the value of the aggregate. We silently ignore the error,
-									// resulting in no result value being bound.
+									agg.close();
 								}
-								agg.close();
+							}
+							if (result.size() > 0) {
+								parent.push(result);
 							}
 						}
-						if (result.size() > 0) {
-							parent.push(result);
-						}
+						parent.close();
 					}
-					parent.close();
-				}
-				@Override
-				public String toString() {
-					return "AggregateBindingSetPipe";
-				}
-    		}, bindings);
+					@Override
+					public String toString() {
+						return "AggregateBindingSetPipe";
+					}
+	    		}, bindings);
+    		};
     	}
     }
 
@@ -1313,149 +1340,149 @@ final class HalyardTupleExprEvaluation {
 	}
 
     /**
-     * Evaluate {@link Reduced} query model nodes
-     * @param parent
+     * Precompile {@link Reduced} query model nodes
      * @param reduced
-     * @param bindings
      */
-    private void evaluateReduced(BindingSetPipe parent, Reduced reduced, BindingSet bindings) {
-    	parentStrategy.initTracking(reduced);
+    private BindingSetPipeEvaluationStep precompileReduced(Reduced reduced) {
         BindingSetPipeEvaluationStep step = precompileTupleExpr(reduced.getArg());
-        step.evaluate(new BindingSetPipe(parent) {
-            private BindingSet previous = null;
-
-            @Override
-            protected boolean next(BindingSet bs) throws InterruptedException {
-                synchronized (this) {
-                    if (bs.equals(previous)) {
-                        return true;
-                    }
-                    previous = bs;
-                }
-				parentStrategy.incrementResultSizeActual(reduced);
-                return parent.push(bs);
-            }
-            @Override
-            public String toString() {
-            	return "ReducedBindingSetPipe";
-            }
-        }, bindings);
+        return (parent, bindings) -> {
+	    	parentStrategy.initTracking(reduced);
+	        step.evaluate(new BindingSetPipe(parent) {
+	            private BindingSet previous = null;
+	
+	            @Override
+	            protected boolean next(BindingSet bs) throws InterruptedException {
+	                synchronized (this) {
+	                    if (bs.equals(previous)) {
+	                        return true;
+	                    }
+	                    previous = bs;
+	                }
+					parentStrategy.incrementResultSizeActual(reduced);
+	                return parent.push(bs);
+	            }
+	            @Override
+	            public String toString() {
+	            	return "ReducedBindingSetPipe";
+	            }
+	        }, bindings);
+        };
     }
 
     /**
-     * Evaluate {@link Distinct} query model nodes
-     * @param parent
+     * Precompile {@link Distinct} query model nodes
      * @param distinct
-     * @param bindings
      */
-    private void evaluateDistinct(BindingSetPipe parent, final Distinct distinct, BindingSet bindings) {
-    	parentStrategy.initTracking(distinct);
+    private BindingSetPipeEvaluationStep precompileDistinct(final Distinct distinct) {
         BindingSetPipeEvaluationStep step = precompileTupleExpr(distinct.getArg());
-        step.evaluate(new BindingSetPipe(parent) {
-            private final BigHashSet<BindingSet> set = BigHashSet.create(collectionMemoryThreshold);
-            @Override
-            protected boolean handleException(Throwable e) {
-                set.close();
-                return parent.handleException(e);
-            }
-            @Override
-            protected boolean next(BindingSet bs) throws InterruptedException {
-                try {
-                    if (!set.add(bs)) {
-                        return true;
-                    }
-                } catch (IOException e) {
-                    return handleException(e);
-                }
-				parentStrategy.incrementResultSizeActual(distinct);
-                return parent.push(bs);
-            }
-            @Override
-			protected void doClose() throws InterruptedException {
-               	set.close();
-                parent.close();
-            }
-            @Override
-            public String toString() {
-            	return "DistinctBindingSetPipe";
-            }
-        }, bindings);
+        return (parent, bindings) -> {
+	    	parentStrategy.initTracking(distinct);
+	        step.evaluate(new BindingSetPipe(parent) {
+	            private final BigHashSet<BindingSet> set = BigHashSet.create(collectionMemoryThreshold);
+	            @Override
+	            protected boolean handleException(Throwable e) {
+	                set.close();
+	                return parent.handleException(e);
+	            }
+	            @Override
+	            protected boolean next(BindingSet bs) throws InterruptedException {
+	                try {
+	                    if (!set.add(bs)) {
+	                        return true;
+	                    }
+	                } catch (IOException e) {
+	                    return handleException(e);
+	                }
+					parentStrategy.incrementResultSizeActual(distinct);
+	                return parent.push(bs);
+	            }
+	            @Override
+				protected void doClose() throws InterruptedException {
+	               	set.close();
+	                parent.close();
+	            }
+	            @Override
+	            public String toString() {
+	            	return "DistinctBindingSetPipe";
+	            }
+	        }, bindings);
+        };
     }
 
 	/**
-	 * Evaluate {@link Extension} query model nodes
-	 * @param parent
+	 * Precompile {@link Extension} query model nodes
 	 * @param extension
-	 * @param bindings
 	 */
-    private void evaluateExtension(BindingSetPipe parent, final Extension extension, BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileExtension(final Extension extension) {
         BindingSetPipeEvaluationStep step = precompileTupleExpr(extension.getArg());
-        step.evaluate(new BindingSetPipe(parent) {
-            @Override
-            protected boolean next(BindingSet bs) throws InterruptedException {
-                QueryBindingSet targetBindings = new QueryBindingSet(bs);
-                for (ExtensionElem extElem : extension.getElements()) {
-                    ValueExpr expr = extElem.getExpr();
-                    if (!(expr instanceof AggregateOperator)) {
-                        try {
-                            // we evaluate each extension element over the targetbindings, so that bindings from
-                            // a previous extension element in this same extension can be used by other extension elements.
-                            // e.g. if a projection contains (?a + ?b as ?c) (?c * 2 as ?d)
-                            Value targetValue = parentStrategy.evaluate(extElem.getExpr(), targetBindings);
-                            if (targetValue != null) {
-                                // Potentially overwrites bindings from super
-                                targetBindings.setBinding(extElem.getName(), targetValue);
-                            }
-                        } catch (ValueExprEvaluationException e) {
-                            // silently ignore type errors in extension arguments. They should not cause the
-                            // query to fail but result in no bindings for this solution
-                            // see https://www.w3.org/TR/sparql11-query/#assignment
-                            // use null as place holder for unbound variables that must remain so
-                            targetBindings.setBinding(extElem.getName(), null);
-                        } catch (QueryEvaluationException e) {
-                            return handleException(e);
-                        }
-                    }
-                }
-                return parent.push(targetBindings);
-            }
-            @Override
-            public String toString() {
-            	return "ExtensionBindingSetPipe";
-            }
-        }, bindings);
+        return (parent, bindings) -> {
+	        step.evaluate(new BindingSetPipe(parent) {
+	            @Override
+	            protected boolean next(BindingSet bs) throws InterruptedException {
+	                QueryBindingSet targetBindings = new QueryBindingSet(bs);
+	                for (ExtensionElem extElem : extension.getElements()) {
+	                    ValueExpr expr = extElem.getExpr();
+	                    if (!(expr instanceof AggregateOperator)) {
+	                        try {
+	                            // we evaluate each extension element over the targetbindings, so that bindings from
+	                            // a previous extension element in this same extension can be used by other extension elements.
+	                            // e.g. if a projection contains (?a + ?b as ?c) (?c * 2 as ?d)
+	                            Value targetValue = parentStrategy.evaluate(extElem.getExpr(), targetBindings);
+	                            if (targetValue != null) {
+	                                // Potentially overwrites bindings from super
+	                                targetBindings.setBinding(extElem.getName(), targetValue);
+	                            }
+	                        } catch (ValueExprEvaluationException e) {
+	                            // silently ignore type errors in extension arguments. They should not cause the
+	                            // query to fail but result in no bindings for this solution
+	                            // see https://www.w3.org/TR/sparql11-query/#assignment
+	                            // use null as place holder for unbound variables that must remain so
+	                            targetBindings.setBinding(extElem.getName(), null);
+	                        } catch (QueryEvaluationException e) {
+	                            return handleException(e);
+	                        }
+	                    }
+	                }
+	                return parent.push(targetBindings);
+	            }
+	            @Override
+	            public String toString() {
+	            	return "ExtensionBindingSetPipe";
+	            }
+	        }, bindings);
+        };
     }
 
     /**
-     * Evaluate {@link Slice} query model nodes.
-     * @param parent
+     * Precompile {@link Slice} query model nodes.
      * @param slice
-     * @param bindings
      */
-    private void evaluateSlice(BindingSetPipe parent, Slice slice, BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileSlice(Slice slice) {
         final long offset = slice.hasOffset() ? slice.getOffset() : 0;
         final long limit = slice.hasLimit() ? offset + slice.getLimit() : Long.MAX_VALUE;
         BindingSetPipeEvaluationStep step = precompileTupleExpr(slice.getArg());
-        step.evaluate(new BindingSetPipe(parent) {
-            private final AtomicLong ll = new AtomicLong(0);
-            @Override
-            protected boolean next(BindingSet bs) throws InterruptedException {
-                long l = ll.incrementAndGet();
-                if (l <= offset) {
-                    return true;
-                } else if (l < limit) {
-                    return parent.push(bs);
-                } else if (l == limit) {
-                    return parent.pushLast(bs);
-                } else {
-                	return false;
-                }
-            }
-            @Override
-            public String toString() {
-            	return "SliceBindingSetPipe";
-            }
-        }, bindings);
+        return (parent, bindings) -> {
+	        step.evaluate(new BindingSetPipe(parent) {
+	            private final AtomicLong ll = new AtomicLong(0);
+	            @Override
+	            protected boolean next(BindingSet bs) throws InterruptedException {
+	                long l = ll.incrementAndGet();
+	                if (l <= offset) {
+	                    return true;
+	                } else if (l < limit) {
+	                    return parent.push(bs);
+	                } else if (l == limit) {
+	                    return parent.pushLast(bs);
+	                } else {
+	                	return false;
+	                }
+	            }
+	            @Override
+	            public String toString() {
+	            	return "SliceBindingSetPipe";
+	            }
+	        }, bindings);
+        };
     }
 
     /**
@@ -2336,30 +2363,30 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Evaluate {@link SingletonSet} query model nodes
-     * @param parent
+     * Precompile {@link SingletonSet} query model nodes
      * @param singletonSet
-     * @param bindings
      */
-    private void evaluateSingletonSet(BindingSetPipe parent, SingletonSet singletonSet, BindingSet bindings) {
-		parentStrategy.initTracking(singletonSet);
-        try {
-            parent.pushLast(bindings);
-            parentStrategy.incrementResultSizeActual(singletonSet);
-        } catch (InterruptedException e) {
-            parent.handleException(e);
-        }
+    private BindingSetPipeEvaluationStep precompileSingletonSet(SingletonSet singletonSet) {
+    	return (parent, bindings) -> {
+			parentStrategy.initTracking(singletonSet);
+	        try {
+	            parent.pushLast(bindings);
+	            parentStrategy.incrementResultSizeActual(singletonSet);
+	        } catch (InterruptedException e) {
+	            parent.handleException(e);
+	        }
+    	};
     }
 
 	/**
-	 * Evaluate {@link EmptySet} query model nodes
-	 * @param parent
+	 * Precompile {@link EmptySet} query model nodes
 	 * @param emptySet
-	 * @param bindings
 	 */
-	private void evaluateEmptySet(BindingSetPipe parent, EmptySet emptySet, BindingSet bindings) {
-		parentStrategy.initTracking(emptySet);
-		parent.empty();
+	private BindingSetPipeEvaluationStep precompileEmptySet(EmptySet emptySet) {
+    	return (parent, bindings) -> {
+			parentStrategy.initTracking(emptySet);
+			parent.empty();
+    	};
 	}
 
 	/**
@@ -2554,55 +2581,72 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-	 * Evaluate {@link TupleFunctionCall} query model nodes
+	 * Precompile {@link TupleFunctionCall} query model nodes
 	 * 
-	 * @param topPipe
 	 * @param tfc
-	 * @param bindings
 	 */
-	private void evaluateTupleFunctionCall(BindingSetPipe topPipe, ExtendedTupleFunctionCall tfc, BindingSet bindings)
+	private BindingSetPipeEvaluationStep precompileTupleFunctionCall(ExtendedTupleFunctionCall tfc)
 			throws QueryEvaluationException {
 		TupleFunction func = tupleFunctionRegistry.get(tfc.getURI())
 				.orElseThrow(() -> new QueryEvaluationException("Unknown tuple function '" + tfc.getURI() + "'"));
 
-        BindingSetPipeEvaluationStep step = precompileTupleExpr(tfc.getDependentExpression());
-		step.evaluate(new BindingSetPipe(topPipe) {
-			@Override
-			protected boolean next(BindingSet bs) throws InterruptedException {
-				try {
-					List<ValueExpr> args = tfc.getArgs();
-					Value[] argValues = new Value[args.size()];
-					for (int i = 0; i < args.size(); i++) {
-						argValues[i] = parentStrategy.evaluate(args.get(i), bs);
-					}
-
-					CloseableIteration<BindingSet, QueryEvaluationException> iter;
-					queryContext.begin();
+		Function<BindingSetPipe,BindingSetPipe> pipeBuilder = parent -> {
+			return new BindingSetPipe(parent) {
+				@Override
+				protected boolean next(BindingSet bs) throws InterruptedException {
 					try {
-						iter = TupleFunctionEvaluationStrategy.evaluate(func, tfc.getResultVars(), bs, tripleSource.getValueFactory(), argValues);
-					} finally {
-						queryContext.end();
-					}
-					iter = new QueryContextIteration(iter, queryContext);
-					try {
-						while (iter.hasNext()) {
-							if(!parent.push(iter.next())) {
-								return false;
-							}
+						List<ValueExpr> args = tfc.getArgs();
+						Value[] argValues = new Value[args.size()];
+						for (int i = 0; i < args.size(); i++) {
+							argValues[i] = parentStrategy.evaluate(args.get(i), bs);
 						}
-					} finally {
-						iter.close();
+	
+						CloseableIteration<BindingSet, QueryEvaluationException> iter;
+						queryContext.begin();
+						try {
+							iter = TupleFunctionEvaluationStrategy.evaluate(func, tfc.getResultVars(), bs, tripleSource.getValueFactory(), argValues);
+						} finally {
+							queryContext.end();
+						}
+						iter = new QueryContextIteration(iter, queryContext);
+						try {
+							while (iter.hasNext()) {
+								if(!parent.push(iter.next())) {
+									return false;
+								}
+							}
+						} finally {
+							iter.close();
+						}
+					} catch (ValueExprEvaluationException ignore) {
+						// can't evaluate arguments
 					}
-				} catch (ValueExprEvaluationException ignore) {
-					// can't evaluate arguments
+					return true;
 				}
-				return true;
-			}
-			@Override
-			public String toString() {
-				return "TupleFunctionCallBindingSetPipe";
-			}
-		}, bindings);
+				@Override
+				public String toString() {
+					return "TupleFunctionCallBindingSetPipe";
+				}
+			};
+		};
+
+		TupleExpr depExpr = tfc.getDependentExpression();
+		if (depExpr != null) {
+			BindingSetPipeEvaluationStep step = precompileTupleExpr(depExpr);
+			return (parent, bindings) -> {
+				step.evaluate(pipeBuilder.apply(parent), bindings);
+			};
+		} else {
+			// dependencies haven't been identified, but we'll try to evaluate anyway
+			return (parent, bindings) -> {
+				BindingSetPipe pipe = pipeBuilder.apply(parent);
+				try {
+					pipe.pushLast(bindings);
+				} catch (InterruptedException e) {
+					pipe.handleException(e);
+				}
+			};
+		}
 	}
 
 	/**
