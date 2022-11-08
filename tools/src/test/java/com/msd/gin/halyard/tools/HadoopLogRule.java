@@ -24,14 +24,14 @@ public class HadoopLogRule implements TestRule {
 				try {
 					base.evaluate();
 				} catch(Throwable err) {
-					Pattern errPattern = Pattern.compile("Exception|Error", Pattern.CASE_INSENSITIVE);
+					Pattern errPattern = Pattern.compile("Exception|Error|Caused by: |Suppressed: ", Pattern.CASE_INSENSITIVE);
 					Path clusterHome = Paths.get("target/test/data/testCluster");
 					if (Files.exists(clusterHome)) {
 						Files.walk(clusterHome)
 						.filter(p -> "syslog".equals(p.getFileName().toString()))
 						.forEach(f -> {
 							try(Stream<String> lines = Files.lines(f)) {
-								String log = lines.filter(l -> errPattern.matcher(l).matches() || l.startsWith("\tat "))
+								String log = lines.filter(l -> errPattern.matcher(l).find() || l.startsWith("\tat "))
 		    					.map(l -> "*** "+l+"\n")
 		    					.reduce("", String::concat);
 								System.out.println(log);

@@ -156,7 +156,7 @@ public final class HalyardHash extends AbstractHalyardTool {
 	public int run(CommandLine cmd) throws Exception {
     	configureString(cmd, 's', null);
         configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
-		getConf().setBoolean(HalyardBulkLoad.SKIP_INVALID_PROPERTY, true);
+		getConf().setBoolean(HalyardBulkLoad.ALLOW_INVALID_IRIS_PROPERTY, true);
         String sourcePaths = getConf().get(SOURCE_PATHS_PROPERTY);
 		TableMapReduceUtil.addDependencyJarsForClasses(getConf(),
                 NTriplesUtil.class,

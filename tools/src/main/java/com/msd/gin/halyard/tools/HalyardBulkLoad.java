@@ -113,7 +113,12 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
     /**
      * Boolean property ignoring RDF parsing errors
      */
-    public static final String SKIP_INVALID_PROPERTY = confProperty("parser", "skip-invalid");
+    public static final String ALLOW_INVALID_IRIS_PROPERTY = confProperty("parser", "allow-invalid-iris");
+
+    /**
+     * Boolean property ignoring RDF parsing errors
+     */
+    public static final String SKIP_INVALID_LINES_PROPERTY = confProperty("parser", "skip-invalid-lines");
 
     /**
      * Boolean property enabling RDF parser verification of data values
@@ -378,7 +383,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         private final Path paths[];
         private final long[] sizes, offsets;
         private final long size;
-        private final boolean skipInvalid, verifyDataTypeValues;
+        private final boolean allowInvalidIris, skipInvalidLines, verifyDataTypeValues;
         private final String defaultRdfContextPattern;
         private final boolean overrideRdfContext;
         private final long maxSize;
@@ -397,7 +402,8 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
             this.offsets = split.getStartOffsets();
             this.size = split.getLength();
             Configuration conf = context.getConfiguration();
-            this.skipInvalid = conf.getBoolean(SKIP_INVALID_PROPERTY, false);
+            this.allowInvalidIris = conf.getBoolean(ALLOW_INVALID_IRIS_PROPERTY, false);
+            this.skipInvalidLines = conf.getBoolean(SKIP_INVALID_LINES_PROPERTY, false);
             this.verifyDataTypeValues = conf.getBoolean(VERIFY_DATATYPE_VALUES_PROPERTY, false);
             this.overrideRdfContext = conf.getBoolean(OVERRIDE_CONTEXT_PROPERTY, false);
             this.defaultRdfContextPattern = conf.get(DEFAULT_CONTEXT_PROPERTY);
@@ -463,14 +469,14 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                     parser.setRDFHandler(this);
                     parser.setParseErrorListener(this);
                     parser.set(BasicParserSettings.PRESERVE_BNODE_IDS, true);
-                    if (skipInvalid) {
-                        parser.set(BasicParserSettings.VERIFY_URI_SYNTAX, false);
-                        parser.set(BasicParserSettings.VERIFY_RELATIVE_URIS, false);
-                        parser.set(BasicParserSettings.VERIFY_LANGUAGE_TAGS, false);
+                    parser.set(BasicParserSettings.VERIFY_URI_SYNTAX, !allowInvalidIris);
+                    parser.set(BasicParserSettings.VERIFY_RELATIVE_URIS, !allowInvalidIris);
+                    if (skipInvalidLines) {
                         parser.set(NTriplesParserSettings.FAIL_ON_INVALID_LINES, false);
                         parser.getParserConfig().addNonFatalError(NTriplesParserSettings.FAIL_ON_INVALID_LINES);
                     }
-                    parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
+                   	parser.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, verifyDataTypeValues);
+                    parser.set(BasicParserSettings.VERIFY_LANGUAGE_TAGS, verifyDataTypeValues);
                     if (defaultRdfContextPattern != null || overrideRdfContext) {
                         IRI defaultRdfContext;
                         if (defaultRdfContextPattern != null) {
@@ -485,7 +491,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
                     parser.setValueFactory(valueFactory);
                     parser.parse(localIn, localBaseUri);
                 } catch (Exception e) {
-                    if (skipInvalid) {
+                    if (allowInvalidIris && skipInvalidLines && !verifyDataTypeValues) {
                         LOG.warn("Exception while parsing RDF", e);
                     } else {
                         throw e;
@@ -662,8 +668,9 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         addOption("s", "source", "source_paths", SOURCE_PATHS_PROPERTY, "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
         addOption("w", "work-dir", "shared_folder", "Unique non-existent folder within shared filesystem to server as a working directory for the temporary HBase files,  the files are moved to their final HBase locations during the last stage of the load process", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, target table is created if it does not exist, however optional HBase namespace of the target table must already exist", true, true);
-        addOption("i", "allow-invalid", null, SKIP_INVALID_PROPERTY, "Optionally allow invalid IRI values (less overhead)", false, false);
+        addOption("i", "allow-invalid-iris", null, ALLOW_INVALID_IRIS_PROPERTY, "Optionally allow invalid IRI values (less overhead)", false, false);
         addOption("d", "verify-data-types", null, VERIFY_DATATYPE_VALUES_PROPERTY, "Optionally verify RDF data type values while parsing", false, false);
+        addOption("l", "skip-invalid-lines", null, SKIP_INVALID_LINES_PROPERTY, "Optionally skip invalid lines", false, false);
         addOption("r", "truncate-target", null, TRUNCATE_PROPERTY, "Optionally truncate target table just before the loading the new data", false, false);
         addOption("b", "pre-split-bits", "bits", SPLIT_BITS_PROPERTY, "Optionally specify bit depth of region pre-splits for a case when target table does not exist (default is 3)", false, true);
         addOption("g", "default-named-graph", "named_graph", DEFAULT_CONTEXT_PROPERTY, "Optionally specify default target named graph", false, true);
@@ -679,6 +686,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         String target = cmd.getOptionValue('t');
         configureBoolean(cmd, 'i');
         configureBoolean(cmd, 'd');
+        configureBoolean(cmd, 'l');
         configureBoolean(cmd, 'r');
         configureInt(cmd, 'b', DEFAULT_SPLIT_BITS);
         configureIRIPattern(cmd, 'g', null);

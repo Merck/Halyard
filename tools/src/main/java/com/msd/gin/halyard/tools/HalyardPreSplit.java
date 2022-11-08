@@ -191,7 +191,8 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         );
         addOption("s", "source", "source_paths", SOURCE_PATHS_PROPERTY, "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, optional HBase namespace of the target table must already exist", true, true);
-        addOption("i", "allow-invalid", null, SKIP_INVALID_PROPERTY, "Optionally allow invalid IRI values (less overhead)", false, false);
+        addOption("i", "allow-invalid-iris", null, ALLOW_INVALID_IRIS_PROPERTY, "Optionally allow invalid IRI values (less overhead)", false, false);
+        addOption("l", "skip-invalid-lines", null, SKIP_INVALID_LINES_PROPERTY, "Optionally skip invalid lines", false, false);
         addOption("g", "default-named-graph", "named_graph", DEFAULT_CONTEXT_PROPERTY, "Optionally specify default target named graph", false, true);
         addOption("o", "named-graph-override", null, OVERRIDE_CONTEXT_PROPERTY, "Optionally override named graph also for quads, named graph is stripped from quads if --default-named-graph option is not specified", false, false);
         addOption("d", "decimation-factor", "decimation_factor", DECIMATION_FACTOR_PROPERTY, String.format("Optionally overide pre-split random decimation factor (default is %d)", DEFAULT_DECIMATION_FACTOR), false, true);
@@ -216,6 +217,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 	        }
         }
         configureBoolean(cmd, 'i');
+        configureBoolean(cmd, 'l');
         configureIRIPattern(cmd, 'g', null);
         configureBoolean(cmd, 'o');
         configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
