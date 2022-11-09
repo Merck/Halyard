@@ -923,8 +923,8 @@ public class HBaseSailConnection extends AbstractSailConnection implements Exten
 			}
 			Throwable e = exception;
 			if (e != null) {
-				if (e instanceof RuntimeException) {
-					throw (RuntimeException) e;
+				if (e instanceof QueryEvaluationException) {
+					throw (QueryEvaluationException) e;
 				} else {
 					throw new QueryEvaluationException(e);
 				}

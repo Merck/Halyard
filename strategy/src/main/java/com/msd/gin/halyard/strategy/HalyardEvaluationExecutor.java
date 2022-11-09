@@ -558,8 +558,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     					bs = queue.poll(pollTimeoutMillis, TimeUnit.MILLISECONDS);
     					Throwable thr = exception;
     					if (thr != null) {
-	    					if (thr instanceof RuntimeException) {
-	    						throw (RuntimeException) thr;
+	    					if (thr instanceof QueryEvaluationException) {
+	    						throw (QueryEvaluationException) thr;
 	    					} else {
 	                        	throw new QueryEvaluationException(thr);
 	                        }
