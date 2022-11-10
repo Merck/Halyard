@@ -20,9 +20,9 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.ServiceRoot;
+import com.msd.gin.halyard.util.RateTracker;
 
 import java.lang.management.ManagementFactory;
-import java.util.ArrayDeque;
 import java.util.Hashtable;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -82,7 +82,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     // a map of query model nodes and their priority
     private final Cache<QueryModelNode, Integer> priorityMapCache = CacheBuilder.newBuilder().weakKeys().build();
 
-    private volatile float taskRate;
+    private final RateTracker taskRateTracker;
 
     private int threads;
     private int maxRetries;
@@ -136,25 +136,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
 		int taskRateUpdateMillis = conf.getInt(StrategyConfig.HALYARD_EVALUATION_TASK_RATE_UPDATE_MILLIS, 100);
 		int taskRateWindowSize = conf.getInt(StrategyConfig.HALYARD_EVALUATION_TASK_RATE_WINDOW_SIZE, 10);
-		TIMER.schedule(new TimerTask() {
-			final float taskRateWindowDuration = taskRateUpdateMillis*taskRateWindowSize;
-			final ArrayDeque<Integer> samples = new ArrayDeque<>(taskRateWindowSize);
-			long previousTaskCount;
-			int windowTaskCount;
-			@Override
-			public void run() {
-				long completedTaskCount = executor.getCompletedTaskCount();
-				int newest = (int) (completedTaskCount - previousTaskCount);
-				previousTaskCount = completedTaskCount;
-				if (samples.size() == taskRateWindowSize) {
-					int oldest = samples.removeFirst();
-					windowTaskCount -= oldest;
-				}
-				samples.addLast(newest);
-				windowTaskCount += newest;
-				taskRate = windowTaskCount/taskRateWindowDuration;
-			}
-		}, 37, taskRateUpdateMillis);
+		taskRateTracker = new RateTracker(TIMER, taskRateUpdateMillis, taskRateWindowSize, () -> executor.getCompletedTaskCount());
+		taskRateTracker.start();
 
 		long threadPoolCheckPeriodSecs = conf.getInt(StrategyConfig.HALYARD_EVALUATION_THREAD_POOL_CHECK_PERIOD_SECS, 5);
 		TIMER.schedule(new TimerTask() {
@@ -173,7 +156,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     				}
     			}
 			}
-		}, 1000, TimeUnit.SECONDS.toMillis(threadPoolCheckPeriodSecs));
+		}, 1000L, TimeUnit.SECONDS.toMillis(threadPoolCheckPeriodSecs));
 
 		MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
 		try {
@@ -225,8 +208,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 	}
 
 	@Override
-	public float getTaskRate() {
-		return taskRate;
+	public float getTaskRatePerSecond() {
+		return taskRateTracker.getRatePerSecond();
 	}
 
 	@Override
@@ -340,12 +323,14 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     	final BindingSet bindingSet;
     	final int queryPriority;
     	final HalyardEvaluationStrategy strategy;
+    	int taskPriority;
 
     	PrioritizedTask(TupleExpr queryNode, BindingSet bs, HalyardEvaluationStrategy strategy) {
     		this.queryNode = queryNode;
     		this.bindingSet = bs;
     		this.queryPriority = getPriorityForNode(queryNode);
     		this.strategy = strategy;
+    		setSubPriority(MIN_SUB_PRIORITY);
     	}
 
     	public final TupleExpr getQueryNode() {
@@ -356,25 +341,23 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     		return bindingSet;
     	}
 
-    	public final int getTaskPriority() {
-    		return 1000*queryPriority + getSubPriority();
-    	}
-
     	/**
-    	 * Task sub-priority.
-    	 * @return MIN_SUB_PRIORITY to MAX_SUB_PRIORITY inclusive
+    	 * Sets this task's sub-priority.
+    	 * @param subPriority MIN_SUB_PRIORITY to MAX_SUB_PRIORITY inclusive
     	 */
-    	protected abstract int getSubPriority();
+    	protected final void setSubPriority(int subPriority) {
+    		taskPriority = 1000*queryPriority + subPriority;
+    	}
 
     	@Override
 		public final int compareTo(PrioritizedTask o) {
     		// descending order
-			return o.getTaskPriority() - this.getTaskPriority();
+			return o.taskPriority - this.taskPriority;
 		}
 
     	@Override
     	public String toString() {
-    		return super.toString() + "[queryNode = " + printQueryNode(queryNode, bindingSet) + ", priority = " + getTaskPriority() + ", strategy = " + strategy + "]";
+    		return super.toString() + "[queryNode = " + printQueryNode(queryNode, bindingSet) + ", priority = " + taskPriority + ", strategy = " + strategy + "]";
     	}
 	}
 
@@ -446,7 +429,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     final class IterateAndPipeTask extends PrioritizedTask {
         private final BindingSetPipe pipe;
         private final Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory;
-        private final AtomicInteger pushPriority = new AtomicInteger();
+        private int pushPriority = MIN_SUB_PRIORITY;
         private CloseableIteration<BindingSet, QueryEvaluationException> iter;
 
         /**
@@ -497,15 +480,13 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 		@Override
     	public void run() {
         	if (pushNext()) {
-        		pushPriority.updateAndGet(count -> (count < MAX_SUB_PRIORITY) ? count+1 : MAX_SUB_PRIORITY);
+        		if (pushPriority < MAX_SUB_PRIORITY) {
+        			pushPriority++;
+        		}
+        		setSubPriority(pushPriority);
                 executor.execute(this);
         	}
     	}
-
-		@Override
-		protected int getSubPriority() {
-			return pushPriority.get();
-		}
     }
 
     final class PipeAndQueueTask extends PrioritizedTask {
@@ -525,11 +506,6 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 			} catch(Throwable e) {
 				pipe.handleException(e);
 			}
-		}
-
-		@Override
-		protected int getSubPriority() {
-			return MIN_SUB_PRIORITY;
 		}
     }
 
@@ -578,18 +554,18 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             }
 
         	private boolean checkThreads(int retries) {
-        		int maxPoolSize = executor.getMaximumPoolSize();
+        		final int maxPoolSize = executor.getMaximumPoolSize();
         		// if we've been consistently blocked and are at full capacity and not making any progress overall
-        		if (retries > maxRetries && executor.getActiveCount() >= maxPoolSize && taskRate == 0.0f) {
+        		if (retries > maxRetries && executor.getActiveCount() >= maxPoolSize && taskRateTracker.getRatePerSecond() == 0.0f) {
         			// then try adding some emergency threads
     				synchronized (executor) {
-    					// check thread pool hasn't been modified already in the meantime
-    					if (maxPoolSize == executor.getMaximumPoolSize()) {
+    					// check thread pool hasn't been modified already in the meantime and still blocked
+    					if (maxPoolSize == executor.getMaximumPoolSize() && executor.getActiveCount() == maxPoolSize && taskRateTracker.getRatePerSecond() == 0.0f) {
     						if (maxPoolSize < maxThreads) {
-    							LOGGER.warn("All {} threads seem to be blocked - adding {} more\n{}", executor.getPoolSize(), threadGain, executor.toString());
-    							maxPoolSize = Math.min(executor.getMaximumPoolSize()+threadGain, maxThreads);
-    							executor.setMaximumPoolSize(maxPoolSize);
-    							executor.setCorePoolSize(Math.min(executor.getCorePoolSize()+threadGain, maxPoolSize));
+    							int newMaxPoolSize = Math.min(maxPoolSize + threadGain, maxThreads);
+    							LOGGER.warn("Queue {}: all {} threads seem to be blocked (taskRate {}) - adding {} more\n{}", Integer.toHexString(queue.hashCode()), executor.getPoolSize(), taskRateTracker.getRatePerSecond(), newMaxPoolSize - maxPoolSize, executor.toString());
+    							executor.setMaximumPoolSize(newMaxPoolSize);
+    							executor.setCorePoolSize(Math.min(executor.getCorePoolSize()+threadGain, newMaxPoolSize));
     						} else {
     							// out of options
     							throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", maxThreads));
@@ -598,7 +574,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
     				}
 					return true;
         		} else if (retries > retryLimit) {
-        			throw new QueryEvaluationException(String.format("Maximum retries exceeded: %d", retries));
+        			// something else is wrong
+        			throw new QueryEvaluationException(String.format("Retry limit exceeded: %d (active threads %d, task rate %f)", retries, executor.getActiveCount(), taskRateTracker.getRatePerSecond()));
         		}
         		return false;
             }
