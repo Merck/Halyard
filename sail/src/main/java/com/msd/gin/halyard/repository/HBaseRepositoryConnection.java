@@ -1,11 +1,10 @@
 package com.msd.gin.halyard.repository;
 
-import com.msd.gin.halyard.common.TimeLimitTupleQueryResultHandler;
+import com.msd.gin.halyard.query.TupleQueryBindingSetPipe;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.MalformedQueryException;
@@ -72,8 +71,9 @@ public class HBaseRepositoryConnection extends SailRepositoryConnection {
 				TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
 				try {
 					HBaseSailConnection sailCon = (HBaseSailConnection) getConnection().getSailConnection();
-					handler = HBaseRepositoryConnection.enforceMaxQueryTime(handler, getMaxExecutionTime());
-					sailCon.evaluate(handler, tupleExpr, getActiveDataset(), getBindings(), getIncludeInferred());
+					TupleQueryBindingSetPipe pipe = new TupleQueryBindingSetPipe(tupleExpr.getBindingNames(), handler);
+					sailCon.evaluate(pipe, tupleExpr, getActiveDataset(), getBindings(), getIncludeInferred());
+					pipe.waitUntilClosed(getMaxExecutionTime());
 				} catch (SailException e) {
 					throw new QueryEvaluationException(e.getMessage(), e);
 				}
@@ -104,17 +104,5 @@ public class HBaseRepositoryConnection extends SailRepositoryConnection {
 		SailUpdate update = new HBaseUpdate(parsedUpdate, sail, this);
 		addImplicitBindings(update);
 		return update;
-	}
-
-	private static TupleQueryResultHandler enforceMaxQueryTime(TupleQueryResultHandler handler, int maxTimeSecs) {
-		if (maxTimeSecs > 0) {
-			handler = new TimeLimitTupleQueryResultHandler(handler, TimeUnit.SECONDS.toMillis(maxTimeSecs)) {
-				@Override
-				protected void throwInterruptedException() {
-					throw new TupleQueryResultHandlerException("Query evaluation took too long");
-				}
-			};
-		}
-		return handler;
 	}
 }

@@ -2,9 +2,9 @@ package com.msd.gin.halyard.repository;
 
 import com.google.common.base.Stopwatch;
 import com.msd.gin.halyard.algebra.Algebra;
-import com.msd.gin.halyard.common.TimeLimitTupleQueryResultHandler;
+import com.msd.gin.halyard.query.BindingSetPipe;
 import com.msd.gin.halyard.query.EmptyTripleSource;
-import com.msd.gin.halyard.query.TupleQueryResultHandlerWrapper;
+import com.msd.gin.halyard.query.TupleQueryBindingSetPipe;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 import com.msd.gin.halyard.sail.TimestampedUpdateContext;
@@ -177,7 +177,9 @@ public class HBaseUpdate extends SailUpdate {
 						}
 					}
 				};
-				evaluateWhereClause(handler, whereClause, uc, maxExecutionTime);
+				TupleQueryBindingSetPipe pipe = new TupleQueryBindingSetPipe(whereClause.getBindingNames(), handler);
+				evaluateWhereClause(pipe, whereClause, uc);
+				pipe.waitUntilClosed(maxExecutionTime);
 			} catch (QueryEvaluationException e) {
 				throw new SailException(e);
 			}
@@ -208,17 +210,17 @@ public class HBaseUpdate extends SailUpdate {
 			return tupleExpr;
 		}
 
-		private void evaluateWhereClause(TupleQueryResultHandler handler, final TupleExpr whereClause, final UpdateContext uc, final int maxExecutionTime) throws SailException {
-			handler = new TupleQueryResultHandlerWrapper(handler) {
+		private void evaluateWhereClause(BindingSetPipe handler, final TupleExpr whereClause, final UpdateContext uc) {
+			handler = new BindingSetPipe(handler) {
 				private final boolean isEmptyWhere = Algebra.isEmpty(whereClause);
 				private final BindingSet ucBinding = uc.getBindingSet();
 				@Override
-				public void handleSolution(BindingSet sourceBinding) throws TupleQueryResultHandlerException {
+				protected boolean next(BindingSet sourceBinding) {
 					if (isEmptyWhere && sourceBinding.isEmpty() && ucBinding != null) {
 						// in the case of an empty WHERE clause, we use the
 						// supplied
 						// bindings to produce triples to DELETE/INSERT
-						super.handleSolution(ucBinding);
+						return super.next(ucBinding);
 					} else {
 						// check if any supplied bindings do not occur in the
 						// bindingset
@@ -233,22 +235,13 @@ public class HBaseUpdate extends SailUpdate {
 							for (String bindingName : uniqueBindings) {
 								mergedSet.addBinding(ucBinding.getBinding(bindingName));
 							}
-							super.handleSolution(mergedSet);
+							return super.next(mergedSet);
 						} else {
-							super.handleSolution(sourceBinding);
+							return super.next(sourceBinding);
 						}
 					}
 				}
 			};
-			if (maxExecutionTime > 0) {
-				handler = new TimeLimitTupleQueryResultHandler(handler, TimeUnit.SECONDS.toMillis(maxExecutionTime)) {
-					@Override
-					protected void throwInterruptedException() throws TupleQueryResultHandlerException {
-						throw new TupleQueryResultHandlerException("execution took too long");
-					}
-				};
-			}
-
 			con.evaluate(handler, whereClause, uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
 		}
 

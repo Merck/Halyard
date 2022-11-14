@@ -32,6 +32,7 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 	private final Connection hConnection;
 	private final Configuration config;
 	private final String defaultTableName;
+	private final boolean usePush;
 	private final int evaluationTimeout;
 	private final Ticker ticker;
 
@@ -44,13 +45,15 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 	 * @param conn
 	 * @param config
 	 * @param defaultTableName default table name to use (if any) if not specified in SERVICE URL.
+	 * @param push
 	 * @param evaluationTimeout
 	 * @param ticker
 	 */
-	public HBaseFederatedServiceResolver(@Nullable Connection conn, Configuration config, @Nullable String defaultTableName, int evaluationTimeout, @Nullable Ticker ticker) {
+	public HBaseFederatedServiceResolver(@Nullable Connection conn, Configuration config, @Nullable String defaultTableName, boolean usePush, int evaluationTimeout, @Nullable Ticker ticker) {
 		this.hConnection = conn;
 		this.config = config;
 		this.defaultTableName = defaultTableName;
+		this.usePush = usePush;
 		this.evaluationTimeout = evaluationTimeout;
 		this.ticker = ticker;
 	}
@@ -77,7 +80,7 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 			SailFederatedService federatedService;
 			try {
 				federatedService = federatedServices.get(serviceUrl, () -> {
-					HBaseSail sail = new HBaseSail(hConnection, config, federatedTable, false, 0, true, evaluationTimeout, null, ticker, HBaseSailConnection.Factory.INSTANCE, this);
+					HBaseSail sail = new HBaseSail(hConnection, config, federatedTable, false, 0, usePush, evaluationTimeout, null, ticker, HBaseSailConnection.Factory.INSTANCE, this);
 					sail.owner = sail.getFederatedServiceResolverName();
 					HBaseSail.ScanSettings scanSettings = sail.getScanSettings();
 					for (NameValuePair nvp : queryParams) {

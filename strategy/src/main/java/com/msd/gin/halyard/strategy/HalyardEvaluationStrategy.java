@@ -19,6 +19,8 @@ package com.msd.gin.halyard.strategy;
 import com.google.common.base.Stopwatch;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
+import com.msd.gin.halyard.query.BindingSetPipe;
+import com.msd.gin.halyard.query.BindingSetPipeQueryEvaluationStep;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -190,8 +192,8 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 
     @Override
     public QueryEvaluationStep precompile(TupleExpr expr) {
-    	QueryBindingSetPipeEvaluationStep step = tupleEval.precompile(expr);
-    	return new QueryBindingSetPipeEvaluationStep() {
+    	BindingSetPipeQueryEvaluationStep step = tupleEval.precompile(expr);
+    	return new BindingSetPipeQueryEvaluationStep() {
 			@Override
 			public void evaluate(BindingSetPipe parent, BindingSet bindings) {
 				step.evaluate(parent, bindings);

@@ -7,8 +7,6 @@
  *******************************************************************************/
 package com.msd.gin.halyard.sail.connection;
 
-import com.msd.gin.halyard.sail.ExtendedSailConnection;
-
 import java.util.ArrayList;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
@@ -24,6 +22,9 @@ import org.eclipse.rdf4j.query.impl.IteratingTupleQueryResult;
 import org.eclipse.rdf4j.query.parser.ParsedTupleQuery;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
+
+import com.msd.gin.halyard.query.TupleQueryBindingSetPipe;
+import com.msd.gin.halyard.sail.BindingSetPipeSailConnection;
 
 /**
  * @author Arjohn Kampman
@@ -61,9 +62,11 @@ public class SailConnectionTupleQuery extends SailConnectionQuery implements Tup
 	public void evaluate(TupleQueryResultHandler handler)
 			throws QueryEvaluationException, TupleQueryResultHandlerException {
 		SailConnection sailCon = getSailConnection();
-		if (sailCon instanceof ExtendedSailConnection) {
+		if (sailCon instanceof BindingSetPipeSailConnection) {
 			TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
-			((ExtendedSailConnection) sailCon).evaluate(handler, tupleExpr, getActiveDataset(), getBindings(), getIncludeInferred());
+			TupleQueryBindingSetPipe pipe = new TupleQueryBindingSetPipe(tupleExpr.getBindingNames(), handler);
+			((BindingSetPipeSailConnection) sailCon).evaluate(pipe, tupleExpr, getActiveDataset(), getBindings(), getIncludeInferred());
+			pipe.waitUntilClosed(getMaxExecutionTime());
 		} else {
 			TupleQueryResult queryResult = evaluate();
 			QueryResults.report(queryResult, handler);

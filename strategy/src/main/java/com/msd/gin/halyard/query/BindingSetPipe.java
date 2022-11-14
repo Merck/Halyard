@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.msd.gin.halyard.strategy;
+package com.msd.gin.halyard.query;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -48,10 +48,8 @@ public abstract class BindingSetPipe {
      *
      * @param bs BindingSet
      * @return boolean indicating if more data are expected from the caller
-     * @throws InterruptedException
-     * @throws QueryEvaluationException
      */
-    public final boolean push(BindingSet bs) throws InterruptedException {
+    public final boolean push(BindingSet bs) {
     	if (!closed.get()) {
         	return next(bs);
     	} else {
@@ -59,7 +57,7 @@ public abstract class BindingSetPipe {
     	}
     }
 
-    protected boolean next(BindingSet bs) throws InterruptedException {
+    protected boolean next(BindingSet bs) {
     	if (parent != null) {
     		return parent.push(bs);
     	} else {
@@ -67,19 +65,19 @@ public abstract class BindingSetPipe {
     	}
     }
 
-    public final void close() throws InterruptedException {
+    public final void close() {
     	if (closed.compareAndSet(false, true)) {
     		doClose();
     	}
     }
 
-    protected void doClose() throws InterruptedException {
+    protected void doClose() {
     	if (parent != null) {
     		parent.close();
     	}
     }
 
-    public final boolean pushLast(BindingSet bs) throws InterruptedException {
+    public final boolean pushLast(BindingSet bs) {
     	if (push(bs)) {
     		// push() returned true indicating more BindingSets are expected
     		// so need to call close() to indicate that there are no more
@@ -88,7 +86,7 @@ public abstract class BindingSetPipe {
     	return false;
     }
 
-    protected boolean handleException(Throwable e) {
+    public boolean handleException(Throwable e) {
         if (parent != null) {
             return parent.handleException(e);
         } else {
@@ -101,10 +99,6 @@ public abstract class BindingSetPipe {
     }
 
     public final void empty() {
-        try {
-            close();
-        } catch (InterruptedException e) {
-            handleException(e);
-        }
+        close();
     }
 }

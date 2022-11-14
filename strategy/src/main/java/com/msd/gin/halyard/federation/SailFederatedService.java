@@ -1,12 +1,11 @@
 package com.msd.gin.halyard.federation;
 
 import com.msd.gin.halyard.algebra.ServiceRoot;
-import com.msd.gin.halyard.query.TupleQueryResultHandlerWrapper;
-import com.msd.gin.halyard.sail.ExtendedSailConnection;
+import com.msd.gin.halyard.query.BindingSetPipe;
+import com.msd.gin.halyard.sail.BindingSetPipeSailConnection;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -16,8 +15,6 @@ import org.eclipse.rdf4j.common.iteration.SilentIteration;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.TupleQueryResultHandler;
-import org.eclipse.rdf4j.query.TupleQueryResultHandlerException;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.repository.sparql.federation.JoinExecutorBase;
@@ -25,7 +22,7 @@ import org.eclipse.rdf4j.repository.sparql.query.InsertBindingSetCursor;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 
-public class SailFederatedService implements ExtendedFederatedService {
+public class SailFederatedService implements BindingSetPipeFederatedService {
 	private final Sail sail;
 	private boolean initialized;
 
@@ -67,31 +64,25 @@ public class SailFederatedService implements ExtendedFederatedService {
 	@Override
 	public CloseableIteration<BindingSet, QueryEvaluationException> select(Service service, Set<String> projectionVars,
 			BindingSet bindings, String baseUri) throws QueryEvaluationException {
-		try (SailConnection conn = sail.getConnection()) {
-			CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = conn.evaluate(ServiceRoot.create(service), null, bindings, true);
-			CloseableIteration<BindingSet, QueryEvaluationException> result = new InsertBindingSetCursor((CloseableIteration<BindingSet, QueryEvaluationException>) iter, bindings);
-			if (service.isSilent()) {
-				return new SilentIteration<>(result);
-			} else {
-				return result;
-			}
+		SailConnection conn = sail.getConnection();
+		CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = conn.evaluate(ServiceRoot.create(service), null, bindings, true);
+		CloseableIteration<BindingSet, QueryEvaluationException> result = new InsertBindingSetCursor((CloseableIteration<BindingSet, QueryEvaluationException>) iter, bindings);
+		result = new CloseConnectionIteration(result, conn);
+		if (service.isSilent()) {
+			result = new SilentIteration<>(result);
 		}
+		return result;
 	}
 
 	@Override
-	public void select(TupleQueryResultHandler handler, Service service, Set<String> projectionVars, BindingSet bindings, String baseUri) throws QueryEvaluationException {
+	public void select(BindingSetPipe handler, Service service, Set<String> projectionVars, BindingSet bindings, String baseUri) throws QueryEvaluationException {
 		try (SailConnection conn = sail.getConnection()) {
-			if (conn instanceof ExtendedSailConnection) {
-				((ExtendedSailConnection) conn).evaluate(new InsertBindingSetTupleQueryResultHandler(handler, bindings), ServiceRoot.create(service), null, bindings, true);
+			if (conn instanceof BindingSetPipeSailConnection) {
+				((BindingSetPipeSailConnection) conn).evaluate(new InsertBindingSetPipe(handler, bindings), ServiceRoot.create(service), null, bindings, true);
 			} else {
-				CloseableIteration<? extends BindingSet, QueryEvaluationException> iter = conn.evaluate(ServiceRoot.create(service), null, bindings, true);
-				CloseableIteration<BindingSet, QueryEvaluationException> result = new InsertBindingSetCursor((CloseableIteration<BindingSet, QueryEvaluationException>) iter, bindings);
-				if (service.isSilent()) {
-					result = new SilentIteration<>(result);
+				try (CloseableIteration<BindingSet, QueryEvaluationException> result = select(service, projectionVars, bindings, baseUri)) {
+					BindingSetPipeSailConnection.report(result, handler);
 				}
-				Set<String> bindingNames = new HashSet<>(service.getBindingNames());
-				bindingNames.addAll(bindings.getBindingNames());
-				ExtendedSailConnection.report(bindingNames, result, handler);
 			}
 		}
 	}
@@ -110,12 +101,10 @@ public class SailFederatedService implements ExtendedFederatedService {
 		}
 
 		CloseableIteration<BindingSet, QueryEvaluationException> result = new SimpleServiceIteration(service, allBindings, baseUri);
-
 		if (service.isSilent()) {
-			return new SilentIteration<>(result);
-		} else {
-			return result;
+			result = new SilentIteration<>(result);
 		}
+		return result;
 	}
 
 
@@ -143,31 +132,58 @@ public class SailFederatedService implements ExtendedFederatedService {
 	}
 
 
-	private static class InsertBindingSetTupleQueryResultHandler extends TupleQueryResultHandlerWrapper {
+	private static class CloseConnectionIteration implements CloseableIteration<BindingSet, QueryEvaluationException> {
+		private final CloseableIteration<BindingSet, QueryEvaluationException> delegate;
+		private final SailConnection conn;
+
+		CloseConnectionIteration(CloseableIteration<BindingSet, QueryEvaluationException> delegate, SailConnection conn) {
+			this.delegate = delegate;
+			this.conn = conn;
+		}
+
+		@Override
+		public boolean hasNext() throws QueryEvaluationException {
+			return delegate.hasNext();
+		}
+
+		@Override
+		public BindingSet next() throws QueryEvaluationException {
+			return delegate.next();
+		}
+
+		@Override
+		public void remove() throws QueryEvaluationException {
+			delegate.remove();
+		}
+
+		@Override
+		public void close() throws QueryEvaluationException {
+			try {
+				delegate.close();
+			} finally {
+				conn.close();
+			}
+		}
+	}
+
+
+	private static class InsertBindingSetPipe extends BindingSetPipe {
 		private final BindingSet bindingSet;
 
-		InsertBindingSetTupleQueryResultHandler(TupleQueryResultHandler delegate, BindingSet bs) {
-			super(delegate);
+		InsertBindingSetPipe(BindingSetPipe parent, BindingSet bs) {
+			super(parent);
 			this.bindingSet = bs;
 		}
 
 		@Override
-		public void startQueryResult(List<String> bindingNames) throws TupleQueryResultHandlerException {
-			// preserve order!!!
-			LinkedHashSet<String> allBindingNames = new LinkedHashSet<>(bindingNames);
-			allBindingNames.addAll(bindingSet.getBindingNames());
-			super.startQueryResult(new ArrayList<>(allBindingNames));
-		}
-
-		@Override
-		public void handleSolution(BindingSet next) throws TupleQueryResultHandlerException {
-			int size = bindingSet.size() + next.size();
-			QueryBindingSet set = new QueryBindingSet(size);
-			set.addAll(bindingSet);
-			for (Binding binding : next) {
-				set.setBinding(binding);
+		protected boolean next(BindingSet bs) {
+			int size = bindingSet.size() + bs.size();
+			QueryBindingSet combined = new QueryBindingSet(size);
+			combined.addAll(bindingSet);
+			for (Binding binding : bs) {
+				combined.setBinding(binding);
 			}
-			super.handleSolution(set);
+			return super.next(combined);
 		}
 	}
 }

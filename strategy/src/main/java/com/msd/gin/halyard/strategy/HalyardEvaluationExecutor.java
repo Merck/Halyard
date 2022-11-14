@@ -20,6 +20,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.ServiceRoot;
+import com.msd.gin.halyard.query.BindingSetPipe;
 import com.msd.gin.halyard.util.RateTracker;
 
 import java.lang.management.ManagementFactory;
@@ -583,10 +584,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             @Override
             protected void handleClose() throws QueryEvaluationException {
                 super.handleClose();
-                try {
-                	pipe.close();
-                } catch (InterruptedException ignore) {
-                }
+               	pipe.close();
             }
 
             @Override
@@ -612,26 +610,31 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             }
 
             @Override
-            protected boolean next(BindingSet bs) throws InterruptedException {
-                return addToQueue(bs);
+            protected boolean next(BindingSet bs) {
+                try {
+					return addToQueue(bs);
+				} catch (InterruptedException e) {
+					return handleException(e);
+				}
             }
 
             @Override
-            protected void doClose() throws InterruptedException {
-        		addToQueue(END_OF_QUEUE);
+            protected void doClose() {
+        		try {
+					addToQueue(END_OF_QUEUE);
+				} catch (InterruptedException e) {
+					handleException(e);
+				}
             }
 
             @Override
-            protected boolean handleException(Throwable e) {
+            public boolean handleException(Throwable e) {
                 Throwable lastEx = exception;
                 if (lastEx != null) {
                 	e.addSuppressed(lastEx);
                 }
                 exception = e;
-                try {
-                	close();
-                } catch (InterruptedException ignore) {
-                }
+               	close();
                 return false;
             }
 

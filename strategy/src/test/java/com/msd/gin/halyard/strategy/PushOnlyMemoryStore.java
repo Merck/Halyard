@@ -1,12 +1,12 @@
 package com.msd.gin.halyard.strategy;
 
-import com.msd.gin.halyard.sail.ExtendedSailConnection;
+import com.msd.gin.halyard.query.BindingSetPipe;
+import com.msd.gin.halyard.sail.BindingSetPipeSailConnection;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.TupleQueryResultHandler;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.sail.NotifyingSailConnection;
 import org.eclipse.rdf4j.sail.SailException;
@@ -20,7 +20,7 @@ public class PushOnlyMemoryStore extends MemoryStore {
         return new PushOnlySailConnection(super.getConnectionInternal());
     }
 
-	static final class PushOnlySailConnection extends NotifyingSailConnectionWrapper implements ExtendedSailConnection {
+	static final class PushOnlySailConnection extends NotifyingSailConnectionWrapper implements BindingSetPipeSailConnection {
 		protected PushOnlySailConnection(NotifyingSailConnection conn) {
 			super(conn);
 		}
@@ -31,8 +31,8 @@ public class PushOnlyMemoryStore extends MemoryStore {
 		}
 
 		@Override
-		public void evaluate(TupleQueryResultHandler handler, final TupleExpr tupleExpr, final Dataset dataset, final BindingSet bindings, final boolean includeInferred) throws SailException {
-			ExtendedSailConnection.report(tupleExpr.getBindingNames(), getWrappedConnection().evaluate(tupleExpr, dataset, bindings, includeInferred), handler);
+		public void evaluate(BindingSetPipe handler, final TupleExpr tupleExpr, final Dataset dataset, final BindingSet bindings, final boolean includeInferred) {
+			BindingSetPipeSailConnection.report(getWrappedConnection().evaluate(tupleExpr, dataset, bindings, includeInferred), handler);
 		}
 	}
 }

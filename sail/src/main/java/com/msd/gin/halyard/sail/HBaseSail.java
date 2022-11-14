@@ -251,7 +251,8 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	}
 
 	HBaseSail(Configuration config, String snapshotName, String snapshotRestorePath, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings) {
-		this(config, snapshotName, snapshotRestorePath, pushStrategy, evaluationTimeout, elasticSettings, null, HBaseSailConnection.Factory.INSTANCE, new HBaseFederatedServiceResolver(null, config, null, evaluationTimeout, null));
+		this(config, snapshotName, snapshotRestorePath, pushStrategy, evaluationTimeout, elasticSettings, null, HBaseSailConnection.Factory.INSTANCE,
+				new HBaseFederatedServiceResolver(null, config, null, pushStrategy, evaluationTimeout, null));
 	}
 
 	/**
@@ -291,7 +292,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	private HBaseSail(@Nullable Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker,
 			SailConnectionFactory connFactory) {
 		this(conn, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, ticker, connFactory,
-				new HBaseFederatedServiceResolver(conn, config, tableName, evaluationTimeout, null));
+				new HBaseFederatedServiceResolver(conn, config, tableName, pushStrategy, evaluationTimeout, null));
 	}
 
 	public HBaseSail(@Nonnull Connection conn, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker) {

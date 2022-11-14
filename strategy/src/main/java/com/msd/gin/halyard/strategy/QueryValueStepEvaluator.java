@@ -14,6 +14,7 @@ public final class QueryValueStepEvaluator implements Function<BindingSet, Value
 		this.step = step;
 	}
 
+	@Override
 	public Value apply(BindingSet bs) {
 		try {
 			return step.evaluate(bs);
