@@ -167,7 +167,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         try {
         	if ("/_health".equals(path)) {
                 exchange.sendResponseHeaders(HttpURLConnection.HTTP_NO_CONTENT, -1);
-        	} else if ("/_stop".equals(path) && exchange.getRemoteAddress().getAddress().isLoopbackAddress()) {
+        	} else if ("/_stop".equals(path) && exchange.getLocalAddress().getAddress().isLoopbackAddress()) {
                 exchange.sendResponseHeaders(HttpURLConnection.HTTP_NO_CONTENT, -1);
                 doStop = true;
         	} else {
