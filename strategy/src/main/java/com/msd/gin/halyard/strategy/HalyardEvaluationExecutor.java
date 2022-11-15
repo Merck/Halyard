@@ -45,6 +45,7 @@ import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
+import org.eclipse.rdf4j.query.QueryInterruptedException;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
@@ -102,13 +103,13 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 			Hashtable<String,String> attrs = new Hashtable<>();
 			attrs.put("type", HalyardEvaluationExecutor.class.getName());
 			attrs.put("id", Integer.toString(executor.hashCode()));
-			mbs.registerMBean(executor, ObjectName.getInstance("com.msd.gin.halyard", attrs));
+			mbs.registerMBean(executor, ObjectName.getInstance(StrategyConfig.JMX_DOMAIN, attrs));
 		}
 		{
 			Hashtable<String,String> attrs = new Hashtable<>();
 			attrs.put("type", TrackingThreadPoolExecutor.class.getName());
 			attrs.put("id", Integer.toString(executor.executor.hashCode()));
-			mbs.registerMBean(executor.executor, ObjectName.getInstance("com.msd.gin.halyard", attrs));
+			mbs.registerMBean(executor.executor, ObjectName.getInstance(StrategyConfig.JMX_DOMAIN, attrs));
 		}
 	}
 
@@ -125,8 +126,8 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
 	HalyardEvaluationExecutor(Configuration conf) {
 	    threads = conf.getInt(StrategyConfig.HALYARD_EVALUATION_THREADS, 20);
-	    maxRetries = conf.getInt(StrategyConfig.HALYARD_EVALUATION_MAX_RETRIES, 3);
-	    retryLimit = conf.getInt(StrategyConfig.HALYARD_EVALUATION_RETRY_LIMIT, 100);
+	    setMaxRetries(conf.getInt(StrategyConfig.HALYARD_EVALUATION_MAX_RETRIES, 3));
+	    setRetryLimit(conf.getInt(StrategyConfig.HALYARD_EVALUATION_RETRY_LIMIT, 100));
 	    threadGain = conf.getInt(StrategyConfig.HALYARD_EVALUATION_THREAD_GAIN, 5);
 	    maxThreads = conf.getInt(StrategyConfig.HALYARD_EVALUATION_MAX_THREADS, 100);
 		executor = createExecutor("Halyard Executors", "Halyard ", threads);
@@ -549,7 +550,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 						}
                     }
                 } catch (InterruptedException ex) {
-                    throw new QueryEvaluationException(ex);
+                    throw new QueryInterruptedException(ex);
                 }
                 return (bs == END_OF_QUEUE) ? null : bs;
             }
@@ -604,7 +605,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             private boolean addToQueue(BindingSet bs) throws InterruptedException {
             	boolean added = queue.offer(bs, offerTimeoutMillis, TimeUnit.MILLISECONDS);
             	if (!added && !isClosed()) {
-            		handleException(new QueryEvaluationException("Timed-out waiting for client to consume binding sets"));
+            		handleException(new QueryInterruptedException("Timed-out waiting for client to consume binding sets"));
             	}
             	return added;
             }

@@ -2,6 +2,8 @@ package com.msd.gin.halyard.strategy;
 
 import java.lang.Thread.State;
 
+import javax.management.ConstructorParameters;
+
 public interface TrackingThreadPoolExecutorMXBean {
 	int getCorePoolSize();
 	void setCorePoolSize(int size);
@@ -20,6 +22,7 @@ public interface TrackingThreadPoolExecutorMXBean {
 		private final Thread.State state;
 		private final String task;
 
+		@ConstructorParameters({"name", "state", "task"})
 		public ThreadInfo(String name, State state, String task) {
 			this.name = name;
 			this.state = state;
@@ -47,6 +50,7 @@ public interface TrackingThreadPoolExecutorMXBean {
 	public static final class QueueInfo {
 		private final String task;
 
+		@ConstructorParameters({"task"})
 		public QueueInfo(String task) {
 			this.task = task;
 		}

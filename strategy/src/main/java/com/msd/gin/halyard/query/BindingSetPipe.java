@@ -57,6 +57,11 @@ public abstract class BindingSetPipe {
     	}
     }
 
+    /**
+     * 
+     * @param bs BindingSet
+     * @return boolean indicating if more data are expected from the caller
+     */
     protected boolean next(BindingSet bs) {
     	if (parent != null) {
     		return parent.push(bs);
@@ -77,18 +82,16 @@ public abstract class BindingSetPipe {
     	}
     }
 
-    public final boolean pushLast(BindingSet bs) {
-    	if (push(bs)) {
-    		// push() returned true indicating more BindingSets are expected
-    		// so need to call close() to indicate that there are no more
-    		close();
-    	}
-    	return false;
+    public final void pushLast(BindingSet bs) {
+    	push(bs);
+    	close();
     }
 
     public boolean handleException(Throwable e) {
         if (parent != null) {
             return parent.handleException(e);
+        } else if (e instanceof QueryEvaluationException) {
+        	throw (QueryEvaluationException) e;
         } else {
         	throw new QueryEvaluationException(e);
         }

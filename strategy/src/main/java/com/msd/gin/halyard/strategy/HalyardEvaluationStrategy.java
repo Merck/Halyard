@@ -191,7 +191,7 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
     }
 
     @Override
-    public QueryEvaluationStep precompile(TupleExpr expr) {
+    public BindingSetPipeQueryEvaluationStep precompile(TupleExpr expr) {
     	BindingSetPipeQueryEvaluationStep step = tupleEval.precompile(expr);
     	return new BindingSetPipeQueryEvaluationStep() {
 			@Override

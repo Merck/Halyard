@@ -100,7 +100,7 @@ import org.slf4j.LoggerFactory;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 
 public class HBaseSailConnection extends AbstractSailConnection implements BindingSetPipeSailConnection {
-	private static final Logger LOG = LoggerFactory.getLogger(HBaseSailConnection.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(HBaseSailConnection.class);
 
 	public static final String SOURCE_STRING_BINDING = "__source__";
 	public static final String QUERY_CONTEXT_KEYSPACE_ATTRIBUTE = KeyspaceConnection.class.getName();
@@ -204,7 +204,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 	}
 
 	private TupleExpr optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred, TripleSource source, EvaluationStrategy strategy) {
-		LOG.debug("Evaluated TupleExpr before optimizers:\n{}", tupleExpr);
+		LOGGER.debug("Evaluated TupleExpr before optimizers:\n{}", tupleExpr);
 
 		if (cloneTupleExpression) {
 			tupleExpr = tupleExpr.clone();
@@ -220,10 +220,10 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 		}
 		new SearchInterpreter().optimize(tupleExpr, dataset, bindings);
 		new WithinDistanceInterpreter().optimize(tupleExpr, dataset, bindings);
-		LOG.debug("Evaluated TupleExpr after interpretation:\n{}", tupleExpr);
+		LOGGER.trace("Evaluated TupleExpr after interpretation:\n{}", tupleExpr);
 
 		strategy.optimize(tupleExpr, getStatistics(), bindings);
-		LOG.debug("Evaluated TupleExpr after optimization:\n{}", tupleExpr);
+		LOGGER.debug("Evaluated TupleExpr after optimization:\n{}", tupleExpr);
 		return tupleExpr;
 	}
 

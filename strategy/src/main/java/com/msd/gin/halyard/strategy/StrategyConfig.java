@@ -19,4 +19,5 @@ public final class StrategyConfig {
 
 	static final int DEFAULT_HASH_JOIN_LIMIT = 50000;
 	static final int DEFAULT_MEMORY_THRESHOLD = 100000;
+	public static final String JMX_DOMAIN = "com.msd.gin.halyard";
 }

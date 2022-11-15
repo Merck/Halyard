@@ -753,10 +753,14 @@ final class HalyardTupleExprEvaluation {
         } else if (expr instanceof Order) {
         	return precompileOrder((Order) expr);
         } else if (expr instanceof QueryRoot) {
-            parentStrategy.sharedValueOfNow = null;
-            return precompileTupleExpr(((QueryRoot) expr).getArg());
+        	QueryRoot root = (QueryRoot) expr;
+        	BindingSetPipeEvaluationStep step = precompileTupleExpr(root.getArg());
+        	return (parent, bindings) -> {
+                parentStrategy.sharedValueOfNow = null;
+        		step.evaluate(parent, bindings);
+        	};
         } else if (expr instanceof DescribeOperator) {
-        	return (parent, bindings) -> evaluateDescribeOperator(parent, (DescribeOperator) expr, bindings);
+        	return precompileDescribeOperator((DescribeOperator) expr);
         } else if (expr == null) {
             throw new IllegalArgumentException("expr must not be null");
         } else {
@@ -897,14 +901,15 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Evaluate {@link DescribeOperator} query model nodes
-     * @param parent
+     * Precompile {@link DescribeOperator} query model nodes
      * @param operator
-     * @param bindings
      */
-    private void evaluateDescribeOperator(BindingSetPipe parent, DescribeOperator operator, BindingSet bindings) {
-    	executor.pullAndPushAsync(parent, bs -> new DescribeIteration(precompile(operator.getArg()).evaluate(bs), parentStrategy,
+    private BindingSetPipeEvaluationStep precompileDescribeOperator(DescribeOperator operator) {
+		BindingSetPipeQueryEvaluationStep argStep = precompile(operator.getArg());
+		return (parent, bindings) -> {
+			executor.pullAndPushAsync(parent, bs -> new DescribeIteration(argStep.evaluate(bs), parentStrategy,
 				operator.getBindingNames(), bs), operator, bindings, parentStrategy);
+        };
     }
 
 	/**
@@ -1464,17 +1469,24 @@ final class HalyardTupleExprEvaluation {
         final long limit = slice.hasLimit() ? offset + slice.getLimit() : Long.MAX_VALUE;
         BindingSetPipeEvaluationStep step = precompileTupleExpr(slice.getArg());
         return (parent, bindings) -> {
+        	parentStrategy.initTracking(slice);
 	        step.evaluate(new BindingSetPipe(parent) {
-	            private final AtomicLong ll = new AtomicLong(0);
+	            private final AtomicLong counter = new AtomicLong(0);
+	            private final AtomicLong remaining = new AtomicLong(limit-offset);
 	            @Override
 	            protected boolean next(BindingSet bs) {
-	                long l = ll.incrementAndGet();
+	                long l = counter.incrementAndGet();
 	                if (l <= offset) {
 	                    return true;
-	                } else if (l < limit) {
-	                    return parent.push(bs);
-	                } else if (l == limit) {
-	                    return parent.pushLast(bs);
+	                } else if (l <= limit) {
+		            	parentStrategy.incrementResultSizeActual(slice);
+		            	boolean pushMore = parent.push(bs);
+		            	if (remaining.decrementAndGet() == 0) {
+		            		// we're the last one so close
+		            		close();
+		            		pushMore = false;
+		            	}
+		            	return pushMore;
 	                } else {
 	                	return false;
 	                }
@@ -1592,11 +1604,11 @@ final class HalyardTupleExprEvaluation {
         } else if (expr instanceof LeftJoin) {
         	return precompileLeftJoin((LeftJoin) expr);
         } else if (expr instanceof Union) {
-        	return (parent, bindings) -> evaluateUnion(parent, (Union) expr, bindings);
+        	return precompileUnion((Union) expr);
         } else if (expr instanceof Intersection) {
-        	return (parent, bindings) -> evaluateIntersection(parent, (Intersection) expr, bindings);
+        	return precompileIntersection((Intersection) expr);
         } else if (expr instanceof Difference) {
-        	return (parent, bindings) -> evaluateDifference(parent, (Difference) expr, bindings);
+        	return precompileDifference((Difference) expr);
         } else if (expr == null) {
             throw new IllegalArgumentException("expr must not be null");
         } else {
@@ -1642,7 +1654,11 @@ final class HalyardTupleExprEvaluation {
                 	@Override
                 	protected boolean next(BindingSet bs) {
                         parentStrategy.incrementResultSizeActual(join);
-                		return parent.push(bs);
+                		boolean pushMore = parent.push(bs);
+                		if (!pushMore) {
+                			joinsFinished.set(true);
+                		}
+                		return pushMore;
                 	}
                     @Override
     				protected void doClose() {
@@ -1656,7 +1672,7 @@ final class HalyardTupleExprEvaluation {
                     	return "JoinBindingSetPipe(inner)";
                     }
                 }, bs);
-                return true;
+                return !parent.isClosed(); // innerStep is async, check if we've been closed
             }
             @Override
 			protected void doClose() {
@@ -1734,8 +1750,9 @@ final class HalyardTupleExprEvaluation {
                         bs = extendedResult;
                     }
                     return parent.push(bs);
+            	} else {
+            		return true;
             	}
-                return true;
             }
             @Override
             public String toString() {
@@ -1777,7 +1794,11 @@ final class HalyardTupleExprEvaluation {
                     }
                 	private boolean pushToParent(BindingSet bs) {
                 		parentStrategy.incrementResultSizeActual(leftJoin);
-                		return parent.push(bs);
+                		boolean pushMore = parent.push(bs);
+                		if (!pushMore) {
+                			joinsFinished.set(true);
+                		}
+                		return pushMore;
                 	}
                     @Override
     				protected void doClose() {
@@ -1795,7 +1816,7 @@ final class HalyardTupleExprEvaluation {
                     	return "LeftJoinBindingSetPipe(right)";
                     }
                 }, leftBindings);
-                return true;
+                return !parent.isClosed(); // rightStep is async, check if we've been closed
             }
             @Override
 			protected void doClose() {
@@ -1960,7 +1981,6 @@ final class HalyardTupleExprEvaluation {
     	 * Performs a hash-join.
     	 * @param hashTablePartition hash table to join against.
     	 * @param isLast true if this is the last time doJoin() will be called for the current join operation.
-    	 * @throws InterruptedException
     	 */
     	public final void doJoin(HashJoinTable hashTablePartition, boolean isLast) {
     		if (hashTablePartition.entryCount() == 0) {
@@ -1988,7 +2008,11 @@ final class HalyardTupleExprEvaluation {
 			}
 			protected final boolean pushToParent(BindingSet bs) {
         		parentStrategy.incrementResultSizeActual(join);
-        		return parent.push(bs);
+        		boolean pushMore = parent.push(bs);
+        		if (!pushMore) {
+        			joinsFinished.set(true);
+        		}
+        		return pushMore;
         	}
             @Override
 			protected void doClose() {
@@ -2043,7 +2067,7 @@ final class HalyardTupleExprEvaluation {
 						}
 					}
 				}
-				return true;
+				return !parent.isClosed();
 			}
 		    @Override
 		    public String toString() {
@@ -2111,7 +2135,7 @@ final class HalyardTupleExprEvaluation {
 						}
 					}
 				}
-				return true;
+				return !parent.isClosed();
 			}
 		    @Override
 		    public String toString() {
@@ -2171,160 +2195,170 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Evaluate {@link Union} query model nodes.
-     * @param parent
+     * Precompiles {@link Union} query model nodes.
      * @param union
-     * @param bindings
      */
-    private void evaluateUnion(BindingSetPipe parent, Union union, BindingSet bindings) {
-    	parentStrategy.initTracking(union);
-        final AtomicInteger args = new AtomicInteger(2);
-        final class UnionBindingSetPipe extends BindingSetPipe {
-        	UnionBindingSetPipe(BindingSetPipe parent) {
-        		super(parent);
-        	}
-        	@Override
-        	protected boolean next(BindingSet bs) {
-                parentStrategy.incrementResultSizeActual(union);
-        		return parent.push(bs);
-        	}
-            @Override
-			protected void doClose() {
-                if (args.decrementAndGet() == 0) {
-                    parent.close();
-                }
-            }
-            @Override
-            public String toString() {
-            	return "UnionBindingSetPipe";
-            }
-        };
+    private BindingSetPipeEvaluationStep precompileUnion(Union union) {
         BindingSetPipeEvaluationStep leftStep = precompileTupleExpr(union.getLeftArg());
         BindingSetPipeEvaluationStep rightStep = precompileTupleExpr(union.getRightArg());
-        leftStep.evaluate(new UnionBindingSetPipe(parent), bindings);
-        rightStep.evaluate(new UnionBindingSetPipe(parent), bindings);
+        return (parent, bindings) -> {
+        	parentStrategy.initTracking(union);
+            final AtomicInteger args = new AtomicInteger(2);
+            // A pipe can only be closed once, so need separate instances
+	        leftStep.evaluate(new UnionBindingSetPipe(parent, union, args), bindings);
+	        rightStep.evaluate(new UnionBindingSetPipe(parent, union, args), bindings);
+        };
+    }
+
+    final class UnionBindingSetPipe extends BindingSetPipe {
+    	final Union union;
+        final AtomicInteger args;
+    	UnionBindingSetPipe(BindingSetPipe parent, Union union, AtomicInteger args) {
+    		super(parent);
+    		this.union = union;
+    		this.args = args;
+    	}
+    	@Override
+    	protected boolean next(BindingSet bs) {
+            parentStrategy.incrementResultSizeActual(union);
+    		boolean pushMore = parent.push(bs);
+    		if (!pushMore) {
+    			args.set(0);
+    		}
+    		return pushMore;
+    	}
+        @Override
+		protected void doClose() {
+            if (args.decrementAndGet() == 0) {
+                parent.close();
+            }
+        }
+        @Override
+        public String toString() {
+        	return "UnionBindingSetPipe";
+        }
     }
 
     /**
-     * Evaluate {@link Intersection} query model nodes
-     * @param topPipe
+     * Precompiles {@link Intersection} query model nodes
      * @param intersection
-     * @param bindings
      */
-    private void evaluateIntersection(final BindingSetPipe topPipe, final Intersection intersection, final BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileIntersection(final Intersection intersection) {
         BindingSetPipeEvaluationStep rightStep = precompileTupleExpr(intersection.getRightArg());
         BindingSetPipeEvaluationStep leftStep = precompileTupleExpr(intersection.getLeftArg());
-        rightStep.evaluate(new BindingSetPipe(topPipe) {
-            private final BigHashSet<BindingSet> secondSet = BigHashSet.create(collectionMemoryThreshold);
-            @Override
-            public boolean handleException(Throwable e) {
-                secondSet.close();
-                return parent.handleException(e);
-            }
-            @Override
-            protected boolean next(BindingSet bs) {
-                try {
-                    secondSet.add(bs);
-                    return true;
-                } catch (IOException e) {
-                    return handleException(e);
-                }
-            }
-            @Override
-			protected void doClose() {
-                leftStep.evaluate(new BindingSetPipe(parent) {
-                    @Override
-                    protected boolean next(BindingSet bs) {
-                        try {
-                            return secondSet.contains(bs) ? parent.push(bs) : true;
-                        } catch (IOException e) {
-                            return handleException(e);
-                        }
-                    }
-                    @Override
-    				protected void doClose() {
-                        secondSet.close();
-                        parent.close();
-                    }
-                    @Override
-                    public String toString() {
-                    	return "IntersectionBindingSetPipe(left)";
-                    }
-                }, bindings);
-            }
-            @Override
-            public String toString() {
-            	return "IntersectionBindingSetPipe(right)";
-            }
-        }, bindings);
+        return (topPipe, bindings) -> {
+	        rightStep.evaluate(new BindingSetPipe(topPipe) {
+	            private final BigHashSet<BindingSet> secondSet = BigHashSet.create(collectionMemoryThreshold);
+	            @Override
+	            public boolean handleException(Throwable e) {
+	                secondSet.close();
+	                return parent.handleException(e);
+	            }
+	            @Override
+	            protected boolean next(BindingSet bs) {
+	                try {
+	                    secondSet.add(bs);
+	                    return true;
+	                } catch (IOException e) {
+	                    return handleException(e);
+	                }
+	            }
+	            @Override
+				protected void doClose() {
+	                leftStep.evaluate(new BindingSetPipe(parent) {
+	                    @Override
+	                    protected boolean next(BindingSet bs) {
+	                        try {
+	                            return secondSet.contains(bs) ? parent.push(bs) : true;
+	                        } catch (IOException e) {
+	                            return handleException(e);
+	                        }
+	                    }
+	                    @Override
+	    				protected void doClose() {
+	                        secondSet.close();
+	                        parent.close();
+	                    }
+	                    @Override
+	                    public String toString() {
+	                    	return "IntersectionBindingSetPipe(left)";
+	                    }
+	                }, bindings);
+	            }
+	            @Override
+	            public String toString() {
+	            	return "IntersectionBindingSetPipe(right)";
+	            }
+	        }, bindings);
+        };
     }
 
     /**
-     * Evaluate {@link Difference} query model nodes
-     * @param topPipe
+     * Precompiles {@link Difference} query model nodes
      * @param difference
-     * @param bindings
      */
-    private void evaluateDifference(final BindingSetPipe topPipe, final Difference difference, final BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileDifference(final Difference difference) {
         BindingSetPipeEvaluationStep rightStep = precompileTupleExpr(difference.getRightArg());
         BindingSetPipeEvaluationStep leftStep = precompileTupleExpr(difference.getLeftArg());
-        rightStep.evaluate(new BindingSetPipe(topPipe) {
-            private final BigHashSet<BindingSet> excludeSet = BigHashSet.create(collectionMemoryThreshold);
-            @Override
-            public boolean handleException(Throwable e) {
-                excludeSet.close();
-                return parent.handleException(e);
-            }
-            @Override
-            protected boolean next(BindingSet bs) {
-                try {
-                    excludeSet.add(bs);
-                    return true;
-                } catch (IOException e) {
-                    return handleException(e);
-                }
-            }
-            @Override
-			protected void doClose() {
-                leftStep.evaluate(new BindingSetPipe(parent) {
-                    @Override
-                    protected boolean next(BindingSet bs) {
-                        for (BindingSet excluded : excludeSet) {
-                            // build set of shared variable names
-                            Set<String> sharedBindingNames = new HashSet<>(excluded.getBindingNames());
-                            sharedBindingNames.retainAll(bs.getBindingNames());
-                            // two bindingsets that share no variables are compatible by
-                            // definition, however, the formal
-                            // definition of SPARQL MINUS indicates that such disjoint sets should
-                            // be filtered out.
-                            // See http://www.w3.org/TR/sparql11-query/#sparqlAlgebra
-                            if (!sharedBindingNames.isEmpty()) {
-                                if (QueryResults.bindingSetsCompatible(excluded, bs)) {
-                                    // at least one compatible bindingset has been found in the
-                                    // exclude set, therefore the object is compatible, therefore it
-                                    // should not be accepted.
-                                    return true;
-                                }
-                            }
-                        }
-                        return parent.push(bs);
-                    }
-                    @Override
-    				protected void doClose() {
-                        excludeSet.close();
-                        parent.close();
-                    }
-                    @Override
-                    public String toString() {
-                    	return "DifferenceBindingSetPipe(left)";
-                    }
-                }, bindings);
-            }
-            @Override
-            public String toString() {
-            	return "DifferenceBindingSetPipe(right)";
-            }
-        }, bindings);
+        return (topPipe, bindings) -> {
+	        rightStep.evaluate(new BindingSetPipe(topPipe) {
+	            private final BigHashSet<BindingSet> excludeSet = BigHashSet.create(collectionMemoryThreshold);
+	            @Override
+	            public boolean handleException(Throwable e) {
+	                excludeSet.close();
+	                return parent.handleException(e);
+	            }
+	            @Override
+	            protected boolean next(BindingSet bs) {
+	                try {
+	                    excludeSet.add(bs);
+	                    return true;
+	                } catch (IOException e) {
+	                    return handleException(e);
+	                }
+	            }
+	            @Override
+				protected void doClose() {
+	                leftStep.evaluate(new BindingSetPipe(parent) {
+	                    @Override
+	                    protected boolean next(BindingSet bs) {
+	                        for (BindingSet excluded : excludeSet) {
+	                            // build set of shared variable names
+	                            Set<String> sharedBindingNames = new HashSet<>(excluded.getBindingNames());
+	                            sharedBindingNames.retainAll(bs.getBindingNames());
+	                            // two bindingsets that share no variables are compatible by
+	                            // definition, however, the formal
+	                            // definition of SPARQL MINUS indicates that such disjoint sets should
+	                            // be filtered out.
+	                            // See http://www.w3.org/TR/sparql11-query/#sparqlAlgebra
+	                            if (!sharedBindingNames.isEmpty()) {
+	                                if (QueryResults.bindingSetsCompatible(excluded, bs)) {
+	                                    // at least one compatible bindingset has been found in the
+	                                    // exclude set, therefore the object is compatible, therefore it
+	                                    // should not be accepted.
+	                                    return true;
+	                                }
+	                            }
+	                        }
+	                        return parent.push(bs);
+	                    }
+	                    @Override
+	    				protected void doClose() {
+	                        excludeSet.close();
+	                        parent.close();
+	                    }
+	                    @Override
+	                    public String toString() {
+	                    	return "DifferenceBindingSetPipe(left)";
+	                    }
+	                }, bindings);
+	            }
+	            @Override
+	            public String toString() {
+	            	return "DifferenceBindingSetPipe(right)";
+	            }
+	        }, bindings);
+        };
     }
 
     private void evaluateStarJoin(BindingSetPipe parent, StarJoin starJoin, BindingSet bindings) {
@@ -2345,8 +2379,8 @@ final class HalyardTupleExprEvaluation {
     private BindingSetPipeEvaluationStep precompileSingletonSet(SingletonSet singletonSet) {
     	return (parent, bindings) -> {
 			parentStrategy.initTracking(singletonSet);
-            parent.pushLast(bindings);
             parentStrategy.incrementResultSizeActual(singletonSet);
+            parent.pushLast(bindings);
     	};
     }
 

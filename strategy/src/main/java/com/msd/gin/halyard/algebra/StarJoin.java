@@ -34,6 +34,10 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.helpers.collectors.StatementPatternCollector;
 
+/**
+ * Collection of joins (incl. filters) that share a common subject var and context var (if present), e.g. ?s :p1 ?o1; :p2 ?o2; :p3 ?o3.
+ * In some cases, it is faster to evaluate these as ?s ?p ?o then filter the results (?s known at evaluation time).
+ */
 public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	private static final long serialVersionUID = -4523270958311045771L;
 

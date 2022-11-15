@@ -20,12 +20,13 @@ import com.msd.gin.halyard.federation.SailFederatedService;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.optimizers.SimpleStatementPatternCardinalityCalculator;
+import com.msd.gin.halyard.query.BindingSetPipeQueryEvaluationStep;
 
 import java.util.LinkedList;
 
 import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
-import org.eclipse.rdf4j.common.iteration.FilterIteration;
+import org.eclipse.rdf4j.common.iteration.IterationWrapper;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
@@ -36,7 +37,6 @@ import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
-import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.repository.sparql.federation.SPARQLServiceResolver;
@@ -91,7 +91,7 @@ public class MemoryStoreWithHalyardStrategy extends MemoryStore {
         	conf.setFloat(StrategyConfig.HASH_JOIN_COST_RATIO, cardinalityRatio);
         	HalyardEvaluationStrategy evalStrat = new HalyardEvaluationStrategy(conf, new MockTripleSource(tripleSource), dataset, getFederatedServiceResolver(), stats) {
         		@Override
-        		public QueryEvaluationStep precompile(TupleExpr expr) {
+        		public BindingSetPipeQueryEvaluationStep precompile(TupleExpr expr) {
         			queryHistory.add(expr);
         			return super.precompile(expr);
         		}
@@ -115,26 +115,21 @@ public class MemoryStoreWithHalyardStrategy extends MemoryStore {
 
         @Override
         public CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
-            return new FilterIteration<Statement, QueryEvaluationException>(tripleSource.getStatements(subj, pred, obj, contexts)){
-                boolean first = true;
+            return new IterationWrapper<Statement, QueryEvaluationException>(tripleSource.getStatements(subj, pred, obj, contexts)){
+            	final long CONNECTION_DELAY = 20L;
+            	final long NEXT_DELAY = 2L;
+                long delay = CONNECTION_DELAY;
 
                 @Override
                 public boolean hasNext() throws QueryEvaluationException {
-                    if (first) {
-                        // emulate time taken to perform a HBase scan.
-                        first = false;
-                        try {
-                            Thread.sleep(20);
-                        } catch (InterruptedException ex) {
-                            //ignore
-                        }
+                    // emulate time taken to perform a HBase scan.
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ex) {
+                        //ignore
                     }
+                    delay = NEXT_DELAY;
                     return super.hasNext();
-                }
-
-                @Override
-                protected boolean accept(Statement stmt) throws QueryEvaluationException {
-                    return true;
                 }
             };
         }

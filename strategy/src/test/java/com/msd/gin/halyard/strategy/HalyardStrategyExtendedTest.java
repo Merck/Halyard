@@ -267,4 +267,32 @@ public class HalyardStrategyExtendedTest {
 	        assertEquals(1, ((Literal)bs.getValue("o")).intValue());
         }
     }
+
+    @Test
+    public void testJoinEarlyTermination() throws Exception {
+        con.add(getClass().getResource("/testdata-query/dataset-query.trig"));
+    	String q = "PREFIX ex: <http://example.org/> SELECT * { ?s ex:name ?n; ex:hasParent ?p } LIMIT 4";
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertEquals(4, countSlowly(res));
+        }
+    }
+
+    @Test
+    public void testUnionEarlyTermination() throws Exception {
+        con.add(getClass().getResource("/testdata-query/dataset-query.trig"));
+    	String q = "PREFIX ex: <http://example.org/> SELECT ?s { {?s ex:name ?n} UNION {?s ex:hasParent ?p} } LIMIT 4";
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertEquals(4, countSlowly(res));
+        }
+    }
+
+    private int countSlowly(TupleQueryResult res) throws InterruptedException {
+    	int num = 0;
+    	while (res.hasNext()) {
+    		res.next();
+    		num++;
+    		Thread.sleep(100L); // allow time for threads to potentially do more work than is needed
+    	}
+    	return num;
+    }
 }
