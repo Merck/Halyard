@@ -29,6 +29,8 @@ import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.query.BindingSetPipe;
 import com.msd.gin.halyard.query.BindingSetPipeQueryEvaluationStep;
 import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
+import com.msd.gin.halyard.query.ValuePipe;
+import com.msd.gin.halyard.query.ValuePipeQueryValueEvaluationStep;
 import com.msd.gin.halyard.strategy.aggregators.AvgAggregateFunction;
 import com.msd.gin.halyard.strategy.aggregators.AvgCollector;
 import com.msd.gin.halyard.strategy.aggregators.CSVCollector;
@@ -155,6 +157,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.iterator.DescribeIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.PathIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ProjectionIterator;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
+import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtility;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.TupleExprs;
@@ -855,38 +858,39 @@ final class HalyardTupleExprEvaluation {
      */
     private BindingSetPipeEvaluationStep precompileFilter(final Filter filter) {
         BindingSetPipeEvaluationStep argStep = precompileTupleExpr(filter.getArg());
+        ValuePipeQueryValueEvaluationStep conditionStep = parentStrategy.precompile(filter.getCondition(), evalContext);
+        boolean isInSubQuery = isPartOfSubQuery(filter);
         BindingSetPipeEvaluationStep step = (parent, bindings) -> {
-	        argStep.evaluate(new BindingSetPipe(parent) {
+	        argStep.evaluate(new PipeJoin(parent) {
 	            final Set<String> scopeBindingNames = filter.getBindingNames();
 	
 	            @Override
 	            protected boolean next(BindingSet bs) {
-	                try {
-	                    if (accept(bs)) {
-	                        parentStrategy.incrementResultSizeActual(filter);
-	                        return parent.push(bs); //push results that pass the filter.
-	                    } else {
-	                        return true; //nothing passes the filter but processing continues.
-	                    }
-	                } catch (QueryEvaluationException e) {
-	                    return handleException(e);
-	                }
-	            }
-	            private boolean accept(BindingSet bs) throws QueryEvaluationException {
-	                try {
-	                    // Limit the bindings to the ones that are in scope for this filter
-	                    QueryBindingSet scopeBindings = new QueryBindingSet(bs);
-	                    // FIXME J1 scopeBindingNames should include bindings from superquery if the filter
-	                    // is part of a subquery. This is a workaround: we should fix the settings of scopeBindingNames,
-	                    // rather than skipping the limiting of bindings.
-	                    if (!isPartOfSubQuery(filter)) {
-	                        scopeBindings.retainAll(scopeBindingNames);
-	                    }
-	                    return parentStrategy.isTrue(filter.getCondition(), scopeBindings);
-	                } catch (ValueExprEvaluationException e) {
-	                    // failed to evaluate condition
-	                    return false;
-	                }
+                    // Limit the bindings to the ones that are in scope for this filter
+                    QueryBindingSet scopeBindings = new QueryBindingSet(bs);
+                    // FIXME J1 scopeBindingNames should include bindings from superquery if the filter
+                    // is part of a subquery. This is a workaround: we should fix the settings of scopeBindingNames,
+                    // rather than skipping the limiting of bindings.
+                    if (!isInSubQuery) {
+                        scopeBindings.retainAll(scopeBindingNames);
+                    }
+                    startChildPipe();
+	            	conditionStep.evaluate(new ValuePipe(null) {
+	            		@Override
+	            		protected void next(Value v) {
+	            			if (QueryEvaluationUtility.getEffectiveBooleanValue(v).orElse(false)) {
+		                        parentStrategy.incrementResultSizeActual(filter);
+		                        pushToParent(bs);
+	            			}
+	            			endChildPipe();
+	            		}
+	            		@Override
+	            		public void handleValueError(String msg) {
+	            			// ignore - failed to evaluate condition
+	            			endChildPipe();
+	            		}
+	            	}, scopeBindings);
+	            	return !parent.isClosed();
 	            }
 	            @Override
 	            public String toString() {
@@ -1421,34 +1425,55 @@ final class HalyardTupleExprEvaluation {
 	 * @param extension
 	 */
     private BindingSetPipeEvaluationStep precompileExtension(final Extension extension) {
-        BindingSetPipeEvaluationStep step = precompileTupleExpr(extension.getArg());
+        BindingSetPipeEvaluationStep argStep = precompileTupleExpr(extension.getArg());
+        List<ExtensionElem> extElems = extension.getElements();
+        List<org.apache.commons.lang3.tuple.Triple<String,ValuePipeQueryValueEvaluationStep,QueryEvaluationException>> nonAggs = new ArrayList<>(extElems.size());
+        for (ExtensionElem extElem : extElems) {
+        	ValueExpr expr = extElem.getExpr();
+        	if (!(expr instanceof AggregateOperator)) {
+        		ValuePipeQueryValueEvaluationStep elemStep;
+        		QueryEvaluationException ex;
+        		try {
+        			elemStep = parentStrategy.precompile(expr, evalContext);
+        			ex = null;
+        		} catch (QueryEvaluationException e) {
+        			elemStep = null;
+        			ex = e;
+        		}
+        		nonAggs.add(org.apache.commons.lang3.tuple.Triple.of(extElem.getName(), elemStep, ex));
+        	}
+        }
+
         return (parent, bindings) -> {
-	        step.evaluate(new BindingSetPipe(parent) {
+	        argStep.evaluate(new BindingSetPipe(parent) {
 	            @Override
 	            protected boolean next(BindingSet bs) {
 	                QueryBindingSet targetBindings = new QueryBindingSet(bs);
-	                for (ExtensionElem extElem : extension.getElements()) {
-	                    ValueExpr expr = extElem.getExpr();
-	                    if (!(expr instanceof AggregateOperator)) {
-	                        try {
-	                            // we evaluate each extension element over the targetbindings, so that bindings from
-	                            // a previous extension element in this same extension can be used by other extension elements.
-	                            // e.g. if a projection contains (?a + ?b as ?c) (?c * 2 as ?d)
-	                            Value targetValue = parentStrategy.evaluate(extElem.getExpr(), targetBindings);
-	                            if (targetValue != null) {
-	                                // Potentially overwrites bindings from super
-	                                targetBindings.setBinding(extElem.getName(), targetValue);
-	                            }
-	                        } catch (ValueExprEvaluationException e) {
-	                            // silently ignore type errors in extension arguments. They should not cause the
-	                            // query to fail but result in no bindings for this solution
-	                            // see https://www.w3.org/TR/sparql11-query/#assignment
-	                            // use null as place holder for unbound variables that must remain so
-	                            targetBindings.setBinding(extElem.getName(), null);
-	                        } catch (QueryEvaluationException e) {
-	                            return handleException(e);
-	                        }
-	                    }
+	                for (org.apache.commons.lang3.tuple.Triple<String,ValuePipeQueryValueEvaluationStep,QueryEvaluationException> nonAgg : nonAggs) {
+	                	QueryEvaluationException ex = nonAgg.getRight();
+	                	if (ex != null) {
+	                		return handleException(ex);
+	                	}
+                		String extElemName = nonAgg.getLeft();
+                		ValuePipeQueryValueEvaluationStep elemStep = nonAgg.getMiddle();
+                        try {
+                            // we evaluate each extension element over the targetbindings, so that bindings from
+                            // a previous extension element in this same extension can be used by other extension elements.
+                            // e.g. if a projection contains (?a + ?b as ?c) (?c * 2 as ?d)
+                            Value targetValue = elemStep.evaluate(targetBindings);
+                            if (targetValue != null) {
+                                // Potentially overwrites bindings from super
+                                targetBindings.setBinding(extElemName, targetValue);
+                            }
+                        } catch (ValueExprEvaluationException e) {
+                            // silently ignore type errors in extension arguments. They should not cause the
+                            // query to fail but result in no bindings for this solution
+                            // see https://www.w3.org/TR/sparql11-query/#assignment
+                            // use null as place holder for unbound variables that must remain so
+                            targetBindings.setBinding(extElemName, null);
+                        } catch (QueryEvaluationException e) {
+                            return handleException(e);
+                        }
 	                }
 	                return parent.push(targetBindings);
 	            }
@@ -1643,29 +1668,19 @@ final class HalyardTupleExprEvaluation {
         BindingSetPipeEvaluationStep outerStep = precompileTupleExpr(join.getLeftArg());
         BindingSetPipeEvaluationStep innerStep = precompileTupleExpr(join.getRightArg());
     	parentStrategy.initTracking(join);
-        outerStep.evaluate(new BindingSetPipe(topPipe) {
-        	final AtomicLong joinsInProgress = new AtomicLong();
-        	final AtomicBoolean joinsFinished = new AtomicBoolean();
-
+        outerStep.evaluate(new PipeJoin(topPipe) {
             @Override
             protected boolean next(BindingSet bs) {
-            	joinsInProgress.incrementAndGet();
+            	startChildPipe();
                 innerStep.evaluate(new BindingSetPipe(parent) {
                 	@Override
                 	protected boolean next(BindingSet bs) {
                         parentStrategy.incrementResultSizeActual(join);
-                		boolean pushMore = parent.push(bs);
-                		if (!pushMore) {
-                			joinsFinished.set(true);
-                		}
-                		return pushMore;
+                		return pushToParent(bs);
                 	}
                     @Override
     				protected void doClose() {
-                    	joinsInProgress.decrementAndGet();
-                    	if (joinsFinished.get() && joinsInProgress.compareAndSet(0L, -1L)) {
-                    		parent.close();
-                    	}
+                    	endChildPipe();
                     }
                     @Override
                     public String toString() {
@@ -1673,13 +1688,6 @@ final class HalyardTupleExprEvaluation {
                     }
                 }, bs);
                 return !parent.isClosed(); // innerStep is async, check if we've been closed
-            }
-            @Override
-			protected void doClose() {
-            	joinsFinished.set(true);
-            	if(joinsInProgress.compareAndSet(0L, -1L)) {
-            		parent.close();
-            	}
             }
             @Override
             public String toString() {
@@ -1761,19 +1769,17 @@ final class HalyardTupleExprEvaluation {
         };
         BindingSetPipeEvaluationStep leftStep = precompileTupleExpr(leftJoin.getLeftArg());
         BindingSetPipeEvaluationStep rightStep = precompileTupleExpr(leftJoin.getRightArg());
-        leftStep.evaluate(new BindingSetPipe(topPipe) {
-        	final AtomicLong joinsInProgress = new AtomicLong();
-        	final AtomicBoolean joinsFinished = new AtomicBoolean();
-
+        ValuePipeQueryValueEvaluationStep conditionStep = leftJoin.hasCondition() ? parentStrategy.precompile(leftJoin.getCondition(), evalContext) : null;
+        leftStep.evaluate(new PipeJoin(topPipe) {
         	@Override
             protected boolean next(final BindingSet leftBindings) {
-            	joinsInProgress.incrementAndGet();
+        		startChildPipe();
                 rightStep.evaluate(new BindingSetPipe(parent) {
                     private boolean failed = true;
                     @Override
                     protected boolean next(BindingSet rightBindings) {
                     	try {
-                            if (leftJoin.getCondition() == null) {
+                            if (conditionStep == null) {
                                 failed = false;
                                 return pushToParent(rightBindings);
                             } else {
@@ -1781,7 +1787,7 @@ final class HalyardTupleExprEvaluation {
                                 // this filter
                                 QueryBindingSet scopeBindings = new QueryBindingSet(rightBindings);
                                 scopeBindings.retainAll(scopeBindingNames);
-                                if (parentStrategy.isTrue(leftJoin.getCondition(), scopeBindings)) {
+                                if (parentStrategy.isTrue(conditionStep, scopeBindings)) {
                                     failed = false;
                                     return pushToParent(rightBindings);
                                 }
@@ -1792,24 +1798,13 @@ final class HalyardTupleExprEvaluation {
                         }
                         return true;
                     }
-                	private boolean pushToParent(BindingSet bs) {
-                		parentStrategy.incrementResultSizeActual(leftJoin);
-                		boolean pushMore = parent.push(bs);
-                		if (!pushMore) {
-                			joinsFinished.set(true);
-                		}
-                		return pushMore;
-                	}
                     @Override
     				protected void doClose() {
                         if (failed) {
                             // Join failed, return left arg's bindings
                         	pushToParent(leftBindings);
                         }
-                    	joinsInProgress.decrementAndGet();
-                    	if (joinsFinished.get() && joinsInProgress.compareAndSet(0L, -1L)) {
-                    		parent.close();
-                    	}
+                        endChildPipe();
                     }
                     @Override
                     public String toString() {
@@ -1819,12 +1814,10 @@ final class HalyardTupleExprEvaluation {
                 return !parent.isClosed(); // rightStep is async, check if we've been closed
             }
             @Override
-			protected void doClose() {
-            	joinsFinished.set(true);
-            	if(joinsInProgress.compareAndSet(0L, -1L)) {
-            		parent.close();
-            	}
-            }
+        	protected boolean pushToParent(BindingSet bs) {
+        		parentStrategy.incrementResultSizeActual(leftJoin);
+        		return super.pushToParent(bs);
+        	}
             @Override
             public String toString() {
             	return "LeftJoinBindingSetPipe(left)";
@@ -2584,15 +2577,20 @@ final class HalyardTupleExprEvaluation {
 		TupleFunction func = tupleFunctionRegistry.get(tfc.getURI())
 				.orElseThrow(() -> new QueryEvaluationException("Unknown tuple function '" + tfc.getURI() + "'"));
 
+		List<ValueExpr> args = tfc.getArgs();
+		ValuePipeQueryValueEvaluationStep[] argSteps = new ValuePipeQueryValueEvaluationStep[args.size()];
+		for (int i = 0; i < args.size(); i++) {
+			argSteps[i] = parentStrategy.precompile(args.get(i), evalContext);
+		}
+
 		Function<BindingSetPipe,BindingSetPipe> pipeBuilder = parent -> {
 			return new BindingSetPipe(parent) {
 				@Override
 				protected boolean next(BindingSet bs) {
 					try {
-						List<ValueExpr> args = tfc.getArgs();
-						Value[] argValues = new Value[args.size()];
-						for (int i = 0; i < args.size(); i++) {
-							argValues[i] = parentStrategy.evaluate(args.get(i), bs);
+						Value[] argValues = new Value[argSteps.length];
+						for (int i = 0; i < argSteps.length; i++) {
+							argValues[i] = argSteps[i].evaluate(bs);
 						}
 	
 						CloseableIteration<BindingSet, QueryEvaluationException> iter;
@@ -2697,5 +2695,41 @@ final class HalyardTupleExprEvaluation {
         } else {
             return isPartOfSubQuery(parent);
         }
+    }
+
+
+    static abstract class PipeJoin extends BindingSetPipe {
+    	private final AtomicLong inProgress = new AtomicLong();
+    	private final AtomicBoolean finished = new AtomicBoolean();
+
+    	PipeJoin(BindingSetPipe parent) {
+    		super(parent);
+    	}
+
+    	protected final void startChildPipe() {
+    		inProgress.incrementAndGet();
+    	}
+    	protected boolean pushToParent(BindingSet bs) {
+    		boolean more = parent.push(bs);
+    		if (!more) {
+    			finished.set(true);
+    		}
+    		return more;
+    	}
+    	protected final void endChildPipe() {
+    		inProgress.decrementAndGet();
+    		// close if we are the last child and the main pipe has already finished
+    		if (finished.get() && inProgress.compareAndSet(0L, -1L)) {
+    			parent.close();
+    		}
+    	}
+    	@Override
+    	protected final void doClose() {
+    		finished.set(true);
+    		// close if all children have already finished
+    		if (inProgress.compareAndSet(0L, -1L)) {
+    			parent.close();
+    		}
+    	}
     }
 }

@@ -21,6 +21,7 @@ import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.query.BindingSetPipe;
 import com.msd.gin.halyard.query.BindingSetPipeQueryEvaluationStep;
+import com.msd.gin.halyard.query.ValuePipeQueryValueEvaluationStep;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -38,7 +39,6 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
-import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizerPipeline;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryValueEvaluationStep;
@@ -244,7 +244,7 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 	}
 
     @Override
-    public QueryValueEvaluationStep precompile(ValueExpr expr, QueryEvaluationContext context) {
+    public ValuePipeQueryValueEvaluationStep precompile(ValueExpr expr, QueryEvaluationContext context) {
     	return valueEval.precompile(expr);
     }
 
@@ -265,8 +265,8 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
     }
 
 	@Override
-	public boolean isTrue(QueryValueEvaluationStep expr, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-		Value value = expr.evaluate(bindings);
+	public boolean isTrue(QueryValueEvaluationStep step, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
+		Value value = step.evaluate(bindings);
 		return QueryEvaluationUtility.getEffectiveBooleanValue(value).orElse(false);
 	}
 

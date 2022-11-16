@@ -1396,7 +1396,6 @@ public abstract class ComplexSPARQLQueryTest {
 				"          foaf:mbox ?mbox . " +
 				"       FILTER(EXISTS { " +
 				"            FILTER(REGEX(?name, \"Bo\") && REGEX(?mbox, \"bob\")) " +
-				// query.append(" FILTER(REGEX(?mbox, \"bob\")) ");
 				"            } )" +
 				" } ";
 

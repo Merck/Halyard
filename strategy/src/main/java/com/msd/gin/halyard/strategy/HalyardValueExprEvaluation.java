@@ -16,25 +16,45 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.query.BindingSetPipe;
+import com.msd.gin.halyard.query.BindingSetPipeQueryEvaluationStep;
+import com.msd.gin.halyard.query.ValuePipe;
+import com.msd.gin.halyard.query.ValuePipeQueryValueEvaluationStep;
+
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
-import org.eclipse.rdf4j.common.iteration.CloseableIteration;
+import javax.annotation.Nullable;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.common.net.ParsedIRI;
-import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.datatypes.XMLDatatypeUtil;
-import org.eclipse.rdf4j.model.impl.BooleanLiteral;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
+import org.eclipse.rdf4j.query.QueryInterruptedException;
 import org.eclipse.rdf4j.query.algebra.And;
 import org.eclipse.rdf4j.query.algebra.BNodeGenerator;
 import org.eclipse.rdf4j.query.algebra.Bound;
@@ -71,13 +91,12 @@ import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExprTripleRef;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
-import org.eclipse.rdf4j.query.algebra.evaluation.QueryValueEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.Function;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.FunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.datetime.Now;
-import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtil;
+import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtility;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.XMLDatatypeMathUtil;
 
 /**
@@ -87,11 +106,18 @@ import org.eclipse.rdf4j.query.algebra.evaluation.util.XMLDatatypeMathUtil;
  */
 class HalyardValueExprEvaluation {
 
+	private static final Cache<Pair<String,String>,Pattern> REGEX_CACHE = CacheBuilder.newBuilder().concurrencyLevel(1).maximumSize(100).expireAfterAccess(1L, TimeUnit.HOURS).build();
+
     private final HalyardEvaluationStrategy parentStrategy;
 	private final FunctionRegistry functionRegistry;
     private final TripleSource tripleSource;
     private final QueryContext queryContext;
     private final ValueFactory valueFactory;
+    private final Literal TRUE;
+    private final Literal FALSE;
+    private final ValueOrError OK_TRUE;
+    private final ValueOrError OK_FALSE;
+	private int pollTimeoutMillis;
 
 	HalyardValueExprEvaluation(HalyardEvaluationStrategy parentStrategy, QueryContext queryContext, FunctionRegistry functionRegistry,
 			TripleSource tripleSource) {
@@ -100,80 +126,100 @@ class HalyardValueExprEvaluation {
 		this.functionRegistry = functionRegistry;
         this.tripleSource = tripleSource;
         this.valueFactory = tripleSource.getValueFactory();
+        this.TRUE = valueFactory.createLiteral(true);
+        this.FALSE = valueFactory.createLiteral(false);
+        this.OK_TRUE = ValueOrError.ok(TRUE);
+        this.OK_FALSE = ValueOrError.ok(FALSE);
+		Configuration conf = parentStrategy.getConfiguration();
+        this.pollTimeoutMillis = HalyardEvaluationExecutor.getInstance(conf).getQueuePollTimeoutMillis();
     }
 
     /**
      * Precompiles the given {@link ValueExpr}
      */
-	QueryValueEvaluationStep precompile(ValueExpr expr) throws ValueExprEvaluationException, QueryEvaluationException {
+	ValuePipeQueryValueEvaluationStep precompile(ValueExpr expr) throws ValueExprEvaluationException, QueryEvaluationException {
+		ValuePipeEvaluationStep step = precompileValueExpr(expr);
+		return new ValuePipeQueryValueEvaluationStep() {
+			@Override
+			public void evaluate(ValuePipe parent, BindingSet bindings) {
+				step.evaluate(parent, bindings);
+			}
+			@Override
+			public Value evaluate(BindingSet bindings) throws QueryEvaluationException {
+				return get(pipe -> step.evaluate(pipe, bindings));
+			}
+		};
+	}
+
+	private ValuePipeEvaluationStep precompileValueExpr(ValueExpr expr) throws ValueExprEvaluationException, QueryEvaluationException {
         if (expr instanceof Var) {
-            return bindings -> evaluate((Var) expr, bindings);
+            return precompileVar((Var) expr);
         } else if (expr instanceof ValueConstant) {
-            return bindings -> evaluate((ValueConstant) expr, bindings);
+            return precompileValueConstant((ValueConstant) expr);
         } else if (expr instanceof BNodeGenerator) {
-            return bindings -> evaluate((BNodeGenerator) expr, bindings);
+            return precompileBNodeGenerator((BNodeGenerator) expr);
         } else if (expr instanceof Bound) {
-            return bindings -> evaluate((Bound) expr, bindings);
+            return precompileBound((Bound) expr);
         } else if (expr instanceof Str) {
-            return bindings -> evaluate((Str) expr, bindings);
+            return precompileStr((Str) expr);
         } else if (expr instanceof Label) {
-            return bindings -> evaluate((Label) expr, bindings);
+            return precompileLabel((Label) expr);
         } else if (expr instanceof Lang) {
-            return bindings -> evaluate((Lang) expr, bindings);
+            return precompileLang((Lang) expr);
         } else if (expr instanceof LangMatches) {
-            return bindings -> evaluate((LangMatches) expr, bindings);
+            return precompileLangMatches((LangMatches) expr);
         } else if (expr instanceof Datatype) {
-            return bindings -> evaluate((Datatype) expr, bindings);
+            return precompileDatatype((Datatype) expr);
         } else if (expr instanceof Namespace) {
-            return bindings -> evaluate((Namespace) expr, bindings);
+            return precompileNamespace((Namespace) expr);
         } else if (expr instanceof LocalName) {
-            return bindings -> evaluate((LocalName) expr, bindings);
+            return precompileLocalName((LocalName) expr);
         } else if (expr instanceof IsResource) {
-            return bindings -> evaluate((IsResource) expr, bindings);
+            return precompileIsResource((IsResource) expr);
         } else if (expr instanceof IsURI) {
-            return bindings -> evaluate((IsURI) expr, bindings);
+            return precompileIsURI((IsURI) expr);
         } else if (expr instanceof IsBNode) {
-            return bindings -> evaluate((IsBNode) expr, bindings);
+            return precompileIsBNode((IsBNode) expr);
         } else if (expr instanceof IsLiteral) {
-            return bindings -> evaluate((IsLiteral) expr, bindings);
+            return precompileIsLiteral((IsLiteral) expr);
         } else if (expr instanceof IsNumeric) {
-            return bindings -> evaluate((IsNumeric) expr, bindings);
+            return precompileIsNumeric((IsNumeric) expr);
         } else if (expr instanceof IRIFunction) {
-            return bindings -> evaluate((IRIFunction) expr, bindings);
+            return precompileIRIFunction((IRIFunction) expr);
         } else if (expr instanceof Regex) {
-            return bindings -> evaluate((Regex) expr, bindings);
+            return precompileRegex((Regex) expr);
         } else if (expr instanceof Coalesce) {
-            return bindings -> evaluate((Coalesce) expr, bindings);
+            return precompileCoalesce((Coalesce) expr);
         } else if (expr instanceof Like) {
-            return bindings -> evaluate((Like) expr, bindings);
+            return precompileLike((Like) expr);
         } else if (expr instanceof FunctionCall) {
             return precompileFunctionCall((FunctionCall) expr);
         } else if (expr instanceof And) {
-            return bindings -> evaluate((And) expr, bindings);
+            return precompileAnd((And) expr);
         } else if (expr instanceof Or) {
-            return bindings -> evaluate((Or) expr, bindings);
+            return precompileOr((Or) expr);
         } else if (expr instanceof Not) {
-            return bindings -> evaluate((Not) expr, bindings);
+            return precompileNot((Not) expr);
         } else if (expr instanceof SameTerm) {
-            return bindings -> evaluate((SameTerm) expr, bindings);
+            return precompileSameTerm((SameTerm) expr);
         } else if (expr instanceof Compare) {
-            return bindings -> evaluate((Compare) expr, bindings);
+            return precompileCompare((Compare) expr);
         } else if (expr instanceof MathExpr) {
-            return bindings -> evaluate((MathExpr) expr, bindings);
+            return precompileMathExpr((MathExpr) expr);
         } else if (expr instanceof In) {
-            return bindings -> evaluate((In) expr, bindings);
+            return precompileIn((In) expr);
         } else if (expr instanceof CompareAny) {
-            return bindings -> evaluate((CompareAny) expr, bindings);
+            return precompileCompareAny((CompareAny) expr);
         } else if (expr instanceof CompareAll) {
-            return bindings -> evaluate((CompareAll) expr, bindings);
+            return precompileCompareAll((CompareAll) expr);
         } else if (expr instanceof Exists) {
-            return bindings -> evaluate((Exists) expr, bindings);
+            return precompileExists((Exists) expr);
         } else if (expr instanceof If) {
-            return bindings -> evaluate((If) expr, bindings);
+            return precompileIf((If) expr);
         } else if (expr instanceof ListMemberOperator) {
-            return bindings -> evaluate((ListMemberOperator) expr, bindings);
+            return precompileListMemberOperator((ListMemberOperator) expr);
 		} else if (expr instanceof ValueExprTripleRef) {
-			return bindings -> evaluate((ValueExprTripleRef) expr, bindings);
+			return precompileValueExprTripleRef((ValueExprTripleRef) expr );
         } else if (expr == null) {
             throw new IllegalArgumentException("expr must not be null");
         } else {
@@ -181,836 +227,1302 @@ class HalyardValueExprEvaluation {
         }
     }
 
-    /**
-     * Evaluate a {@link Var} query model node.
+	/**
+     * Precompiles a {@link Var} query model node.
      * @param var
-     * @param bindings the set of named value bindings
-     * @return the result of {@link Var#getValue()} from either {@code var}, or if {@code null}, from the {@ bindings}
-     * @throws ValueExprEvaluationException
-     * @throws QueryEvaluationException
      */
-    private Value evaluate(Var var, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
+    private ValuePipeEvaluationStep precompileVar(Var var) throws ValueExprEvaluationException, QueryEvaluationException {
         Value value = var.getValue();
-        if (value == null) {
-            value = bindings.getValue(var.getName());
+        if (value != null) {
+	    	return new ConstantValuePipeEvaluationStep(value);
+        } else {
+	    	return (parent, bindings) -> {
+		        Value bvalue = bindings.getValue(var.getName());
+		        if (bvalue != null) {
+		        	parent.push(bvalue);
+		        } else {
+		            parent.handleValueError(String.format("Var %s has no value (%s)", var.getName(), bindings));
+		        }
+	    	};
         }
-        if (value == null) {
-            throw new ValueExprEvaluationException(String.format("Var %s has no value (%s)", var.getName(), bindings));
-        }
-        return value;
     }
 
     /**
-     * Evaluate a {@link ValueConstant} query model node.
+     * Precompiles a {@link ValueConstant} query model node.
      * @param valueConstant
-     * @param bindings the set of named value bindings
-     * @return the {@link Value} of {@code valueConstant}
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(ValueConstant valueConstant, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        return valueConstant.getValue();
+    private ValuePipeEvaluationStep precompileValueConstant(ValueConstant valueConstant) throws ValueExprEvaluationException, QueryEvaluationException {
+    	return new ConstantValuePipeEvaluationStep(valueConstant.getValue());
     }
 
     /**
-     * Evaluate a {@link BNodeGenerator} node
+     * Precompiles a {@link BNodeGenerator} node
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return the value of the evaluation
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(BNodeGenerator node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
+    private ValuePipeEvaluationStep precompileBNodeGenerator(BNodeGenerator node) throws ValueExprEvaluationException, QueryEvaluationException {
         ValueExpr nodeIdExpr = node.getNodeIdExpr();
         if (nodeIdExpr != null) {
-            Value nodeId = precompile(nodeIdExpr).evaluate(bindings);
-            if (nodeId instanceof Literal) {
-                String nodeLabel = ((Literal) nodeId).getLabel() + (bindings.toString().hashCode());
-                return valueFactory.createBNode(nodeLabel);
-            } else {
-                throw new ValueExprEvaluationException("BNODE function argument must be a literal");
-            }
-        }
-        return valueFactory.createBNode();
-    }
-
-    /**
-     * Evaluate a {@link Bound} node
-     * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return {@link BooleanLiteral#TRUE} if the node can be evaluated or {@link BooleanLiteral#FALSE} if an exception occurs
-     * @throws QueryEvaluationException
-     */
-    private Value evaluate(Bound node, BindingSet bindings) throws QueryEvaluationException {
-        try {
-            evaluate(node.getArg(), bindings);
-            return BooleanLiteral.TRUE;
-        } catch (ValueExprEvaluationException e) {
-            return BooleanLiteral.FALSE;
-        }
-    }
-
-    /**
-     * Evaluate a {@link Str} node
-     * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return a literal representation of the evaluation: a URI, the value of a simple literal or the label of any other literal
-     * @throws ValueExprEvaluationException
-     * @throws QueryEvaluationException
-     */
-    private Value evaluate(Str node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        if (argValue instanceof IRI) {
-            return valueFactory.createLiteral(argValue.toString());
-        } else if (argValue instanceof Literal) {
-            Literal literal = (Literal) argValue;
-            if (QueryEvaluationUtil.isSimpleLiteral(literal)) {
-                return literal;
-            } else {
-                return valueFactory.createLiteral(literal.getLabel());
-            }
+        	ValuePipeEvaluationStep step = precompileValueExpr(nodeIdExpr);
+	    	return (parent, bindings) -> {
+	    		step.evaluate(new ConvertingValuePipe(parent, nodeId -> {
+    	            if (nodeId instanceof Literal) {
+    	                String nodeLabel = ((Literal) nodeId).getLabel() + (bindings.toString().hashCode());
+    	                return ValueOrError.ok(valueFactory.createBNode(nodeLabel));
+    	            } else {
+    	                return ValueOrError.fail("BNODE function argument must be a literal");
+    	            }
+	    		}), bindings);
+	    	};
         } else {
-            throw new ValueExprEvaluationException();
+        	return (parent, bindings) -> parent.push(valueFactory.createBNode());
         }
     }
 
     /**
-     * Evaluate a {@link Label} node
+     * Precompiles a {@link Bound} node
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return the {@link Literal} resulting from the evaluation of the argument of the {@code Label}.
+     * @throws QueryEvaluationException
+     */
+    private ValuePipeEvaluationStep precompileBound(Bound node) throws QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileVar(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ValuePipe(parent) {
+    			@Override
+    			protected void next(Value v) {
+    				parent.push(TRUE);
+    			}
+    			@Override
+    			public void handleValueError(String msg) {
+   					parent.push(FALSE);
+    			}
+    		}, bindings);
+    	};
+    }
+
+    /**
+     * Precompiles a {@link Str} node
+     * @param node the node to evaluate
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(Label node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
+    private ValuePipeEvaluationStep precompileStr(Str node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, argValue -> {
+				Literal str;
+		        if (argValue instanceof IRI) {
+		            str = valueFactory.createLiteral(argValue.toString());
+		        } else if (argValue instanceof Literal) {
+		            Literal literal = (Literal) argValue;
+		            if (QueryEvaluationUtility.isSimpleLiteral(literal)) {
+		                str = literal;
+		            } else {
+		                str = valueFactory.createLiteral(literal.getLabel());
+		            }
+		        } else {
+		        	return ValueOrError.fail("Str");
+		        }
+	        	return ValueOrError.ok(str);
+    		}), bindings);
+    	};
+    }
+
+    /**
+     * Precompiles a {@link Label} node
+     * @param node the node to evaluate
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
+    private ValuePipeEvaluationStep precompileLabel(Label node) throws ValueExprEvaluationException, QueryEvaluationException {
         // FIXME: deprecate Label in favour of Str(?)
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        if (argValue instanceof Literal) {
-            Literal literal = (Literal) argValue;
-            if (QueryEvaluationUtil.isSimpleLiteral(literal)) {
-                return literal;
-            } else {
-                return valueFactory.createLiteral(literal.getLabel());
-            }
-        } else {
-            throw new ValueExprEvaluationException();
-        }
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, argValue -> {
+		        if (argValue instanceof Literal) {
+		            Literal literal = (Literal) argValue;
+    				Literal str;
+		            if (QueryEvaluationUtility.isSimpleLiteral(literal)) {
+		                str = literal;
+		            } else {
+		                str = valueFactory.createLiteral(literal.getLabel());
+		            }
+		        	return ValueOrError.ok(str);
+		        } else {
+		            return ValueOrError.fail("Label");
+		        }
+    		}), bindings);
+    	};
     }
 
     /**
-     * Evaluate a {@link Lang} node
+     * Precompiles a {@link Lang} node
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return a {@link Literal} of the language tag of the {@code Literal} returned by evaluating the argument of the {@code node} or a
-     * {code Literal} representing an empty {@code String} if there is no tag
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(Lang node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        if (argValue instanceof Literal) {
-            Literal literal = (Literal) argValue;
-            Optional<String> langTag = literal.getLanguage();
-            if (langTag.isPresent()) {
-                return valueFactory.createLiteral(langTag.get());
-            }
-            return valueFactory.createLiteral("");
-        }
-        throw new ValueExprEvaluationException();
+    private ValuePipeEvaluationStep precompileLang(Lang node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, argValue -> {
+		        if (argValue instanceof Literal) {
+		            Literal literal = (Literal) argValue;
+		            Optional<String> langTag = literal.getLanguage();
+    				Literal str = null;
+		            if (langTag.isPresent()) {
+		                str = valueFactory.createLiteral(langTag.get());
+		            } else {
+		            	str = valueFactory.createLiteral("");
+		            }
+		        	return ValueOrError.ok(str);
+		        } else {
+		        	return ValueOrError.fail("Lang");
+		        }
+    		}), bindings);
+    	};
     }
 
     /**
-     * Evaluate a {@link Datatype} node
+     * Precompiles a {@link Datatype} node
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return a {@link Literal} representing the evaluation of the argument of the {@link Datatype}.
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(Datatype node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value v = precompile(node.getArg()).evaluate(bindings);
-        if (v instanceof Literal) {
-            Literal literal = (Literal) v;
-            if (literal.getDatatype() != null) {
-                // literal with datatype
-                return literal.getDatatype();
-            } else if (literal.getLanguage() != null) {
-                return RDF.LANGSTRING;
-            } else {
-                // simple literal
-                return XSD.STRING;
-            }
-        }
-        throw new ValueExprEvaluationException();
+    private ValuePipeEvaluationStep precompileDatatype(Datatype node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, v -> {
+		        if (v instanceof Literal) {
+		            Literal literal = (Literal) v;
+    				IRI dt;
+		            if (literal.getDatatype() != null) {
+		                // literal with datatype
+		                dt = literal.getDatatype();
+		            } else if (literal.getLanguage() != null) {
+		                dt = RDF.LANGSTRING;
+		            } else {
+		                // simple literal
+		                dt = XSD.STRING;
+		            }
+		        	return ValueOrError.ok(dt);
+		        } else {
+		        	return ValueOrError.fail("Datatype");
+		        }
+    		}), bindings);
+    	};
     }
 
     /**
-     * Evaluate a {@link Namespace} node
+     * Precompiles a {@link Namespace} node
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return the {@link Literal} of the URI of {@link IRI} returned by evaluating the argument of the {@code node}
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(Namespace node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        if (argValue instanceof IRI) {
-            IRI uri = (IRI) argValue;
-            return valueFactory.createIRI(uri.getNamespace());
-        } else {
-            throw new ValueExprEvaluationException();
-        }
+    private ValuePipeEvaluationStep precompileNamespace(Namespace node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, argValue -> {
+		        if (argValue instanceof IRI) {
+		            IRI uri = (IRI) argValue;
+		            return ValueOrError.ok(valueFactory.createIRI(uri.getNamespace()));
+		        } else {
+		            return ValueOrError.fail("Namespace");
+		        }
+    		}), bindings);
+    	};
     }
 
     /**
-     * Evaluate a LocalName node
+     * Precompiles a LocalName node
      * @param node the node to evaluate
      * @param bindings the set of named value bindings
      * @return the {@link Literal} of the  {@link IRI} returned by evaluating the argument of the {@code node}
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(LocalName node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        if (argValue instanceof IRI) {
-            IRI uri = (IRI) argValue;
-            return valueFactory.createLiteral(uri.getLocalName());
-        } else {
-            throw new ValueExprEvaluationException();
-        }
+    private ValuePipeEvaluationStep precompileLocalName(LocalName node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, argValue -> {
+		        if (argValue instanceof IRI) {
+		            IRI uri = (IRI) argValue;
+		            return ValueOrError.ok(valueFactory.createLiteral(uri.getLocalName()));
+		        } else {
+		            return ValueOrError.fail("LocalName");
+		        }
+    		}), bindings);
+    	};
     }
 
     /**
      * Determines whether the operand (a variable) contains a Resource.
-     *
-     * @return <tt>true</tt> if the operand contains a Resource, <tt>false</tt>
-     * otherwise.
      */
-    private Value evaluate(IsResource node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        return BooleanLiteral.valueOf(argValue instanceof Resource);
+    private ValuePipeEvaluationStep precompileIsResource(IsResource node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, argValue -> ok(argValue.isResource())), bindings);
+    	};
     }
 
     /**
      * Determines whether the operand (a variable) contains a URI.
-     *
-     * @return <tt>true</tt> if the operand contains a URI, <tt>false</tt>
-     * otherwise.
      */
-    private Value evaluate(IsURI node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        return BooleanLiteral.valueOf(argValue instanceof IRI);
+    private ValuePipeEvaluationStep precompileIsURI(IsURI node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, argValue -> ok(argValue.isIRI())), bindings);
+    	};
     }
 
     /**
      * Determines whether the operand (a variable) contains a BNode.
-     *
-     * @return <tt>true</tt> if the operand contains a BNode, <tt>false</tt>
-     * otherwise.
      */
-    private Value evaluate(IsBNode node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        return BooleanLiteral.valueOf(argValue instanceof BNode);
+    private ValuePipeEvaluationStep precompileIsBNode(IsBNode node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, argValue -> ok(argValue.isBNode())), bindings);
+    	};
     }
 
     /**
      * Determines whether the operand (a variable) contains a Literal.
-     *
-     * @return <tt>true</tt> if the operand contains a Literal, <tt>false</tt>
-     * otherwise.
      */
-    private Value evaluate(IsLiteral node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        return BooleanLiteral.valueOf(argValue instanceof Literal);
+    private ValuePipeEvaluationStep precompileIsLiteral(IsLiteral node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, argValue -> ok(argValue.isLiteral())), bindings);
+    	};
     }
 
     /**
      * Determines whether the operand (a variable) contains a numeric datatyped literal, i.e. a literal with datatype xsd:float, xsd:double, xsd:decimal, or a
      * derived datatype of xsd:decimal.
-     *
-     * @return <tt>true</tt> if the operand contains a numeric datatyped literal,
-     * <tt>false</tt> otherwise.
      */
-    private Value evaluate(IsNumeric node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        if (argValue instanceof Literal) {
-            Literal lit = (Literal) argValue;
-            IRI datatype = lit.getDatatype();
-            return BooleanLiteral.valueOf(XMLDatatypeUtil.isNumericDatatype(datatype));
-        } else {
-            return BooleanLiteral.FALSE;
-        }
+    private ValuePipeEvaluationStep precompileIsNumeric(IsNumeric node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, argValue -> {
+				Literal result;
+		        if (argValue instanceof Literal) {
+		            Literal lit = (Literal) argValue;
+		            IRI datatype = lit.getDatatype();
+		            result = valueFactory.createLiteral(XMLDatatypeUtil.isNumericDatatype(datatype));
+		        } else {
+		            result = FALSE;
+		        }
+		        return ValueOrError.ok(result);
+    		}), bindings);
+    	};
     }
 
     /**
      * Creates a URI from the operand value (a plain literal or a URI).
      *
      * @param node the node to evaluate, represents an invocation of the SPARQL IRI function
-     * @param bindings the set of named value bindings used to generate the value that the URI is based on
-     * @return a URI generated from the given arguments
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private IRI evaluate(IRIFunction node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        if (argValue instanceof Literal) {
-            final Literal lit = (Literal) argValue;
-            String uriString = lit.getLabel();
-            final String baseURI = node.getBaseURI();
-            try {
-                    ParsedIRI iri = ParsedIRI.create(uriString);
-                    if (!iri.isAbsolute() && baseURI != null) {
-                            // uri string may be a relative reference.
-                            uriString = ParsedIRI.create(baseURI).resolve(iri).toString();
-                    }
-                    else if (!iri.isAbsolute()) {
-                            throw new ValueExprEvaluationException("not an absolute IRI reference: " + uriString);
-                    }
-            }
-            catch (IllegalArgumentException e) {
-                    throw new ValueExprEvaluationException("not a valid IRI reference: " + uriString);
-            }
-            IRI result = null;
-            try {
-                result = valueFactory.createIRI(uriString);
-            } catch (IllegalArgumentException e) {
-                throw new ValueExprEvaluationException(e.getMessage());
-            }
-            return result;
-        } else if (argValue instanceof IRI) {
-            return ((IRI) argValue);
-        }
-        throw new ValueExprEvaluationException();
+    private ValuePipeEvaluationStep precompileIRIFunction(IRIFunction node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ValuePipe(parent) {
+    			@Override
+    			protected void next(Value argValue) {
+    				IRI result = null;
+    				String errMsg = "IRIFunction";
+    		        if (argValue instanceof Literal) {
+    		            String uriString = ((Literal) argValue).getLabel();
+    		            final String baseURI = node.getBaseURI();
+    		            try {
+		                    ParsedIRI iri = ParsedIRI.create(uriString);
+		                    if (!iri.isAbsolute()) {
+	                            // uri string may be a relative reference.
+			                    if (baseURI != null) {
+		                            uriString = ParsedIRI.create(baseURI).resolve(iri).toString();
+			                    } else {
+			                        errMsg = "not an absolute IRI reference: " + uriString;
+			                    }
+		                    }
+    		                result = valueFactory.createIRI(uriString);
+    		            } catch (IllegalArgumentException e) {
+    		                errMsg = "not a valid IRI reference: " + uriString;
+    		            }
+    		        } else if (argValue instanceof IRI) {
+    		            result = ((IRI) argValue);
+    		        }
+
+    		        if (result != null) {
+    		        	parent.push(result);
+    		        } else {
+    		        	parent.handleValueError(errMsg);
+    		        }
+    			}
+    		}, bindings);
+    	};
     }
 
     /**
      * Determines whether the two operands match according to the <code>regex</code> operator.
-     *
-     * @return <tt>true</tt> if the operands match according to the
-     * <tt>regex</tt> operator, <tt>false</tt> otherwise.
      */
-    private Value evaluate(Regex node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value arg = precompile(node.getArg()).evaluate(bindings);
-        Value parg = precompile(node.getPatternArg()).evaluate(bindings);
-        Value farg = null;
-        ValueExpr flagsArg = node.getFlagsArg();
-        if (flagsArg != null) {
-            farg = precompile(flagsArg).evaluate(bindings);
-        }
-        if (QueryEvaluationUtil.isStringLiteral(arg) && QueryEvaluationUtil.isSimpleLiteral(parg)
-                && (farg == null || QueryEvaluationUtil.isSimpleLiteral(farg))) {
-            String text = ((Literal) arg).getLabel();
-            String ptn = ((Literal) parg).getLabel();
-            String flags = "";
-            if (farg != null) {
-                flags = ((Literal) farg).getLabel();
-            }
-            // TODO should this Pattern be cached?
-            int f = 0;
-            for (char c : flags.toCharArray()) {
-                switch (c) {
-                    case 's':
-                        f |= Pattern.DOTALL;
-                        break;
-                    case 'm':
-                        f |= Pattern.MULTILINE;
-                        break;
-                    case 'i':
-                        f |= Pattern.CASE_INSENSITIVE;
-                        f |= Pattern.UNICODE_CASE;
-                        break;
-                    case 'x':
-                        f |= Pattern.COMMENTS;
-                        break;
-                    case 'd':
-                        f |= Pattern.UNIX_LINES;
-                        break;
-                    case 'u':
-                        f |= Pattern.UNICODE_CASE;
-                        break;
-                    default:
-                        throw new ValueExprEvaluationException(flags);
-                }
-            }
-            Pattern pattern = Pattern.compile(ptn, f);
-            boolean result = pattern.matcher(text).find();
-            return BooleanLiteral.valueOf(result);
-        }
-        throw new ValueExprEvaluationException();
+    private ValuePipeEvaluationStep precompileRegex(Regex node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep argStep = precompileValueExpr(node.getArg());
+    	ValuePipeEvaluationStep pargStep = precompileValueExpr(node.getPatternArg());
+    	ValuePipeEvaluationStep flagsStep;
+    	if (node.getFlagsArg() != null) {
+    		flagsStep = precompileValueExpr(node.getFlagsArg());
+    	} else {
+    		flagsStep = null;
+    	}
+    	return (parent, bindings) -> {
+    		AtomicInteger args = new AtomicInteger((flagsStep != null) ? 3 : 2);
+    		AtomicReference<Value> argRef = new AtomicReference<>();
+    		AtomicReference<Value> pargRef = new AtomicReference<>();
+    		AtomicReference<Value> fargRef = (flagsStep != null) ? new AtomicReference<>() : null;
+    		Supplier<ValueOrError> resultSupplier = () -> {
+    	    	Value arg = argRef.get();
+    	        Value parg = pargRef.get();
+    	        Value farg = (fargRef != null) ? fargRef.get() : null;
+    	        if (QueryEvaluationUtility.isStringLiteral(arg) && QueryEvaluationUtility.isSimpleLiteral(parg)
+    	                && (farg == null || QueryEvaluationUtility.isSimpleLiteral(farg))) {
+    	            String text = ((Literal) arg).getLabel();
+    	            String ptn = ((Literal) parg).getLabel();
+    	            String flags;
+    	            if (farg != null) {
+    	                flags = ((Literal) farg).getLabel();
+    	            } else {
+    	            	flags = "";
+    	            }
+    	            try {
+	    	            Pattern pattern = REGEX_CACHE.get(Pair.of(ptn, flags), () -> {
+	        	            int f = 0;
+	        	            for (char c : flags.toCharArray()) {
+	        	                switch (c) {
+	        	                    case 's':
+	        	                        f |= Pattern.DOTALL;
+	        	                        break;
+	        	                    case 'm':
+	        	                        f |= Pattern.MULTILINE;
+	        	                        break;
+	        	                    case 'i':
+	        	                        f |= Pattern.CASE_INSENSITIVE;
+	        	                        f |= Pattern.UNICODE_CASE;
+	        	                        break;
+	        	                    case 'x':
+	        	                        f |= Pattern.COMMENTS;
+	        	                        break;
+	        	                    case 'd':
+	        	                        f |= Pattern.UNIX_LINES;
+	        	                        break;
+	        	                    case 'u':
+	        	                        f |= Pattern.UNICODE_CASE;
+	        	                        break;
+	        	                    default:
+	        	                        throw new ValueExprEvaluationException(flags);
+	        	                }
+	        	            }
+	        	            return Pattern.compile(ptn, f);
+	    	            });
+	    	            boolean result = pattern.matcher(text).find();
+	    	            return ok(result);
+    	            } catch (ExecutionException e) {
+    	            	return ValueOrError.fail(e.getCause().getMessage());
+    	            }
+    	        }
+    	        return ValueOrError.fail("Regex");
+    		};
+    		argStep.evaluate(new MultiValuePipe(parent, args, v -> argRef.set(v), resultSupplier), bindings);
+    		pargStep.evaluate(new MultiValuePipe(parent, args, v -> pargRef.set(v), resultSupplier), bindings);
+    		if (flagsStep != null) {
+        		flagsStep.evaluate(new MultiValuePipe(parent, args, v -> fargRef.set(v), resultSupplier), bindings);
+    		}
+    	};
     }
 
     /**
      * Determines whether the language tag or the node matches the language argument of the node
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(LangMatches node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value langTagValue = precompile(node.getLeftArg()).evaluate(bindings);
-        Value langRangeValue = precompile(node.getRightArg()).evaluate(bindings);
-        if (QueryEvaluationUtil.isSimpleLiteral(langTagValue)
-                && QueryEvaluationUtil.isSimpleLiteral(langRangeValue)) {
-            String langTag = ((Literal) langTagValue).getLabel();
-            String langRange = ((Literal) langRangeValue).getLabel();
-            boolean result = false;
-            if (langRange.equals("*")) {
-                result = langTag.length() > 0;
-            } else if (langTag.length() == langRange.length()) {
-                result = langTag.equalsIgnoreCase(langRange);
-            } else if (langTag.length() > langRange.length()) {
-                // check if the range is a prefix of the tag
-                String prefix = langTag.substring(0, langRange.length());
-                result = prefix.equalsIgnoreCase(langRange) && langTag.charAt(langRange.length()) == '-';
-            }
-            return BooleanLiteral.valueOf(result);
-        }
-        throw new ValueExprEvaluationException();
+    private ValuePipeEvaluationStep precompileLangMatches(LangMatches node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep langTagStep = precompileValueExpr(node.getLeftArg());
+    	ValuePipeEvaluationStep langRangeStep = precompileValueExpr(node.getRightArg());
+    	return (parent, bindings) -> {
+    		AtomicInteger args = new AtomicInteger(2);
+    		AtomicReference<Value> langTagRef = new AtomicReference<>();
+    		AtomicReference<Value> langRangeRef = new AtomicReference<>();
+    		Supplier<ValueOrError> resultSupplier = () -> {
+    	    	Value langTagValue = langTagRef.get();
+    	        Value langRangeValue = langRangeRef.get();
+    	        if (QueryEvaluationUtility.isSimpleLiteral(langTagValue)
+    	                && QueryEvaluationUtility.isSimpleLiteral(langRangeValue)) {
+    	            String langTag = ((Literal) langTagValue).getLabel();
+    	            String langRange = ((Literal) langRangeValue).getLabel();
+    	            boolean result = false;
+    	            if (langRange.equals("*")) {
+    	                result = langTag.length() > 0;
+    	            } else if (langTag.length() == langRange.length()) {
+    	                result = langTag.equalsIgnoreCase(langRange);
+    	            } else if (langTag.length() > langRange.length()) {
+    	                // check if the range is a prefix of the tag
+    	                String prefix = langTag.substring(0, langRange.length());
+    	                result = prefix.equalsIgnoreCase(langRange) && langTag.charAt(langRange.length()) == '-';
+    	            }
+    	            return ok(result);
+    	        }
+    	        return ValueOrError.fail("LangMatches");
+    		};
+    		langTagStep.evaluate(new MultiValuePipe(parent, args, v -> langTagRef.set(v), resultSupplier), bindings);
+    		langRangeStep.evaluate(new MultiValuePipe(parent, args, v -> langRangeRef.set(v), resultSupplier), bindings);
+    	};
     }
 
     /**
      * Determines whether the two operands match according to the <code>like</code> operator. The operator is defined as a string comparison with the possible
      * use of an asterisk (*) at the end and/or the start of the second operand to indicate substring matching.
-     *
-     * @return <tt>true</tt> if the operands match according to the
-     * <tt>like</tt>
-     * operator, <tt>false</tt> otherwise.
      */
-    private Value evaluate(Like node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value val = precompile(node.getArg()).evaluate(bindings);
-        String strVal = null;
-        if (val instanceof IRI) {
-            strVal = ((IRI) val).stringValue();
-        } else if (val instanceof Literal) {
-            strVal = ((Literal) val).getLabel();
-        }
-        if (strVal == null) {
-            throw new ValueExprEvaluationException();
-        }
-        if (!node.isCaseSensitive()) {
-            // Convert strVal to lower case, just like the pattern has been done
-            strVal = strVal.toLowerCase(Locale.ROOT);
-        }
-        int valIndex = 0;
-        int prevPatternIndex = -1;
-        int patternIndex = node.getOpPattern().indexOf('*');
-        if (patternIndex == -1) {
-            // No wildcards
-            return BooleanLiteral.valueOf(node.getOpPattern().equals(strVal));
-        }
-        String snippet;
-        if (patternIndex > 0) {
-            // Pattern does not start with a wildcard, first part must match
-            snippet = node.getOpPattern().substring(0, patternIndex);
-            if (!strVal.startsWith(snippet)) {
-                return BooleanLiteral.FALSE;
-            }
-            valIndex += snippet.length();
-            prevPatternIndex = patternIndex;
-            patternIndex = node.getOpPattern().indexOf('*', patternIndex + 1);
-        }
-        while (patternIndex != -1) {
-            // Get snippet between previous wildcard and this wildcard
-            snippet = node.getOpPattern().substring(prevPatternIndex + 1, patternIndex);
-            // Search for the snippet in the value
-            valIndex = strVal.indexOf(snippet, valIndex);
-            if (valIndex == -1) {
-                return BooleanLiteral.FALSE;
-            }
-            valIndex += snippet.length();
-            prevPatternIndex = patternIndex;
-            patternIndex = node.getOpPattern().indexOf('*', patternIndex + 1);
-        }
-        // Part after last wildcard
-        snippet = node.getOpPattern().substring(prevPatternIndex + 1);
-        if (snippet.length() > 0) {
-            // Pattern does not end with a wildcard.
-            // Search last occurence of the snippet.
-            valIndex = strVal.indexOf(snippet, valIndex);
-            int i;
-            while ((i = strVal.indexOf(snippet, valIndex + 1)) != -1) {
-                // A later occurence was found.
-                valIndex = i;
-            }
-            if (valIndex == -1) {
-                return BooleanLiteral.FALSE;
-            }
-            valIndex += snippet.length();
-            if (valIndex < strVal.length()) {
-                // Some characters were not matched
-                return BooleanLiteral.FALSE;
-            }
-        }
-        return BooleanLiteral.TRUE;
+    private ValuePipeEvaluationStep precompileLike(Like node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep argStep = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		argStep.evaluate(new ConvertingValuePipe(parent, val -> {
+		        String strVal;
+		        if (val instanceof IRI) {
+		            strVal = ((IRI) val).stringValue();
+		        } else if (val instanceof Literal) {
+		            strVal = ((Literal) val).getLabel();
+		        } else {
+		            return ValueOrError.fail("Like");
+		        }
+		        if (!node.isCaseSensitive()) {
+		            // Convert strVal to lower case, just like the pattern has been done
+		            strVal = strVal.toLowerCase(Locale.ROOT);
+		        }
+		        int valIndex = 0;
+		        int prevPatternIndex = -1;
+		        int patternIndex = node.getOpPattern().indexOf('*');
+		        if (patternIndex == -1) {
+		            // No wildcards
+		            return ok(node.getOpPattern().equals(strVal));
+		        }
+		        String snippet;
+		        if (patternIndex > 0) {
+		            // Pattern does not start with a wildcard, first part must match
+		            snippet = node.getOpPattern().substring(0, patternIndex);
+		            if (!strVal.startsWith(snippet)) {
+		                return OK_FALSE;
+		            }
+		            valIndex += snippet.length();
+		            prevPatternIndex = patternIndex;
+		            patternIndex = node.getOpPattern().indexOf('*', patternIndex + 1);
+		        }
+		        while (patternIndex != -1) {
+		            // Get snippet between previous wildcard and this wildcard
+		            snippet = node.getOpPattern().substring(prevPatternIndex + 1, patternIndex);
+		            // Search for the snippet in the value
+		            valIndex = strVal.indexOf(snippet, valIndex);
+		            if (valIndex == -1) {
+		                return OK_FALSE;
+		            }
+		            valIndex += snippet.length();
+		            prevPatternIndex = patternIndex;
+		            patternIndex = node.getOpPattern().indexOf('*', patternIndex + 1);
+		        }
+		        // Part after last wildcard
+		        snippet = node.getOpPattern().substring(prevPatternIndex + 1);
+		        if (snippet.length() > 0) {
+		            // Pattern does not end with a wildcard.
+		            // Search last occurence of the snippet.
+		            valIndex = strVal.indexOf(snippet, valIndex);
+		            int i;
+		            while ((i = strVal.indexOf(snippet, valIndex + 1)) != -1) {
+		                // A later occurence was found.
+		                valIndex = i;
+		            }
+		            if (valIndex == -1) {
+		                return OK_FALSE;
+		            }
+		            valIndex += snippet.length();
+		            if (valIndex < strVal.length()) {
+		                // Some characters were not matched
+		                return OK_FALSE;
+		            }
+		        }
+                return OK_FALSE;
+    		}), bindings);
+    	};
     }
 
     /**
      * Evaluates a function.
      */
-    private QueryValueEvaluationStep precompileFunctionCall(FunctionCall node) throws ValueExprEvaluationException, QueryEvaluationException {
+    private ValuePipeEvaluationStep precompileFunctionCall(FunctionCall node) throws ValueExprEvaluationException, QueryEvaluationException {
 		Function function = functionRegistry.get(node.getURI()).orElseThrow(() -> new QueryEvaluationException(String.format("Unknown function '%s'", node.getURI())));
 
 		// the NOW function is a special case as it needs to keep a shared return
         // value for the duration of the query.
         if (function instanceof Now) {
-            return (bs) -> evaluate((Now) function, bs);
+            return precompileNow((Now) function);
         }
 
         List<ValueExpr> args = node.getArgs();
-        QueryValueEvaluationStep[] argSteps = new QueryValueEvaluationStep[args.size()];
+        ValuePipeEvaluationStep[] argSteps = new ValuePipeEvaluationStep[args.size()];
         for (int i = 0; i < args.size(); i++) {
-            argSteps[i] = precompile(args.get(i));
+            argSteps[i] = precompileValueExpr(args.get(i));
         }
-        return (bs) -> {
-	        Value result;
-	        queryContext.begin();
-	        try {
-	        	Value[] argValues = new Value[argSteps.length];
+        return (parent, bs) -> {
+        	if (argSteps.length > 0) {
+	        	AtomicInteger argsRemaining = new AtomicInteger(argSteps.length);
+	        	AtomicReferenceArray<Value> argValues = new AtomicReferenceArray<>(argSteps.length);
+	        	Supplier<ValueOrError> resultSupplier = () -> {
+					Value[] arr = new Value[argValues.length()];
+					for (int i=0; i<arr.length; i++) {
+						arr[i] = argValues.get(i);
+					}
+					Value result;
+			        queryContext.begin();
+			        try {
+			        	result = function.evaluate(tripleSource, arr);
+			        } catch (ValueExprEvaluationException e) {
+			        	return ValueOrError.fail(e.getMessage());
+			        } finally {
+			        	queryContext.end();
+			        }
+			        return ValueOrError.ok(result);
+	        	};
 	        	for (int i = 0; i < argSteps.length; i++) {
-	        		argValues[i] = argSteps[i].evaluate(bs);
+	        		final int idx = i;
+	        		argSteps[i].evaluate(new MultiValuePipe(parent, argsRemaining, v -> argValues.set(idx, v), resultSupplier), bs);
 	        	}
-	        	result = function.evaluate(tripleSource, argValues);
-	        } finally {
-	        	queryContext.end();
-	        }
-	        return result;
+        	} else {
+				Value result;
+		        queryContext.begin();
+		        try {
+		        	result = function.evaluate(tripleSource);
+		        } finally {
+		        	queryContext.end();
+		        }
+        		parent.push(result);
+        	}
+        };
+    }
+
+    final class ArgValuePipe extends ValuePipe {
+    	final Function function;
+    	final AtomicInteger args;
+    	final AtomicReferenceArray<Value> argValues;
+		final int index;
+		protected ArgValuePipe(ValuePipe parent, Function function, AtomicInteger args, AtomicReferenceArray<Value> argValues, int index) {
+			super(parent);
+			this.function = function;
+			this.args = args;
+			this.argValues = argValues;
+			this.index = index;
+		}
+		@Override
+		protected void next(Value v) {
+			argValues.set(index, v);
+			if (args.decrementAndGet() == 0) {
+				Value[] arr = new Value[argValues.length()];
+				for (int i=0; i<arr.length; i++) {
+					arr[i] = argValues.get(i);
+				}
+		        Value result;
+		        queryContext.begin();
+		        try {
+		        	result = function.evaluate(tripleSource, arr);
+		        } finally {
+		        	queryContext.end();
+		        }
+		        parent.push(result);
+			}
+		}
+	}
+
+    /**
+     * Precompiles an {@link And} node
+     * @param node the node to evaluate
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
+    private ValuePipeEvaluationStep precompileAnd(And node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep leftStep = precompileValueExpr(node.getLeftArg());
+    	ValuePipeEvaluationStep rightStep = precompileValueExpr(node.getRightArg());
+    	return (topPipe, bindings) -> {
+    		leftStep.evaluate(new ValuePipe(topPipe) {
+    			@Override
+    			protected void next(Value leftValue) {
+    				QueryEvaluationUtility.Result result = QueryEvaluationUtility.getEffectiveBooleanValue(leftValue);
+    				switch (result) {
+    					case _true:
+					        // Left argument evaluated to 'true', result is determined
+					        // by the evaluation of the right argument.
+	    	            	rightStep.evaluate(new ConvertingValuePipe(topPipe, HalyardValueExprEvaluation.this::effectiveBooleanLiteral), bindings);
+    						break;
+    					case _false:
+	    	                // Left argument evaluates to false, we don't need to look any
+	    	                // further
+	    	                parent.push(FALSE);
+    						break;
+    					case incompatibleValueExpression:
+        					handleValueError("And");
+    						break;
+    					default:
+    						throw new AssertionError(result);
+    				}
+    			}
+				@Override
+				public void handleValueError(String msg) {
+		            // Failed to evaluate the left argument. Result is 'false' when
+		            // the right argument evaluates to 'false', failure otherwise.
+	            	rightStep.evaluate(new ConvertingValuePipe(topPipe, rightValue -> {
+						if (QueryEvaluationUtility.getEffectiveBooleanValue(rightValue) == QueryEvaluationUtility.Result._false) {
+						    return OK_FALSE;
+						} else {
+						    return ValueOrError.fail("And");
+						}
+	            	}), bindings);
+				}
+    		}, bindings);
+    	};
+    }
+
+    /**
+     * Precompiles an {@link Or} node
+     * @param bindings the set of named value bindings
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
+    private ValuePipeEvaluationStep precompileOr(Or node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep leftStep = precompileValueExpr(node.getLeftArg());
+    	ValuePipeEvaluationStep rightStep = precompileValueExpr(node.getRightArg());
+    	return (topPipe, bindings) -> {
+    		leftStep.evaluate(new ValuePipe(topPipe) {
+    			@Override
+    			protected void next(Value leftValue) {
+    				QueryEvaluationUtility.Result result = QueryEvaluationUtility.getEffectiveBooleanValue(leftValue);
+    				switch (result) {
+    					case _true:
+	    	                // Left argument evaluates to true, we don't need to look any
+	    	                // further
+	    	                parent.push(TRUE);
+    						break;
+    					case _false:
+	    	                // Left argument evaluated to 'false', result is determined
+	    	                // by the evaluation of the right argument.
+	    	            	rightStep.evaluate(new ConvertingValuePipe(topPipe, HalyardValueExprEvaluation.this::effectiveBooleanLiteral), bindings);
+    						break;
+    					case incompatibleValueExpression:
+        					handleValueError("Or");
+    						break;
+    					default:
+    						throw new AssertionError(result);
+    				}
+    			}
+				@Override
+				public void handleValueError(String msg) {
+		            // Failed to evaluate the left argument. Result is 'true' when
+		            // the right argument evaluates to 'true', failure otherwise.
+	            	rightStep.evaluate(new ConvertingValuePipe(topPipe, rightValue -> {
+						if (QueryEvaluationUtility.getEffectiveBooleanValue(rightValue) == QueryEvaluationUtility.Result._true) {
+						    return OK_TRUE;
+						} else {
+						    return ValueOrError.fail("And");
+						}
+	            	}), bindings);
+				}
+    		}, bindings);
+    	};
+    }
+
+    /**
+     * Precompiles a {@link Not} node
+     * @param node the node to evaluate
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
+    private ValuePipeEvaluationStep precompileNot(Not node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep step = precompileValueExpr(node.getArg());
+    	return (parent, bindings) -> {
+    		step.evaluate(new ConvertingValuePipe(parent, v -> {
+    			QueryEvaluationUtility.Result result = QueryEvaluationUtility.getEffectiveBooleanValue(v);
+    			switch (result) {
+    				case _true:
+    					return OK_FALSE; // NOT(true)
+    				case _false:
+    					return OK_TRUE; // NOT(false)
+    				case incompatibleValueExpression:
+    					return ValueOrError.fail("Not");
+    				default:
+    					throw new AssertionError(result);
+    			}
+    		}), bindings);
+    	};
+    }
+
+    /**
+     * Precompiles a {@link Now} node. the value of 'now' is shared across the whole query and evaluation strategy
+     * @param node the node to evaluate
+     * @throws ValueExprEvaluationException
+     * @throws QueryEvaluationException
+     */
+    private ValuePipeEvaluationStep precompileNow(Now node) throws ValueExprEvaluationException, QueryEvaluationException {
+        return (parent, bindings)-> {
+            if (parentStrategy.sharedValueOfNow == null) {
+                parentStrategy.sharedValueOfNow = node.evaluate(valueFactory);
+            }
+        	parent.push(parentStrategy.sharedValueOfNow);
         };
     }
 
     /**
-     * Evaluate an {@link And} node
+     * Precompiles if the left and right arguments of the {@link SameTerm} node are equal
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(And node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        try {
-            Value leftValue = precompile(node.getLeftArg()).evaluate(bindings);
-            if (QueryEvaluationUtil.getEffectiveBooleanValue(leftValue) == false) {
-                // Left argument evaluates to false, we don't need to look any
-                // further
-                return BooleanLiteral.FALSE;
-            }
-        } catch (ValueExprEvaluationException e) {
-            // Failed to evaluate the left argument. Result is 'false' when
-            // the right argument evaluates to 'false', failure otherwise.
-            Value rightValue = precompile(node.getRightArg()).evaluate(bindings);
-            if (QueryEvaluationUtil.getEffectiveBooleanValue(rightValue) == false) {
-                return BooleanLiteral.FALSE;
-            } else {
-                throw new ValueExprEvaluationException();
-            }
-        }
-        // Left argument evaluated to 'true', result is determined
-        // by the evaluation of the right argument.
-        Value rightValue = precompile(node.getRightArg()).evaluate(bindings);
-        return BooleanLiteral.valueOf(QueryEvaluationUtil.getEffectiveBooleanValue(rightValue));
+    private ValuePipeEvaluationStep precompileSameTerm(SameTerm node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep leftStep = precompileValueExpr(node.getLeftArg());
+    	ValuePipeEvaluationStep rightStep = precompileValueExpr(node.getRightArg());
+    	return (parent, bindings) -> {
+    		AtomicInteger args = new AtomicInteger(2);
+    		AtomicReference<Value> leftValue = new AtomicReference<>();
+    		AtomicReference<Value> rightValue = new AtomicReference<>();
+    		Supplier<ValueOrError> resultSupplier = () -> ok(Objects.equals(leftValue.get(), rightValue.get()));
+    		leftStep.evaluate(new MultiValuePipe(parent, args, v -> leftValue.set(v), resultSupplier), bindings);
+    		rightStep.evaluate(new MultiValuePipe(parent, args, v -> rightValue.set(v), resultSupplier), bindings);
+    	};
     }
 
     /**
-     * Evaluate an {@link And} node
+     * Precompiles a {@link Coalesce} node
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
+     * @throws ValueExprEvaluationException
+     */
+    private ValuePipeEvaluationStep precompileCoalesce(Coalesce node) throws ValueExprEvaluationException {
+    	List<ValueExpr> args = node.getArguments();
+    	ValuePipeEvaluationStep[] argSteps = new ValuePipeEvaluationStep[args.size()];
+    	for (int i=0; i<argSteps.length; i++) {
+    		argSteps[i] = precompileValueExpr(args.get(i));
+    	}
+    	return (parent, bindings) -> {
+    		Iterator<ValuePipeEvaluationStep> stepIter = Arrays.asList(argSteps).iterator();
+    		evaluateNextArg(parent, node, stepIter, bindings);
+    	};
+    }
+
+    private void evaluateNextArg(ValuePipe parent, Coalesce node, Iterator<ValuePipeEvaluationStep> stepIter, BindingSet bindings) {
+    	if (stepIter.hasNext()) {
+    		stepIter.next().evaluate(new ValuePipe(parent) {
+    			@Override
+    			protected void next(Value v) {
+    				if (v != null) {
+    	                // return first result that does not produce an error on evaluation.
+    					parent.push(v);
+    				} else {
+    					nextArg();
+    				}
+    			}
+    			@Override
+    			public void handleValueError(String errMsg) {
+   					nextArg();
+    			}
+    			private void nextArg() {
+					evaluateNextArg(parent, node, stepIter, bindings);
+    			}
+    		}, bindings);
+    	} else {
+    		parent.handleValueError("COALESCE arguments do not evaluate to a value: " + node.getSignature());
+    	}
+    }
+
+    /**
+     * Precompiles a Compare node
+     * @param node the node to evaluate
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(Or node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        try {
-            Value leftValue = precompile(node.getLeftArg()).evaluate(bindings);
-            if (QueryEvaluationUtil.getEffectiveBooleanValue(leftValue) == true) {
-                // Left argument evaluates to true, we don't need to look any
-                // further
-                return BooleanLiteral.TRUE;
-            }
-        } catch (ValueExprEvaluationException e) {
-            // Failed to evaluate the left argument. Result is 'true' when
-            // the right argument evaluates to 'true', failure otherwise.
-            Value rightValue = precompile(node.getRightArg()).evaluate(bindings);
-            if (QueryEvaluationUtil.getEffectiveBooleanValue(rightValue) == true) {
-                return BooleanLiteral.TRUE;
-            } else {
-                throw new ValueExprEvaluationException();
-            }
-        }
-        // Left argument evaluated to 'false', result is determined
-        // by the evaluation of the right argument.
-        Value rightValue = precompile(node.getRightArg()).evaluate(bindings);
-        return BooleanLiteral.valueOf(QueryEvaluationUtil.getEffectiveBooleanValue(rightValue));
+    private ValuePipeEvaluationStep precompileCompare(Compare node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep leftStep = precompileValueExpr(node.getLeftArg());
+    	ValuePipeEvaluationStep rightStep = precompileValueExpr(node.getRightArg());
+    	return (parent, bindings) -> {
+    		AtomicInteger args = new AtomicInteger(2);
+    		AtomicReference<Value> leftValue = new AtomicReference<>();
+    		AtomicReference<Value> rightValue = new AtomicReference<>();
+    		Supplier<ValueOrError> resultSupplier = () -> of(QueryEvaluationUtility.compare(leftValue.get(), rightValue.get(), node.getOperator(), parentStrategy.isStrict()));
+    		leftStep.evaluate(new MultiValuePipe(parent, args, v -> leftValue.set(v), resultSupplier), bindings);
+    		rightStep.evaluate(new MultiValuePipe(parent, args, v -> rightValue.set(v), resultSupplier), bindings);
+    	};
     }
 
     /**
-     * Evaluate a {@link Not} node
+     * Precompiles a {@link MathExpr}
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(Not node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value argValue = precompile(node.getArg()).evaluate(bindings);
-        boolean argBoolean = QueryEvaluationUtil.getEffectiveBooleanValue(argValue);
-        return BooleanLiteral.valueOf(!argBoolean);
+    private ValuePipeEvaluationStep precompileMathExpr(MathExpr node) throws ValueExprEvaluationException, QueryEvaluationException {
+        ValuePipeEvaluationStep leftStep = precompileValueExpr(node.getLeftArg());
+    	ValuePipeEvaluationStep rightStep = precompileValueExpr(node.getRightArg());
+    	return (parent, bindings) -> {
+    		AtomicInteger args = new AtomicInteger(2);
+    		AtomicReference<Value> leftValue = new AtomicReference<>();
+    		AtomicReference<Value> rightValue = new AtomicReference<>();
+    		Supplier<ValueOrError> resultSupplier = () -> {
+    			Value leftVal = leftValue.get();
+    			Value rightVal = rightValue.get();
+    	        if (leftVal instanceof Literal && rightVal instanceof Literal) {
+    				return ValueOrError.of(() -> XMLDatatypeMathUtil.compute((Literal)leftVal, (Literal)rightVal, node.getOperator()));
+    	        }
+    	        return ValueOrError.fail("Both arguments must be numeric literals");
+    		};
+    		leftStep.evaluate(new MultiValuePipe(parent, args, v -> leftValue.set(v), resultSupplier), bindings);
+    		rightStep.evaluate(new MultiValuePipe(parent, args, v -> rightValue.set(v), resultSupplier), bindings);
+    	};
     }
 
     /**
-     * Evaluate a {@link Now} node. the value of 'now' is shared across the whole query and evaluation strategy
+     * Precompiles an {@link If} node
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
+     * @throws QueryEvaluationException
+     */
+    private ValuePipeEvaluationStep precompileIf(If node) throws QueryEvaluationException {
+    	ValuePipeEvaluationStep conditionStep = precompileValueExpr(node.getCondition());
+    	ValuePipeEvaluationStep resultStep = precompileValueExpr(node.getResult());
+    	ValuePipeEvaluationStep altStep = precompileValueExpr(node.getAlternative());
+    	return (parent, bindings) -> {
+    		conditionStep.evaluate(new ValuePipe(parent) {
+    			@Override
+    			protected void next(Value value) {
+    				QueryEvaluationUtility.Result result = QueryEvaluationUtility.getEffectiveBooleanValue(value);
+    				switch (result) {
+    					case _true:
+        		        	resultStep.evaluate(parent, bindings);
+    						break;
+    					case _false:
+        		        	altStep.evaluate(parent, bindings);
+    						break;
+    					case incompatibleValueExpression:
+        		            // in case of type error, if-construction should result in empty
+        		            // binding.
+        		        	parent.push(null);
+    						break;
+    					default:
+    						throw new AssertionError(result);
+    				}
+    			}
+    		}, bindings);
+    	};
+    }
+
+    /**
+     * Precompiles an {@link In} node
+     * @param node the node to evaluate
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(Now node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        if (parentStrategy.sharedValueOfNow == null) {
-            parentStrategy.sharedValueOfNow = node.evaluate(valueFactory);
-        }
-        return parentStrategy.sharedValueOfNow;
-    }
-
-    /**
-     * Evaluate if the left and right arguments of the {@link SameTerm} node are equal
-     * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
-     * @throws ValueExprEvaluationException
-     * @throws QueryEvaluationException
-     */
-    private Value evaluate(SameTerm node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value leftVal = precompile(node.getLeftArg()).evaluate(bindings);
-        Value rightVal = precompile(node.getRightArg()).evaluate(bindings);
-        return BooleanLiteral.valueOf(leftVal != null && leftVal.equals(rightVal));
-    }
-
-    /**
-     * Evaluate a {@link Coalesce} node
-     * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return the first {@link Value} that doesn't produce an error on evaluation
-     * @throws ValueExprEvaluationException
-     */
-    private Value evaluate(Coalesce node, BindingSet bindings) throws ValueExprEvaluationException {
-        for (ValueExpr expr : node.getArguments()) {
-            try {
-                Value result = precompile(expr).evaluate(bindings);
-                if (result != null) return result;
-                // return first result that does not produce an error on evaluation.
-            } catch (QueryEvaluationException ignore) {
-            }
-        }
-        throw new ValueExprEvaluationException("COALESCE arguments do not evaluate to a value: " + node.getSignature());
-    }
-
-    /**
-     * Evaluates a Compare node
-     * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return the {@link Value} resulting from the comparison of the left and right arguments of the {@code node} using the comparison operator
-     * of the {@code node}.
-     * @throws ValueExprEvaluationException
-     * @throws QueryEvaluationException
-     */
-    private Value evaluate(Compare node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value leftVal = precompile(node.getLeftArg()).evaluate(bindings);
-        Value rightVal = precompile(node.getRightArg()).evaluate(bindings);
-		return BooleanLiteral.valueOf(
-				QueryEvaluationUtil.compare(leftVal, rightVal, node.getOperator(), parentStrategy.isStrict()));
-    }
-
-    /**
-     * Evaluate a {@link MathExpr}
-     * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return the {@link Value} of the math operation on the {@link Value}s return from evaluating the left and right arguments of the node
-     * @throws ValueExprEvaluationException
-     * @throws QueryEvaluationException
-     */
-    private Value evaluate(MathExpr node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        // Do the math
-        Value leftVal = precompile(node.getLeftArg()).evaluate(bindings);
-        Value rightVal = precompile(node.getRightArg()).evaluate(bindings);
-        if (leftVal instanceof Literal && rightVal instanceof Literal) {
-			return XMLDatatypeMathUtil.compute((Literal)leftVal, (Literal)rightVal, node.getOperator());
-        }
-        throw new ValueExprEvaluationException("Both arguments must be numeric literals");
-    }
-
-    /**
-     * Evaluate an {@link If} node
-     * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
-     * @throws QueryEvaluationException
-     */
-    private Value evaluate(If node, BindingSet bindings) throws QueryEvaluationException {
-        Value result;
-        boolean conditionIsTrue;
-        try {
-            Value value = precompile(node.getCondition()).evaluate(bindings);
-            conditionIsTrue = QueryEvaluationUtil.getEffectiveBooleanValue(value);
-        } catch (ValueExprEvaluationException e) {
-            // in case of type error, if-construction should result in empty
-            // binding.
-            return null;
-        }
-        if (conditionIsTrue) {
-            result = precompile(node.getResult()).evaluate(bindings);
-        } else {
-            result = precompile(node.getAlternative()).evaluate(bindings);
-        }
-        return result;
-    }
-
-    /**
-     * Evaluate an {@link In} node
-     * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
-     * @throws ValueExprEvaluationException
-     * @throws QueryEvaluationException
-     */
-    private Value evaluate(In node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value leftValue = precompile(node.getArg()).evaluate(bindings);
-        // Result is false until a match has been found
-        boolean result = false;
-        // Use first binding name from tuple expr to compare values
+    private ValuePipeEvaluationStep precompileIn(In node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep argStep = precompileValueExpr(node.getArg());
+		BindingSetPipeQueryEvaluationStep subQueryStep = parentStrategy.precompile(node.getSubQuery());
         String bindingName = node.getSubQuery().getBindingNames().iterator().next();
-        try (CloseableIteration<BindingSet, QueryEvaluationException> iter = parentStrategy.evaluate(node.getSubQuery(), bindings)) {
-            while (result == false && iter.hasNext()) {
-                BindingSet bindingSet = iter.next();
-                Value rightValue = bindingSet.getValue(bindingName);
-                result = leftValue == null && rightValue == null || leftValue != null
-                        && leftValue.equals(rightValue);
-            }
-        }
-        return BooleanLiteral.valueOf(result);
+		return (valuePipe, bindings) -> {
+			argStep.evaluate(new ValuePipe(null) {
+				@Override
+				protected void next(Value argValue) {
+					subQueryStep.evaluate(new ValueBindingSetPipe(valuePipe) {
+						volatile Value isIn = FALSE;
+						@Override
+						protected boolean next(BindingSet bs) {
+							Value v = bs.getValue(bindingName);
+							boolean matches = Objects.equals(argValue, v);
+							if (matches) {
+								isIn = TRUE;
+							}
+							return !matches;
+						}
+						@Override
+						protected void doClose() {
+							parent.push(isIn);
+						}
+					}, bindings);
+				}
+			}, bindings);
+		};
     }
 
     /**
-     * Evaluate a {@link ListMemberOperator}
+     * Precompiles a {@link ListMemberOperator}
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(ListMemberOperator node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        List<ValueExpr> args = node.getArguments();
-        Value leftValue = precompile(args.get(0)).evaluate(bindings);
-        boolean result = false;
-        ValueExprEvaluationException typeError = null;
-        for (int i = 1; i < args.size(); i++) {
-            ValueExpr arg = args.get(i);
-            try {
-                Value rightValue = precompile(arg).evaluate(bindings);
-                result = leftValue == null && rightValue == null;
-                if (!result) {
-                    result = QueryEvaluationUtil.compare(leftValue, rightValue, Compare.CompareOp.EQ);
-                }
-                if (result) {
-                    break;
-                }
-            } catch (ValueExprEvaluationException caught) {
-                typeError = caught;
-            }
-        }
-        if (typeError != null && !result) {
+    private ValuePipeEvaluationStep precompileListMemberOperator(ListMemberOperator node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	List<ValueExpr> args = node.getArguments();
+    	ValuePipeEvaluationStep[] argSteps = new ValuePipeEvaluationStep[args.size()];
+    	for (int i=0; i<argSteps.length; i++) {
+    		argSteps[i] = precompileValueExpr(args.get(i));
+    	}
+    	return (parent, bindings) -> {
+    		Iterator<ValuePipeEvaluationStep> stepIter = Arrays.asList(argSteps).iterator();
+    		ValuePipeEvaluationStep leftStep = stepIter.next();
+    		leftStep.evaluate(new ValuePipe(parent) {
+    			@Override
+    			protected void next(Value leftValue) {
+    				evaluateNextMember(parent, leftValue, null, stepIter, bindings);
+    			}
+    		}, bindings);
+    	};
+    }
+
+    private void evaluateNextMember(ValuePipe parent, Value leftValue, String typeError, Iterator<ValuePipeEvaluationStep> stepIter, BindingSet bindings) {
+    	if (stepIter.hasNext()) {
+    		stepIter.next().evaluate(new ValuePipe(parent) {
+    			@Override
+    			protected void next(Value rightValue) {
+                    boolean result = leftValue == null && rightValue == null;
+                    if (!result) {
+        				QueryEvaluationUtility.Result cmp = QueryEvaluationUtility.compare(leftValue, rightValue, Compare.CompareOp.EQ, parentStrategy.isStrict());
+        				switch (cmp) {
+        					case _true:
+        						result = true;
+        						break;
+        					case _false:
+        					case incompatibleValueExpression:
+        						result = false;
+        						break;
+        					default:
+        						throw new AssertionError(cmp);
+        				}
+                    }
+                    if (result) {
+                        parent.push(TRUE);
+                    } else {
+    					evaluateNextMember(parent, leftValue, typeError, stepIter, bindings);
+                    }
+    			}
+    			@Override
+    			public void handleValueError(String errMsg) {
+   					evaluateNextMember(parent, leftValue, errMsg, stepIter, bindings);
+    			}
+    		}, bindings);
+    	} else if (typeError != null) {
             // cf. SPARQL spec a type error is thrown if the value is not in the
             // list and one of the list members caused a type error in the
             // comparison.
-            throw typeError;
-        }
-        return BooleanLiteral.valueOf(result);
+    		parent.handleValueError(typeError);
+    	} else {
+    		parent.push(FALSE);
+    	}
     }
 
     /**
-     * Evaluate a {@link CompareAny} node
+     * Precompiles a {@link CompareAny} node
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(CompareAny node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value leftValue = precompile(node.getArg()).evaluate(bindings);
-        // Result is false until a match has been found
-        boolean result = false;
-        // Use first binding name from tuple expr to compare values
+    private ValuePipeEvaluationStep precompileCompareAny(CompareAny node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep argStep = precompileValueExpr(node.getArg());
+		BindingSetPipeQueryEvaluationStep subQueryStep = parentStrategy.precompile(node.getSubQuery());
         String bindingName = node.getSubQuery().getBindingNames().iterator().next();
-        try (CloseableIteration<BindingSet, QueryEvaluationException> iter = parentStrategy.evaluate(node.getSubQuery(), bindings)) {
-            while (result == false && iter.hasNext()) {
-                BindingSet bindingSet = iter.next();
-                Value rightValue = bindingSet.getValue(bindingName);
-                try {
-                    result = QueryEvaluationUtil.compare(leftValue, rightValue, node.getOperator());
-                } catch (ValueExprEvaluationException e) {
-                    // ignore, maybe next value will match
-                }
-            }
-        }
-        return BooleanLiteral.valueOf(result);
+		return (valuePipe, bindings) -> {
+			argStep.evaluate(new ValuePipe(null) {
+				@Override
+				protected void next(Value argValue) {
+					subQueryStep.evaluate(new ValueBindingSetPipe(valuePipe) {
+						volatile Value hasMatch = FALSE;
+						@Override
+						protected boolean next(BindingSet bs) {
+							Value v = bs.getValue(bindingName);
+							boolean matches = false;
+	        				QueryEvaluationUtility.Result cmp = QueryEvaluationUtility.compare(argValue, v, node.getOperator(), parentStrategy.isStrict());
+	        				switch (cmp) {
+	        					case _true:
+	        						matches = true;
+	        						break;
+	        					case _false:
+	        					case incompatibleValueExpression:
+	        						matches = false;
+	        						break;
+	        					default:
+	        						throw new AssertionError(cmp);
+	        				}
+							if (matches) {
+								hasMatch = TRUE;
+			                }
+							return !matches;
+						}
+						@Override
+						protected void doClose() {
+							parent.push(hasMatch);
+						}
+					}, bindings);
+				}
+			}, bindings);
+		};
     }
 
     /**
-     * Evaluate a {@link CompareAll} node
+     * Precompiles a {@link CompareAll} node
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(CompareAll node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        Value leftValue = precompile(node.getArg()).evaluate(bindings);
-        // Result is true until a mismatch has been found
-        boolean result = true;
-        // Use first binding name from tuple expr to compare values
+    private ValuePipeEvaluationStep precompileCompareAll(CompareAll node) throws ValueExprEvaluationException, QueryEvaluationException {
+    	ValuePipeEvaluationStep argStep = precompileValueExpr(node.getArg());
+		BindingSetPipeQueryEvaluationStep subQueryStep = parentStrategy.precompile(node.getSubQuery());
         String bindingName = node.getSubQuery().getBindingNames().iterator().next();
-        try (CloseableIteration<BindingSet, QueryEvaluationException> iter = parentStrategy.evaluate(node.getSubQuery(), bindings)) {
-            while (result == true && iter.hasNext()) {
-                BindingSet bindingSet = iter.next();
-                Value rightValue = bindingSet.getValue(bindingName);
-                try {
-                    result = QueryEvaluationUtil.compare(leftValue, rightValue, node.getOperator());
-                } catch (ValueExprEvaluationException e) {
-                    // Exception thrown by ValueCompare.isTrue(...)
-                    result = false;
-                }
-            }
-        }
-        return BooleanLiteral.valueOf(result);
+		return (valuePipe, bindings) -> {
+			argStep.evaluate(new ValuePipe(null) {
+				@Override
+				protected void next(Value argValue) {
+					subQueryStep.evaluate(new ValueBindingSetPipe(valuePipe) {
+						volatile Value isMatch = TRUE;
+						@Override
+						protected boolean next(BindingSet bs) {
+							Value v = bs.getValue(bindingName);
+							boolean matches;
+	        				QueryEvaluationUtility.Result cmp = QueryEvaluationUtility.compare(argValue, v, node.getOperator(), parentStrategy.isStrict());
+	        				switch (cmp) {
+	        					case _true:
+	        						matches = true;
+	        						break;
+	        					case _false:
+	        					case incompatibleValueExpression:
+	        						matches = false;
+	        						break;
+	        					default:
+	        						throw new AssertionError(cmp);
+	        				}
+							if (!matches) {
+								isMatch = FALSE;
+							}
+							return matches;
+						}
+						@Override
+						protected void doClose() {
+							parent.push(isMatch);
+						}
+					}, bindings);
+				}
+			}, bindings);
+		};
     }
 
     /**
-     * Evaluate a {@link Exists} node
+     * Precompiles a {@link Exists} node
      * @param node the node to evaluate
-     * @param bindings the set of named value bindings
-     * @return
      * @throws ValueExprEvaluationException
      * @throws QueryEvaluationException
      */
-    private Value evaluate(Exists node, BindingSet bindings) throws ValueExprEvaluationException, QueryEvaluationException {
-        try (CloseableIteration<BindingSet, QueryEvaluationException> iter = parentStrategy.evaluate(node.getSubQuery(), bindings)) {
-            return BooleanLiteral.valueOf(iter.hasNext());
-        }
+    private ValuePipeEvaluationStep precompileExists(Exists node) throws ValueExprEvaluationException, QueryEvaluationException {
+		BindingSetPipeQueryEvaluationStep step = parentStrategy.precompile(node.getSubQuery());
+		return (valuePipe, bindings) -> {
+			step.evaluate(new ValueBindingSetPipe(valuePipe) {
+				volatile Value hasResult = FALSE;
+				@Override
+				protected boolean next(BindingSet bs) {
+					hasResult = TRUE;
+					return false;
+				}
+				@Override
+				protected void doClose() {
+					parent.push(hasResult);
+				}
+			}, bindings);
+		};
     }
 
-	private Value evaluate(ValueExprTripleRef node, BindingSet bindings) throws QueryEvaluationException {
-		Value subj = evaluate(node.getSubjectVar(), bindings);
-		if (!(subj instanceof Resource)) {
-			throw new ValueExprEvaluationException("no subject value");
-		}
-		Value pred = evaluate(node.getPredicateVar(), bindings);
-		if (!(pred instanceof IRI)) {
-			throw new ValueExprEvaluationException("no predicate value");
-		}
-		Value obj = evaluate(node.getObjectVar(), bindings);
-		if (obj == null) {
-			throw new ValueExprEvaluationException("no object value");
-		}
-		return tripleSource.getValueFactory().createTriple((Resource) subj, (IRI) pred, obj);
-
+	private ValuePipeEvaluationStep precompileValueExprTripleRef(ValueExprTripleRef node) throws QueryEvaluationException {
+		ValuePipeEvaluationStep subjStep = precompileVar(node.getSubjectVar());
+		ValuePipeEvaluationStep predStep = precompileVar(node.getPredicateVar());
+		ValuePipeEvaluationStep objStep = precompileVar(node.getObjectVar());
+		return (parent, bindings) -> {
+    		AtomicInteger args = new AtomicInteger(3);
+    		AtomicReference<Value> subjValue = new AtomicReference<>();
+    		AtomicReference<Value> predValue = new AtomicReference<>();
+    		AtomicReference<Value> objValue = new AtomicReference<>();
+    		Supplier<ValueOrError> resultSupplier = () -> {
+    			Value subj = subjValue.get();
+    			Value pred = predValue.get();
+    			Value obj = objValue.get();
+    			if (!(subj instanceof Resource)) {
+    				return ValueOrError.fail("no subject value");
+    			}
+    			if (!(pred instanceof IRI)) {
+    				return ValueOrError.fail("no predicate value");
+    			}
+    			if (obj == null) {
+    				return ValueOrError.fail("no object value");
+    			}
+    			return ValueOrError.ok(valueFactory.createTriple((Resource) subj, (IRI) pred, obj));
+    		};
+    		subjStep.evaluate(new MultiValuePipe(parent, args, v -> subjValue.set(v), resultSupplier), bindings);
+    		predStep.evaluate(new MultiValuePipe(parent, args, v -> predValue.set(v), resultSupplier), bindings);
+    		objStep.evaluate(new MultiValuePipe(parent, args, v -> objValue.set(v), resultSupplier), bindings);
+		};
 	}
+
+	private Value get(Consumer<ValuePipe> pushAction) {
+		final class GetTask implements Runnable {
+			final CountDownLatch done = new CountDownLatch(1);
+			volatile ValueOrError result;
+			@Override
+			public void run() {
+	        	pushAction.accept(new ValuePipe(null) {
+	    			@Override
+	    			protected void next(Value v) {
+	    				result = ValueOrError.ok(v); // maybe null
+	    				done.countDown();
+	    			}
+	    			@Override
+	    			public void handleValueError(String err) {
+	    				result = ValueOrError.fail(err);
+	    				done.countDown();
+	    			}
+	        	});
+			}
+			public Value get(long timeout) {
+				try {
+					done.await(timeout, TimeUnit.MILLISECONDS);
+				} catch (InterruptedException e) {
+					throw new QueryInterruptedException(e);
+				}
+				if (result.isOk()) {
+					return result.getValue();
+				} else {
+					throw new ValueExprEvaluationException(result.getMessage());
+				}
+			}
+		}
+		GetTask task = new GetTask();
+    	task.run();
+    	return task.get(pollTimeoutMillis);
+	}
+
+	ValueOrError ok(boolean b) {
+		return ValueOrError.ok(valueFactory.createLiteral(b));
+	}
+
+	ValueOrError of(QueryEvaluationUtility.Result result) {
+		switch (result) {
+			case _true:
+				return OK_TRUE;
+			case _false:
+				return OK_FALSE;
+			case incompatibleValueExpression:
+				return ValueOrError.fail("Incompatible value expression");
+			default:
+				throw new AssertionError(result);
+		}
+	}
+
+	ValueOrError effectiveBooleanLiteral(Value v) {
+		return of(QueryEvaluationUtility.getEffectiveBooleanValue(v));
+	}
+
+
+	static final class ConstantValuePipeEvaluationStep implements ValuePipeEvaluationStep {
+    	private final Value value;
+		protected ConstantValuePipeEvaluationStep(Value value) {
+			this.value = value;
+		}
+		@Override
+		public void evaluate(ValuePipe parent, BindingSet bindings) {
+			parent.push(value);
+		}
+    }
+
+	static final class ValueOrError {
+		private final Value v;
+		private final String err;
+		private ValueOrError(Value v, String err) {
+			this.v = v;
+			this.err = err;
+		}
+		boolean isOk() {
+			return (err == null); // Value can be null!
+		}
+		Value getValue() {
+			return v;
+		}
+		String getMessage() {
+			return err;
+		}
+		static ValueOrError ok(@Nullable Value v) {
+			return new ValueOrError(v, null);
+		}
+		static ValueOrError fail(String msg) {
+			return new ValueOrError(null, Objects.requireNonNull(msg));
+		}
+		static ValueOrError of(Supplier<Value> supplier) {
+			try {
+				return ok(supplier.get());
+			} catch (ValueExprEvaluationException e) {
+				return fail(e.getMessage());
+			}
+		}
+	}
+
+	static final class ConvertingValuePipe extends ValuePipe {
+    	private final java.util.function.Function<Value,ValueOrError> map;
+		protected ConvertingValuePipe(ValuePipe parent, java.util.function.Function<Value,ValueOrError> map) {
+			super(parent);
+			this.map = map;
+		}
+		@Override
+		protected void next(Value v) {
+			ValueOrError voe = map.apply(v);
+			if (voe.isOk()) {
+				parent.push(voe.getValue());
+			} else {
+				parent.handleValueError(voe.getMessage());
+			}
+		}
+    }
+
+    static final class MultiValuePipe extends ValuePipe {
+    	final AtomicInteger remaining;
+    	final Consumer<Value> valueConsumer;
+    	final Supplier<ValueOrError> resultSupplier;
+		protected MultiValuePipe(ValuePipe parent, AtomicInteger remaining, Consumer<Value> valueConsumer, Supplier<ValueOrError> resultSupplier) {
+			super(parent);
+			this.remaining = remaining;
+			this.valueConsumer = valueConsumer;
+			this.resultSupplier = resultSupplier;
+		}
+		@Override
+		protected void next(Value v) {
+			valueConsumer.accept(v);
+			if (remaining.decrementAndGet() == 0) {
+				ValueOrError result = resultSupplier.get();
+				if (result.isOk()) {
+					parent.push(result.getValue());
+				} else {
+					parent.handleValueError(result.getMessage());
+				}
+			}
+		}
+	}
+
+    static abstract class ValueBindingSetPipe extends BindingSetPipe {
+    	protected final ValuePipe parent;
+		protected ValueBindingSetPipe(ValuePipe parent) {
+			super(null);
+			this.parent = parent;
+		}
+		@Override
+		public final boolean handleException(Throwable e) {
+			if (e instanceof ValueExprEvaluationException) {
+				parent.handleValueError(e.getMessage());
+			} else if (e instanceof RuntimeException) {
+				throw (RuntimeException) e;
+			} else {
+				throw new QueryEvaluationException(e);
+			}
+			return false;
+		}
+    }
 }
