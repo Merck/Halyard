@@ -144,6 +144,7 @@ import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryContext;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.evaluation.RDFStarTripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.ValueExprEvaluationException;
@@ -235,7 +236,7 @@ final class HalyardTupleExprEvaluation {
 
 			@Override
 			public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(BindingSet bindings) {
-				return executor.pushAndPull(pipe -> step.evaluate(pipe, bindings), expr, bindings, parentStrategy);
+				return executor.pushAndPull(step, expr, bindings, parentStrategy);
 			}
     	};
     }
@@ -346,9 +347,9 @@ final class HalyardTupleExprEvaluation {
 		}
 
 		try {
-			Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory = evaluateStatementPattern(sp, bindings, ts);
-			if (iterFactory != null) {
-		        executor.pullAndPushAsync(parent, iterFactory, sp, bindings, parentStrategy);
+			QueryEvaluationStep evalStep = evaluateStatementPattern(sp, bindings, ts);
+			if (evalStep != null) {
+		        executor.pullAndPushAsync(parent, evalStep, sp, bindings, parentStrategy);
 			} else {
 				parent.empty();
 			}
@@ -357,7 +358,7 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
-    private Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> evaluateStatementPattern(final StatementPattern sp, final BindingSet bindings, TripleSource tripleSource) {
+    private QueryEvaluationStep evaluateStatementPattern(final StatementPattern sp, final BindingSet bindings, TripleSource tripleSource) {
         final Var subjVar = sp.getSubjectVar(); //subject
         final Var predVar = sp.getPredicateVar(); //predicate
         final Var objVar = sp.getObjectVar(); //object
@@ -581,8 +582,8 @@ final class HalyardTupleExprEvaluation {
 					return;
 				}
 
-				final Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory;
-				iterFactory = bs -> {
+				final QueryEvaluationStep evalStep;
+				evalStep = bs -> {
 					CloseableIteration<? extends Triple, QueryEvaluationException> sourceIter = ((RDFStarTripleSource) tripleSource)
 							.getRdfStarTriples((Resource) subjValue, (IRI) predValue, objValue);
 		
@@ -627,7 +628,7 @@ final class HalyardTupleExprEvaluation {
 						}
 					};
 				};
-				executor.pullAndPushAsync(parent, iterFactory, ref, bindings, parentStrategy);
+				executor.pullAndPushAsync(parent, evalStep, ref, bindings, parentStrategy);
 			};
 		} else {
 			return (parent, bindings) -> {
@@ -652,9 +653,9 @@ final class HalyardTupleExprEvaluation {
 					return;
 				}
 
-				final Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory;
+				final QueryEvaluationStep evalStep;
 				// standard reification iteration
-				iterFactory = bs -> {
+				evalStep = bs -> {
 					// 1. walk over resources used as subjects of (x rdf:type rdf:Statement)
 					final CloseableIteration<? extends Resource, QueryEvaluationException> iter = new ConvertingIteration<Statement, Resource, QueryEvaluationException>(
 							tripleSource.getStatements((Resource) extValue, RDF.TYPE, RDF.STATEMENT)) {
@@ -726,7 +727,7 @@ final class HalyardTupleExprEvaluation {
 						}
 					};
 				};
-				executor.pullAndPushAsync(parent, iterFactory, ref, bindings, parentStrategy);
+				executor.pullAndPushAsync(parent, evalStep, ref, bindings, parentStrategy);
 			};
 		}
 	}
@@ -1598,8 +1599,8 @@ final class HalyardTupleExprEvaluation {
             if (fs instanceof BindingSetPipeFederatedService) {
             	((BindingSetPipeFederatedService)fs).select(pipe, service, freeVars, bindings, baseUri);
             } else {
-                Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory = bs -> fs.select(service, freeVars, bs, baseUri);
-                executor.pullAndPushAsync(pipe, iterFactory, service, bindings, parentStrategy);
+                QueryEvaluationStep evalStep = bs -> fs.select(service, freeVars, bs, baseUri);
+                executor.pullAndPushAsync(pipe, evalStep, service, bindings, parentStrategy);
             }
         } catch (QueryEvaluationException e) {
             // suppress exceptions if silent

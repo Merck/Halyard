@@ -32,8 +32,6 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 import javax.management.JMException;
 import javax.management.MBeanServer;
@@ -53,6 +51,7 @@ import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.slf4j.Logger;
@@ -222,24 +221,28 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 	/**
      * Asynchronously pulls from an iteration of binding sets and pushes to a {@link BindingSetPipe}.
      * @param pipe the pipe that evaluation results are returned on
-     * @param iter
+     * @param evalStep query step to evaluate
      * @param node an implementation of any {@TupleExpr} sub-type
+     * @param bs binding set
+     * @param strategy
      */
 	void pullAndPushAsync(BindingSetPipe pipe,
-			Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory,
+			QueryEvaluationStep evalStep,
 			TupleExpr node, BindingSet bs, HalyardEvaluationStrategy strategy) {
-		executor.execute(new IterateAndPipeTask(pipe, iterFactory, node, bs, strategy));
+		executor.execute(new IterateAndPipeTask(pipe, evalStep, node, bs, strategy));
     }
 
     /**
      * Asynchronously pushes to a pipe using the push action, and returns an iteration of binding sets to pull from.
-     * @param pushAction action to push to the pipe
+     * @param evalStep query step to evaluate
      * @param node an implementation of any {@TupleExpr} sub-type
+     * @param bs binding set
+     * @param strategy
      * @return iteration of binding sets to pull from.
      */
-	CloseableIteration<BindingSet, QueryEvaluationException> pushAndPull(Consumer<BindingSetPipe> pushAction, TupleExpr node, BindingSet bs, HalyardEvaluationStrategy strategy) {
+	CloseableIteration<BindingSet, QueryEvaluationException> pushAndPull(BindingSetPipeEvaluationStep evalStep, TupleExpr node, BindingSet bs, HalyardEvaluationStrategy strategy) {
         BindingSetPipeQueue queue = new BindingSetPipeQueue();
-        executor.execute(new PipeAndQueueTask(queue.pipe, pushAction, node, bs, strategy));
+        executor.execute(new PipeAndQueueTask(queue.pipe, evalStep, node, bs, strategy));
         return queue.iteration;
 	}
 
@@ -430,28 +433,28 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
      */
     final class IterateAndPipeTask extends PrioritizedTask {
         private final BindingSetPipe pipe;
-        private final Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory;
+        private final QueryEvaluationStep evalStep;
         private int pushPriority = MIN_SUB_PRIORITY;
         private CloseableIteration<BindingSet, QueryEvaluationException> iter;
 
         /**
          * Constructor for the class with the supplied variables
          * @param pipe The pipe to return evaluations to
-         * @param iterFactory The supplier for the iterator over the evaluation tree
+         * @param evalStep The query step to evaluation
          */
 		IterateAndPipeTask(BindingSetPipe pipe,
-				Function<BindingSet,CloseableIteration<BindingSet, QueryEvaluationException>> iterFactory,
+				QueryEvaluationStep evalStep,
 				TupleExpr expr, BindingSet bs, HalyardEvaluationStrategy strategy) {
 			super(expr, bs, strategy);
             this.pipe = pipe;
-            this.iterFactory = iterFactory;
+            this.evalStep = evalStep;
         }
 
 		boolean pushNext() {
         	try {
             	if (!pipe.isClosed()) {
             		if (iter == null) {
-                        iter = strategy.track(iterFactory.apply(bindingSet), queryNode);
+                        iter = strategy.track(evalStep.evaluate(bindingSet), queryNode);
                         return true;
             		} else {
 	                	if(iter.hasNext()) {
@@ -493,18 +496,18 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 
     final class PipeAndQueueTask extends PrioritizedTask {
         private final BindingSetPipe pipe;
-        private final Consumer<BindingSetPipe> pushAction;
+        private final BindingSetPipeEvaluationStep evalStep;
 
-		PipeAndQueueTask(BindingSetPipe pipe, Consumer<BindingSetPipe> pushAction, TupleExpr expr, BindingSet bs, HalyardEvaluationStrategy strategy) {
+		PipeAndQueueTask(BindingSetPipe pipe, BindingSetPipeEvaluationStep evalStep, TupleExpr expr, BindingSet bs, HalyardEvaluationStrategy strategy) {
 			super(expr, bs, strategy);
 			this.pipe = pipe;
-			this.pushAction = pushAction;
+			this.evalStep = evalStep;
 		}
 
 		@Override
 		public void run() {
 			try {
-				pushAction.accept(pipe);
+				evalStep.evaluate(pipe, bindingSet);
 			} catch(Throwable e) {
 				pipe.handleException(e);
 			}
