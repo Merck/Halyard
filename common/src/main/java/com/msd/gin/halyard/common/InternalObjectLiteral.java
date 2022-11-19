@@ -16,6 +16,10 @@ public class InternalObjectLiteral<T> implements ObjectLiteral<T> {
 
 	private final T obj;
 
+	public static <T> InternalObjectLiteral<T> of(T o) {
+		return new InternalObjectLiteral<>(o);
+	}
+
 	public InternalObjectLiteral(T o) {
 		this.obj = o;
 	}

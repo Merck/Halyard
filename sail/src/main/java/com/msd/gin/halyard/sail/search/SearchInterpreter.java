@@ -134,7 +134,7 @@ public class SearchInterpreter implements QueryOptimizer {
 			tfc.addArg(params.limitVar != null ? params.limitVar.clone() : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_RESULT_SIZE)));
 			tfc.addArg(params.fuzzinessVar != null ? params.fuzzinessVar.clone() : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_FUZZINESS)));
 			tfc.addArg(params.phraseSlopVar != null ? params.phraseSlopVar.clone() : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_PHRASE_SLOP)));
-			tfc.addArg(new ValueConstant(new InternalObjectLiteral<>(params.matches)));
+			tfc.addArg(new ValueConstant(InternalObjectLiteral.of(params.matches)));
 			for (SearchParams.MatchParams matchParams : params.matches) {
 				if (matchParams.matchVar != null) {
 					tfc.addResultVar(matchParams.matchVar.clone());

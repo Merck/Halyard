@@ -269,6 +269,18 @@ public class HalyardStrategyExtendedTest {
     }
 
     @Test
+    public void testNonConstantPatternRegex() {
+    	String q = "ASK { VALUES (?t ?p) {('abc' 'a.c')} FILTER(regex(?t, ?p)) }";
+        assertTrue(con.prepareBooleanQuery(QueryLanguage.SPARQL, q).evaluate());
+    }
+
+    @Test
+    public void testConstantIn() {
+    	String q = "ASK { FILTER('b' in ('a', 'b', 'c')) }";
+        assertTrue(con.prepareBooleanQuery(QueryLanguage.SPARQL, q).evaluate());
+    }
+
+    @Test
     public void testJoinEarlyTermination() throws Exception {
         con.add(getClass().getResource("/testdata-query/dataset-query.trig"));
     	String q = "PREFIX ex: <http://example.org/> SELECT * { ?s ex:name ?n; ex:hasParent ?p } LIMIT 4";
