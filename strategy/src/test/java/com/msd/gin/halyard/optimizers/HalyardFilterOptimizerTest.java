@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
+
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.algebra.And;
@@ -32,7 +34,6 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.parser.ParsedQuery;
 import org.eclipse.rdf4j.query.parser.QueryParserUtil;
 import org.junit.Test;
@@ -125,7 +126,7 @@ public class HalyardFilterOptimizerTest {
     public void testPropagateFilterMoreAgresivelly() {
 		TupleExpr expr = QueryParserUtil.parseQuery(QueryLanguage.SPARQL, "select * where {?a ?b ?c, ?d. filter (?d = ?nonexistent)}", "http://baseuri/").getTupleExpr();
 		getOptimizer().optimize(expr, null, null);
-        expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
+        expr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(Join node) throws RuntimeException {
                 assertEquals(expr.toString(), "Filter", node.getRightArg().getSignature());
@@ -151,7 +152,7 @@ public class HalyardFilterOptimizerTest {
     	TupleExpr expr = QueryParserUtil.parseQuery(QueryLanguage.SPARQL, "select * {?s <:p1> ?o1; <:p2> ?o2; <:p3> ?o3 filter(?o1 = \"x\")}", null).getTupleExpr();
         new StarJoinOptimizer().optimize(expr, null, null);
         getOptimizer().optimize(expr, null, null);
-        expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
+        expr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(Filter node) throws RuntimeException {
                 assertEquals(expr.toString(), "StarJoin", node.getParentNode().getSignature());

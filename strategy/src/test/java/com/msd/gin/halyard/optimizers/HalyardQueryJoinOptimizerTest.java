@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.util.ArrayList;
@@ -31,7 +32,6 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.parser.sparql.SPARQLParser;
 import org.junit.Test;
 
@@ -53,7 +53,7 @@ public class HalyardQueryJoinOptimizerTest {
     public void testQueryJoinOptimizerWithSimpleJoin() {
         final TupleExpr expr = new SPARQLParser().parseQuery("select * where {?a ?b ?c, \"1\".}", BASE_URI).getTupleExpr();
         new HalyardQueryJoinOptimizer(createStatistics()).optimize(expr, null, null);
-        expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
+        expr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(Join node) {
                 assertTrue(expr.toString(), ((StatementPattern)node.getLeftArg()).getObjectVar().hasValue());
@@ -66,7 +66,7 @@ public class HalyardQueryJoinOptimizerTest {
     public void testQueryJoinOptimizerWithSplitFunction() {
         final TupleExpr expr = new SPARQLParser().parseQuery("select * where {?a a \"1\";?b ?d. filter (<" + HALYARD.PARALLEL_SPLIT_FUNCTION + ">(10, ?d))}", BASE_URI).getTupleExpr();
         new HalyardQueryJoinOptimizer(createStatistics()).optimize(expr, null, null);
-        expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
+        expr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(Join node) {
                 assertTrue(expr.toString(), ((StatementPattern)node.getLeftArg()).getObjectVar().hasValue());
@@ -79,7 +79,7 @@ public class HalyardQueryJoinOptimizerTest {
     public void testQueryJoinOptimizerWithBind() {
         final TupleExpr expr = new SPARQLParser().parseQuery("SELECT * WHERE { BIND (<http://whatever/obj> AS ?b)  ?a <http://whatever/pred> ?b , \"whatever\".}", BASE_URI).getTupleExpr();
         new HalyardQueryJoinOptimizer(createStatistics()).optimize(expr, null, null);
-        expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
+        expr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(Join node) {
                 if (node.getLeftArg() instanceof StatementPattern) {
@@ -102,7 +102,7 @@ public class HalyardQueryJoinOptimizerTest {
         predicateStats.put(pred3, 25.0);
         new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(() -> new MockStatementPatternCardinalityCalculator(predicateStats), null)).optimize(expr, null, null);
         List<IRI> joinOrder = new ArrayList<>();
-        expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
+        expr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(Join node) {
                 if (node.getLeftArg() instanceof StatementPattern) {
@@ -132,7 +132,7 @@ public class HalyardQueryJoinOptimizerTest {
         predicateStats.put(predb, 45.0);
         new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(() -> new MockStatementPatternCardinalityCalculator(predicateStats), null)).optimize(expr, null, null);
         List<IRI> joinOrder = new ArrayList<>();
-        expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
+        expr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(Join node) {
                 if (node.getLeftArg() instanceof StatementPattern) {
@@ -161,7 +161,7 @@ public class HalyardQueryJoinOptimizerTest {
         new StarJoinOptimizer().optimize(expr, null, null);
         new HalyardQueryJoinOptimizer(new HalyardEvaluationStatistics(() -> new MockStatementPatternCardinalityCalculator(predicateStats), null)).optimize(expr, null, null);
         List<IRI> joinOrder = new ArrayList<>();
-        expr.visit(new AbstractQueryModelVisitor<RuntimeException>(){
+        expr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>(){
             @Override
             public void meet(StatementPattern node) {
                 joinOrder.add((IRI) node.getPredicateVar().getValue());

@@ -1,6 +1,7 @@
 package com.msd.gin.halyard.repository;
 
 import com.google.common.base.Stopwatch;
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.query.BindingSetPipe;
 import com.msd.gin.halyard.query.EmptyTripleSource;
@@ -49,7 +50,6 @@ import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.collectors.StatementPatternCollector;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
 import org.eclipse.rdf4j.query.parser.ParsedUpdate;
@@ -538,7 +538,7 @@ public class HBaseUpdate extends SailUpdate {
 		}
 	}
 
-	static class WhereCollector extends AbstractQueryModelVisitor<RuntimeException> {
+	static class WhereCollector extends AbstractExtendedQueryModelVisitor<RuntimeException> {
 		private final List<TupleFunctionCall> tupleFunctionCalls = new ArrayList<>();
 
 		static List<TupleFunctionCall> process(TupleExpr expr) {

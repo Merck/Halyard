@@ -1,5 +1,6 @@
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.Algorithms;
 
 import java.io.InputStream;
@@ -15,7 +16,6 @@ import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.TupleQueryResultBuilder;
 import org.eclipse.rdf4j.query.resultio.QueryResultIO;
 import org.eclipse.rdf4j.query.resultio.TupleQueryResultFormat;
@@ -231,7 +231,7 @@ public class HalyardStrategyJoinTest {
         assertEquals(expr.toString(), expectedResults, results);
 
         List<BinaryTupleOperator> joins = new ArrayList<>();
-        expr.visit(new AbstractQueryModelVisitor<RuntimeException>() {
+        expr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>() {
 			@Override
 			public void meet(Join node) {
 				joins.add(node);

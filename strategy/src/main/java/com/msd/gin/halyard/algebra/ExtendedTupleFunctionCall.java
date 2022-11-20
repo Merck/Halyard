@@ -11,7 +11,6 @@ import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 
 public class ExtendedTupleFunctionCall extends TupleFunctionCall {
 	private static final long serialVersionUID = 2773708379343562817L;
@@ -100,7 +99,7 @@ public class ExtendedTupleFunctionCall extends TupleFunctionCall {
 				}
 			} else if (!(expr instanceof ValueConstant)) {
 				// everything else
-				expr.visitChildren(new AbstractQueryModelVisitor<RuntimeException>() {
+				expr.visitChildren(new AbstractExtendedQueryModelVisitor<RuntimeException>() {
 					@Override
 					public void meet(Var var) {
 						if (!var.hasValue()) {

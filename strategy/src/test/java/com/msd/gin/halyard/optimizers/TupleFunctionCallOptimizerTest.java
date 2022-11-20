@@ -1,5 +1,6 @@
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
 
@@ -21,7 +22,6 @@ import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.QueryModelNormalizerOptimizer;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -124,7 +124,7 @@ public class TupleFunctionCallOptimizerTest {
 
 	private List<Join> getJoins(TupleExpr expr) {
 		List<Join> joins = new ArrayList<>();
-		expr.visit(new AbstractQueryModelVisitor<RuntimeException>() {
+		expr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>() {
 			@Override
 			public void meet(Join node) throws RuntimeException {
 				joins.add(node);

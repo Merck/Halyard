@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.sail.ElasticSettings;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
@@ -43,7 +44,6 @@ import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.sail.SailException;
@@ -94,7 +94,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
 						getStatistics().updateCardinalityMap(expr, Collections.emptySet(), Collections.emptySet(), cardMap);
 		                final StringBuilder buf = new StringBuilder(256);
 		                buf.append(msg).append(System.lineSeparator());
-		                expr.visit(new AbstractQueryModelVisitor<RuntimeException>() {
+		                expr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>() {
 		                    private int indentLevel = 0;
 		                    @Override
 		                    protected void meetNode(QueryModelNode node) {

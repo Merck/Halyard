@@ -84,17 +84,17 @@ public class ExtendedEvaluationStatistics extends EvaluationStatistics {
 		}
 
         @Override
-        protected void meetNode(QueryModelNode node) {
-        	if (node instanceof StarJoin) {
-        		meetStarJoin((StarJoin) node);
-        	} else if (node instanceof TupleFunctionCall) {
-        		meetTupleFunctionCall((TupleFunctionCall) node);
-            } else {
-                node.visitChildren(this);
-            }
-        }
+    	public void meetOther(QueryModelNode node) {
+    		if (node instanceof TupleFunctionCall) {
+    			meet((TupleFunctionCall)node);
+    		} else if (node instanceof StarJoin) {
+    			meet((StarJoin)node);
+    		} else {
+    			super.meetOther(node);
+    		}
+    	}
 
-        protected void meetStarJoin(StarJoin node) {
+        public void meet(StarJoin node) {
         	double card = Double.POSITIVE_INFINITY;
         	for (TupleExpr sp : node.getArgs()) {
         		sp.visit(this);
@@ -107,7 +107,7 @@ public class ExtendedEvaluationStatistics extends EvaluationStatistics {
             cardinality = card*Math.pow(VAR_CARDINALITY*VAR_CARDINALITY, (double)(vars.size()-constCount)/vars.size());
         }
 
-        protected void meetTupleFunctionCall(TupleFunctionCall node) {
+        public void meet(TupleFunctionCall node) {
 			// must have all arguments bound to be able to evaluate
 			double argCard = 1.0;
 			for (ValueExpr expr : node.getArgs()) {

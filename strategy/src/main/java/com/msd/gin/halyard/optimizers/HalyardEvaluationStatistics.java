@@ -203,13 +203,15 @@ public final class HalyardEvaluationStatistics extends ExtendedEvaluationStatist
             updateMap(node);
         }
 
-        protected void meetStarJoin(StarJoin node) {
-        	super.meetStarJoin(node);
+        @Override
+        public void meet(StarJoin node) {
+        	super.meet(node);
         	updateMap(node);
         }
 
-        protected void meetTupleFunctionCall(TupleFunctionCall node) {
-        	super.meetTupleFunctionCall(node);
+        @Override
+        public void meet(TupleFunctionCall node) {
+        	super.meet(node);
 			updateMap(node);
 		}
 

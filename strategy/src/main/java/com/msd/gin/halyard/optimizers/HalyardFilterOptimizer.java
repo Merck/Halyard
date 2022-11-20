@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.StarJoin;
 
 import java.util.ArrayList;
@@ -40,7 +41,6 @@ import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Union;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractSimpleQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.collectors.VarNameCollector;
 
@@ -124,7 +124,7 @@ public final class HalyardFilterOptimizer implements QueryOptimizer {
 		}
 	}
 
-	private static class FilterRelocator extends AbstractQueryModelVisitor<RuntimeException> {
+	private static class FilterRelocator extends /*Halyard*/AbstractExtendedQueryModelVisitor<RuntimeException> {
 
 		private final Filter filter;
 		private final List<String> filterVars;
@@ -139,19 +139,16 @@ public final class HalyardFilterOptimizer implements QueryOptimizer {
 			filter.visit(new FilterRelocator(filter));
 		}
 
-		// Halyard
 		@Override
 		protected void meetNode(QueryModelNode node) {
-			if (node instanceof StarJoin) {
-				meetStarJoin((StarJoin) node);
-			} else {
-				assert node instanceof TupleExpr;
-				relocate(filter, (TupleExpr) node);
-			}
+			// By default, do not traverse
+			assert node instanceof TupleExpr;
+			relocate(filter, (TupleExpr) node);
 		}
 
 		// Halyard
-		private void meetStarJoin(StarJoin node) {
+		@Override
+		public void meet(StarJoin node) {
 			for (TupleExpr expr : node.getArgs()) {
 				if (expr.getBindingNames().containsAll(filterVars)) {
 					expr.visit(this);

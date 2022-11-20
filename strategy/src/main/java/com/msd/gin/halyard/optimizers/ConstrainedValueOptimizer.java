@@ -1,5 +1,6 @@
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.ConstrainedStatementPattern;
 import com.msd.gin.halyard.common.ValueType;
 
@@ -32,7 +33,6 @@ import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.BGPCollector;
 
 public class ConstrainedValueOptimizer implements QueryOptimizer {
@@ -42,7 +42,7 @@ public class ConstrainedValueOptimizer implements QueryOptimizer {
 		tupleExpr.visit(new ConstraintScanner());
 	}
 
-	static final class ConstraintScanner extends AbstractQueryModelVisitor<RuntimeException> {
+	static final class ConstraintScanner extends AbstractExtendedQueryModelVisitor<RuntimeException> {
 		private void processGraphPattern(ConstraintCollector gpc) {
 			for (StatementPattern sp: gpc.getStatementPatterns()) {
 				Var s = sp.getSubjectVar();

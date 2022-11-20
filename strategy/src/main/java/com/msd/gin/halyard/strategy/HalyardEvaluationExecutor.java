@@ -18,6 +18,7 @@ package com.msd.gin.halyard.strategy;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.ServiceRoot;
 import com.msd.gin.halyard.query.BindingSetPipe;
@@ -52,7 +53,6 @@ import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -267,7 +267,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
             final AtomicInteger counter = new AtomicInteger(startingPriority);
 
             // populate the priority cache
-            new AbstractQueryModelVisitor<RuntimeException>() {
+            new AbstractExtendedQueryModelVisitor<RuntimeException>() {
                 @Override
                 protected void meetNode(QueryModelNode n) {
                     int pp = counter.getAndIncrement();
@@ -367,7 +367,7 @@ final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean
 	}
 
 	static String printQueryNode(TupleExpr queryNode, BindingSet bs) {
-		final class NodePrinter extends AbstractQueryModelVisitor<RuntimeException> {
+		final class NodePrinter extends AbstractExtendedQueryModelVisitor<RuntimeException> {
 			final StringBuilder sb = new StringBuilder(128);
 			@Override
 			public void meetNode(QueryModelNode node) {

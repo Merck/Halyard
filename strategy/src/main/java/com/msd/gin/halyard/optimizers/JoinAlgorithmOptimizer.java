@@ -1,5 +1,6 @@
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.Algorithms;
 
 import org.eclipse.rdf4j.query.BindingSet;
@@ -11,7 +12,6 @@ import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 
 public class JoinAlgorithmOptimizer implements QueryOptimizer {
 	private static double INDEX_LOOKUP_COST = 10;
@@ -34,7 +34,7 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 
 	@Override
 	public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-		tupleExpr.visit(new AbstractQueryModelVisitor<RuntimeException>() {
+		tupleExpr.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>() {
 			@Override
 			public void meet(Join join) {
 				super.meet(join);

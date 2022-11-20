@@ -18,6 +18,7 @@ package com.msd.gin.halyard.optimizers;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.BGPCollector;
 import com.msd.gin.halyard.algebra.StarJoin;
@@ -39,7 +40,6 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 
 public class StarJoinOptimizer implements QueryOptimizer {
 
@@ -48,7 +48,7 @@ public class StarJoinOptimizer implements QueryOptimizer {
 		tupleExpr.visit(new StarJoinFinder());
 	}
 
-	static class StarJoinFinder extends AbstractQueryModelVisitor<RDF4JException> {
+	static class StarJoinFinder extends AbstractExtendedQueryModelVisitor<RDF4JException> {
 
 		@Override
 		public void meet(Service node) throws RDF4JException {

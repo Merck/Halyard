@@ -21,8 +21,12 @@ public abstract class AbstractExtendedQueryModelVisitor<X extends Exception> ext
 		meetNode(node);
 	}
 
-	public void meet(StarJoin node) throws X {
+	protected void meetNAryTupleOperator(NAryTupleOperator node) throws X {
 		meetNode(node);
+	}
+
+	public void meet(StarJoin node) throws X {
+		meetNAryTupleOperator(node);
 	}
 
 }
