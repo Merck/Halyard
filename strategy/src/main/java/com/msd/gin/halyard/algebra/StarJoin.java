@@ -22,7 +22,6 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
-import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.QueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
@@ -32,7 +31,7 @@ import org.eclipse.rdf4j.query.algebra.helpers.collectors.StatementPatternCollec
 
 /**
  * Collection of joins (incl. filters) that share a common subject var and context var (if present), e.g. ?s :p1 ?o1; :p2 ?o2; :p3 ?o3.
- * In some cases, it is faster to evaluate these as ?s ?p ?o and then filter the results (?s known at evaluation time).
+ * In some cases, it is faster to evaluate these as ?s ?p ?o and then filter the results (?s can be determined at evaluation time, either from the available bindings or by evaluating the first argument).
  */
 public class StarJoin extends NAryTupleOperator {
 	private static final long serialVersionUID = -4523270958311045771L;
@@ -117,21 +116,5 @@ public class StarJoin extends NAryTupleOperator {
 		}
 
 		return clone;
-	}
-
-
-	public static final class TopJoin extends Join {
-		private static final long serialVersionUID = 8151800716831792753L;
-
-		public TopJoin(TupleExpr parent, TupleExpr left, TupleExpr right) {
-			super(left, right);
-			setParentNode(parent);
-		}
-
-		@Override
-		public void setResultSizeActual(long resultSizeActual) {
-			super.setResultSizeActual(resultSizeActual);
-			getParentNode().setResultSizeActual(resultSizeActual);
-		}
 	}
 }
