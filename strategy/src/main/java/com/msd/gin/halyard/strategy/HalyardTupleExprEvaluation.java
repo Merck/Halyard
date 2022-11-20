@@ -1030,12 +1030,23 @@ final class HalyardTupleExprEvaluation {
      */
     private BindingSetPipeEvaluationStep precompileGroup(Group group) {
         BindingSetPipeEvaluationStep step = precompileTupleExpr(group.getArg());
+        List<GroupElem> elems = group.getGroupElements();
+        ValuePipeQueryValueEvaluationStep[] opArgSteps = new ValuePipeQueryValueEvaluationStep[elems.size()];
+        for (int i=0; i<opArgSteps.length; i++) {
+        	AggregateOperator op = elems.get(i).getOperator();
+        	if (op instanceof UnaryValueOperator) {
+        		ValueExpr arg = ((UnaryValueOperator)op).getArg();
+        		if (arg != null) {
+        			opArgSteps[i] = parentStrategy.precompile(arg, evalContext);
+        		}
+        	}
+		}
     	if (group.getGroupBindingNames().isEmpty()) {
     		// no GROUP BY present
     		return (parent, bindings) -> {
     	    	parentStrategy.initTracking(group);
 	    		step.evaluate(new BindingSetPipe(parent) {
-	    			final GroupValue aggregators = createGroupValue(group, bindings);
+	    			final GroupValue aggregators = createGroupValue(group, opArgSteps, bindings);
 					@Override
 					protected boolean next(BindingSet bs) {
 						aggregators.addValues(bs);
@@ -1063,7 +1074,7 @@ final class HalyardTupleExprEvaluation {
 	    			final String[] groupNames = toStringArray(group.getGroupBindingNames());
 					@Override
 					protected boolean next(BindingSet bs) {
-						GroupValue aggregators = groupByMap.computeIfAbsent(BindingSetValues.create(groupNames, bs), k -> createGroupValue(group, bindings));
+						GroupValue aggregators = groupByMap.computeIfAbsent(BindingSetValues.create(groupNames, bs), k -> createGroupValue(group, opArgSteps, bindings));
 						aggregators.addValues(bs);
 						return true;
 					}
@@ -1081,8 +1092,9 @@ final class HalyardTupleExprEvaluation {
 							}
 						} else {
 							QueryBindingSet result = new QueryBindingSet(bindings);
-							for (GroupElem ge : group.getGroupElements()) {
-								Aggregator<?,?> agg = createAggregator(ge.getOperator(), bindings);
+							for (int i=0; i<opArgSteps.length; i++) {
+								GroupElem ge = elems.get(i);
+								Aggregator<?,?> agg = createAggregator(ge.getOperator(), opArgSteps[i], bindings);
 								if (agg != null) {
 									try {
 										Value v = agg.getValue();
@@ -1111,10 +1123,12 @@ final class HalyardTupleExprEvaluation {
     	}
     }
 
-    private GroupValue createGroupValue(Group group, BindingSet parentBindings) {
+    private GroupValue createGroupValue(Group group, ValuePipeQueryValueEvaluationStep[] opArgSteps, BindingSet parentBindings) {
 		Map<String,Aggregator<?,?>> aggregators = new HashMap<>();
-		for (GroupElem ge : group.getGroupElements()) {
-			Aggregator<?,?> agg = createAggregator(ge.getOperator(), parentBindings);
+        List<GroupElem> elems = group.getGroupElements();
+		for (int i=0; i<opArgSteps.length; i++) {
+			GroupElem ge = elems.get(i);
+			Aggregator<?,?> agg = createAggregator(ge.getOperator(), opArgSteps[i], parentBindings);
 			if (agg != null) {
 				aggregators.put(ge.getName(), agg);
 			}
@@ -1166,12 +1180,12 @@ final class HalyardTupleExprEvaluation {
 
 	private static final Predicate<?> ALWAYS_TRUE = (v) -> true;
 
-	private Aggregator<?,?> createAggregator(AggregateOperator operator, BindingSet parentBindings) {
+	private Aggregator<?,?> createAggregator(AggregateOperator operator, ValuePipeQueryValueEvaluationStep opArgStep, BindingSet parentBindings) {
     	boolean isDistinct = operator.isDistinct();
 		if (operator instanceof Count) {
 			Count count = (Count) operator;
 			if (count.getArg() != null) {
-				QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(count.getArg(), evalContext));
+				QueryValueStepEvaluator eval = new QueryValueStepEvaluator(opArgStep);
 				Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 				return Aggregator.create(new CountAggregateFunction(eval), distinct, new LongCollector(tripleSource.getValueFactory()));
 			} else {
@@ -1179,28 +1193,28 @@ final class HalyardTupleExprEvaluation {
 				return Aggregator.create(new WildcardCountAggregateFunction(), distinct, new LongCollector(tripleSource.getValueFactory()));
 			}
 		} else if (operator instanceof Min) {
-			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(((Min)operator).getArg(), evalContext));
+			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(opArgStep);
 			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			return Aggregator.create(new MinAggregateFunction(eval), distinct, new ValueCollector(parentStrategy.isStrict()));
 		} else if (operator instanceof Max) {
-			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(((Max)operator).getArg(), evalContext));
+			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(opArgStep);
 			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			return Aggregator.create(new MaxAggregateFunction(eval), distinct, new ValueCollector(parentStrategy.isStrict()));
 		} else if (operator instanceof Sum) {
-			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(((Sum)operator).getArg(), evalContext));
+			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(opArgStep);
 			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			return Aggregator.create(new SumAggregateFunction(eval), distinct, new NumberCollector());
 		} else if (operator instanceof Avg) {
-			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(((Avg)operator).getArg(), evalContext));
+			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(opArgStep);
 			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			return Aggregator.create(new AvgAggregateFunction(eval), distinct, new AvgCollector(tripleSource.getValueFactory()));
 		} else if (operator instanceof Sample) {
-			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(((Sample)operator).getArg(), evalContext));
+			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(opArgStep);
 			Predicate<Value> distinct = (Predicate<Value>) ALWAYS_TRUE;
 			return Aggregator.create(new SampleAggregateFunction(eval), distinct, new SampleCollector());
 		} else if (operator instanceof GroupConcat) {
 			GroupConcat grpConcat = (GroupConcat) operator;
-			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(grpConcat.getArg(), evalContext));
+			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(opArgStep);
 			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			String sep;
 			ValueExpr sepExpr = grpConcat.getSeparator();
@@ -1214,7 +1228,7 @@ final class HalyardTupleExprEvaluation {
 			AggregateFunctionCall aggFuncCall = (AggregateFunctionCall) operator;
 			AggregateFunctionFactory aggFuncFactory = aggregateFunctionRegistry.get(aggFuncCall.getIRI())
 				.orElseThrow(() -> new QueryEvaluationException("Unknown aggregate function '" + aggFuncCall.getIRI() + "'"));
-			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(parentStrategy.precompile(aggFuncCall.getArg(), evalContext));
+			QueryValueStepEvaluator eval = new QueryValueStepEvaluator(opArgStep);
 			AggregateFunction aggFunc = aggFuncFactory.buildFunction(eval);
 			Predicate<Value> distinct = isDistinct ? createDistinctValues() : (Predicate<Value>) ALWAYS_TRUE;
 			if (aggFunc.getClass().getAnnotation(ThreadSafe.class) != null) {
