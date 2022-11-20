@@ -7,6 +7,8 @@
  *******************************************************************************/
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,7 +29,6 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.TupleExprs;
 
@@ -57,7 +58,7 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 		tupleExpr.visit(new JoinVisitor(statistics));
 	}
 
-	protected static class JoinVisitor extends AbstractQueryModelVisitor<RuntimeException> {
+	protected static class JoinVisitor extends /*Halyard*/AbstractExtendedQueryModelVisitor<RuntimeException> {
 
 		private final ExtendedEvaluationStatistics statistics;
 		Set<String> boundVars = new HashSet<>();

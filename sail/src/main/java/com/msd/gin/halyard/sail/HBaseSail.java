@@ -177,7 +177,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
 	final String snapshotName;
 	final Path snapshotRestorePath;
 	final boolean create;
-    final boolean pushStrategy;
+	final boolean pushStrategy;
 	final int splitBits;
 	protected HalyardEvaluationStatistics statistics;
 	final int evaluationTimeoutSecs;

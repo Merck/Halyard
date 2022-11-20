@@ -3,7 +3,6 @@ package com.msd.gin.halyard.strategy;
 import com.msd.gin.halyard.optimizers.ConstrainedValueOptimizer;
 import com.msd.gin.halyard.optimizers.ExtendedEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.QueryJoinOptimizer;
-import com.msd.gin.halyard.optimizers.TupleFunctionCallOptimizer;
 
 import java.util.Arrays;
 
@@ -56,7 +55,6 @@ public class ExtendedQueryOptimizerPipeline implements QueryOptimizerPipeline {
 			new FilterOptimizer(),
 			new ConstrainedValueOptimizer(),
 			new OrderLimitOptimizer(),
-			new TupleFunctionCallOptimizer(),
 			new ParentReferenceCleaner()
 		);
 	}

@@ -2370,13 +2370,17 @@ final class HalyardTupleExprEvaluation {
     }
 
     private void evaluateStarJoin(BindingSetPipe parent, StarJoin starJoin, BindingSet bindings) {
-    	Join nestedJoins = starJoin.toJoins();
+    	// Detach the args into a join tree.
+    	List<? extends TupleExpr> args = starJoin.getArgs();
+    	Join nestedJoins = (Join) Algebra.join(args);
     	Join topJoin = new StarJoin.TopJoin(starJoin, nestedJoins.getLeftArg(), nestedJoins.getRightArg());
 		JoinAlgorithmOptimizer algoOpt = parentStrategy.getJoinAlgorithmOptimizer();
     	if (algoOpt != null) {
     		algoOpt.optimize(topJoin, null, null);
     	}
-        BindingSetPipeEvaluationStep step = precompileTupleExpr(topJoin);
+        BindingSetPipeEvaluationStep step = precompileJoin(topJoin);
+        // now re-attach
+        starJoin.setArgs(args);
     	step.evaluate(parent, bindings);
     }
 

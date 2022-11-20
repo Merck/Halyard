@@ -16,10 +16,12 @@
  */
 package com.msd.gin.halyard.optimizers;
 
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.StarJoin;
 import com.msd.gin.halyard.vocab.HALYARD;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,12 +33,9 @@ import org.eclipse.rdf4j.query.IncompatibleOperationException;
 import org.eclipse.rdf4j.query.algebra.Extension;
 import org.eclipse.rdf4j.query.algebra.FunctionCall;
 import org.eclipse.rdf4j.query.algebra.Join;
-import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
-import org.eclipse.rdf4j.query.algebra.helpers.collectors.StatementPatternCollector;
 
 /**
  *
@@ -51,7 +50,7 @@ public final class HalyardQueryJoinOptimizer extends QueryJoinOptimizer {
     @Override
     public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
         final Set<String> parallelSplitBounds = new HashSet<>();
-        tupleExpr.visit(new AbstractQueryModelVisitor<IncompatibleOperationException>() {
+        tupleExpr.visit(new AbstractExtendedQueryModelVisitor<IncompatibleOperationException>() {
             @Override
             public void meet(FunctionCall node) throws IncompatibleOperationException {
                 if (HALYARD.PARALLEL_SPLIT_FUNCTION.stringValue().equals(node.getURI())) {
@@ -86,22 +85,31 @@ public final class HalyardQueryJoinOptimizer extends QueryJoinOptimizer {
             }
 
             @Override
-            public void meetNode(QueryModelNode node) {
-            	if (node instanceof StarJoin) {
-            		meetStarJoin((StarJoin) node);
-            	} else {
-            		super.meetNode(node);
-            	}
-            }
-
-            private void meetStarJoin(StarJoin node) {
-            	Join joins = node.toJoins();
+            public void meet(StarJoin node) {
+            	List<? extends TupleExpr> sjArgs = node.getArgs();
+            	// Detach the args into a join tree.
+            	Join joins = (Join) Algebra.join(sjArgs);
             	TupleExpr root = Algebra.ensureRooted(joins);
             	// optimize the join order
             	meet(joins);
-        		StatementPatternCollector spc = new StatementPatternCollector();
-        		root.visit(spc);
-            	node.setStatementPatterns(spc.getStatementPatterns());
+            	// re-attach in new order
+            	List<TupleExpr> orderedArgs = new ArrayList<>(sjArgs.size());
+        		root.visit(new AbstractExtendedQueryModelVisitor<RuntimeException>() {
+        			@Override
+        			public void meet(Join join) {
+        				TupleExpr left = join.getLeftArg();
+        				TupleExpr right = join.getRightArg();
+        				// joins should be right-recursive
+        				assert !(left instanceof Join);
+       					orderedArgs.add(left);
+       					if (!(right instanceof Join)) {
+       						// leaf join has both left and right
+       						orderedArgs.add(right);
+       					}
+       					right.visit(this);
+        			}
+				});
+            	node.setArgs(orderedArgs);
             }
 
             @Override

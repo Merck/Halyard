@@ -25,7 +25,6 @@ import com.msd.gin.halyard.optimizers.HalyardQueryJoinOptimizer;
 import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.optimizers.QueryJoinOptimizer;
 import com.msd.gin.halyard.optimizers.StarJoinOptimizer;
-import com.msd.gin.halyard.optimizers.TupleFunctionCallOptimizer;
 
 import java.util.Arrays;
 
@@ -89,7 +88,6 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 			new HalyardFilterOptimizer(),
 			new ConstrainedValueOptimizer(),
 			new OrderLimitOptimizer(),
-			new TupleFunctionCallOptimizer(),
 			new ParentReferenceCleaner(),
 			joinAlgoOptimizer
 		);

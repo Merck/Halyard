@@ -36,7 +36,7 @@ import org.eclipse.rdf4j.query.algebra.helpers.collectors.StatementPatternCollec
 
 /**
  * Collection of joins (incl. filters) that share a common subject var and context var (if present), e.g. ?s :p1 ?o1; :p2 ?o2; :p3 ?o3.
- * In some cases, it is faster to evaluate these as ?s ?p ?o then filter the results (?s known at evaluation time).
+ * In some cases, it is faster to evaluate these as ?s ?p ?o and then filter the results (?s known at evaluation time).
  */
 public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 	private static final long serialVersionUID = -4523270958311045771L;
@@ -49,7 +49,7 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 		assert exprs.size() > 1;
 		setCommonVar(commonVar);
 		setContextVar(contextVar);
-		setStatementPatterns(exprs);
+		setArgs(exprs);
 	}
 
 	public void setCommonVar(Var var) {
@@ -76,15 +76,15 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 		return Arrays.asList(args);
 	}
 
-	public void setStatementPatterns(List<StatementPattern> exprs) {
+	public void setArgs(List<? extends TupleExpr> exprs) {
 		args = new TupleExpr[exprs.size()];
 		for (int i=0; i<exprs.size(); i++) {
-			StatementPattern sp = exprs.get(i);
-			setStatementPattern(i, sp);
+			TupleExpr te = exprs.get(i);
+			setArgs(i, te);
 		}
 	}
 
-	private void setStatementPattern(int i, TupleExpr sp) {
+	private void setArgs(int i, TupleExpr sp) {
 		sp.setParentNode(this);
 		args[i] = sp;
 	}
@@ -102,10 +102,6 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 			sp.getVars(varCollection);
 		}
 		return varCollection;
-	}
-
-	public Join toJoins() {
-		return (Join) Algebra.join(getArgs());
 	}
 
 	@Override
@@ -133,7 +129,7 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 		} else {
 			for (int i=0; i<args.length; i++) {
 				if (current == args[i]) {
-					setStatementPattern(i, (TupleExpr) replacement);
+					setArgs(i, (TupleExpr) replacement);
 					return;
 				}
 			}
@@ -170,7 +166,7 @@ public class StarJoin extends AbstractQueryModelNode implements TupleExpr {
 
 		for (int i=0; i<args.length; i++) {
 			TupleExpr exprClone = args[i].clone();
-			clone.setStatementPattern(i, exprClone);
+			clone.setArgs(i, exprClone);
 		}
 		return clone;
 	}

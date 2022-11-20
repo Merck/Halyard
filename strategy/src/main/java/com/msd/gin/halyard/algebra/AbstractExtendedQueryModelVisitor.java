@@ -10,13 +10,19 @@ public abstract class AbstractExtendedQueryModelVisitor<X extends Exception> ext
 		if (node instanceof TupleFunctionCall) {
 			// all TupleFunctionCalls are expected to be ExtendedTupleFunctionCalls
 			meet((ExtendedTupleFunctionCall)node);
+		} else if (node instanceof StarJoin) {
+			meet((StarJoin)node);
 		} else {
 			super.meetOther(node);
 		}
 	}
 
-	public void meet(ExtendedTupleFunctionCall tfc) throws X {
-		meetNode(tfc);
+	public void meet(ExtendedTupleFunctionCall node) throws X {
+		meetNode(node);
+	}
+
+	public void meet(StarJoin node) throws X {
+		meetNode(node);
 	}
 
 }
