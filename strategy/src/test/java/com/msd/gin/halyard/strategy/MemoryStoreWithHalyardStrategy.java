@@ -102,6 +102,7 @@ public class MemoryStoreWithHalyardStrategy extends MemoryStore {
         	};
             evalStrat.setOptimizerPipeline(new HalyardQueryOptimizerPipeline(evalStrat, tripleSource.getValueFactory(), stats));
             evalStrat.setTrackResultSize(true);
+            evalStrat.setTrackTime(true);
             return evalStrat;
         }
 	}

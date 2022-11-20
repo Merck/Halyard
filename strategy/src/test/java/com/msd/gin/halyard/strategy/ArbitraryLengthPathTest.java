@@ -40,7 +40,7 @@ import org.junit.runners.Parameterized;
 public class ArbitraryLengthPathTest {
     @Parameterized.Parameters
     public static Collection<Integer> data() {
-        return Arrays.asList(10, 100, 1000);
+        return Arrays.asList(0, 10, 100, 1000);
     }
 
     private final int n;

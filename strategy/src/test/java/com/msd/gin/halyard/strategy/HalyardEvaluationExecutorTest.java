@@ -10,6 +10,7 @@ import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.Var;
+import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -65,5 +66,19 @@ public class HalyardEvaluationExecutorTest {
 		assertEquals(13, executor.getPriorityForNode(serviceJoin));
 		assertEquals(14, executor.getPriorityForNode(serviceJoin.getLeftArg()));
 		assertEquals(18, executor.getPriorityForNode(serviceJoin.getRightArg()));
+	}
+
+	@Test
+	public void testPrintQueryNode() {
+		HalyardEvaluationExecutor.printQueryNode(createStatementPattern(1), EmptyBindingSet.getInstance());
+	};
+
+	@Test
+	public void testThreadPool() {
+		HalyardEvaluationExecutor executor = new HalyardEvaluationExecutor(new Configuration());
+		int tasks = executor.getThreadPoolExecutor().getActiveCount();
+		assertEquals(0, tasks);
+		assertEquals(tasks, executor.getThreadPoolExecutor().getThreadDump().length);
+		assertEquals(0, executor.getThreadPoolExecutor().getQueueDump().length);
 	}
 }
