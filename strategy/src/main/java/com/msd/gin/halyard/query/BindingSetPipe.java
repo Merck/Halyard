@@ -100,8 +100,4 @@ public abstract class BindingSetPipe {
     public final boolean isClosed() {
     	return closed.get();
     }
-
-    public final void empty() {
-        close();
-    }
 }

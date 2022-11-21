@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.strategy;
 
+import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.Algorithms;
 import com.msd.gin.halyard.algebra.ConstrainedStatementPattern;
@@ -160,7 +161,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.iterator.ProjectionIterator;
 import org.eclipse.rdf4j.query.algebra.evaluation.iterator.QueryContextIteration;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.QueryEvaluationUtility;
 import org.eclipse.rdf4j.query.algebra.evaluation.util.ValueComparator;
-import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.TupleExprs;
 import org.eclipse.rdf4j.query.algebra.helpers.collectors.VarNameCollector;
 import org.eclipse.rdf4j.query.impl.MapBindingSet;
@@ -312,14 +312,14 @@ final class HalyardTupleExprEvaluation {
 						if (v != null) {
 							if (constraintFunc instanceof Datatype) {
 								if (!v.isIRI()) {
-									parent.empty();
+									parent.close(); // nothing to push
 									return;
 								}
 								IRI dt = (IRI) v;
 				    			objConstraint = new LiteralConstraint(dt);
 							} else if (constraintFunc instanceof Lang) {
 								if (!v.isLiteral()) {
-									parent.empty();
+									parent.close(); // nothing to push
 									return;
 								}
 								Literal langValue = (Literal) v;
@@ -351,7 +351,7 @@ final class HalyardTupleExprEvaluation {
 			if (evalStep != null) {
 		        executor.pullAndPushAsync(parent, evalStep, sp, bindings, parentStrategy);
 			} else {
-				parent.empty();
+				parent.close(); // nothing to push
 			}
         } catch (QueryEvaluationException e) {
             parent.handleException(e);
@@ -578,7 +578,7 @@ final class HalyardTupleExprEvaluation {
 				// the evaluation of the TripleRef should be suitably forwarded down the sail and filter/construct
 				// the correct solution out of the results of that call
 				if (extValue != null && !(extValue instanceof Resource)) {
-					parent.empty();
+					parent.close(); // nothing to push
 					return;
 				}
 
@@ -649,7 +649,7 @@ final class HalyardTupleExprEvaluation {
 				// the evaluation of the TripleRef should be suitably forwarded down the sail and filter/construct
 				// the correct solution out of the results of that call
 				if (extValue != null && !(extValue instanceof Resource)) {
-					parent.empty();
+					parent.close(); // nothing to push
 					return;
 				}
 
@@ -743,7 +743,7 @@ final class HalyardTupleExprEvaluation {
         } else if (expr instanceof Filter) {
         	return precompileFilter((Filter) expr);
         } else if (expr instanceof Service) {
-        	return (parent, bindings) -> evaluateService(parent, (Service) expr, bindings);
+        	return precompileService((Service) expr);
         } else if (expr instanceof Slice) {
         	return precompileSlice((Slice) expr);
         } else if (expr instanceof Extension) {
@@ -1535,99 +1535,104 @@ final class HalyardTupleExprEvaluation {
     }
 
     /**
-     * Evaluate {@link Service} query model nodes
-     * @param topPipe
+     * Precompiles {@link Service} query model nodes
      * @param service
-     * @param bindings
      */
-    private void evaluateService(final BindingSetPipe topPipe, Service service, BindingSet bindings) {
+    private BindingSetPipeEvaluationStep precompileService(Service service) {
         Var serviceRef = service.getServiceRef();
-        String serviceUri;
-        if (serviceRef.hasValue()) {
-            serviceUri = serviceRef.getValue().stringValue();
-        } else if (bindings != null && bindings.getValue(serviceRef.getName()) != null) {
-            serviceUri = bindings.getBinding(serviceRef.getName()).getValue().stringValue();
+        Value serviceRefValue = serviceRef.getValue();
+        if (serviceRefValue != null) {
+        	// service endpoint known ahead of time
+        	FederatedService fs = parentStrategy.getService(serviceRefValue.stringValue());
+        	return (topPipe, bindings) -> evaluateService(topPipe, service, fs, bindings);
         } else {
-            topPipe.handleException(new QueryEvaluationException("SERVICE variables must be bound at evaluation time."));
-            return;
+			return (topPipe, bindings) -> {
+				Value boundServiceRefValue = bindings.getValue(serviceRef.getName());
+			    if (boundServiceRefValue != null) {
+			        String serviceUri = boundServiceRefValue.stringValue();
+		        	FederatedService fs = parentStrategy.getService(serviceUri);
+					evaluateService(topPipe, service, fs, bindings);
+			    } else {
+			        topPipe.handleException(new QueryEvaluationException("SERVICE variables must be bound at evaluation time."));
+			    }
+			};
         }
-        try {
-            // create a copy of the free variables, and remove those for which
-            // bindings are available (we can set them as constraints!)
-            Set<String> freeVars = new HashSet<>(service.getServiceVars());
-            freeVars.removeAll(bindings.getBindingNames());
-            // Get bindings from values pre-bound into variables.
-            MapBindingSet allBindings = new MapBindingSet();
-            for (Binding binding : bindings) {
-                allBindings.addBinding(binding.getName(), binding.getValue());
-            }
-            final Set<Var> boundVars = new HashSet<Var>();
-            new AbstractQueryModelVisitor<RuntimeException> (){
-                @Override
-                public void meet(Var var) {
-                    if (var.hasValue()) {
-                        boundVars.add(var);
-                    }
-                }
-            }.meet(service);
-            for (Var boundVar : boundVars) {
-                freeVars.remove(boundVar.getName());
-                allBindings.addBinding(boundVar.getName(), boundVar.getValue());
-            }
-            bindings = allBindings;
-            String baseUri = service.getBaseURI();
-            FederatedService fs = parentStrategy.getService(serviceUri);
-            // special case: no free variables => perform ASK query
-            if (freeVars.isEmpty()) {
-                boolean exists = fs.ask(service, bindings, baseUri);
-                // check if triples are available (with inserted bindings)
-                if (exists) {
-                    topPipe.push(bindings);
-                }
-                topPipe.close();
-                return;
+    }
 
-            }
-            // otherwise: perform a SELECT query
-            BindingSetPipe pipe;
-        	if (service.isSilent()) {
-        		pipe = new BindingSetPipe(topPipe) {
-        			@Override
-        			public boolean handleException(Throwable thr) {
-        				close();
-        				return false;
-        			}
-        			@Override
-        			public String toString() {
-        				return "SilentBindingSetPipe";
-        			}
-        		};
-        	} else {
-        		pipe = topPipe;
-        	}
-            if (fs instanceof BindingSetPipeFederatedService) {
-            	((BindingSetPipeFederatedService)fs).select(pipe, service, freeVars, bindings, baseUri);
-            } else {
-                QueryEvaluationStep evalStep = bs -> fs.select(service, freeVars, bs, baseUri);
-                executor.pullAndPushAsync(pipe, evalStep, service, bindings, parentStrategy);
-            }
-        } catch (QueryEvaluationException e) {
-            // suppress exceptions if silent
-            if (service.isSilent()) {
-                topPipe.pushLast(bindings);
-            } else {
-                topPipe.handleException(e);
-            }
-        } catch (RuntimeException e) {
-            // suppress special exceptions (e.g. UndeclaredThrowable with
-            // wrapped
-            // QueryEval) if silent
-            if (service.isSilent()) {
-                topPipe.pushLast(bindings);
-            } else {
-                topPipe.handleException(e);
-            }
+    private void evaluateService(BindingSetPipe topPipe, Service service, FederatedService fs, BindingSet bindings) {
+        // create a copy of the free variables, and remove those for which
+        // bindings are available (we can set them as constraints!)
+        Set<String> freeVars = new HashSet<>(service.getServiceVars());
+        freeVars.removeAll(bindings.getBindingNames());
+        // Get bindings from values pre-bound into variables.
+        MapBindingSet fsBindings = new MapBindingSet(bindings.size() + 1);
+        for (Binding binding : bindings) {
+            fsBindings.addBinding(binding.getName(), binding.getValue());
         }
+        final Set<Var> boundVars = new HashSet<Var>();
+        new AbstractExtendedQueryModelVisitor<RuntimeException> (){
+            @Override
+            public void meet(Var var) {
+                if (var.hasValue()) {
+                    boundVars.add(var);
+                }
+            }
+        }.meet(service);
+        for (Var boundVar : boundVars) {
+            freeVars.remove(boundVar.getName());
+            fsBindings.addBinding(boundVar.getName(), boundVar.getValue());
+        }
+        String baseUri = service.getBaseURI();
+	    try {
+	        // special case: no free variables => perform ASK query
+	        if (freeVars.isEmpty()) {
+	            // check if triples are available (with inserted bindings)
+	            if (fs.ask(service, fsBindings, baseUri)) {
+	                topPipe.push(fsBindings);
+	            }
+            	topPipe.close();
+	        } else {
+		        // otherwise: perform a SELECT query
+		        BindingSetPipe pipe;
+		    	if (service.isSilent()) {
+		    		pipe = new BindingSetPipe(topPipe) {
+		    			@Override
+		    			public boolean handleException(Throwable thr) {
+		    				close();
+		    				return false;
+		    			}
+		    			@Override
+		    			public String toString() {
+		    				return "SilentBindingSetPipe";
+		    			}
+		    		};
+		    	} else {
+		    		pipe = topPipe;
+		    	}
+		        if (fs instanceof BindingSetPipeFederatedService) {
+		        	((BindingSetPipeFederatedService)fs).select(pipe, service, freeVars, fsBindings, baseUri);
+		        } else {
+		            QueryEvaluationStep evalStep = bs -> fs.select(service, freeVars, bs, baseUri);
+		            executor.pullAndPushAsync(pipe, evalStep, service, fsBindings, parentStrategy);
+		        }
+	        }
+	    } catch (QueryEvaluationException e) {
+	        // suppress exceptions if silent
+	        if (service.isSilent()) {
+	            topPipe.pushLast(fsBindings);
+	        } else {
+	            topPipe.handleException(e);
+	        }
+	    } catch (RuntimeException e) {
+	        // suppress special exceptions (e.g. UndeclaredThrowable with
+	        // wrapped
+	        // QueryEval) if silent
+	        if (service.isSilent()) {
+	            topPipe.pushLast(fsBindings);
+	        } else {
+	            topPipe.handleException(e);
+	        }
+	    }
     }
 
     /**
@@ -2379,7 +2384,7 @@ final class HalyardTupleExprEvaluation {
 	private BindingSetPipeEvaluationStep precompileEmptySet(EmptySet emptySet) {
     	return (parent, bindings) -> {
 			parentStrategy.initTracking(emptySet);
-			parent.empty();
+			parent.close(); // nothing to push
     	};
 	}
 
@@ -2396,7 +2401,7 @@ final class HalyardTupleExprEvaluation {
 			Value obj = Algebra.getVarValue(objVar, bindings);
 			if (subj != null && obj != null) {
 				if (!subj.equals(obj)) {
-					parent.empty();
+					parent.close(); // nothing to push
 					return;
 				}
 			}
@@ -2457,10 +2462,9 @@ final class HalyardTupleExprEvaluation {
 					result = null;
 				}
 				if (result != null) {
-					parent.pushLast(result);
-				} else {
-					parent.empty();
+					parent.push(result);
 				}
+				parent.close();
 			}
 		};
 	}
