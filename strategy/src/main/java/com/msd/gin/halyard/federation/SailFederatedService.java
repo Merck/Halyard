@@ -2,6 +2,7 @@ package com.msd.gin.halyard.federation;
 
 import com.msd.gin.halyard.algebra.ServiceRoot;
 import com.msd.gin.halyard.query.BindingSetPipe;
+import com.msd.gin.halyard.sail.BindingSetPipeSail;
 import com.msd.gin.halyard.sail.BindingSetPipeSailConnection;
 
 import java.util.ArrayList;
@@ -76,13 +77,13 @@ public class SailFederatedService implements BindingSetPipeFederatedService {
 
 	@Override
 	public void select(BindingSetPipe handler, Service service, Set<String> projectionVars, BindingSet bindings, String baseUri) throws QueryEvaluationException {
-		try (SailConnection conn = sail.getConnection()) {
-			if (conn instanceof BindingSetPipeSailConnection) {
-				((BindingSetPipeSailConnection) conn).evaluate(new InsertBindingSetPipe(handler, bindings), ServiceRoot.create(service), null, bindings, true);
-			} else {
-				try (CloseableIteration<BindingSet, QueryEvaluationException> result = select(service, projectionVars, bindings, baseUri)) {
-					BindingSetPipeSailConnection.report(result, handler);
-				}
+		if (sail instanceof BindingSetPipeSail) {
+			try (BindingSetPipeSailConnection conn = ((BindingSetPipeSail)sail).getConnection()) {
+				conn.evaluate(new InsertBindingSetPipe(new CloseConnectionBindingSetPipe(handler, conn), bindings), ServiceRoot.create(service), null, bindings, true);
+			}
+		} else {
+			try (CloseableIteration<BindingSet, QueryEvaluationException> result = select(service, projectionVars, bindings, baseUri)) {
+				BindingSetPipeSailConnection.report(result, handler);
 			}
 		}
 	}
@@ -160,6 +161,25 @@ public class SailFederatedService implements BindingSetPipeFederatedService {
 		public void close() throws QueryEvaluationException {
 			try {
 				delegate.close();
+			} finally {
+				conn.close();
+			}
+		}
+	}
+
+
+	private static class CloseConnectionBindingSetPipe extends BindingSetPipe {
+		private final SailConnection conn;
+
+		CloseConnectionBindingSetPipe(BindingSetPipe parent, SailConnection conn) {
+			super(parent);
+			this.conn = conn;
+		}
+
+		@Override
+		protected void doClose() {
+			try {
+				parent.close();
 			} finally {
 				conn.close();
 			}

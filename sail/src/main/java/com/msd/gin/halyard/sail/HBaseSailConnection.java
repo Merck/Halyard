@@ -28,6 +28,7 @@ import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.TupleFunctionCallOptimizer;
 import com.msd.gin.halyard.query.BindingSetPipe;
 import com.msd.gin.halyard.query.BindingSetPipeQueryEvaluationStep;
+import com.msd.gin.halyard.query.TimeLimitBindingSetPipe;
 import com.msd.gin.halyard.sail.HBaseSail.SailConnectionFactory;
 import com.msd.gin.halyard.sail.connection.SailConnectionQueryPreparer;
 import com.msd.gin.halyard.sail.geosparql.WithinDistanceInterpreter;
@@ -318,6 +319,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 			initQueryContext(queryContext);
 			TupleExpr optimizedTree = getOptimizedQuery(sourceString, tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy);
 			sail.trackQuery(sourceString, tupleExpr, optimizedTree);
+			handler = TimeLimitBindingSetPipe.apply(handler, sail.evaluationTimeoutSecs);
 			try {
 				evaluateInternal(handler, optimizedTree, strategy);
 			} catch (QueryEvaluationException ex) {

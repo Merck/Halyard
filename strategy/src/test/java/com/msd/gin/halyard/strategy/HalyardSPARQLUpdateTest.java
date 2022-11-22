@@ -24,7 +24,7 @@ import org.eclipse.rdf4j.repository.sail.SailRepository;
  *
  * @author Adam Sotona (MSD)
  */
-public class HalyardSPARQLUpdateTest  extends SPARQLUpdateTest {
+public class HalyardSPARQLUpdateTest extends SPARQLUpdateTest {
 
 	@Override
 	protected Repository newRepository()

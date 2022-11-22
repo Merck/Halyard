@@ -97,7 +97,7 @@ import co.elastic.clients.transport.rest_client.RestClientTransport;
  * only supported for queries across multiple graphs in one Halyard database.
  * @author Adam Sotona (MSD)
  */
-public class HBaseSail implements Sail, HBaseSailMXBean {
+public class HBaseSail implements BindingSetPipeSail, HBaseSailMXBean {
 
     /**
      * Ticker is a simple service interface that is notified when some data are processed.
@@ -639,7 +639,7 @@ public class HBaseSail implements Sail, HBaseSailMXBean {
     }
 
     @Override
-	public SailConnection getConnection() throws SailException {
+	public BindingSetPipeSailConnection getConnection() throws SailException {
 		if (!isInitialized()) {
 			throw new IllegalStateException("Sail is not initialized or has been shut down");
 		}
