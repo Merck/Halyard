@@ -139,6 +139,7 @@ public class HBaseUpdate extends SailUpdate {
 			this.vf = vf;
 		}
 
+		@Override
 		protected void executeModify(Modify modify, UpdateContext uc, int maxExecutionTime) throws SailException {
 			try {
 				ModifyInfo insertInfo;
@@ -251,12 +252,12 @@ public class HBaseUpdate extends SailUpdate {
 
 				TupleExpr expr = deleteClause.getClause();
 				int deleteCount = 0;
-				if (sail.isTrackResultTime()) {
-					expr.setTotalTimeNanosActual(Math.max(0, expr.getTotalTimeNanosActual()));
-				}
-				Stopwatch stopwatch;
 				if (sail.isTrackResultSize()) {
 					expr.setResultSizeActual(Math.max(0, expr.getResultSizeActual()));
+				}
+				Stopwatch stopwatch;
+				if (sail.isTrackResultTime()) {
+					expr.setTotalTimeNanosActual(Math.max(0, expr.getTotalTimeNanosActual()));
 					stopwatch = Stopwatch.createStarted();
 				} else {
 					stopwatch = null;
@@ -316,12 +317,12 @@ public class HBaseUpdate extends SailUpdate {
 
 				TupleExpr expr = insertClause.getClause();
 				int insertCount = 0;
-				if (sail.isTrackResultTime()) {
-					expr.setTotalTimeNanosActual(Math.max(0, expr.getTotalTimeNanosActual()));
-				}
-				Stopwatch stopwatch;
 				if (sail.isTrackResultSize()) {
 					expr.setResultSizeActual(Math.max(0, expr.getResultSizeActual()));
+				}
+				Stopwatch stopwatch;
+				if (sail.isTrackResultTime()) {
+					expr.setTotalTimeNanosActual(Math.max(0, expr.getTotalTimeNanosActual()));
 					stopwatch = Stopwatch.createStarted();
 				} else {
 					stopwatch = null;

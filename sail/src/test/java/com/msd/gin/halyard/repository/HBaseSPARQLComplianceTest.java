@@ -1,8 +1,9 @@
-package com.msd.gin.halyard.sail;
+package com.msd.gin.halyard.repository;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.repository.HBaseRepository;
 import com.msd.gin.halyard.repository.HBaseRepositoryFactory;
+import com.msd.gin.halyard.sail.HBaseSail;
 
 import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.repository.Repository;

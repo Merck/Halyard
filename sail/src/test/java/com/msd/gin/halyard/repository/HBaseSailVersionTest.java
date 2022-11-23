@@ -14,11 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.msd.gin.halyard.sail;
+package com.msd.gin.halyard.repository;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.repository.HBaseRepository;
+import com.msd.gin.halyard.sail.HBaseSail;
 
 import java.util.Date;
 import java.util.HashSet;

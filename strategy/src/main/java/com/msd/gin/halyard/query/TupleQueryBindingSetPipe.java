@@ -25,8 +25,10 @@ public class TupleQueryBindingSetPipe extends BindingSetPipe {
 	 * NB: BindingSetPipes are designed to be used concurrently but TupleQueryResultHandlers aren't so need to synchronize access.
 	 */
 	@Override
-	protected synchronized boolean next(BindingSet bs) {
-		handler.handleSolution(bs);
+	protected boolean next(BindingSet bs) {
+		synchronized (handler) {
+			handler.handleSolution(bs);
+		}
 		return true;
 	}
 
@@ -39,7 +41,9 @@ public class TupleQueryBindingSetPipe extends BindingSetPipe {
 
 	@Override
 	protected void doClose() {
-		handler.endQueryResult();
+		synchronized (handler) {
+			handler.endQueryResult();
+		}
 		doneLatch.countDown();
 	}
 

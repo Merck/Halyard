@@ -995,18 +995,15 @@ final class HalyardTupleExprEvaluation {
 	
 	            @Override
 	            protected void doClose() {
-	                try {
-	                    for (Map.Entry<ComparableBindingSetWrapper, Long> me : sorter) {
-	                        for (long i = me.getValue(); i > 0; i--) {
-	                            if (!parent.push(me.getKey().bs)) {
-	                                return;
-	                            }
-	                        }
-	                    }
-	                    parent.close();
-	                } finally {
-	                    sorter.close();
-	                }
+                    for (Map.Entry<ComparableBindingSetWrapper, Long> me : sorter) {
+                        for (long i = me.getValue(); i > 0; i--) {
+                            if (!parent.push(me.getKey().bs)) {
+                                return;
+                            }
+                        }
+                    }
+                    sorter.close();
+                    parent.close();
 	            }
 	
 	            @Override
@@ -1076,12 +1073,12 @@ final class HalyardTupleExprEvaluation {
 						if (!groupByMap.isEmpty()) {
 							for(Map.Entry<BindingSetValues,GroupValue> aggEntry : groupByMap.entrySet()) {
 								BindingSetValues groupKey = aggEntry.getKey();
-								GroupValue aggregators = aggEntry.getValue();
 								MutableBindingSet result = groupKey.setBindings(groupNames, bindings);
-								aggregators.bindResult(result);
+								try (GroupValue aggregators = aggEntry.getValue()) {
+									aggregators.bindResult(result);
+								}
 								parentStrategy.incrementResultSizeActual(group);
 								parent.push(result);
-								aggregators.close();
 							}
 						} else {
 							QueryBindingSet result = new QueryBindingSet(bindings);
@@ -1097,8 +1094,9 @@ final class HalyardTupleExprEvaluation {
 									} catch (ValueExprEvaluationException ignore) {
 										// There was a type error when calculating the value of the aggregate. We silently ignore the error,
 										// resulting in no result value being bound.
+									} finally {
+										agg.close();
 									}
-									agg.close();
 								}
 							}
 							if (result.size() > 0) {
