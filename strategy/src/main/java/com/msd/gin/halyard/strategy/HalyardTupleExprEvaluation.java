@@ -182,7 +182,6 @@ final class HalyardTupleExprEvaluation {
 	private static final String ANON_OBJECT_VAR = "__obj";
 	private static final int MAX_INITIAL_HASH_JOIN_TABLE_SIZE = 5000;
 
-	private final HalyardEvaluationExecutor executor;
     private final HalyardEvaluationStrategy parentStrategy;
 	private final TupleFunctionRegistry tupleFunctionRegistry;
 	private final CustomAggregateFunctionRegistry aggregateFunctionRegistry = CustomAggregateFunctionRegistry.getInstance();
@@ -205,7 +204,6 @@ final class HalyardTupleExprEvaluation {
 	 */
 	HalyardTupleExprEvaluation(HalyardEvaluationStrategy parentStrategy, QueryContext queryContext,
 			TupleFunctionRegistry tupleFunctionRegistry, TripleSource tripleSource, Dataset dataset) {
-		this.executor = HalyardEvaluationExecutor.getInstance(parentStrategy.getConfiguration());
         this.parentStrategy = parentStrategy;
 		this.queryContext = queryContext;
 		this.tupleFunctionRegistry = tupleFunctionRegistry;
@@ -236,7 +234,7 @@ final class HalyardTupleExprEvaluation {
 
 			@Override
 			public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(BindingSet bindings) {
-				return executor.pushAndPull(step, expr, bindings, parentStrategy);
+				return parentStrategy.executor.pushAndPull(step, expr, bindings, parentStrategy);
 			}
     	};
     }
@@ -349,7 +347,7 @@ final class HalyardTupleExprEvaluation {
 		try {
 			QueryEvaluationStep evalStep = evaluateStatementPattern(sp, bindings, ts);
 			if (evalStep != null) {
-		        executor.pullAndPushAsync(parent, evalStep, sp, bindings, parentStrategy);
+				parentStrategy.executor.pullAndPushAsync(parent, evalStep, sp, bindings, parentStrategy);
 			} else {
 				parent.close(); // nothing to push
 			}
@@ -628,7 +626,7 @@ final class HalyardTupleExprEvaluation {
 						}
 					};
 				};
-				executor.pullAndPushAsync(parent, evalStep, ref, bindings, parentStrategy);
+				parentStrategy.executor.pullAndPushAsync(parent, evalStep, ref, bindings, parentStrategy);
 			};
 		} else {
 			return (parent, bindings) -> {
@@ -727,7 +725,7 @@ final class HalyardTupleExprEvaluation {
 						}
 					};
 				};
-				executor.pullAndPushAsync(parent, evalStep, ref, bindings, parentStrategy);
+				parentStrategy.executor.pullAndPushAsync(parent, evalStep, ref, bindings, parentStrategy);
 			};
 		}
 	}
@@ -907,7 +905,7 @@ final class HalyardTupleExprEvaluation {
     private BindingSetPipeEvaluationStep precompileDescribeOperator(DescribeOperator operator) {
 		BindingSetPipeQueryEvaluationStep argStep = precompile(operator.getArg());
 		return (parent, bindings) -> {
-			executor.pullAndPushAsync(parent, bs -> new DescribeIteration(argStep.evaluate(bs), parentStrategy,
+			parentStrategy.executor.pullAndPushAsync(parent, bs -> new DescribeIteration(argStep.evaluate(bs), parentStrategy,
 				operator.getBindingNames(), bs), operator, bindings, parentStrategy);
         };
     }
@@ -1613,7 +1611,7 @@ final class HalyardTupleExprEvaluation {
 		        	((BindingSetPipeFederatedService)fs).select(pipe, service, freeVars, fsBindings, baseUri);
 		        } else {
 		            QueryEvaluationStep evalStep = bs -> fs.select(service, freeVars, bs, baseUri);
-		            executor.pullAndPushAsync(pipe, evalStep, service, fsBindings, parentStrategy);
+		            parentStrategy.executor.pullAndPushAsync(pipe, evalStep, service, fsBindings, parentStrategy);
 		        }
 	        }
 	    } catch (QueryEvaluationException e) {
@@ -2484,7 +2482,7 @@ final class HalyardTupleExprEvaluation {
 	        //temporary solution using copy of the original iterator
 	        //re-writing this to push model is a bit more complex task
 	        try {
-	        	executor.pullAndPushAsync(parent, bs -> new PathIteration(new StrictEvaluationStrategy(null, null) {
+	        	parentStrategy.executor.pullAndPushAsync(parent, bs -> new PathIteration(new StrictEvaluationStrategy(null, null) {
 	                @Override
 	                public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(ZeroLengthPath zlp, BindingSet bindings) throws QueryEvaluationException {
 	                    zlp.setParentNode(alp);

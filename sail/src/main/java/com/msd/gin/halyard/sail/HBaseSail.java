@@ -30,6 +30,7 @@ import com.msd.gin.halyard.spin.SpinFunctionInterpreter;
 import com.msd.gin.halyard.spin.SpinMagicPropertyInterpreter;
 import com.msd.gin.halyard.spin.SpinParser;
 import com.msd.gin.halyard.spin.SpinParser.Input;
+import com.msd.gin.halyard.strategy.HalyardEvaluationExecutor;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.File;
@@ -199,6 +200,7 @@ public class HBaseSail implements BindingSetPipeSail, HBaseSailMXBean {
 	private final List<QueryContextInitializer> queryContextInitializers = new ArrayList<>();
 	private final ScanSettings scanSettings = new ScanSettings();
 	final SailConnectionFactory connFactory;
+	HalyardEvaluationExecutor executor; // reference to a shared instance
 	Connection hConnection;
 	final boolean hConnectionIsShared; //whether a Connection is provided or we need to create our own
 	Keyspace keyspace;
@@ -523,6 +525,8 @@ public class HBaseSail implements BindingSetPipeSail, HBaseSailMXBean {
 		} catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException | MalformedObjectNameException e) {
 			throw new AssertionError(e);
 		}
+
+		this.executor = HalyardEvaluationExecutor.getInstance(config);
 	}
 
 	private boolean isInitialized() {
@@ -584,7 +588,9 @@ public class HBaseSail implements BindingSetPipeSail, HBaseSailMXBean {
 	}
 
     @Override
-    public void shutDown() throws SailException { //release resources
+	public void shutDown() throws SailException {
+		executor = null; // release our reference to it
+
 		if (mxInst != null) {
 			try {
 				ManagementFactory.getPlatformMBeanServer().unregisterMBean(mxInst.getObjectName());

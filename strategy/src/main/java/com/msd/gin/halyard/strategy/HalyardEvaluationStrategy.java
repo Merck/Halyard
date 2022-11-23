@@ -68,6 +68,7 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
     private final FederatedServiceResolver serviceResolver;
     private final TripleSource tripleSource;
     private final QueryContext queryContext;
+	final HalyardEvaluationExecutor executor;
     /**
      * Evaluates TupleExpressions and all implementations of that interface
      */
@@ -108,22 +109,23 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 	public HalyardEvaluationStrategy(Configuration conf, TripleSource tripleSource, QueryContext queryContext,
 			TupleFunctionRegistry tupleFunctionRegistry,
 			FunctionRegistry functionRegistry, Dataset dataset, FederatedServiceResolver serviceResolver,
-			HalyardEvaluationStatistics statistics) {
+			HalyardEvaluationStatistics statistics, HalyardEvaluationExecutor executor) {
 		this.conf = conf;
 		this.tripleSource = tripleSource;
 		this.queryContext = queryContext;
 		this.dataset = dataset;
 		this.serviceResolver = serviceResolver;
+		this.executor = executor;
 		this.tupleEval = new HalyardTupleExprEvaluation(this, queryContext, tupleFunctionRegistry, tripleSource,
 				dataset);
 		this.valueEval = new HalyardValueExprEvaluation(this, queryContext, functionRegistry, tripleSource);
 		this.pipeline = new HalyardQueryOptimizerPipeline(this, tripleSource.getValueFactory(), statistics);
 	}
 
-	public HalyardEvaluationStrategy(Configuration conf, TripleSource tripleSource, Dataset dataset,
+	HalyardEvaluationStrategy(Configuration conf, TripleSource tripleSource, Dataset dataset,
 			FederatedServiceResolver serviceResolver, HalyardEvaluationStatistics statistics) {
 		this(conf, tripleSource, new QueryContext(), TupleFunctionRegistry.getInstance(), FunctionRegistry.getInstance(),
-				dataset, serviceResolver, statistics);
+				dataset, serviceResolver, statistics, HalyardEvaluationExecutor.getInstance(conf));
 	}
 
 	@Override

@@ -44,7 +44,6 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.common.net.ParsedIRI;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -136,8 +135,7 @@ class HalyardValueExprEvaluation {
         this.FALSE = valueFactory.createLiteral(false);
         this.OK_TRUE = ValueOrError.ok(TRUE);
         this.OK_FALSE = ValueOrError.ok(FALSE);
-		Configuration conf = parentStrategy.getConfiguration();
-        this.pollTimeoutMillis = HalyardEvaluationExecutor.getInstance(conf).getQueuePollTimeoutMillis();
+        this.pollTimeoutMillis = parentStrategy.executor.getQueuePollTimeoutMillis();
     }
 
     /**

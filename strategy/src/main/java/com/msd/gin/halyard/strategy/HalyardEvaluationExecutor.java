@@ -57,7 +57,7 @@ import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean {
+public final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean {
 	private static final Logger LOGGER = LoggerFactory.getLogger(HalyardEvaluationExecutor.class);
     private static final BindingSet END_OF_QUEUE = new EmptyBindingSet();
     // high default priority for dynamically created query nodes
