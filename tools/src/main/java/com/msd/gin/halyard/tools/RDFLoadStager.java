@@ -109,6 +109,8 @@ public final class RDFLoadStager implements Callable<Void> {
 				}
 				LOGGER.info("Merging {} bytes of {} data...", totalSize, ext);
 
+				// don't create more partitions than files
+				numPartitions = Math.min(numPartitions, files.size());
 				List<Partition> partitions = new ArrayList<>(numPartitions);
 				if (numPartitions > 1) {
 					for (int i=0; i<numPartitions; i++) {
