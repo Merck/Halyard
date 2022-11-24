@@ -24,6 +24,14 @@ public abstract class AbstractSailConnection implements SailConnection {
 	// Track the time used when evaluating a query, used by explain(...)
 	protected boolean trackResultTime;
 
+	public void setTrackResultSize(boolean f) {
+		trackResultSize = f;
+	}
+
+	public void setTrackResultTime(boolean f) {
+		trackResultTime = f;
+	}
+
 	@Override
 	public Explanation explain(Explanation.Level level, TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred, int timeoutSeconds) {
 		boolean queryTimedOut = false;

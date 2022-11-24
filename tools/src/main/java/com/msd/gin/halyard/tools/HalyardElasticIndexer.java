@@ -129,35 +129,35 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
                 statements++;
             	Literal l = (Literal) st.getObject();
                 if (literals.add(l)) {
-            		try(StringBuilderWriter json = new StringBuilderWriter(128)) {
-		                json.append("{\"").append(SearchDocument.ID_FIELD).append("\":");
-		                String id = rdfFactory.id(l).toString();
-		                JSONObject.quote(id, json);
-		                json.append(",\"").append(SearchDocument.LABEL_FIELD).append("\":");
-		                IRI datatype = l.getDatatype();
-		    			if (XMLDatatypeUtil.isNumericDatatype(datatype)) {
-		    				if (XMLDatatypeUtil.isIntegerDatatype(datatype)) {
-		    					json.append(Long.toString(l.longValue()));
-		    				} else {
-		    					json.append(Double.toString(l.doubleValue()));
-		    				}
-		    			} else {
-			                JSONObject.quote(l.getLabel(), json);
-		    			}
-		    			if (GEO.WKT_LITERAL.equals(datatype)) {
-		    				json.append(",\"geometry\":");
-			                JSONObject.quote(l.getLabel(), json);
-		    			}
-		                json.append(",\"").append(SearchDocument.DATATYPE_FIELD).append("\":");
-		                JSONObject.quote(datatype.stringValue(), json);
-		                if(l.getLanguage().isPresent()) {
-			                json.append(",\"").append(SearchDocument.LANG_FIELD).append("\":");
-			                JSONObject.quote(l.getLanguage().get(), json);
-		                }
-		                json.append("}\n");
-		                outputJson.set(json.toString());
-		                output.write(NullWritable.get(), outputJson);
-            		}
+            		StringBuilderWriter json = new StringBuilderWriter(128);
+	                json.append("{\"").append(SearchDocument.ID_FIELD).append("\":");
+	                String id = rdfFactory.id(l).toString();
+	                JSONObject.quote(id, json);
+	                json.append(",\"").append(SearchDocument.LABEL_FIELD).append("\":");
+	                IRI datatype = l.getDatatype();
+	    			if (XMLDatatypeUtil.isNumericDatatype(datatype)) {
+	    				if (XMLDatatypeUtil.isIntegerDatatype(datatype)) {
+	    					json.append(Long.toString(l.longValue()));
+	    				} else {
+	    					json.append(Double.toString(l.doubleValue()));
+	    				}
+	    			} else {
+		                JSONObject.quote(l.getLabel(), json);
+	    			}
+	    			if (GEO.WKT_LITERAL.equals(datatype)) {
+	    				json.append(",\"geometry\":");
+		                JSONObject.quote(l.getLabel(), json);
+	    			}
+	                json.append(",\"").append(SearchDocument.DATATYPE_FIELD).append("\":");
+	                JSONObject.quote(datatype.stringValue(), json);
+	                if(l.getLanguage().isPresent()) {
+		                json.append(",\"").append(SearchDocument.LANG_FIELD).append("\":");
+		                JSONObject.quote(l.getLanguage().get(), json);
+	                }
+	                json.append("}\n");
+            		json.close();
+	                outputJson.set(json.toString());
+	                output.write(NullWritable.get(), outputJson);
 	                exports++;
                 }
             }

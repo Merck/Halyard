@@ -16,6 +16,7 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.repository.HBaseRepository;
 import com.msd.gin.halyard.sail.ElasticSettings;
 import com.msd.gin.halyard.sail.HBaseSail;
 
@@ -106,7 +107,7 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
             // that are to be run by this tool
             List<String> cmdArgs = Arrays.asList(cmd.getArgs());
 
-            SailRepository rep = new SailRepository(
+            SailRepository rep = new HBaseRepository(
                     new HBaseSail(getConf(), table, false, 0, usePush, timeout, ElasticSettings.from(getConf())));
             rep.init();
             try {
@@ -132,7 +133,7 @@ public final class HalyardEndpoint extends AbstractHalyardTool {
                 }
                 CountDownLatch latch = new CountDownLatch(1);
                 SimpleHttpServer server = new SimpleHttpServer(port);
-                HttpSparqlHandler handler = new HttpSparqlHandler(rep, storedQueries, writerConfig, () -> latch.countDown());
+                HttpSparqlHandler handler = new HttpSparqlHandler(rep, storedQueries, writerConfig, latch::countDown);
                 server.createContext(CONTEXT, handler);
                 server.start();
                 try {

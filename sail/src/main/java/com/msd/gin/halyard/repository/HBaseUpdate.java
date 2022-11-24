@@ -172,9 +172,12 @@ public class HBaseUpdate extends SailUpdate {
 					public void handleSolution(BindingSet next) throws TupleQueryResultHandlerException {
 						if (!next.equals(previous)) { // minimize duplicates
 							previous = next;
-							deleteBoundTriples(next, deleteInfo, tsUc);
-
-							insertBoundTriples(next, insertInfo, tsUc);
+							if (deleteInfo != null) {
+								deleteBoundTriples(next, deleteInfo, tsUc);
+							}
+							if (insertInfo != null) {
+								insertBoundTriples(next, insertInfo, tsUc);
+							}
 						}
 					}
 				};
@@ -246,114 +249,110 @@ public class HBaseUpdate extends SailUpdate {
 			con.evaluate(handler, whereClause, uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
 		}
 
-		private void deleteBoundTriples(BindingSet whereBinding, ModifyInfo deleteClause, TimestampedUpdateContext uc) throws SailException {
-			if (deleteClause != null) {
-				List<StatementPattern> deletePatterns = deleteClause.getStatementPatterns();
+		private void deleteBoundTriples(BindingSet whereBinding, ModifyInfo deleteInfo, TimestampedUpdateContext uc) throws SailException {
+			List<StatementPattern> deletePatterns = deleteInfo.getStatementPatterns();
 
-				TupleExpr expr = deleteClause.getClause();
-				int deleteCount = 0;
-				if (sail.isTrackResultSize()) {
-					expr.setResultSizeActual(Math.max(0, expr.getResultSizeActual()));
+			TupleExpr clause = deleteInfo.getClause();
+			int deleteCount = 0;
+			if (sail.isTrackResultSize()) {
+				clause.setResultSizeActual(Math.max(0, clause.getResultSizeActual()));
+			}
+			Stopwatch stopwatch;
+			if (sail.isTrackResultTime()) {
+				clause.setTotalTimeNanosActual(Math.max(0, clause.getTotalTimeNanosActual()));
+				stopwatch = Stopwatch.createStarted();
+			} else {
+				stopwatch = null;
+			}
+			Value patternValue;
+			for (StatementPattern deletePattern : deletePatterns) {
+
+				patternValue = Algebra.getVarValue(deletePattern.getSubjectVar(), whereBinding);
+				Resource subject = patternValue instanceof Resource ? (Resource) patternValue : null;
+
+				patternValue = Algebra.getVarValue(deletePattern.getPredicateVar(), whereBinding);
+				IRI predicate = patternValue instanceof IRI ? (IRI) patternValue : null;
+
+				Value object = Algebra.getVarValue(deletePattern.getObjectVar(), whereBinding);
+
+				Resource context = null;
+				if (deletePattern.getContextVar() != null) {
+					patternValue = Algebra.getVarValue(deletePattern.getContextVar(), whereBinding);
+					context = patternValue instanceof Resource ? (Resource) patternValue : null;
 				}
-				Stopwatch stopwatch;
-				if (sail.isTrackResultTime()) {
-					expr.setTotalTimeNanosActual(Math.max(0, expr.getTotalTimeNanosActual()));
-					stopwatch = Stopwatch.createStarted();
-				} else {
-					stopwatch = null;
+
+				if (subject == null || predicate == null || object == null) {
+					/*
+					 * skip removal of triple if any variable is unbound (may happen with optional patterns or if triple pattern forms illegal triple). See SES-1047 and #610.
+					 */
+					continue;
 				}
-				Value patternValue;
-				for (StatementPattern deletePattern : deletePatterns) {
 
-					patternValue = Algebra.getVarValue(deletePattern.getSubjectVar(), whereBinding);
-					Resource subject = patternValue instanceof Resource ? (Resource) patternValue : null;
+				Statement toBeDeleted = (context != null) ? vf.createStatement(subject, predicate, object, context) : vf.createStatement(subject, predicate, object);
+				setTimestamp(uc, toBeDeleted, deleteInfo.getTupleFunctionCalls(), whereBinding);
 
-					patternValue = Algebra.getVarValue(deletePattern.getPredicateVar(), whereBinding);
-					IRI predicate = patternValue instanceof IRI ? (IRI) patternValue : null;
-
-					Value object = Algebra.getVarValue(deletePattern.getObjectVar(), whereBinding);
-
-					Resource context = null;
-					if (deletePattern.getContextVar() != null) {
-						patternValue = Algebra.getVarValue(deletePattern.getContextVar(), whereBinding);
-						context = patternValue instanceof Resource ? (Resource) patternValue : null;
-					}
-
-					if (subject == null || predicate == null || object == null) {
-						/*
-						 * skip removal of triple if any variable is unbound (may happen with optional patterns or if triple pattern forms illegal triple). See SES-1047 and #610.
-						 */
-						continue;
-					}
-
-					Statement toBeDeleted = (context != null) ? vf.createStatement(subject, predicate, object, context) : vf.createStatement(subject, predicate, object);
-					setTimestamp(uc, toBeDeleted, deleteClause.getTupleFunctionCalls(), whereBinding);
-
-					if (context != null) {
-						if (RDF4J.NIL.equals(context) || SESAME.NIL.equals(context)) {
-							con.removeStatement(uc, subject, predicate, object, (Resource) null);
-						} else {
-							con.removeStatement(uc, subject, predicate, object, context);
-						}
+				if (context != null) {
+					if (RDF4J.NIL.equals(context) || SESAME.NIL.equals(context)) {
+						con.removeStatement(uc, subject, predicate, object, (Resource) null);
 					} else {
-						IRI[] remove = getDefaultRemoveGraphs(uc.getDataset());
-						con.removeStatement(uc, subject, predicate, object, remove);
+						con.removeStatement(uc, subject, predicate, object, context);
 					}
-					deleteCount++;
+				} else {
+					IRI[] remove = getDefaultRemoveGraphs(uc.getDataset());
+					con.removeStatement(uc, subject, predicate, object, remove);
 				}
-				if (sail.isTrackResultTime()) {
-					stopwatch.stop();
-					expr.setTotalTimeNanosActual(expr.getTotalTimeNanosActual() + stopwatch.elapsed(TimeUnit.NANOSECONDS));
-				}
-				if (sail.isTrackResultSize()) {
-					expr.setResultSizeActual(expr.getResultSizeActual() + deleteCount);
-				}
+				deleteCount++;
+			}
+			if (sail.isTrackResultTime()) {
+				stopwatch.stop();
+				clause.setTotalTimeNanosActual(clause.getTotalTimeNanosActual() + stopwatch.elapsed(TimeUnit.NANOSECONDS));
+			}
+			if (sail.isTrackResultSize()) {
+				clause.setResultSizeActual(clause.getResultSizeActual() + deleteCount);
 			}
 		}
 
-		private void insertBoundTriples(BindingSet whereBinding, ModifyInfo insertClause, TimestampedUpdateContext uc) throws SailException {
-			if (insertClause != null) {
-				List<StatementPattern> insertPatterns = insertClause.getStatementPatterns();
+		private void insertBoundTriples(BindingSet whereBinding, ModifyInfo insertInfo, TimestampedUpdateContext uc) throws SailException {
+			List<StatementPattern> insertPatterns = insertInfo.getStatementPatterns();
 
-				TupleExpr expr = insertClause.getClause();
-				int insertCount = 0;
-				if (sail.isTrackResultSize()) {
-					expr.setResultSizeActual(Math.max(0, expr.getResultSizeActual()));
-				}
-				Stopwatch stopwatch;
-				if (sail.isTrackResultTime()) {
-					expr.setTotalTimeNanosActual(Math.max(0, expr.getTotalTimeNanosActual()));
-					stopwatch = Stopwatch.createStarted();
-				} else {
-					stopwatch = null;
-				}
-				// bnodes in the insert pattern are locally scoped for each
-				// individual source binding.
-				MapBindingSet bnodeMapping = new MapBindingSet();
-				for (StatementPattern insertPattern : insertPatterns) {
-					Statement toBeInserted = createStatementFromPattern(insertPattern, whereBinding, bnodeMapping);
+			TupleExpr clause = insertInfo.getClause();
+			int insertCount = 0;
+			if (sail.isTrackResultSize()) {
+				clause.setResultSizeActual(Math.max(0, clause.getResultSizeActual()));
+			}
+			Stopwatch stopwatch;
+			if (sail.isTrackResultTime()) {
+				clause.setTotalTimeNanosActual(Math.max(0, clause.getTotalTimeNanosActual()));
+				stopwatch = Stopwatch.createStarted();
+			} else {
+				stopwatch = null;
+			}
+			// bnodes in the insert pattern are locally scoped for each
+			// individual source binding.
+			MapBindingSet bnodeMapping = new MapBindingSet();
+			for (StatementPattern insertPattern : insertPatterns) {
+				Statement toBeInserted = createStatementFromPattern(insertPattern, whereBinding, bnodeMapping);
 
-					if (toBeInserted != null) {
-						setTimestamp(uc, toBeInserted, insertClause.getTupleFunctionCalls(), whereBinding);
+				if (toBeInserted != null) {
+					setTimestamp(uc, toBeInserted, insertInfo.getTupleFunctionCalls(), whereBinding);
 
-						IRI with = uc.getDataset().getDefaultInsertGraph();
-						if (with == null && toBeInserted.getContext() == null) {
-							con.addStatement(uc, toBeInserted.getSubject(), toBeInserted.getPredicate(), toBeInserted.getObject());
-						} else if (toBeInserted.getContext() == null) {
-							con.addStatement(uc, toBeInserted.getSubject(), toBeInserted.getPredicate(), toBeInserted.getObject(), with);
-						} else {
-							con.addStatement(uc, toBeInserted.getSubject(), toBeInserted.getPredicate(), toBeInserted.getObject(), toBeInserted.getContext());
-						}
-						insertCount++;
+					IRI with = uc.getDataset().getDefaultInsertGraph();
+					if (with == null && toBeInserted.getContext() == null) {
+						con.addStatement(uc, toBeInserted.getSubject(), toBeInserted.getPredicate(), toBeInserted.getObject());
+					} else if (toBeInserted.getContext() == null) {
+						con.addStatement(uc, toBeInserted.getSubject(), toBeInserted.getPredicate(), toBeInserted.getObject(), with);
+					} else {
+						con.addStatement(uc, toBeInserted.getSubject(), toBeInserted.getPredicate(), toBeInserted.getObject(), toBeInserted.getContext());
 					}
+					insertCount++;
 				}
-				if (sail.isTrackResultTime()) {
-					stopwatch.stop();
-					expr.setTotalTimeNanosActual(expr.getTotalTimeNanosActual() + stopwatch.elapsed(TimeUnit.NANOSECONDS));
-				}
-				if (sail.isTrackResultSize()) {
-					expr.setResultSizeActual(expr.getResultSizeActual() + insertCount);
-				}
+			}
+			if (sail.isTrackResultTime()) {
+				stopwatch.stop();
+				clause.setTotalTimeNanosActual(clause.getTotalTimeNanosActual() + stopwatch.elapsed(TimeUnit.NANOSECONDS));
+			}
+			if (sail.isTrackResultSize()) {
+				clause.setResultSizeActual(clause.getResultSizeActual() + insertCount);
 			}
 		}
 

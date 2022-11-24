@@ -655,8 +655,8 @@ public class HBaseSail implements BindingSetPipeSail, HBaseSailMXBean {
 		} catch (IOException ioe) {
 			throw new SailException(ioe);
 		}
-		conn.trackResultSize = trackResultSize;
-		conn.trackResultTime = trackResultTime;
+		conn.setTrackResultSize(trackResultSize);
+		conn.setTrackResultTime(trackResultTime);
 		return conn;
     }
 
