@@ -926,7 +926,7 @@ final class HalyardTupleExprEvaluation {
         private final boolean ascending[];
         private final long minorOrder;
 
-        public ComparableBindingSetWrapper(EvaluationStrategy strategy, BindingSet bs, List<OrderElem> elements, long minorOrder) throws QueryEvaluationException {
+        ComparableBindingSetWrapper(EvaluationStrategy strategy, BindingSet bs, List<OrderElem> elements, long minorOrder) throws QueryEvaluationException {
             this.bs = bs;
             this.values = new Value[elements.size()];
             this.ascending = new boolean[elements.size()];
@@ -944,7 +944,7 @@ final class HalyardTupleExprEvaluation {
 
         @Override
         public int compareTo(ComparableBindingSetWrapper o) {
-            if (equals(o)) return 0;
+            if (bs.equals(o.bs)) return 0;
             for (int i=0; i<values.length; i++) {
                 int cmp = ascending[i] ? VC.compare(values[i], o.values[i]) : VC.compare(o.values[i], values[i]);
                 if (cmp != 0) {
@@ -992,9 +992,9 @@ final class HalyardTupleExprEvaluation {
 	                    return handleException(e);
 	                }
 	            }
-	
-	            @Override
-	            protected void doClose() {
+
+	        	
+	            private void pushOrdered() {
                     for (Map.Entry<ComparableBindingSetWrapper, Long> me : sorter) {
                         for (long i = me.getValue(); i > 0; i--) {
                             if (!parent.push(me.getKey().bs)) {
@@ -1002,6 +1002,11 @@ final class HalyardTupleExprEvaluation {
                             }
                         }
                     }
+	            }
+
+	            @Override
+	            protected void doClose() {
+	            	pushOrdered();
                     sorter.close();
                     parent.close();
 	            }

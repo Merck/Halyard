@@ -31,6 +31,7 @@ import com.msd.gin.halyard.spin.SpinMagicPropertyInterpreter;
 import com.msd.gin.halyard.spin.SpinParser;
 import com.msd.gin.halyard.spin.SpinParser.Input;
 import com.msd.gin.halyard.strategy.HalyardEvaluationExecutor;
+import com.msd.gin.halyard.strategy.HalyardEvaluationExecutorMXBean;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.File;
@@ -381,6 +382,11 @@ public class HBaseSail implements BindingSetPipeSail, HBaseSailMXBean {
 	@Override
 	public QueryInfo[] getRecentQueries() {
 		return queryHistory.toArray(new QueryInfo[queryHistory.size()]);
+	}
+
+	@Override
+	public HalyardEvaluationExecutorMXBean getExecutor() {
+		return executor;
 	}
 
 	String getFederatedServiceResolverName() {

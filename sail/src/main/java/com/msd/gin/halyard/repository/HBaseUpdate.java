@@ -5,7 +5,7 @@ import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.query.BindingSetPipe;
 import com.msd.gin.halyard.query.EmptyTripleSource;
-import com.msd.gin.halyard.query.TupleQueryBindingSetPipe;
+import com.msd.gin.halyard.query.QueueingBindingSetPipe;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
 import com.msd.gin.halyard.sail.TimestampedUpdateContext;
@@ -31,17 +31,15 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF4J;
 import org.eclipse.rdf4j.model.vocabulary.SESAME;
 import org.eclipse.rdf4j.model.vocabulary.XSD;
-import org.eclipse.rdf4j.query.AbstractTupleQueryResultHandler;
 import org.eclipse.rdf4j.query.Binding;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.TupleQueryResultHandler;
-import org.eclipse.rdf4j.query.TupleQueryResultHandlerException;
 import org.eclipse.rdf4j.query.UpdateExecutionException;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.Modify;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
+import org.eclipse.rdf4j.query.algebra.Reduced;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
@@ -155,7 +153,7 @@ public class HBaseUpdate extends SailUpdate {
 
 				ModifyInfo deleteInfo;
 				TupleExpr deleteClause = modify.getDeleteExpr();
-				TupleExpr whereClause = modify.getWhereExpr();
+				TupleExpr whereClause = new Reduced(modify.getWhereExpr());
 				whereClause = Algebra.ensureRooted(whereClause);
 				if (deleteClause != null) {
 					// for deletes, TupleFunctions are expected in the where clause
@@ -166,24 +164,25 @@ public class HBaseUpdate extends SailUpdate {
 				}
 
 				TimestampedUpdateContext tsUc = new TimestampedUpdateContext(uc.getUpdateExpr(), uc.getDataset(), uc.getBindingSet(), uc.isIncludeInferred());
-				TupleQueryResultHandler handler = new AbstractTupleQueryResultHandler() {
-					private BindingSet previous;
-					@Override
-					public void handleSolution(BindingSet next) throws TupleQueryResultHandlerException {
-						if (!next.equals(previous)) { // minimize duplicates
-							previous = next;
-							if (deleteInfo != null) {
-								deleteBoundTriples(next, deleteInfo, tsUc);
-							}
-							if (insertInfo != null) {
-								insertBoundTriples(next, insertInfo, tsUc);
-							}
-						}
-					}
-				};
-				TupleQueryBindingSetPipe pipe = new TupleQueryBindingSetPipe(whereClause.getBindingNames(), handler);
+				long timeout = maxExecutionTime > 0 ? maxExecutionTime : Integer.MAX_VALUE;
+				QueueingBindingSetPipe pipe = new QueueingBindingSetPipe(sail.getExecutor().getMaxQueueSize(), timeout, TimeUnit.SECONDS);
 				evaluateWhereClause(pipe, whereClause, uc);
-				pipe.waitUntilClosed(maxExecutionTime);
+				if (sail.isTrackResultSize()) {
+					if (deleteInfo != null) {
+						deleteInfo.getClause().setResultSizeActual(0);
+					}
+					if (insertInfo != null) {
+						insertInfo.getClause().setResultSizeActual(0);
+					}
+				}
+				pipe.collect(next -> {
+					if (deleteInfo != null) {
+						deleteBoundTriples(next, deleteInfo, tsUc);
+					}
+					if (insertInfo != null) {
+						insertBoundTriples(next, insertInfo, tsUc);
+					}
+				});
 			} catch (QueryEvaluationException e) {
 				throw new SailException(e);
 			}
@@ -254,9 +253,6 @@ public class HBaseUpdate extends SailUpdate {
 
 			TupleExpr clause = deleteInfo.getClause();
 			int deleteCount = 0;
-			if (sail.isTrackResultSize()) {
-				clause.setResultSizeActual(Math.max(0, clause.getResultSizeActual()));
-			}
 			Stopwatch stopwatch;
 			if (sail.isTrackResultTime()) {
 				clause.setTotalTimeNanosActual(Math.max(0, clause.getTotalTimeNanosActual()));
@@ -317,9 +313,6 @@ public class HBaseUpdate extends SailUpdate {
 
 			TupleExpr clause = insertInfo.getClause();
 			int insertCount = 0;
-			if (sail.isTrackResultSize()) {
-				clause.setResultSizeActual(Math.max(0, clause.getResultSizeActual()));
-			}
 			Stopwatch stopwatch;
 			if (sail.isTrackResultTime()) {
 				clause.setTotalTimeNanosActual(Math.max(0, clause.getTotalTimeNanosActual()));

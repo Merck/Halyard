@@ -22,13 +22,13 @@ import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
 import com.msd.gin.halyard.algebra.Algebra;
 import com.msd.gin.halyard.algebra.ServiceRoot;
 import com.msd.gin.halyard.query.BindingSetPipe;
+import com.msd.gin.halyard.query.QueueingBindingSetPipe;
 import com.msd.gin.halyard.util.RateTracker;
 
 import java.lang.management.ManagementFactory;
 import java.util.Hashtable;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -44,7 +44,6 @@ import org.eclipse.rdf4j.common.iteration.LookAheadIteration;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.QueryInterruptedException;
 import org.eclipse.rdf4j.query.algebra.Filter;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
@@ -53,13 +52,11 @@ import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
-import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class HalyardEvaluationExecutor implements HalyardEvaluationExecutorMXBean {
 	private static final Logger LOGGER = LoggerFactory.getLogger(HalyardEvaluationExecutor.class);
-    private static final BindingSet END_OF_QUEUE = new EmptyBindingSet();
     // high default priority for dynamically created query nodes
     private static final int DEFAULT_PRIORITY = 65535;
     private static final Timer TIMER = new Timer("HalyardEvaluationExecutorTimer", true);
@@ -516,15 +513,12 @@ public final class HalyardEvaluationExecutor implements HalyardEvaluationExecuto
 
     final class BindingSetPipeQueue {
 
-        private final LinkedBlockingQueue<BindingSet> queue = new LinkedBlockingQueue<>(maxQueueSize);
-        private volatile Throwable exception;
-
         final BindingSetPipeIteration iteration = new BindingSetPipeIteration();
-        final QueueingBindingSetPipe pipe = new QueueingBindingSetPipe();
+        final QueueingBindingSetPipe pipe = new QueueingBindingSetPipe(maxQueueSize, offerTimeoutMillis, TimeUnit.MILLISECONDS);
 
         @Override
         public String toString() {
-        	return "Queue "+Integer.toHexString(queue.hashCode())+" for pipe "+Integer.toHexString(pipe.hashCode())+" and iteration "+Integer.toHexString(iteration.hashCode());
+        	return "Pipe "+Integer.toHexString(pipe.hashCode())+" for iteration "+Integer.toHexString(iteration.hashCode());
         }
 
         /**
@@ -533,29 +527,17 @@ public final class HalyardEvaluationExecutor implements HalyardEvaluationExecuto
         final class BindingSetPipeIteration extends LookAheadIteration<BindingSet, QueryEvaluationException> {
         	@Override
             protected BindingSet getNextElement() throws QueryEvaluationException {
-    			BindingSet bs = null;
-    			try {
-                    for (int retries = 0; bs == null && !isClosed(); retries++) {
-    					bs = queue.poll(pollTimeoutMillis, TimeUnit.MILLISECONDS);
-    					Throwable thr = exception;
-    					if (thr != null) {
-	    					if (thr instanceof QueryEvaluationException) {
-	    						throw (QueryEvaluationException) thr;
-	    					} else {
-	                        	throw new QueryEvaluationException(thr);
-	                        }
-    					}
-						if (bs == null) {
-							// no data available - see if we can improve things
-							if (checkThreads(retries)) {
-								retries = 0;
-							}
+    			Object bs = null;
+                for (int retries = 0; bs == null && !isClosed(); retries++) {
+            		bs = pipe.poll(pollTimeoutMillis, TimeUnit.MILLISECONDS);
+					if (bs == null) {
+						// no data available - see if we can improve things
+						if (checkThreads(retries)) {
+							retries = 0;
 						}
-                    }
-                } catch (InterruptedException ex) {
-                    throw new QueryInterruptedException(ex);
+					}
                 }
-                return (bs == END_OF_QUEUE) ? null : bs;
+                return pipe.isEndOfQueue(bs) ? null : (BindingSet) bs;
             }
 
         	private boolean checkThreads(int retries) {
@@ -568,7 +550,7 @@ public final class HalyardEvaluationExecutor implements HalyardEvaluationExecuto
     					if (maxPoolSize == executor.getMaximumPoolSize() && executor.getActiveCount() == maxPoolSize && taskRateTracker.getRatePerSecond() == 0.0f) {
     						if (maxPoolSize < maxThreads) {
     							int newMaxPoolSize = Math.min(maxPoolSize + threadGain, maxThreads);
-    							LOGGER.warn("Queue {}: all {} threads seem to be blocked (taskRate {}) - adding {} more\n{}", Integer.toHexString(queue.hashCode()), executor.getPoolSize(), taskRateTracker.getRatePerSecond(), newMaxPoolSize - maxPoolSize, executor.toString());
+    							LOGGER.warn("Iteration {}: all {} threads seem to be blocked (taskRate {}) - adding {} more\n{}", Integer.toHexString(this.hashCode()), executor.getPoolSize(), taskRateTracker.getRatePerSecond(), newMaxPoolSize - maxPoolSize, executor.toString());
     							executor.setMaximumPoolSize(newMaxPoolSize);
     							executor.setCorePoolSize(Math.min(executor.getCorePoolSize()+threadGain, newMaxPoolSize));
     						} else {
@@ -593,58 +575,7 @@ public final class HalyardEvaluationExecutor implements HalyardEvaluationExecuto
 
             @Override
             public String toString() {
-            	return "Iteration "+Integer.toHexString(this.hashCode())+" for queue "+Integer.toHexString(queue.hashCode());
-            }
-        }
-
-        /**
-         * Pushes data to client.
-         */
-        final class QueueingBindingSetPipe extends BindingSetPipe {
-            QueueingBindingSetPipe() {
-            	super(null);
-            }
-
-            private boolean addToQueue(BindingSet bs) throws InterruptedException {
-            	boolean added = queue.offer(bs, offerTimeoutMillis, TimeUnit.MILLISECONDS);
-            	if (!added && !isClosed()) {
-            		handleException(new QueryInterruptedException("Timed-out waiting for client to consume binding sets"));
-            	}
-            	return added;
-            }
-
-            @Override
-            protected boolean next(BindingSet bs) {
-                try {
-					return addToQueue(bs);
-				} catch (InterruptedException e) {
-					return handleException(e);
-				}
-            }
-
-            @Override
-            protected void doClose() {
-        		try {
-					addToQueue(END_OF_QUEUE);
-				} catch (InterruptedException e) {
-					handleException(e);
-				}
-            }
-
-            @Override
-            public boolean handleException(Throwable e) {
-                Throwable lastEx = exception;
-                if (lastEx != null) {
-                	e.addSuppressed(lastEx);
-                }
-                exception = e;
-               	close();
-                return false;
-            }
-
-            @Override
-            public String toString() {
-            	return "Pipe "+Integer.toHexString(this.hashCode())+" for queue "+Integer.toHexString(queue.hashCode());
+            	return "Iteration "+Integer.toHexString(this.hashCode())+" for pipe "+Integer.toHexString(pipe.hashCode());
             }
         }
     }

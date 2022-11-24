@@ -2,6 +2,7 @@ package com.msd.gin.halyard.sail;
 
 import com.msd.gin.halyard.sail.HBaseSail.QueryInfo;
 import com.msd.gin.halyard.sail.HBaseSail.ScanSettings;
+import com.msd.gin.halyard.strategy.HalyardEvaluationExecutorMXBean;
 
 public interface HBaseSailMXBean {
 	boolean isPushStrategyEnabled();
@@ -18,4 +19,6 @@ public interface HBaseSailMXBean {
 	void setTrackResultTime(boolean f);
 
 	QueryInfo[] getRecentQueries();
+
+	HalyardEvaluationExecutorMXBean getExecutor();
 }
