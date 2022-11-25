@@ -11,9 +11,8 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.helpers.QueryModelTreeToGenericPlanNode;
 import org.eclipse.rdf4j.query.explanation.Explanation;
 import org.eclipse.rdf4j.query.explanation.ExplanationImpl;
-import org.eclipse.rdf4j.sail.SailConnection;
 
-public abstract class AbstractSailConnection implements SailConnection {
+public abstract class AbstractSailConnection implements ResultTrackingSailConnection {
 	// Track the result sizes generated when evaluating a query, used by explain(...)
 	protected boolean trackResultSize;
 
@@ -24,10 +23,22 @@ public abstract class AbstractSailConnection implements SailConnection {
 	// Track the time used when evaluating a query, used by explain(...)
 	protected boolean trackResultTime;
 
+	@Override
+	public boolean isTrackResultSize() {
+		return trackResultSize;
+	}
+
+	@Override
 	public void setTrackResultSize(boolean f) {
 		trackResultSize = f;
 	}
 
+	@Override
+	public boolean isTrackResultTime() {
+		return trackResultTime;
+	}
+
+	@Override
 	public void setTrackResultTime(boolean f) {
 		trackResultTime = f;
 	}

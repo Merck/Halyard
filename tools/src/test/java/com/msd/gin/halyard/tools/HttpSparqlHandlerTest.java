@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.tools;
 
+import com.msd.gin.halyard.sail.ResultTrackingSailConnection;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
@@ -27,7 +29,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -45,6 +46,9 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
+import org.eclipse.rdf4j.sail.NotifyingSailConnection;
+import org.eclipse.rdf4j.sail.SailException;
+import org.eclipse.rdf4j.sail.helpers.NotifyingSailConnectionWrapper;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -71,13 +75,14 @@ public class HttpSparqlHandlerTest {
     private static final String CHARSET = "UTF-8";
 
     // Response content type
-    private static final String XML_CONTENT = "application/sparql-results+xml";
-    private static final String JSON_CONTENT = "application/sparql-results+json";
+    private static final String SPARQL_XML_CONTENT = "application/sparql-results+xml";
+    private static final String SPARQL_JSON_CONTENT = "application/sparql-results+json";
     private static final String JSONLD_CONTENT = "application/ld+json";
     private static final String TSV_CONTENT = "text/tab-separated-values";
     private static final String CSV_CONTENT = "text/csv";
     private static final String TURTLE_CONTENT = "text/turtle";
     private static final String CHARSET_SUFFIX = "; charset=" + CHARSET;
+    private static final String JSON_CONTENT = "application/json";
     // test data
     private static final ValueFactory factory = SimpleValueFactory.getInstance();
     private static final Resource SUBJ = factory.createIRI("http://ginger/subject/");
@@ -110,7 +115,13 @@ public class HttpSparqlHandlerTest {
     @BeforeClass
     public static void init() throws IOException {
         // Create sail repository
-        SailRepository repository = new SailRepository(new MemoryStore());
+        SailRepository repository = new SailRepository(new MemoryStore() {
+
+			@Override
+			protected NotifyingSailConnection getConnectionInternal() throws SailException {
+				return new ResultTrackingSailConnectionAdapter(super.getConnectionInternal());
+			}
+        });
         repository.init();
 
         // Create repositoryConnection to the sail repository
@@ -302,9 +313,9 @@ public class HttpSparqlHandlerTest {
         URL url = new URL(GET_URL);
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setRequestMethod("GET");
-        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        urlConnection.setRequestProperty("Accept", SPARQL_XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
+        assertEquals(SPARQL_XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
@@ -329,13 +340,13 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        urlConnection.setRequestProperty("Accept", SPARQL_XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.ENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("query=ASK%20%7B%7D");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
+        assertEquals(SPARQL_XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
@@ -348,9 +359,9 @@ public class HttpSparqlHandlerTest {
         URL url = new URL(GET_URL);
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setRequestMethod("GET");
-        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        urlConnection.setRequestProperty("Accept", SPARQL_XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
+        assertEquals(SPARQL_XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
@@ -363,7 +374,7 @@ public class HttpSparqlHandlerTest {
         URL url = new URL(GET_URL);
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setRequestMethod("GET");
-        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        urlConnection.setRequestProperty("Accept", SPARQL_XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, urlConnection.getResponseCode());
         try (InputStream in  = urlConnection.getErrorStream()) {
             assertTrue(IOUtils.toString(in, CHARSET).contains("test_parameter2"));
@@ -379,13 +390,13 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        urlConnection.setRequestProperty("Accept", SPARQL_XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.ENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("test_parameter1=" + URLEncoder.encode(SUBJ.stringValue(), CHARSET) + "&test_parameter2=" + URLEncoder.encode(PRED.stringValue(), CHARSET));
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
+        assertEquals(SPARQL_XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
@@ -399,7 +410,7 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setRequestMethod("GET");
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(JSON_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
+        assertEquals(SPARQL_JSON_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
     }
 
     /**
@@ -411,13 +422,13 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        urlConnection.setRequestProperty("Accept", SPARQL_XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.UNENCODED_QUERY_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("ASK {}");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
+        assertEquals(SPARQL_XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "true", "/sparql/boolean");
     }
 
@@ -430,13 +441,13 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        urlConnection.setRequestProperty("Accept", SPARQL_XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.UNENCODED_QUERY_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write("SELECT (1 AS ?value) {}");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        List<String> validResponseContent = Arrays.asList(XML_CONTENT + CHARSET_SUFFIX, JSON_CONTENT + CHARSET_SUFFIX, TSV_CONTENT + CHARSET_SUFFIX, CSV_CONTENT + CHARSET_SUFFIX);
+        List<String> validResponseContent = Arrays.asList(SPARQL_XML_CONTENT + CHARSET_SUFFIX, SPARQL_JSON_CONTENT + CHARSET_SUFFIX, TSV_CONTENT + CHARSET_SUFFIX, CSV_CONTENT + CHARSET_SUFFIX);
         assertTrue(validResponseContent.contains(urlConnection.getContentType()));
     }
 
@@ -516,7 +527,7 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        urlConnection.setRequestProperty("Accept", SPARQL_XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.UNENCODED_QUERY_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write(
@@ -524,7 +535,7 @@ public class HttpSparqlHandlerTest {
                         "WHERE { ?x ?y ?z  GRAPH ?g { ?s ?p ?o } }");
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
+        assertEquals(SPARQL_XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
     }
 
@@ -537,7 +548,7 @@ public class HttpSparqlHandlerTest {
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setDoOutput(true);
         urlConnection.setRequestMethod("POST");
-        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        urlConnection.setRequestProperty("Accept", SPARQL_XML_CONTENT);
         urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.ENCODED_CONTENT);
         OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
         out.write(
@@ -550,7 +561,7 @@ public class HttpSparqlHandlerTest {
         );
         out.close();
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
+        assertEquals(SPARQL_XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
     }
 
@@ -567,9 +578,9 @@ public class HttpSparqlHandlerTest {
         );
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setRequestMethod("GET");
-        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        urlConnection.setRequestProperty("Accept", SPARQL_XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
-        assertEquals(XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
+        assertEquals(SPARQL_XML_CONTENT + CHARSET_SUFFIX, urlConnection.getContentType());
         checkXMLResponseContent(urlConnection, "2", "/sparql/results/result/binding/literal");
     }
 
@@ -597,7 +608,7 @@ public class HttpSparqlHandlerTest {
         URL url = new URL(SERVER_URL + "?query=" + URLEncoder.encode("ASK { [] ?p \"&\" . }", CHARSET));
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setRequestMethod("GET");
-        urlConnection.setRequestProperty("Accept", XML_CONTENT);
+        urlConnection.setRequestProperty("Accept", SPARQL_XML_CONTENT);
         assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
     }
 
@@ -612,6 +623,23 @@ public class HttpSparqlHandlerTest {
         out.write("INSERT DATA { <http://whatever/newSubj> <http://whatever/newPred> <http://whatever/newObj>. }");
         out.close();
         assertEquals(HttpURLConnection.HTTP_NO_CONTENT, urlConnection.getResponseCode());
+    }
+
+    @Test
+    public void testUpdatePostDirectWithResultTracking() throws IOException {
+        URL url = new URL(SERVER_URL + "?track-result-size=true");
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setDoOutput(true);
+        urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.UNENCODED_UPDATE_CONTENT);
+        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
+        out.write("INSERT {<http://whatever/newSubj> <http://whatever/newPred> ?o} WHERE {<http://ginger/subject> <http://ginger/predicate> ?o}");
+        out.close();
+        assertEquals(HttpURLConnection.HTTP_OK, urlConnection.getResponseCode());
+        assertEquals(JSON_CONTENT, urlConnection.getContentType());
+        String json = IOUtils.toString(urlConnection.getInputStream(), "UTF-8");
+        // -1 as SailRepository doesn't support tracked updates
+        assertEquals("{\"results\":[{\"inserted\":-1}]}", json);
     }
 
     @Test
@@ -651,4 +679,33 @@ public class HttpSparqlHandlerTest {
             e.printStackTrace();
         }
     }
+
+	static class ResultTrackingSailConnectionAdapter extends NotifyingSailConnectionWrapper implements ResultTrackingSailConnection {
+		private boolean trackResultSize;
+		private boolean trackResultTime;
+
+		ResultTrackingSailConnectionAdapter(NotifyingSailConnection wrappedCon) {
+			super(wrappedCon);
+		}
+
+		@Override
+		public boolean isTrackResultSize() {
+			return trackResultSize;
+		}
+
+		@Override
+		public void setTrackResultSize(boolean f) {
+			trackResultSize = f;
+		}
+
+		@Override
+		public boolean isTrackResultTime() {
+			return trackResultTime;
+		}
+
+		@Override
+		public void setTrackResultTime(boolean f) {
+			trackResultTime = f;
+		}
+	}
 }

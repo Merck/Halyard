@@ -167,7 +167,7 @@ public class HBaseUpdate extends SailUpdate {
 				long timeout = maxExecutionTime > 0 ? maxExecutionTime : Integer.MAX_VALUE;
 				QueueingBindingSetPipe pipe = new QueueingBindingSetPipe(sail.getExecutor().getMaxQueueSize(), timeout, TimeUnit.SECONDS);
 				evaluateWhereClause(pipe, whereClause, uc);
-				if (sail.isTrackResultSize()) {
+				if (con.isTrackResultSize()) {
 					if (deleteInfo != null) {
 						deleteInfo.getClause().setResultSizeActual(0);
 					}
@@ -254,7 +254,7 @@ public class HBaseUpdate extends SailUpdate {
 			TupleExpr clause = deleteInfo.getClause();
 			int deleteCount = 0;
 			Stopwatch stopwatch;
-			if (sail.isTrackResultTime()) {
+			if (con.isTrackResultTime()) {
 				clause.setTotalTimeNanosActual(Math.max(0, clause.getTotalTimeNanosActual()));
 				stopwatch = Stopwatch.createStarted();
 			} else {
@@ -299,11 +299,11 @@ public class HBaseUpdate extends SailUpdate {
 				}
 				deleteCount++;
 			}
-			if (sail.isTrackResultTime()) {
+			if (con.isTrackResultTime()) {
 				stopwatch.stop();
 				clause.setTotalTimeNanosActual(clause.getTotalTimeNanosActual() + stopwatch.elapsed(TimeUnit.NANOSECONDS));
 			}
-			if (sail.isTrackResultSize()) {
+			if (con.isTrackResultSize()) {
 				clause.setResultSizeActual(clause.getResultSizeActual() + deleteCount);
 			}
 		}
@@ -314,7 +314,7 @@ public class HBaseUpdate extends SailUpdate {
 			TupleExpr clause = insertInfo.getClause();
 			int insertCount = 0;
 			Stopwatch stopwatch;
-			if (sail.isTrackResultTime()) {
+			if (con.isTrackResultTime()) {
 				clause.setTotalTimeNanosActual(Math.max(0, clause.getTotalTimeNanosActual()));
 				stopwatch = Stopwatch.createStarted();
 			} else {
@@ -340,11 +340,11 @@ public class HBaseUpdate extends SailUpdate {
 					insertCount++;
 				}
 			}
-			if (sail.isTrackResultTime()) {
+			if (con.isTrackResultTime()) {
 				stopwatch.stop();
 				clause.setTotalTimeNanosActual(clause.getTotalTimeNanosActual() + stopwatch.elapsed(TimeUnit.NANOSECONDS));
 			}
-			if (sail.isTrackResultSize()) {
+			if (con.isTrackResultSize()) {
 				clause.setResultSizeActual(clause.getResultSizeActual() + insertCount);
 			}
 		}

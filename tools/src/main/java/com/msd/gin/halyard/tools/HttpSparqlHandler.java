@@ -18,7 +18,7 @@ package com.msd.gin.halyard.tools;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.msd.gin.halyard.sail.HBaseSailConnection;
+import com.msd.gin.halyard.sail.ResultTrackingSailConnection;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -489,8 +489,8 @@ public final class HttpSparqlHandler implements HttpHandler {
         String updateString = sparqlQuery.getUpdate();
         ParsedUpdate parsedUpdate;
     	try(SailRepositoryConnection connection = repository.getConnection()) {
-    		if (connection.getSailConnection() instanceof HBaseSailConnection) {
-    			((HBaseSailConnection)connection.getSailConnection()).setTrackResultSize(sparqlQuery.trackResultSize);
+    		if (connection.getSailConnection() instanceof ResultTrackingSailConnection) {
+    			((ResultTrackingSailConnection)connection.getSailConnection()).setTrackResultSize(sparqlQuery.trackResultSize);
     		}
 	        SailUpdate update = (SailUpdate) connection.prepareUpdate(QueryLanguage.SPARQL, updateString, null);
 	    	parsedUpdate = update.getParsedUpdate();
