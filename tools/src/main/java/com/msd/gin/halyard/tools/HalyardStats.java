@@ -31,10 +31,6 @@ import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.vocab.HALYARD;
 import com.msd.gin.halyard.vocab.VOID_EXT;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -68,7 +64,6 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
@@ -105,7 +100,6 @@ public final class HalyardStats extends AbstractHalyardTool {
 
         final ImmutableBytesWritable outputKey = new ImmutableBytesWritable();
         final LongWritable outputValue = new LongWritable();
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream(128);
         ByteBuffer bb = ByteBuffer.allocate(ValueIO.DEFAULT_BUFFER_SIZE);
     	RDFPredicate RDF_TYPE_PREDICATE;
     	byte[] POS_TYPE_HASH;
@@ -175,40 +169,45 @@ public final class HalyardStats extends AbstractHalyardTool {
 			cspoStatsContextHash = rdfFactory.createContext(statsContext).getKeyHash(cspo);
         }
 
+        /**
+         * Copies source into target, and also returns true if target was the same as source.
+         */
         private boolean matchAndCopyKey(byte[] source, int offset, int len, byte[] target) {
             boolean match = true;
             for (int i=0; i<len; i++) {
-                byte b = source[i + offset];
-                if (b != target[i]) {
-                    target[i] = b;
+                if (source[i + offset] != target[i]) {
                     match = false;
+                    break;
                 }
             }
+            System.arraycopy(source, offset, target, 0, len);
             return match;
         }
 
         private boolean matchingGraphContext(Resource subject) {
+        	if (namedGraphContext == null || namedGraphContext.equals(subject)) {
+        		return true;
+        	}
         	String subjValue = subject.stringValue();
             String namedGraph = namedGraphContext.stringValue();
-            return namedGraphContext == null
-                || subject.equals(namedGraphContext)
-                || subjValue.startsWith(namedGraph + "_subject_")
+            return subjValue.startsWith(namedGraph + "_subject_")
                 || subjValue.startsWith(namedGraph + "_property_")
                 || subjValue.startsWith(namedGraph + "_object_");
         }
 
         @Override
-        protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
-            StatementIndex<?,?,?,?> index = stmtIndices.toIndex(key.get()[key.getOffset()]);
+        protected void map(ImmutableBytesWritable rowKey, Result value, Context output) throws IOException, InterruptedException {
+        	byte[] key = rowKey.get();
+            StatementIndex<?,?,?,?> index = stmtIndices.toIndex(key[rowKey.getOffset()]);
 			List<Statement> stmts = HalyardTableUtils.parseStatements(null, null, null, null, value, valueReader, stmtIndices);
-            int hashShift;
+            int hashOffset;
             if (!index.isQuadIndex()) {
             	// triple region
-                hashShift = 1;
+                hashOffset = rowKey.getOffset() + 1;
             } else {
             	// quad region
-                hashShift = 1 + contextKeySize;
-                if (!matchAndCopyKey(key.get(), key.getOffset() + 1, contextKeySize, lastCtxFragment) || index != lastIndex) {
+                hashOffset = rowKey.getOffset() + 1 + contextKeySize;
+                if (!matchAndCopyKey(key, rowKey.getOffset() + 1, contextKeySize, lastCtxFragment) || index != lastIndex) {
                     reset(output);
 					graph = (IRI) stmts.get(0).getContext();
                 }
@@ -253,7 +252,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                 default:
                     throw new IOException("Unknown region #" + index);
             }
-            boolean hashChange = !matchAndCopyKey(key.get(), key.getOffset() + hashShift, keyLen, lastKeyFragment) || index != lastIndex || lastGraph != graph;
+            boolean hashChange = !matchAndCopyKey(key, hashOffset, keyLen, lastKeyFragment) || index != lastIndex || lastGraph != graph;
             if (hashChange) {
                 resetSubset(output);
 				Statement stmt = stmts.get(0);
@@ -262,7 +261,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                     case CSPO:
                         distinctSubjects++;
                         Resource subj = stmt.getSubject();
-                        if (subj instanceof IRI) {
+                        if (subj.isIRI()) {
                             distinctIRIReferenceSubjects++;
                         } else {
                             distinctBlankNodeSubjects++;
@@ -280,9 +279,9 @@ public final class HalyardStats extends AbstractHalyardTool {
                     case COSP:
                         distinctObjects++;
                         Value obj = stmt.getObject();
-                        if (obj instanceof IRI) {
+                        if (obj.isIRI()) {
                         	distinctIRIReferenceObjects++;
-                        } else if (obj instanceof BNode) {
+                        } else if (obj.isBNode()) {
                         	distinctBlankNodeObjects++;
                         } else {
                             distinctLiterals++;
@@ -291,7 +290,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                         subsetId = obj;
                         break;
                     default:
-                        throw new IOException("Unknown region #" + index);
+                        throw new AssertionError("Unknown region #" + index);
                 }
             }
             int stmtCount = stmts.size();
@@ -301,12 +300,12 @@ public final class HalyardStats extends AbstractHalyardTool {
                     triples += stmtCount;
                     break;
                 case POS:
-                    if (Arrays.equals(POS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + predicateKeySize, objectKeySize, lastClassFragment) || hashChange)) {
+                    if (Arrays.equals(POS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key, hashOffset + predicateKeySize, objectKeySize, lastClassFragment) || hashChange)) {
                     	classes++;
                     }
                     break;
                 case CPOS:
-                    if (Arrays.equals(CPOS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key.get(), key.getOffset() + hashShift + predicateKeySize, objectKeySize, lastClassFragment) || hashChange)) {
+                    if (Arrays.equals(CPOS_TYPE_HASH, lastKeyFragment) && (!matchAndCopyKey(key, hashOffset + predicateKeySize, objectKeySize, lastClassFragment) || hashChange)) {
                     	classes++;
                     }
                     break;
@@ -324,22 +323,15 @@ public final class HalyardStats extends AbstractHalyardTool {
 
 		private void report(Context output, IRI property, Value partitionId, long count) throws IOException, InterruptedException {
             if (count > 0 && (namedGraphContext == null || namedGraphContext.equals(graph))) {
-            	baos.reset();
-                try (DataOutputStream dos = new DataOutputStream(baos)) {
-                    dos.writeUTF(graph.stringValue());
-                    dos.writeUTF(property.stringValue());
-                    if (partitionId == null) {
-                        dos.writeInt(0);
-                    } else {
-                    	bb.clear();
-						bb = rdfFactory.idTripleWriter.writeTo(partitionId, bb);
-						bb.flip();
-						int len = bb.limit();
-                        dos.writeInt(len);
-                        dos.write(bb.array(), bb.arrayOffset(), len);
-                    }
+            	ValueIO.Writer writer = rdfFactory.streamWriter;
+            	bb.clear();
+            	bb = ValueIO.writeValue(graph, writer, bb, Short.BYTES);
+            	bb = ValueIO.writeValue(property, writer, bb, Short.BYTES);
+                if (partitionId != null) {
+					bb = writer.writeTo(partitionId, bb);
                 }
-                outputKey.set(baos.toByteArray());
+				bb.flip();
+                outputKey.set(bb.array(), bb.arrayOffset(), bb.limit());
                 outputValue.set(count);
                 output.write(outputKey, outputValue);
             }
@@ -398,13 +390,15 @@ public final class HalyardStats extends AbstractHalyardTool {
     }
 
     static final class StatsPartitioner extends Partitioner<ImmutableBytesWritable, LongWritable> {
-        @Override
+
+    	@Override
         public int getPartition(ImmutableBytesWritable key, LongWritable value, int numPartitions) {
-            try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
-                return (dis.readUTF().hashCode() & Integer.MAX_VALUE) % numPartitions;
-            } catch (IOException e) {
-                throw new IllegalArgumentException(e);
-            }
+        	ByteBuffer buf = ByteBuffer.wrap(key.get(), key.getOffset(), key.getLength());
+        	int graphBytesLen = buf.getShort();
+        	byte[] graphBytes = new byte[graphBytesLen];
+        	buf.get(graphBytes);
+        	int hash = Arrays.hashCode(graphBytes);
+            return Math.floorMod(hash, numPartitions);
         }
     }
 
@@ -412,7 +406,7 @@ public final class HalyardStats extends AbstractHalyardTool {
 
         OutputStream out;
         RDFWriter writer;
-        Map<String, Boolean> graphs;
+        Map<IRI, Boolean> graphs;
         IRI statsGraphContext;
         ValueFactory vf;
         HBaseSail sail;
@@ -475,43 +469,37 @@ public final class HalyardStats extends AbstractHalyardTool {
                 count += val.get();
             }
 
-            String graph;
-            String predicate;
-            ByteBuffer partitionId;
-            try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(key.get(), key.getOffset(), key.getLength()))) {
-                graph = dis.readUTF();
-                predicate = dis.readUTF();
-                partitionId = ByteBuffer.allocate(dis.readInt());
-                dis.readFully(partitionId.array(), partitionId.arrayOffset(), partitionId.limit());
-            }
+        	ValueIO.Reader reader = rdfFactory.streamReader;
+        	ByteBuffer bb = ByteBuffer.wrap(key.get(), key.getOffset(), key.getLength());
+        	IRI graph = (IRI) ValueIO.readValue(bb, reader, Short.BYTES);
+        	IRI predicate = (IRI) ValueIO.readValue(bb, reader, Short.BYTES);
+            Value partitionId = bb.hasRemaining() ? reader.readValue(bb) : null;
 
-            if (SD.NAMED_GRAPH_PROPERTY.stringValue().equals(predicate)) { //workaround to at least count all small named graph that are below the threshold
-                writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, vf.createIRI(graph));
+            if (SD.NAMED_GRAPH_PROPERTY.equals(predicate)) { //workaround to at least count all small named graph that are below the threshold
+                writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, graph);
             } else {
-                IRI graphNode;
-                if (HALYARD.STATS_ROOT_NODE.stringValue().equals(graph)) {
-                    graphNode = HALYARD.STATS_ROOT_NODE;
+                IRI statsNode;
+                if (HALYARD.STATS_ROOT_NODE.equals(graph)) {
+                    statsNode = HALYARD.STATS_ROOT_NODE;
                 } else {
-                    graphNode = vf.createIRI(graph);
-                    if (graphs.putIfAbsent(graph, false) == null) {
-                        writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, graphNode);
-                        writeStatement(graphNode, SD.NAME, vf.createIRI(graph));
-                        writeStatement(graphNode, SD.GRAPH_PROPERTY, graphNode);
-                        writeStatement(graphNode, RDF.TYPE, SD.NAMED_GRAPH_CLASS);
-                        writeStatement(graphNode, RDF.TYPE, SD.GRAPH_CLASS);
-                        writeStatement(graphNode, RDF.TYPE, VOID.DATASET);
+                    statsNode = graph;
+                    if (graphs.putIfAbsent(graph, Boolean.FALSE) == null) {
+                        writeStatement(HALYARD.STATS_ROOT_NODE, SD.NAMED_GRAPH_PROPERTY, statsNode);
+                        writeStatement(statsNode, SD.NAME, statsNode);
+                        writeStatement(statsNode, SD.GRAPH_PROPERTY, statsNode);
+                        writeStatement(statsNode, RDF.TYPE, SD.NAMED_GRAPH_CLASS);
+                        writeStatement(statsNode, RDF.TYPE, SD.GRAPH_CLASS);
+                        writeStatement(statsNode, RDF.TYPE, VOID.DATASET);
                     }
                 }
-                if (partitionId.hasRemaining()) {
-					Value partition = valueReader.readValue(partitionId);
-                    IRI pred = vf.createIRI(predicate);
-					IRI subset = vf.createIRI(graph + "_" + pred.getLocalName() + "_" + rdfFactory.id(partition));
-                    writeStatement(graphNode, vf.createIRI(predicate + "Partition"), subset);
+                if (partitionId != null) {
+					IRI subset = vf.createIRI(graph + "_" + predicate.getLocalName() + "_" + rdfFactory.id(partitionId));
+                    writeStatement(statsNode, vf.createIRI(predicate + "Partition"), subset);
                     writeStatement(subset, RDF.TYPE, VOID.DATASET);
-					writeStatement(subset, pred, partition);
+					writeStatement(subset, predicate, partitionId);
                     writeStatement(subset, VOID.TRIPLES, vf.createLiteral(count));
                 } else {
-                    writeStatement(graphNode, vf.createIRI(predicate), vf.createLiteral(count));
+                    writeStatement(statsNode, predicate, vf.createLiteral(count));
                 }
                 if ((added % 1000) == 0) {
                     context.setStatus(MessageFormat.format("statements removed: {0} added: {1}", removed, added));
@@ -557,7 +545,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             "Halyard Stats is a MapReduce application that calculates dataset statistics and stores them in the named graph within the dataset or exports them into a file. The generated statistics are described by the VoID vocabulary, its extensions, and the SPARQL 1.1 Service Description.",
             "Example: halyard stats -s my_dataset [-g 'http://whatever/mystats'] [-t hdfs:/my_folder/my_stats.trig]");
         addOption("s", "source-dataset", "dataset_table", SOURCE_NAME_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
-        addOption("t", "target-file", "target_url", TARGET, "Optional target file to export the statistics (instead of update) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]", false, true);
+        addOption("t", "target-file", "target_url", TARGET, "Optional target file to export the statistics (instead of update)) hdfs://<path>/<file_name>[{0}].<RDF_ext>[.<compression>]", false, true);
         addOption("R", "graph-threshold", "size", GRAPH_THRESHOLD, "Optional minimal size of a named graph to calculate statistics for (default is 1000)", false, true);
         addOption("r", "partition-threshold", "size", PARTITION_THRESHOLD, "Optional minimal size of a graph partition to calculate statistics for (default is 1000)", false, true);
         addOption("g", "named-graph", "named_graph", NAMED_GRAPH_PROPERTY, "Optional restrict stats calculation to the given named graph only", false, true);

@@ -303,10 +303,16 @@ public class RDFFactory {
 		return RDFContext.create(context, val, this);
 	}
 
+	/**
+	 * Used for testing.
+	 */
 	ValueIO.Writer createWriter() {
 		return valueIO.createWriter(null);
 	}
 
+	/**
+	 * Used for testing.
+	 */
 	ValueIO.Reader createReader(ValueFactory vf) {
 		return valueIO.createReader(vf, null);
 	}

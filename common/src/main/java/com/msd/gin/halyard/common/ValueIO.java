@@ -1086,7 +1086,7 @@ public class ValueIO {
 						try {
 							return iriEncoder.writeBytes(localName, b);
 						} catch (Exception e) {
-							LOGGER.warn("Possibly invalid IRI for namespace {}: {} ({})", ns, iri, e.getMessage());
+							LOGGER.warn("Possibly invalid IRI {} for encoded namespace {} - falling back to generic IRI encoder ({})", iri, ns, e.getMessage());
 							LOGGER.debug("{} for {} failed", IRIEncodingNamespace.class.getSimpleName(), ns, e);
 							// if the dedicated namespace encoder fails then fallback to the generic encoder
 							b.position(failsafeMark);
