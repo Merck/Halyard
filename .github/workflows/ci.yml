@@ -37,4 +37,4 @@ jobs:
       with:
         files: |
           sdk/target/halyard-sdk-*.zip
-          webapps/target/rdf4j-*.war
+          webapps/target/halyard-webapps-*.zip

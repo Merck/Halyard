@@ -17,7 +17,7 @@
             </includes>
         </fileSet>
         <fileSet>
-            <directory>${project.basedir}/target/extra-libs</directory>
+            <directory>${project.basedir}/target</directory>
             <outputDirectory></outputDirectory>
             <includes>
                 <include>rdf4j-server.war</include>
