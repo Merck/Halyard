@@ -79,7 +79,7 @@ public final class WIKIDATA implements Vocabulary {
     public static final Namespace ENSEMBL_NS = new SimpleNamespace("ensembl", "http://rdf.ebi.ac.uk/resource/ensembl/");
     public static final Namespace PUBCHEM_CID_NS = new PrefixedIntegerNamespace("pubchem_cid", "http://rdf.ncbi.nlm.nih.gov/pubchem/compound/", "CID");
     public static final Namespace PUBCHEM_SID_NS = new PrefixedIntegerNamespace("pubchem_sid", "http://rdf.ncbi.nlm.nih.gov/pubchem/substance/", "SID");
-    public static final Namespace PUBMED_NS = new IntegerNamespace("pm", "https://pubmed.ncbi.nlm.nih.gov/");
+    public static final Namespace PUBMED_NS = new IntegerNamespace("pubmed", "https://pubmed.ncbi.nlm.nih.gov/");
     public static final Namespace MUSICBRAINZ_AREA_NS = new UUIDNamespace("mb_area", "http://musicbrainz.org/area/");
     public static final Namespace MUSICBRAINZ_ARTIST_NS = new UUIDNamespace("mb_artist", "http://musicbrainz.org/artist/");
     public static final Namespace MUSICBRAINZ_EVENT_NS = new UUIDNamespace("mb_event", "http://musicbrainz.org/event/");
