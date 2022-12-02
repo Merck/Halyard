@@ -30,7 +30,7 @@
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <rdf4j.version>4.2.0</rdf4j.version>
-        <hbase.version>2.5.0</hbase.version>
+        <hbase.version>2.5.1</hbase.version>
         <hadoop.version>3.3.4</hadoop.version>
         <jersey.version>2.25.1</jersey.version>
         <jetty.version>9.4.43.v20210629</jetty.version>
