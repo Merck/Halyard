@@ -25,10 +25,33 @@
             <fileMode>0755</fileMode>
         </fileSet>
         <fileSet>
-            <directory>${project.basedir}/target</directory>
+            <directory>${project.build.directory}</directory>
             <outputDirectory>lib</outputDirectory>
             <includes>
                 <include>rdf4j-repository-api*.jar</include>
+            </includes>
+        </fileSet>
+        <!-- add properly built hbase-hadoop3 jars needed for map-reduce etc -->
+        <fileSet>
+            <directory>${project.build.directory}/hbase-libs</directory>
+            <outputDirectory>lib</outputDirectory>
+            <includes>
+                <include>hbase-asyncfs-${hbase.version}.jar</include>
+                <include>hbase-client-${hbase.version}.jar</include>
+                <include>hbase-common-${hbase.version}.jar</include>
+                <include>hbase-hadoop2-compat-${hbase.version}.jar</include>
+                <include>hbase-hadoop-compat-${hbase.version}.jar</include>
+                <include>hbase-http-${hbase.version}.jar</include>
+                <include>hbase-logging-${hbase.version}.jar</include>
+                <include>hbase-mapreduce-${hbase.version}.jar</include>
+                <include>hbase-metrics-${hbase.version}.jar</include>
+                <include>hbase-metrics-api-${hbase.version}.jar</include>
+                <include>hbase-server-${hbase.version}.jar</include>
+                <include>hbase-procedure-${hbase.version}.jar</include>
+                <include>hbase-protocol-${hbase.version}.jar</include>
+                <include>hbase-protocol-shaded-${hbase.version}.jar</include>
+                <include>hbase-replication-${hbase.version}.jar</include>
+                <include>hbase-zookeeper-${hbase.version}.jar</include>
             </includes>
         </fileSet>
     </fileSets>
@@ -39,6 +62,7 @@
               <include>*:jar:*</include>
             </includes>
             <excludes>
+                <exclude>org.apache.hbase:*:jar::${hbase.version}</exclude> <!-- exclude hbase-hadoop2 jars -->
                 <exclude>*:sources</exclude>
                 <exclude>*:javadoc</exclude>
             </excludes>

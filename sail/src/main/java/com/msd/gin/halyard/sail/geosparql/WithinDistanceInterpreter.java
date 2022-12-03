@@ -32,7 +32,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 
 /**
- * ?s ?p ?to. bind(geof:distance(?from, ?to, ?units) as ?dist) filter(?dist < ?distLimit)
+ * ?s ?p ?to. bind(geof:distance(?from, ?to, ?units) as ?dist) filter(?dist &lt; ?distLimit)
  */
 public class WithinDistanceInterpreter implements QueryOptimizer {
 	@Override

@@ -86,11 +86,11 @@ public final class Algebra {
 	}
 
 	/**
-	 * Gets a value from a {@code Var} if it has a {@code Value}. If it does not then the method will attempt to get it
+	 * Gets a value from a {@link Var} if it has a {@link Value}. If it does not then the method will attempt to get it
 	 * from the bindings using the name of the Var
-	 * @param var
-	 * @param bindings
-	 * @return the matching {@code Value} or {@code null} if var is {@code null}
+	 * @param var variable to get the value of.
+	 * @param bindings bindings to use if variable doesn't have an existing value.
+	 * @return the matching {@link Value} or {@code null} if var is {@code null}
 	 */
 	public static Value getVarValue(Var var, BindingSet bindings) {
 	    if (var == null) {

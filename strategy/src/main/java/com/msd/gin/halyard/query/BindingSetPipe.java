@@ -22,7 +22,7 @@ import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 
 /**
- * Binding set pipes instances hold {@BindingSet}s (set of evaluated, un-evaluated and intermediate variables) that
+ * Binding set pipes instances hold {@link BindingSet}s (set of evaluated, un-evaluated and intermediate variables) that
  * form part of the query evaluation (a query generates an evaluation tree).
  */
 public abstract class BindingSetPipe {

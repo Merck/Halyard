@@ -45,7 +45,7 @@ public class HBaseFederatedServiceResolver extends SPARQLServiceResolver
 	 * @param conn
 	 * @param config
 	 * @param defaultTableName default table name to use (if any) if not specified in SERVICE URL.
-	 * @param push
+	 * @param usePush
 	 * @param evaluationTimeout
 	 * @param ticker
 	 */

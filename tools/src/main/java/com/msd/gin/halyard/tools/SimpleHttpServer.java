@@ -43,8 +43,6 @@ public class SimpleHttpServer {
      * Instantiate a new HTTP server. Use port number 0 (zero) to let the system select a new port number.
      *
      * @param port    number of port
-     * @param context context path
-     * @param handler handler for handling HTTP requests
      * @throws IOException if could not create the server
      */
     public SimpleHttpServer(int port) throws IOException {

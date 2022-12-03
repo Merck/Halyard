@@ -84,6 +84,13 @@
 								<zip destfile="${project.build.directory}/rdf4j-repository-api-${rdf4j.version}.jar" update="true">
 									<fileset dir="src/main/patches/rdf4j-client" />
 								</zip>
+								<get src="https://github.com/pulquero/hbase/releases/download/rel%2F${hbase.version}%2B${hadoop.version}/hbase-2.5.1-bin.tar.gz" dest="${project.build.directory}/hbase.tar.gz" usetimestamp="true"/>
+								<untar src="${project.build.directory}/hbase.tar.gz" dest="${project.build.directory}/hbase-libs" compression="gzip">
+									<patternset>
+										<include name="hbase-${hbase.version}/lib/hbase-*-${hbase.version}.jar"/>
+									</patternset>
+									<mapper type="flatten"/>
+								</untar>
 							</target>
 						</configuration>
 						<goals>
