@@ -183,6 +183,16 @@ public class HBaseUpdate extends SailUpdate {
 						insertBoundTriples(next, insertInfo, tsUc);
 					}
 				});
+
+				if (con.isTrackResultSize()) {
+					// copy results back from cloned expressions
+					if (deleteInfo != null) {
+						modify.getDeleteExpr().setResultSizeActual(deleteInfo.getClause().getResultSizeActual());
+					}
+					if (insertInfo != null) {
+						modify.getInsertExpr().setResultSizeActual(insertInfo.getClause().getResultSizeActual());
+					}
+				}
 			} catch (QueryEvaluationException e) {
 				throw new SailException(e);
 			}
@@ -480,7 +490,7 @@ public class HBaseUpdate extends SailUpdate {
 		}
 	}
 
-	static class ModifyInfo {
+	static final class ModifyInfo {
 		private final TupleExpr clause;
 		private final List<StatementPattern> stPatterns;
 		private final List<TupleFunctionCall> tupleFunctionCalls;
@@ -504,7 +514,7 @@ public class HBaseUpdate extends SailUpdate {
 		}
 	}
 
-	static class InsertCollector extends StatementPatternCollector {
+	static final class InsertCollector extends StatementPatternCollector {
 		private final List<TupleFunctionCall> tupleFunctionCalls = new ArrayList<>();
 
 		static ModifyInfo process(TupleExpr clause) {
@@ -531,7 +541,7 @@ public class HBaseUpdate extends SailUpdate {
 		}
 	}
 
-	static class WhereCollector extends AbstractExtendedQueryModelVisitor<RuntimeException> {
+	static final class WhereCollector extends AbstractExtendedQueryModelVisitor<RuntimeException> {
 		private final List<TupleFunctionCall> tupleFunctionCalls = new ArrayList<>();
 
 		static List<TupleFunctionCall> process(TupleExpr expr) {

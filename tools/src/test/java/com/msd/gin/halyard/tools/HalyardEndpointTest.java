@@ -18,10 +18,12 @@ package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 import com.msd.gin.halyard.sail.HBaseSail;
+
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
 import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.FileUtils;
@@ -164,6 +166,16 @@ public class HalyardEndpointTest {
     public void testStoredQueriesMissingFile() throws Exception {
         File queries = new File(this.getClass().getResource("testFail.properties").getPath());
         runEndpoint("-s", TABLE, "-q", queries.getPath());
+    }
+
+    @Test
+    public void testResultTracking() throws Exception {
+        File script = new File(this.getClass().getResource("testScript-update-results.sh").getPath());
+        script.setExecutable(true);
+        Path path = Paths.get(ROOT + name.getMethodName());
+        runEndpoint("-s", TABLE, script.getPath(), path.toString());
+        assertTrue(Files.exists(path));
+        assertEquals("{\"results\":[{\"inserted\":1001}]}", Files.readString(path));
     }
 
     /**
