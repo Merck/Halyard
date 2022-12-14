@@ -70,6 +70,9 @@ public class SearchInterpreter implements QueryOptimizer {
 						} else if (HALYARD.LIMIT_PROPERTY.equals(queryPred)) {
 							searchCall.params.setLimitVar(queryObjVar);
 							querySP.replaceWith(new SingletonSet());
+						} else if (HALYARD.MIN_SCORE_PROPERTY.equals(queryPred)) {
+							searchCall.params.setMinScoreVar(queryObjVar);
+							querySP.replaceWith(new SingletonSet());
 						} else if (HALYARD.FUZZINESS_PROPERTY.equals(queryPred)) {
 							searchCall.params.setFuzzinessVar(queryObjVar);
 							querySP.replaceWith(new SingletonSet());
@@ -132,6 +135,7 @@ public class SearchInterpreter implements QueryOptimizer {
 			}
 			tfc.addArg(params.queryVar != null ? params.queryVar.clone() : new ValueConstant(VF.createLiteral("")));
 			tfc.addArg(params.limitVar != null ? params.limitVar.clone() : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_RESULT_SIZE)));
+			tfc.addArg(params.minScoreVar != null ? params.minScoreVar.clone() : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_MIN_SCORE)));
 			tfc.addArg(params.fuzzinessVar != null ? params.fuzzinessVar.clone() : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_FUZZINESS)));
 			tfc.addArg(params.phraseSlopVar != null ? params.phraseSlopVar.clone() : new ValueConstant(VF.createLiteral(SearchClient.DEFAULT_PHRASE_SLOP)));
 			tfc.addArg(new ValueConstant(InternalObjectLiteral.of(params.matches)));
@@ -156,6 +160,7 @@ public class SearchInterpreter implements QueryOptimizer {
 	static final class SearchParams {
 		Var queryVar;
 		Var limitVar;
+		Var minScoreVar;
 		Var fuzzinessVar;
 		Var phraseSlopVar;
 		final List<MatchParams> matches = new ArrayList<>(1);
@@ -164,6 +169,14 @@ public class SearchInterpreter implements QueryOptimizer {
 		void setQueryVar(Var var) {
 			if (queryVar == null) {
 				queryVar = var;
+			} else {
+				invalid = true;
+			}
+		}
+
+		void setMinScoreVar(Var var) {
+			if (minScoreVar == null) {
+				minScoreVar = var;
 			} else {
 				invalid = true;
 			}

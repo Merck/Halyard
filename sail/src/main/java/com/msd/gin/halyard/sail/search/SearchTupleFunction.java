@@ -36,7 +36,7 @@ public class SearchTupleFunction implements TupleFunction {
 
 	@Override
 	public CloseableIteration<? extends List<? extends Value>, QueryEvaluationException> evaluate(ValueFactory valueFactory, Value... args) throws QueryEvaluationException {
-		if (args.length != 5) {
+		if (args.length != 6) {
 			throw new QueryEvaluationException("Missing arguments");
 		}
 
@@ -47,6 +47,7 @@ public class SearchTupleFunction implements TupleFunction {
 		String query = ((Literal) args[argPos++]).getLabel();
 		int queryHash = query.hashCode();
 		int limit = ((Literal) args[argPos++]).intValue();
+		double minScore = ((Literal) args[argPos++]).doubleValue();
 		int fuzziness = ((Literal) args[argPos++]).intValue();
 		int phraseSlop = ((Literal) args[argPos++]).intValue();
 		List<SearchInterpreter.SearchParams.MatchParams> matches = ((ObjectLiteral<List<SearchInterpreter.SearchParams.MatchParams>>) args[argPos++]).objectValue();
@@ -58,7 +59,7 @@ public class SearchTupleFunction implements TupleFunction {
 		}
 
 		try {
-			SearchResponse<SearchDocument> searchResults = searchClient.search(query, limit, fuzziness, phraseSlop);
+			SearchResponse<SearchDocument> searchResults = searchClient.search(query, limit, minScore, fuzziness, phraseSlop);
 			List<List<Hit<SearchDocument>>> results;
 			final int numMatchValues = matches.size();
 			if (numMatchValues == 1) {

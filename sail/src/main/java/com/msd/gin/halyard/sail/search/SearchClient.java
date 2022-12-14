@@ -8,6 +8,7 @@ import co.elastic.clients.elasticsearch.core.SearchResponse;
 
 public final class SearchClient {
 	public static final int DEFAULT_RESULT_SIZE = 10000;
+	public static final double DEFAULT_MIN_SCORE = 0.0;
 	public static final int DEFAULT_FUZZINESS = 1;
 	public static final int DEFAULT_PHRASE_SLOP = 0;
 
@@ -19,8 +20,9 @@ public final class SearchClient {
 		this.index = index;
 	}
 
-	public SearchResponse<SearchDocument> search(String query, int limit, int fuzziness, int slop) throws IOException {
-		return client.search(s -> s.index(index).query(q -> q.queryString(qs -> qs.query(query).defaultField(SearchDocument.LABEL_FIELD).fuzziness(Integer.toString(fuzziness)).phraseSlop(Double.valueOf(slop)))).size(limit),
+	public SearchResponse<SearchDocument> search(String query, int limit, double minScore, int fuzziness, int slop) throws IOException {
+		return client.search(
+				s -> s.index(index).query(q -> q.queryString(qs -> qs.query(query).defaultField(SearchDocument.LABEL_FIELD).fuzziness(Integer.toString(fuzziness)).phraseSlop(Double.valueOf(slop)))).minScore(minScore).size(limit),
 				SearchDocument.class);
 	}
 
