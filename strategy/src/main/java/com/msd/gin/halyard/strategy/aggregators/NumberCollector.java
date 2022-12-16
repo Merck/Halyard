@@ -14,11 +14,11 @@ import org.eclipse.rdf4j.query.parser.sparql.aggregate.AggregateCollector;
 public final class NumberCollector implements AggregateCollector {
 	static final Literal ZERO = SimpleValueFactory.getInstance().createLiteral(BigInteger.ZERO);
 
-	private final AtomicReference<Literal> vref = new AtomicReference<>(ZERO);
+	private final AtomicReference<Literal> vref = new AtomicReference<>();
 	private volatile ValueExprEvaluationException typeError;
 
 	public void add(Literal l) {
-		vref.accumulateAndGet(l, (total,next) -> MathUtil.compute(total, next, MathOp.PLUS));
+		vref.accumulateAndGet(l, (total,next) -> MathUtil.compute(total!=null?total:ZERO, next, MathOp.PLUS));
 	}
 
 	public boolean hasError() {

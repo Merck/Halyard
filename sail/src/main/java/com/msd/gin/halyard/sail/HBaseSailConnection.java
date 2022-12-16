@@ -51,6 +51,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import javax.annotation.Nullable;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.BufferedMutator;
@@ -449,6 +451,18 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
     }
 
     @Override
+	public boolean hasStatement(Resource subj, IRI pred, Value obj, boolean includeInferred, Resource... contexts) throws SailException {
+		for (Resource ctx : contexts) {
+			if (ctx.isTriple()) {
+				return false;
+			}
+		}
+		try (CloseableIteration<? extends Statement, SailException> stIter = getStatements(subj, pred, obj, includeInferred, contexts)) {
+			return stIter.hasNext();
+		}
+	}
+
+	@Override
     public synchronized long size(Resource... contexts) throws SailException {
         long size = 0;
         if (contexts != null && contexts.length > 0 && contexts[0] != null) {
@@ -588,7 +602,10 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
         }
     }
 
-	private void insertStatement(Resource subj, IRI pred, Value obj, Resource ctx, long timestamp) throws IOException {
+	private void insertStatement(Resource subj, IRI pred, Value obj, @Nullable Resource ctx, long timestamp) throws IOException {
+		if (ctx != null && ctx.isTriple()) {
+			throw new SailException("context argument can not be of type Triple: " + ctx);
+		}
 		for (KeyValue kv : HalyardTableUtils.insertKeyValues(subj, pred, obj, ctx, timestamp, sail.getStatementIndices())) {
 			put(kv);
 		}

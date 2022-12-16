@@ -49,8 +49,6 @@ public class HalyardSPARQLQueryTest extends SPARQLQueryComplianceTest {
 		"sparql11-sequence-05",
 		// working draft property path syntax not supported
 		"sparql11-sequence-06",
-		"sparql11-wildcard-cycles-04",
-		"sparql11-not-in-02",
 		// incompatible with non-sequential retrieval
 		"sparql11-subquery-05"
 	};
