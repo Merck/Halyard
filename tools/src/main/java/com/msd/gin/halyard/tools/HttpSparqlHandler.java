@@ -36,6 +36,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,12 +55,14 @@ import org.eclipse.rdf4j.common.exception.RDF4JException;
 import org.eclipse.rdf4j.common.lang.FileFormat;
 import org.eclipse.rdf4j.common.lang.service.FileFormatServiceRegistry;
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.BooleanQuery;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.GraphQuery;
 import org.eclipse.rdf4j.query.MalformedQueryException;
+import org.eclipse.rdf4j.query.Operation;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.algebra.Modify;
@@ -90,6 +93,7 @@ import org.eclipse.rdf4j.rio.RDFWriterFactory;
 import org.eclipse.rdf4j.rio.RDFWriterRegistry;
 import org.eclipse.rdf4j.rio.RioSetting;
 import org.eclipse.rdf4j.rio.WriterConfig;
+import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -364,7 +368,7 @@ public final class HttpSparqlHandler implements HttpHandler {
      * @param sparqlQuery SparqlQuery to fill from the parsed parameter
      * @throws UnsupportedEncodingException which never happens
      */
-    private static void parseQueryParameter(String param, SparqlQuery sparqlQuery) throws UnsupportedEncodingException {
+    private void parseQueryParameter(String param, SparqlQuery sparqlQuery) throws UnsupportedEncodingException {
         if (param.startsWith(QUERY_PREFIX)) {
             sparqlQuery.setQuery(getParameterValue(param, QUERY_PREFIX));
         } else if (param.startsWith(DEFAULT_GRAPH_PREFIX)) {
@@ -376,14 +380,20 @@ public final class HttpSparqlHandler implements HttpHandler {
         } else {
             int i = param.indexOf("=");
             if (i >= 0) {
-                sparqlQuery.addParameter(URLDecoder.decode(param.substring(0, i), CHARSET), URLDecoder.decode(param.substring(i + 1), CHARSET));
+                String name = URLDecoder.decode(param.substring(0, i), CHARSET);
+                String value = URLDecoder.decode(param.substring(i + 1), CHARSET);
+                if (name.startsWith("$")) {
+                	sparqlQuery.addBinding(name.substring(1), NTriplesUtil.parseValue(value, repository.getValueFactory()));
+                } else {
+                    sparqlQuery.addParameter(name, value);
+                }
             } else {
                 throw new IllegalArgumentException("Invalid request parameter: " + param);
             }
         }
     }
 
-    private static void parseUpdateParameter(String param, SparqlQuery sparqlQuery) throws UnsupportedEncodingException {
+    private void parseUpdateParameter(String param, SparqlQuery sparqlQuery) throws UnsupportedEncodingException {
         if (param.startsWith(UPDATE_PREFIX)) {
             sparqlQuery.setUpdate(getParameterValue(param, UPDATE_PREFIX));
         } else if (param.startsWith(USING_GRAPH_URI_PREFIX)) {
@@ -395,7 +405,13 @@ public final class HttpSparqlHandler implements HttpHandler {
         } else {
             int i = param.indexOf("=");
             if (i >= 0) {
-                sparqlQuery.addParameter(URLDecoder.decode(param.substring(0, i), CHARSET), URLDecoder.decode(param.substring(i + 1), CHARSET));
+                String name = URLDecoder.decode(param.substring(0, i), CHARSET);
+                String value = URLDecoder.decode(param.substring(i + 1), CHARSET);
+                if (name.startsWith("$")) {
+                	sparqlQuery.addBinding(name.substring(1), NTriplesUtil.parseValue(value, repository.getValueFactory()));
+                } else {
+                    sparqlQuery.addParameter(name, value);
+                }
             } else {
                 throw new IllegalArgumentException("Invalid request parameter: " + param);
             }
@@ -472,6 +488,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         OutputStream response;
         try(SailRepositoryConnection connection = repository.getConnection()) {
 	        SailQuery query = connection.prepareQuery(QueryLanguage.SPARQL, queryString, null);
+	        sparqlQuery.addBindingsTo(query);
 	        Dataset dataset = sparqlQuery.getDataset();
 	        if (!dataset.getDefaultGraphs().isEmpty() || !dataset.getNamedGraphs().isEmpty()) {
 	            // This will include default graphs and named graphs from  the request parameters but default graphs and
@@ -493,6 +510,7 @@ public final class HttpSparqlHandler implements HttpHandler {
     			((ResultTrackingSailConnection)connection.getSailConnection()).setTrackResultSize(sparqlQuery.trackResultSize);
     		}
 	        SailUpdate update = (SailUpdate) connection.prepareUpdate(QueryLanguage.SPARQL, updateString, null);
+	        sparqlQuery.addBindingsTo(update);
 	    	parsedUpdate = update.getParsedUpdate();
 	        Dataset dataset = sparqlQuery.getDataset();
 	        if (!dataset.getDefaultGraphs().isEmpty() || !dataset.getNamedGraphs().isEmpty()) {
@@ -631,14 +649,14 @@ public final class HttpSparqlHandler implements HttpHandler {
         // SPARQL query string, has to be exactly one
         private String query, update;
         // SPARQL query template parameters for substitution
-        private final List<String> parameterNames = new ArrayList<>(), parameterValues = new ArrayList<>();
+        private final Map<String,String> parameters = new HashMap<>();
+        private final Map<String,Value> bindings = new HashMap<>();
         // Dataset containing default graphs and named graphs
         private final SimpleDataset dataset = new SimpleDataset();
         private boolean trackResultSize;
 
         public String getQuery() {
-            //replace all tokens matching {{parameterName}} inside the SPARQL query with corresponding parameterValues
-            return StringUtils.replaceEach(query, parameterNames.toArray(new String[parameterNames.size()]), parameterValues.toArray(new String[parameterValues.size()]));
+        	return replaceParameters(query);
         }
 
         public void setQuery(String query) {
@@ -652,8 +670,7 @@ public final class HttpSparqlHandler implements HttpHandler {
         }
 
         public String getUpdate() {
-            //replace all tokens matching {{parameterName}} inside the SPARQL query with corresponding parameterValues
-            return StringUtils.replaceEach(update, parameterNames.toArray(new String[parameterNames.size()]), parameterValues.toArray(new String[parameterValues.size()]));
+        	return replaceParameters(update);
         }
 
         public void setUpdate(String update) {
@@ -666,6 +683,19 @@ public final class HttpSparqlHandler implements HttpHandler {
             this.update = update;
         }
 
+        private String replaceParameters(String s) {
+            //replace all tokens matching {{parameterName}} inside the given SPARQL query with corresponding parameterValues
+            String[] tokens = new String[parameters.size()];
+            String[] values = new String[parameters.size()];
+            int i = 0;
+            for (Map.Entry<String,String> param : parameters.entrySet()) {
+                tokens[i] = "{{" + param.getKey() + "}}";
+                values[i] = param.getValue();
+                i++;
+            }
+            return StringUtils.replaceEach(s, tokens, values);
+        }
+
         public void addDefaultGraph(IRI defaultGraph) {
             dataset.addDefaultGraph(defaultGraph);
         }
@@ -675,8 +705,17 @@ public final class HttpSparqlHandler implements HttpHandler {
         }
 
         public void addParameter(String name, String value) {
-            parameterNames.add("{{" + name + "}}");
-            parameterValues.add(value);
+            parameters.put(name, value);
+        }
+
+        public void addBinding(String name, Value value) {
+        	bindings.put(name, value);
+        }
+
+        public void addBindingsTo(Operation op) {
+	        for (Map.Entry<String, Value> binding : bindings.entrySet()) {
+	        	op.setBinding(binding.getKey(), binding.getValue());
+	        }
         }
 
         public Dataset getDataset() {

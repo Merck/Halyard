@@ -46,6 +46,7 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
+import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
 import org.eclipse.rdf4j.sail.NotifyingSailConnection;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.helpers.NotifyingSailConnectionWrapper;
@@ -640,6 +641,20 @@ public class HttpSparqlHandlerTest {
         String json = IOUtils.toString(urlConnection.getInputStream(), "UTF-8");
         // -1 as SailRepository doesn't support tracked updates
         assertEquals("{\"results\":[{\"inserted\":-1}]}", json);
+    }
+
+    @Test
+    public void testQueryWithBindings() throws IOException {
+        URL url = new URL(SERVER_URL + "?$s=" + URLEncoder.encode(NTriplesUtil.toNTriplesString(SUBJ), "UTF-8"));
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setDoOutput(true);
+        urlConnection.setRequestMethod("POST");
+        urlConnection.setRequestProperty("Content-Type", HttpSparqlHandler.UNENCODED_QUERY_CONTENT);
+        OutputStreamWriter out = new OutputStreamWriter(urlConnection.getOutputStream());
+        out.write("SELECT (COUNT(*) as ?count) {?s ?p ?o}");
+        out.close();
+        String result = IOUtils.toString(urlConnection.getInputStream(), "UTF-8");
+        assertEquals("count\r\n1\r\n", result);
     }
 
     @Test
