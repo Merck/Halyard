@@ -65,6 +65,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
@@ -128,6 +129,7 @@ public final class HalyardStats extends AbstractHalyardTool {
         IRI graph = HALYARD.STATS_ROOT_NODE, lastGraph = HALYARD.STATS_ROOT_NODE;
         long triples, distinctSubjects, properties, distinctObjects, classes, removed;
         long distinctIRIReferenceSubjects, distinctIRIReferenceObjects, distinctBlankNodeObjects, distinctBlankNodeSubjects, distinctLiterals;
+        long distinctTripleSubjects, distinctTripleObjects;
         IRI subsetType;
 		Value subsetId;
         long setThreshold, setCounter, subsetThreshold, subsetCounter;
@@ -263,6 +265,8 @@ public final class HalyardStats extends AbstractHalyardTool {
                         Resource subj = stmt.getSubject();
                         if (subj.isIRI()) {
                             distinctIRIReferenceSubjects++;
+                        } else if (subj.isTriple()) {
+                        	distinctTripleSubjects++;
                         } else {
                             distinctBlankNodeSubjects++;
                         }
@@ -281,6 +285,8 @@ public final class HalyardStats extends AbstractHalyardTool {
                         Value obj = stmt.getObject();
                         if (obj.isIRI()) {
                         	distinctIRIReferenceObjects++;
+                        } else if (obj.isTriple()) {
+                        	distinctTripleObjects++;
                         } else if (obj.isBNode()) {
                         	distinctBlankNodeObjects++;
                         } else {
@@ -349,6 +355,8 @@ public final class HalyardStats extends AbstractHalyardTool {
                 report(output, VOID_EXT.DISTINCT_BLANK_NODE_OBJECTS, null, distinctBlankNodeObjects);
                 report(output, VOID_EXT.DISTINCT_BLANK_NODE_SUBJECTS, null, distinctBlankNodeSubjects);
                 report(output, VOID_EXT.DISTINCT_LITERALS, null, distinctLiterals);
+                report(output, VOID_EXT.DISTINCT_TRIPLE_OBJECTS, null, distinctTripleObjects);
+                report(output, VOID_EXT.DISTINCT_TRIPLE_SUBJECTS, null, distinctTripleSubjects);
             } else {
                 report(output, SD.NAMED_GRAPH_PROPERTY, null, 1);
             }
@@ -363,6 +371,8 @@ public final class HalyardStats extends AbstractHalyardTool {
             distinctBlankNodeObjects = 0;
             distinctBlankNodeSubjects = 0;
             distinctLiterals = 0;
+            distinctTripleObjects = 0;
+            distinctTripleSubjects = 0;
             resetSubset(output);
 		}
 
@@ -492,14 +502,15 @@ public final class HalyardStats extends AbstractHalyardTool {
                         writeStatement(statsNode, RDF.TYPE, VOID.DATASET);
                     }
                 }
+                Literal countLiteral = vf.createLiteral(count);
                 if (partitionId != null) {
 					IRI subset = vf.createIRI(graph + "_" + predicate.getLocalName() + "_" + rdfFactory.id(partitionId));
                     writeStatement(statsNode, vf.createIRI(predicate + "Partition"), subset);
                     writeStatement(subset, RDF.TYPE, VOID.DATASET);
 					writeStatement(subset, predicate, partitionId);
-                    writeStatement(subset, VOID.TRIPLES, vf.createLiteral(count));
+                    writeStatement(subset, VOID.TRIPLES, countLiteral);
                 } else {
-                    writeStatement(statsNode, predicate, vf.createLiteral(count));
+                    writeStatement(statsNode, predicate, countLiteral);
                 }
                 if ((added % 1000) == 0) {
                     context.setStatus(MessageFormat.format("statements removed: {0} added: {1}", removed, added));

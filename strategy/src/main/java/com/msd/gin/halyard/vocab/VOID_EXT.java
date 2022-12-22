@@ -25,7 +25,7 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.kohsuke.MetaInfServices;
 
 /**
- * Prefix, namespace and IRIs for the parts of the VIOD ontology used in Halyard
+ * Prefix, namespace and IRIs for the parts of the VOID ontology used in Halyard
  * @author Adam Sotona (MSD)
  */
 @MetaInfServices(Vocabulary.class)
@@ -57,4 +57,10 @@ public final class VOID_EXT implements Vocabulary {
 
     public static final IRI OBJECT_PARTITION = SVF.createIRI(NAMESPACE, "objectPartition");
 
+
+    // CUSTOM EXTENSIONS
+
+    public static final IRI DISTINCT_TRIPLE_SUBJECTS = SVF.createIRI(NAMESPACE, "distinctTripleSubjects");
+
+    public static final IRI DISTINCT_TRIPLE_OBJECTS = SVF.createIRI(NAMESPACE, "distinctTripleObjects");
 }
