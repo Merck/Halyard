@@ -1,12 +1,15 @@
 package com.msd.gin.halyard.optimizers;
 
 import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
+import com.msd.gin.halyard.algebra.Algebra;
+import com.msd.gin.halyard.algebra.BGPCollector;
 import com.msd.gin.halyard.algebra.ConstrainedStatementPattern;
 import com.msd.gin.halyard.common.ValueType;
 
 import java.util.HashMap;
 import java.util.Map;
 
+import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.BooleanLiteral;
 import org.eclipse.rdf4j.model.vocabulary.AFN;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -33,16 +36,21 @@ import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
-import org.eclipse.rdf4j.query.algebra.helpers.BGPCollector;
 
 public class ConstrainedValueOptimizer implements QueryOptimizer {
 
 	@Override
 	public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-		tupleExpr.visit(new ConstraintScanner());
+		tupleExpr.visit(new ConstraintScanner(bindings));
 	}
 
 	static final class ConstraintScanner extends AbstractExtendedQueryModelVisitor<RuntimeException> {
+		final BindingSet bindings;
+
+		ConstraintScanner(BindingSet bindings) {
+			this.bindings = bindings;
+		}
+
 		private void processGraphPattern(ConstraintCollector gpc) {
 			for (StatementPattern sp: gpc.getStatementPatterns()) {
 				Var s = sp.getSubjectVar();
@@ -75,14 +83,14 @@ public class ConstrainedValueOptimizer implements QueryOptimizer {
 
 		@Override
 		public void meet(Filter filter) {
-			ConstraintCollector collector = new ConstraintCollector(this);
+			ConstraintCollector collector = new ConstraintCollector(this, bindings);
 			filter.visit(collector);
 			processGraphPattern(collector);
 		}
 
 		@Override
 		public void meet(Join join) {
-			ConstraintCollector collector = new ConstraintCollector(this);
+			ConstraintCollector collector = new ConstraintCollector(this, bindings);
 			join.visit(collector);
 			processGraphPattern(collector);
 		}
@@ -91,9 +99,11 @@ public class ConstrainedValueOptimizer implements QueryOptimizer {
 
 	static final class ConstraintCollector extends BGPCollector<RuntimeException> {
 		final Map<String,VarConstraint> varConstraints = new HashMap<>();
+		final BindingSet bindings;
 
-		public ConstraintCollector(QueryModelVisitor<RuntimeException> visitor) {
+		ConstraintCollector(QueryModelVisitor<RuntimeException> visitor, BindingSet bindings) {
 			super(visitor);
+			this.bindings = bindings;
 		}
 
 		@Override
@@ -111,7 +121,7 @@ public class ConstrainedValueOptimizer implements QueryOptimizer {
 							} else {
 								varConstraints.put(var.getName(), new VarConstraint(ValueType.LITERAL));
 							}
-						} else if (cmp.getOperator() == CompareOp.EQ && cmp.getRightArg() instanceof ValueConstant && BooleanLiteral.TRUE.equals(((ValueConstant)cmp.getRightArg()).getValue())) {
+						} else if (cmp.getOperator() == CompareOp.EQ && BooleanLiteral.TRUE.equals(getValue(cmp.getRightArg()))) {
 							if (func instanceof IsLiteral) {
 								varConstraints.put(var.getName(), new VarConstraint(ValueType.LITERAL));
 							} else if (func instanceof IsURI) {
@@ -128,8 +138,10 @@ public class ConstrainedValueOptimizer implements QueryOptimizer {
 				} else if (cmp.getLeftArg() instanceof FunctionCall) {
 					FunctionCall funcCall = (FunctionCall) cmp.getLeftArg();
 					if (AFN.LOCALNAME.stringValue().equals(funcCall.getURI()) && funcCall.getArgs().get(0) instanceof Var) {
-						varConstraints.put(((Var)funcCall.getArgs().get(0)).getName(), new VarConstraint(ValueType.IRI));
+						varConstraints.put(((Var) funcCall.getArgs().get(0)).getName(), new VarConstraint(ValueType.IRI));
 					}
+				} else if (cmp.getLeftArg() instanceof Var && isLiteral(cmp.getRightArg())) {
+					varConstraints.put(((Var) cmp.getLeftArg()).getName(), new VarConstraint(ValueType.LITERAL));
 				}
 			} else if (condition instanceof UnaryValueOperator) {
 				UnaryValueOperator func = (UnaryValueOperator) condition;
@@ -148,6 +160,21 @@ public class ConstrainedValueOptimizer implements QueryOptimizer {
 			}
 
 			filter.getArg().visit(this);
+		}
+
+		private Value getValue(ValueExpr expr) {
+			if (expr instanceof ValueConstant) {
+				return ((ValueConstant) expr).getValue();
+			} else if (expr instanceof Var) {
+				return Algebra.getVarValue((Var) expr, bindings);
+			} else {
+				return null;
+			}
+		}
+
+		private boolean isLiteral(ValueExpr expr) {
+			Value v = getValue(expr);
+			return (v != null) && v.isLiteral();
 		}
 
 		@Override

@@ -303,7 +303,7 @@ final class HalyardTupleExprEvaluation {
 						if (constraintValue instanceof ValueConstant) {
 							v = ((ValueConstant) constraintValue).getValue();
 						} else if (constraintValue instanceof Var) {
-							v = ((Var) constraintValue).getValue();
+							v = Algebra.getVarValue((Var) constraintValue, bindings);
 						} else {
 							v = null;
 						}

@@ -35,12 +35,14 @@ import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
  * ?s ?p ?to. bind(geof:distance(?from, ?to, ?units) as ?dist) filter(?dist &lt; ?distLimit)
  */
 public class WithinDistanceInterpreter implements QueryOptimizer {
+	private final QueryOptimizer preFilterOptimizer = HalyardFilterOptimizer.newPreFilterOptimizer();
+	private final QueryOptimizer postFilterOptimizer = HalyardFilterOptimizer.newPostFilterOptimizer();
+
 	@Override
 	public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-		HalyardFilterOptimizer.decomposeFilters(tupleExpr);
-		HalyardFilterOptimizer.pushDownFilters(tupleExpr);
+		preFilterOptimizer.optimize(tupleExpr, dataset, bindings);
 		rewrite(tupleExpr);
-		HalyardFilterOptimizer.mergeFilters(tupleExpr);
+		postFilterOptimizer.optimize(tupleExpr, dataset, bindings);
 	}
 
 	private void rewrite(TupleExpr tupleExpr) {

@@ -2,6 +2,7 @@ package com.msd.gin.halyard.strategy;
 
 import com.msd.gin.halyard.optimizers.ConstrainedValueOptimizer;
 import com.msd.gin.halyard.optimizers.ExtendedEvaluationStatistics;
+import com.msd.gin.halyard.optimizers.HalyardFilterOptimizer;
 import com.msd.gin.halyard.optimizers.QueryJoinOptimizer;
 
 import java.util.Arrays;
@@ -16,7 +17,6 @@ import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.CompareOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.ConjunctiveConstraintSplitterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.ConstantOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.DisjunctiveConstraintOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.FilterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.IterativeEvaluationOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.OrderLimitOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.ParentReferenceCleaner;
@@ -52,8 +52,9 @@ public class ExtendedQueryOptimizerPipeline implements QueryOptimizerPipeline {
 			new QueryJoinOptimizer(statistics),
 			// new SubSelectJoinOptimizer(),
 			new IterativeEvaluationOptimizer(),
-			new FilterOptimizer(),
+			HalyardFilterOptimizer.newPreFilterOptimizer(),
 			new ConstrainedValueOptimizer(),
+			HalyardFilterOptimizer.newPostFilterOptimizer(),
 			new OrderLimitOptimizer(),
 			new ParentReferenceCleaner()
 		);

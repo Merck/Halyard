@@ -153,4 +153,17 @@ public class ConstrainedValueStrategyTest {
 	        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
         }
     }
+
+    @Test
+    public void testFilterComparison() {
+        ValueFactory vf = con.getValueFactory();
+        con.add(vf.createIRI("http://whatever/a"), vf.createIRI("http://whatever/val"), vf.createLiteral(1));
+        con.add(vf.createIRI("http://whatever/b"), vf.createIRI("http://whatever/val"), vf.createLiteral(10));
+    	String q ="SELECT ?s { ?s ?p ?o filter(?o > 5) }";
+        try (TupleQueryResult res = con.prepareTupleQuery(QueryLanguage.SPARQL, q).evaluate()) {
+	        assertTrue(res.hasNext());
+	        BindingSet bs = res.next();
+	        assertEquals("b", ((IRI)bs.getValue("s")).getLocalName());
+        }
+    }
 }

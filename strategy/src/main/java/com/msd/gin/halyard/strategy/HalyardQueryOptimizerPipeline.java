@@ -85,8 +85,9 @@ public final class HalyardQueryOptimizerPipeline implements QueryOptimizerPipeli
 			(statistics instanceof HalyardEvaluationStatistics) ? new HalyardQueryJoinOptimizer((HalyardEvaluationStatistics) statistics) : new QueryJoinOptimizer(statistics),
 			// new SubSelectJoinOptimizer(),
 			new IterativeEvaluationOptimizer(),
-			new HalyardFilterOptimizer(),
+			HalyardFilterOptimizer.newPreFilterOptimizer(),
 			new ConstrainedValueOptimizer(),
+			HalyardFilterOptimizer.newPostFilterOptimizer(),
 			new OrderLimitOptimizer(),
 			new ParentReferenceCleaner(),
 			joinAlgoOptimizer

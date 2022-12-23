@@ -56,15 +56,34 @@ public final class HalyardFilterOptimizer implements QueryOptimizer {
     	mergeFilters(tupleExpr);
     }
 
-    public static void decomposeFilters(TupleExpr tupleExpr) {
+    public static QueryOptimizer newPreFilterOptimizer() {
+    	return new QueryOptimizer() {
+    	    @Override
+    	    public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
+    	    	decomposeFilters(tupleExpr);
+    	    	pushDownFilters(tupleExpr);
+    	    }
+    	};
+    }
+
+    public static QueryOptimizer newPostFilterOptimizer() {
+    	return new QueryOptimizer() {
+    	    @Override
+    	    public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
+    	    	mergeFilters(tupleExpr);
+    	    }
+    	};
+    }
+
+    private static void decomposeFilters(TupleExpr tupleExpr) {
 		tupleExpr.visit(new FilterUnMerger());
     }
 
-    public static void pushDownFilters(TupleExpr tupleExpr) {
+    private static void pushDownFilters(TupleExpr tupleExpr) {
 		tupleExpr.visit(new FilterOrganizer());
     }
 
-    public static void mergeFilters(TupleExpr tupleExpr) {
+    private static void mergeFilters(TupleExpr tupleExpr) {
 		tupleExpr.visit(new FilterMerger());
     }
 
