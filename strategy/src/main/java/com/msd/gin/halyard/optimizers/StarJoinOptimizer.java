@@ -51,6 +51,11 @@ public class StarJoinOptimizer implements QueryOptimizer {
 	static class StarJoinFinder extends AbstractExtendedQueryModelVisitor<RDF4JException> {
 
 		@Override
+		public void meet(StatementPattern node) {
+			// skip children
+		}
+
+		@Override
 		public void meet(Service node) throws RDF4JException {
 			// skip service nodes - leave it to the remote endpoint to optimize
 		}

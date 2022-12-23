@@ -88,13 +88,7 @@ public final class HalyardFilterOptimizer implements QueryOptimizer {
 		}
 	}
 
-	private static class FilterMerger extends AbstractSimpleQueryModelVisitor<RuntimeException> {
-
-		private FilterMerger() {
-			super(false);
-		}
-
-		// Halyard - bug fix
+	private static class FilterMerger extends /*Halyard*/AbstractExtendedQueryModelVisitor<RuntimeException> {
 		@Override
 		public void meet(Filter filter) {
 			super.meet(filter);
@@ -106,21 +100,27 @@ public final class HalyardFilterOptimizer implements QueryOptimizer {
 
 				Filter newFilter = new Filter(childFilter.getArg().clone(), merge);
 				parent.replaceChildNode(filter, newFilter);
-				meet(newFilter);
 			}
+		}
+
+		// Halyard
+		@Override
+		public void meet(StatementPattern node) {
+			// skip children
 		}
 	}
 
-	private static class FilterOrganizer extends AbstractSimpleQueryModelVisitor<RuntimeException> {
-
-		public FilterOrganizer() {
-			super(false);
-		}
-
+	private static class FilterOrganizer extends /*Halyard*/AbstractExtendedQueryModelVisitor<RuntimeException> {
 		@Override
 		public void meet(Filter filter) {
 			super.meet(filter);
 			FilterRelocator.optimize(filter);
+		}
+
+		// Halyard
+		@Override
+		public void meet(StatementPattern node) {
+			// skip children
 		}
 	}
 

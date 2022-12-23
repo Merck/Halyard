@@ -35,9 +35,9 @@ public class HalyardEvaluationExecutorTest {
 		HalyardEvaluationExecutor executor = new HalyardEvaluationExecutor(new Configuration());
 		assertEquals(1, executor.getPriorityForNode(j1));
 		assertEquals(2, executor.getPriorityForNode(sp1));
-		assertEquals(6, executor.getPriorityForNode(j2));
-		assertEquals(7, executor.getPriorityForNode(sp2));
-		assertEquals(11, executor.getPriorityForNode(sp3));
+		assertEquals(3, executor.getPriorityForNode(j2));
+		assertEquals(4, executor.getPriorityForNode(sp2));
+		assertEquals(5, executor.getPriorityForNode(sp3));
 	}
 
 	@Test
@@ -54,18 +54,18 @@ public class HalyardEvaluationExecutorTest {
 		HalyardEvaluationExecutor executor = new HalyardEvaluationExecutor(new Configuration());
 		assertEquals(1, executor.getPriorityForNode(j1));
 		assertEquals(2, executor.getPriorityForNode(sp1));
-		assertEquals(6, executor.getPriorityForNode(j2));
-		assertEquals(7, executor.getPriorityForNode(sp2));
-		assertEquals(11, executor.getPriorityForNode(service));
-		assertEquals(13, executor.getPriorityForNode(j3));
-		assertEquals(14, executor.getPriorityForNode(sp3));
-		assertEquals(18, executor.getPriorityForNode(sp4));
+		assertEquals(3, executor.getPriorityForNode(j2));
+		assertEquals(4, executor.getPriorityForNode(sp2));
+		assertEquals(5, executor.getPriorityForNode(service));
+		assertEquals(6, executor.getPriorityForNode(j3));
+		assertEquals(7, executor.getPriorityForNode(sp3));
+		assertEquals(8, executor.getPriorityForNode(sp4));
 
 		ServiceRoot serviceRoot = ServiceRoot.create(service);
 		Join serviceJoin = (Join) serviceRoot.getArg();
-		assertEquals(13, executor.getPriorityForNode(serviceJoin));
-		assertEquals(14, executor.getPriorityForNode(serviceJoin.getLeftArg()));
-		assertEquals(18, executor.getPriorityForNode(serviceJoin.getRightArg()));
+		assertEquals(6, executor.getPriorityForNode(serviceJoin));
+		assertEquals(7, executor.getPriorityForNode(serviceJoin.getLeftArg()));
+		assertEquals(8, executor.getPriorityForNode(serviceJoin.getRightArg()));
 	}
 
 	@Test

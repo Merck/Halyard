@@ -27,6 +27,7 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.algebra.FunctionCall;
+import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.UpdateExpr;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
@@ -86,7 +87,7 @@ public final class ParallelSplitFunction implements Function {
     }
 
     private static final class ParallelSplitFunctionVisitor extends AbstractExtendedQueryModelVisitor<IllegalArgumentException> {
-        int forks = 0;
+		int forks = 0;
         @Override
         public void meet(FunctionCall node) throws IllegalArgumentException {
             if (PARALLEL_SPLIT_FUNCTION.stringValue().equals(node.getURI())) {
@@ -110,5 +111,10 @@ public final class ParallelSplitFunction implements Function {
                 }
             }
         }
+
+		@Override
+		public void meet(StatementPattern node) {
+			// skip children
+		}
     }
 }

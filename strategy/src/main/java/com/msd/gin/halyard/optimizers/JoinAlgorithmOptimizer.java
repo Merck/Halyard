@@ -46,6 +46,11 @@ public class JoinAlgorithmOptimizer implements QueryOptimizer {
 				super.meet(leftJoin);
 				selectJoinAlgorithm(leftJoin);
 			}
+
+			@Override
+			public void meet(StatementPattern node) {
+				// skip children
+			}
 		});
 	}
 

@@ -69,6 +69,11 @@ public class ConstrainedValueOptimizer implements QueryOptimizer {
 		}
 
 		@Override
+		public void meet(StatementPattern node) {
+			// skip children
+		}
+
+		@Override
 		public void meet(Filter filter) {
 			ConstraintCollector collector = new ConstraintCollector(this);
 			filter.visit(collector);

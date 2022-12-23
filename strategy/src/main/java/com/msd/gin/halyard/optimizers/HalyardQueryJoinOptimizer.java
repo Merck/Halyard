@@ -33,6 +33,7 @@ import org.eclipse.rdf4j.query.IncompatibleOperationException;
 import org.eclipse.rdf4j.query.algebra.Extension;
 import org.eclipse.rdf4j.query.algebra.FunctionCall;
 import org.eclipse.rdf4j.query.algebra.Join;
+import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
@@ -60,6 +61,11 @@ public final class HalyardQueryJoinOptimizer extends QueryJoinOptimizer {
                 }
                 super.meet(node);
             }
+
+    		@Override
+    		public void meet(StatementPattern node) {
+    			// skip children
+    		}
         });
         tupleExpr.visit(new QueryJoinOptimizer.JoinVisitor(statistics) {
             private Set<String> priorityBounds = new HashSet<>();
@@ -107,6 +113,11 @@ public final class HalyardQueryJoinOptimizer extends QueryJoinOptimizer {
        						orderedArgs.add(right);
        					}
        					right.visit(this);
+        			}
+
+        			@Override
+        			public void meet(StatementPattern node) {
+        				// skip children
         			}
 				});
             	node.setArgs(orderedArgs);

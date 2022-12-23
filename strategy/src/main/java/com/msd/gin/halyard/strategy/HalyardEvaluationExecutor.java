@@ -78,7 +78,7 @@ public final class HalyardEvaluationExecutor implements HalyardEvaluationExecuto
 	}
 
     // a map of query model nodes and their priority
-    private final Cache<QueryModelNode, Integer> priorityMapCache = CacheBuilder.newBuilder().weakKeys().build();
+    private final Cache<TupleExpr, Integer> priorityMapCache = CacheBuilder.newBuilder().weakKeys().build();
 
     private final RateTracker taskRateTracker;
 
@@ -265,12 +265,25 @@ public final class HalyardEvaluationExecutor implements HalyardEvaluationExecuto
 
             // populate the priority cache
             new AbstractExtendedQueryModelVisitor<RuntimeException>() {
-                @Override
-                protected void meetNode(QueryModelNode n) {
+            	private int setPriority(TupleExpr n) {
                     int pp = counter.getAndIncrement();
                     priorityMapCache.put(n, pp);
-                    super.meetNode(n);
+                    return pp;
+            	}
+
+            	@Override
+                protected void meetNode(QueryModelNode n) {
+            		if (n instanceof TupleExpr) {
+            			setPriority((TupleExpr) n);
+            		}
+                    n.visitChildren(this);
                 }
+
+    			@Override
+    			public void meet(StatementPattern node) {
+    				setPriority(node);
+    				// skip children
+    			}
 
                 @Override
                 public void meet(Filter node) {
@@ -280,8 +293,7 @@ public final class HalyardEvaluationExecutor implements HalyardEvaluationExecuto
 
                 @Override
                 public void meet(Service n) {
-                    int pp = counter.getAndIncrement();
-                    priorityMapCache.put(n, pp);
+                	int pp = setPriority(n);
                     n.visitChildren(this);
                     counter.getAndUpdate((int count) -> 2 * count - pp + 1); //at least double the distance to have a space for service optimizations
                 }

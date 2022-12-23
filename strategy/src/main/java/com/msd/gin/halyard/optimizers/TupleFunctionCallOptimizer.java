@@ -14,6 +14,7 @@ import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
+import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 
@@ -32,6 +33,11 @@ public class TupleFunctionCallOptimizer implements QueryOptimizer {
 						tfc.setDependentExpression(new SingletonSet());
 					}
 				}
+			}
+
+			@Override
+			public void meet(StatementPattern node) {
+				// skip children
 			}
 
 			@Override
@@ -80,6 +86,11 @@ public class TupleFunctionCallOptimizer implements QueryOptimizer {
 			if (!done) {
 				super.meetBinaryTupleOperator(node);
 			}
+		}
+
+		@Override
+		public void meet(StatementPattern node) {
+			// skip children
 		}
 
 		@Override
