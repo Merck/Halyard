@@ -87,9 +87,9 @@ public final class HalyardSingleBulkUpdate extends AbstractHalyardTool {
 	            TableMapReduceUtil.initCredentials(job);
 	            if (job.waitForCompletion(true)) {
 					BulkLoadHFiles.create(getConf()).bulkLoad(tableName, outPath);
-                    LOG.info("Stage #{} of {} completed.", stage, stages);
+                    LOG.info("Stage #{} of {} completed.", stage+1, stages);
 	            } else {
-            		LOG.error("Stage #{} of {} failed to complete.", stage, stages);
+            		LOG.error("Stage #{} of {} failed to complete.", stage+1, stages);
 	                return -1;
 	            }
 	        }
