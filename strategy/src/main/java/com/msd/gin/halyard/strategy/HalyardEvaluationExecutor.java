@@ -553,30 +553,34 @@ public final class HalyardEvaluationExecutor implements HalyardEvaluationExecuto
             }
 
         	private boolean checkThreads(int retries) {
-        		final int maxPoolSize = executor.getMaximumPoolSize();
-        		// if we've been consistently blocked and are at full capacity and not making any progress overall
-        		if (retries > maxRetries && executor.getActiveCount() >= maxPoolSize && taskRateTracker.getRatePerSecond() == 0.0f) {
-        			// then try adding some emergency threads
-    				synchronized (executor) {
-    					// check thread pool hasn't been modified already in the meantime and still blocked
-    					if (maxPoolSize == executor.getMaximumPoolSize() && executor.getActiveCount() == maxPoolSize && taskRateTracker.getRatePerSecond() == 0.0f) {
-    						if (maxPoolSize < maxThreads) {
-    							int newMaxPoolSize = Math.min(maxPoolSize + threadGain, maxThreads);
-    							LOGGER.warn("Iteration {}: all {} threads seem to be blocked (taskRate {}) - adding {} more\n{}", Integer.toHexString(this.hashCode()), executor.getPoolSize(), taskRateTracker.getRatePerSecond(), newMaxPoolSize - maxPoolSize, executor.toString());
-    							executor.setMaximumPoolSize(newMaxPoolSize);
-    							executor.setCorePoolSize(Math.min(executor.getCorePoolSize()+threadGain, newMaxPoolSize));
-    						} else {
-    							// out of options
-    							throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", maxThreads));
-    						}
-    					}
-    				}
-					return true;
-        		} else if (retries > retryLimit) {
-        			// something else is wrong
-        			throw new QueryEvaluationException(String.format("Retry limit exceeded: %d (active threads %d, task rate %f)", retries, executor.getActiveCount(), taskRateTracker.getRatePerSecond()));
+        		final boolean overallProgress = taskRateTracker.getRatePerSecond() > 0.0f;
+        		// if not making any progress overall
+        		if (!overallProgress) {
+            		final int maxPoolSize = executor.getMaximumPoolSize();
+	        		// if we've been consistently blocked and are at full capacity
+	        		if (retries > maxRetries && executor.getActiveCount() >= maxPoolSize) {
+	        			// then try adding some emergency threads
+	    				synchronized (executor) {
+	    					// check thread pool hasn't been modified already in the meantime and still blocked
+	    					if (maxPoolSize == executor.getMaximumPoolSize() && executor.getActiveCount() == maxPoolSize && taskRateTracker.getRatePerSecond() == 0.0f) {
+	    						if (maxPoolSize < maxThreads) {
+	    							int newMaxPoolSize = Math.min(maxPoolSize + threadGain, maxThreads);
+	    							LOGGER.warn("Iteration {}: all {} threads seem to be blocked (taskRate {}) - adding {} more\n{}", Integer.toHexString(this.hashCode()), executor.getPoolSize(), taskRateTracker.getRatePerSecond(), newMaxPoolSize - maxPoolSize, executor.toString());
+	    							executor.setMaximumPoolSize(newMaxPoolSize);
+	    							executor.setCorePoolSize(Math.min(executor.getCorePoolSize()+threadGain, newMaxPoolSize));
+	    						} else {
+	    							// out of options
+	    							throw new QueryEvaluationException(String.format("Maximum thread limit reached (%d)", maxThreads));
+	    						}
+	    					}
+	    				}
+						return true;
+	        		} else if (retries > retryLimit) {
+	        			// something else is wrong
+	        			throw new QueryEvaluationException(String.format("Retry limit exceeded: %d (active threads %d, task rate %f)", retries, executor.getActiveCount(), taskRateTracker.getRatePerSecond()));
+	        		}
         		}
-        		return false;
+        		return overallProgress;
             }
 
             @Override
