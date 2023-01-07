@@ -298,6 +298,10 @@ public class HBaseSail implements BindingSetPipeSail, HBaseSailMXBean {
 				new HBaseFederatedServiceResolver(conn, config, tableName, pushStrategy, evaluationTimeout, null));
 	}
 
+	HBaseSail(@Nonnull Connection conn, Configuration config, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker) {
+		this(conn, config, tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, ticker, HBaseSailConnection.Factory.INSTANCE);
+	}
+
 	public HBaseSail(@Nonnull Connection conn, String tableName, boolean create, int splitBits, boolean pushStrategy, int evaluationTimeout, ElasticSettings elasticSettings, Ticker ticker) {
 		this(conn, conn.getConfiguration(), tableName, create, splitBits, pushStrategy, evaluationTimeout, elasticSettings, ticker, HBaseSailConnection.Factory.INSTANCE);
 	}
@@ -387,10 +391,6 @@ public class HBaseSail implements BindingSetPipeSail, HBaseSailMXBean {
 	@Override
 	public HalyardEvaluationExecutorMXBean getExecutor() {
 		return executor;
-	}
-
-	String getFederatedServiceResolverName() {
-		return federatedServiceResolver.getClass().getSimpleName() + "@" + Integer.toHexString(federatedServiceResolver.hashCode());
 	}
 
 	BufferedMutator getBufferedMutator() {
@@ -525,7 +525,7 @@ public class HBaseSail implements BindingSetPipeSail, HBaseSailMXBean {
 		if (owner != null) {
 			attrs.put("owner", owner);
 		}
-		attrs.put("federatedServiceResolver", getFederatedServiceResolverName());
+		attrs.put("federatedServiceResolver", HBaseFederatedServiceResolver.getName(federatedServiceResolver));
 		try {
 			mxInst = ManagementFactory.getPlatformMBeanServer().registerMBean(this, ObjectName.getInstance("com.msd.gin.halyard", attrs));
 		} catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException | MalformedObjectNameException e) {

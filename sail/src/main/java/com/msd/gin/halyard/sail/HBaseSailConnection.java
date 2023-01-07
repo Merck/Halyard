@@ -864,7 +864,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 	}
 
 	static final class Factory implements SailConnectionFactory {
-		public static final SailConnectionFactory INSTANCE = new Factory();
+		static final SailConnectionFactory INSTANCE = new Factory();
 
 		@Override
 		public HBaseSailConnection createConnection(HBaseSail sail) throws IOException {

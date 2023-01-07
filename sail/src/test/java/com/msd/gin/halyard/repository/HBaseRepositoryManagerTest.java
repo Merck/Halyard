@@ -19,10 +19,13 @@ package com.msd.gin.halyard.repository;
 import com.msd.gin.halyard.common.HBaseServerTestInstance;
 
 import java.net.MalformedURLException;
+import java.util.Collection;
 
 import org.apache.http.client.HttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.config.RepositoryConfig;
+import org.eclipse.rdf4j.repository.manager.RepositoryInfo;
 import org.eclipse.rdf4j.repository.sail.config.SailRepositoryConfig;
 import org.eclipse.rdf4j.sail.memory.config.MemoryStoreConfig;
 import org.junit.Test;
@@ -54,7 +57,7 @@ public class HBaseRepositoryManagerTest {
         HBaseRepositoryManager rm = new HBaseRepositoryManager();
         rm.overrideConfiguration(HBaseServerTestInstance.getInstanceConfig());
         rm.init();
-        rm.addRepositoryConfig(new RepositoryConfig("repoTest", new SailRepositoryConfig(new MemoryStoreConfig(false))));
+		rm.addRepositoryConfig(new RepositoryConfig("repoTest", "Test repository", new SailRepositoryConfig(new MemoryStoreConfig(false))));
         assertTrue(rm.getAllRepositories().contains(rm.getRepository("repoTest")));
         rm.shutDown();
         //test persistence
@@ -64,4 +67,22 @@ public class HBaseRepositoryManagerTest {
         assertTrue(rm.getAllRepositories().contains(rm.getRepository("repoTest")));
         rm.shutDown();
     }
+
+	@Test
+	public void testGets() throws Exception {
+		HBaseRepositoryManager rm = new HBaseRepositoryManager();
+		rm.overrideConfiguration(HBaseServerTestInstance.getInstanceConfig());
+		rm.init();
+		Collection<String> ids = rm.getRepositoryIDs();
+		Collection<RepositoryInfo> infos = rm.getAllRepositoryInfos();
+		assertEquals(ids.size(), infos.size());
+		for (String id : ids) {
+			assertNotNull(rm.getRepositoryInfo(id));
+		}
+		Collection<Repository> repos = rm.getAllRepositories();
+		assertEquals(ids.size(), repos.size());
+		for (String id : ids) {
+			assertNotNull(rm.getRepository(id));
+		}
+	}
 }

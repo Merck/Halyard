@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.http.client.HttpClient;
@@ -54,24 +55,25 @@ import org.eclipse.rdf4j.repository.sparql.federation.SPARQLServiceResolver;
  * @author Adam Sotona (MSD)
  */
 public final class HBaseRepositoryManager extends RepositoryManager {
-    private static final String SYSTEM_REPO_ID = "RDF4JSYSTEM";
-	private static final String SYSTEM_ID = "SYSTEM";
+	private static final String SYSTEM_TABLE = "RDF4JSYSTEM";
+	// ensure different from RepositoryConfigRepository.ID
+	private static final String SYSTEM_ID = "system";
     private volatile SharedHttpClientSessionManager client;
     private volatile SPARQLServiceResolver serviceResolver;
     private volatile Configuration config = HBaseConfiguration.create();
+
+	public static Repository createSystemRepository(Configuration config) throws RepositoryException {
+		config.set(TableConfig.ID_HASH, "Murmur3-128");
+		SailRepository repo = new SailRepository(new HBaseSail(config, SYSTEM_TABLE, true, 0, true, 180, null, null));
+		repo.init();
+		return repo;
+	}
 
     public HBaseRepositoryManager(Object...anyArgs) {
     }
 
     void overrideConfiguration(Configuration config) {
         this.config = config;
-    }
-
-    protected Repository createSystemRepository() throws RepositoryException {
-		config.set(TableConfig.ID_HASH, "Murmur3-128");
-        SailRepository repo = new SailRepository(new HBaseSail(config, SYSTEM_REPO_ID, true, 0, true, 180, null, null));
-        repo.init();
-        return repo;
     }
 
     @Override
@@ -144,21 +146,27 @@ public final class HBaseRepositoryManager extends RepositoryManager {
 
     @Override
     protected Repository createRepository(String id) throws RepositoryConfigException, RepositoryException {
-        Repository repository = null;
-        RepositoryConfig repConfig = getRepositoryConfig(id);
-        if (repConfig != null) {
-            repConfig.validate();
-            repository = createRepositoryStack(repConfig.getRepositoryImplConfig());
-            repository.init();
-        }
-        return repository;
+		Repository repository;
+		if (SYSTEM_ID.equals(id)) {
+			repository = createSystemRepository(config);
+		} else {
+			RepositoryConfig repConfig = getRepositoryConfig(id);
+			if (repConfig != null) {
+				repConfig.validate();
+				repository = createRepositoryStack(repConfig.getRepositoryImplConfig());
+				repository.init();
+			} else {
+				repository = null;
+			}
+		}
+		return repository;
     }
 
-    private Repository createRepositoryStack(RepositoryImplConfig config) throws RepositoryConfigException {
+    private Repository createRepositoryStack(RepositoryImplConfig implConfig) throws RepositoryConfigException {
         RepositoryFactory factory = RepositoryRegistry.getInstance()
-            .get(config.getType())
-            .orElseThrow(() -> new RepositoryConfigException("Unsupported repository type: " + config.getType()));
-        Repository repository = factory.getRepository(config);
+            .get(implConfig.getType())
+            .orElseThrow(() -> new RepositoryConfigException("Unsupported repository type: " + implConfig.getType()));
+        Repository repository = factory.getRepository(implConfig);
         if (repository instanceof RepositoryResolverClient) {
             ((RepositoryResolverClient) repository).setRepositoryResolver(this);
         }
@@ -170,8 +178,8 @@ public final class HBaseRepositoryManager extends RepositoryManager {
         } else if (repository instanceof HttpClientDependent) {
             ((HttpClientDependent) repository).setHttpClient(getHttpClient());
         }
-        if (config instanceof DelegatingRepositoryImplConfig) {
-            RepositoryImplConfig delegateConfig = ((DelegatingRepositoryImplConfig) config).getDelegate();
+        if (implConfig instanceof DelegatingRepositoryImplConfig) {
+            RepositoryImplConfig delegateConfig = ((DelegatingRepositoryImplConfig) implConfig).getDelegate();
             Repository delegate = createRepositoryStack(delegateConfig);
             try {
                 ((DelegatingRepository) repository).setDelegate(delegate);
@@ -184,69 +192,70 @@ public final class HBaseRepositoryManager extends RepositoryManager {
 
     @Override
     public RepositoryInfo getRepositoryInfo(String id) {
-        RepositoryConfig config = getRepositoryConfig(id);
-        if (config == null) {
-            return null;
-        }
-        RepositoryInfo repInfo = new RepositoryInfo();
-        repInfo.setId(config.getID());
-        repInfo.setDescription(config.getTitle());
-        repInfo.setReadable(true);
-        repInfo.setWritable(true);
+		RepositoryInfo repInfo;
+		RepositoryConfig config = getRepositoryConfig(id);
+		if (config != null) {
+			repInfo = new RepositoryInfo();
+			repInfo.setId(config.getID());
+			repInfo.setDescription(config.getTitle());
+			repInfo.setReadable(true);
+			repInfo.setWritable(true);
+		} else {
+			repInfo = null;
+		}
         return repInfo;
     }
 
     @Override
-    @SuppressWarnings("deprecation")
-    public synchronized List<RepositoryInfo> getAllRepositoryInfos(boolean skipSystemRepo) throws RepositoryException {
-        List<RepositoryInfo> result = new ArrayList<>();
-        for (String name : RepositoryConfigUtil.getRepositoryIDs(getSystemRepository())) {
-            RepositoryInfo repInfo = getRepositoryInfo(name);
-            if (!skipSystemRepo || !repInfo.getId().equals(SYSTEM_REPO_ID)) {
-                result.add(repInfo);
-            }
-        }
-		Collections.sort(result);
-        return result;
-    }
-
-    @Override
     public RepositoryConfig getRepositoryConfig(String repositoryID) throws RepositoryConfigException, RepositoryException {
-		Repository systemRepository = getSystemRepository();
-		if (systemRepository == null) {
-			return null;
+		if (SYSTEM_ID.equals(repositoryID)) {
+			return new RepositoryConfig(SYSTEM_ID, "System repository");
 		} else {
+			Repository systemRepository = getSystemRepository();
 			return RepositoryConfigUtil.getRepositoryConfig(systemRepository, repositoryID);
 		}
+	}
+
+	@Override
+	public boolean hasRepositoryConfig(String repositoryID) throws RepositoryException, RepositoryConfigException {
+		return getRepositoryConfig(repositoryID) != null;
 	}
 
 	public Repository getSystemRepository() {
 		if (!isInitialized()) {
 			throw new IllegalStateException("Repository Manager is not initialized");
 		}
-		synchronized (initializedRepositories) {
-			Repository systemRepository = initializedRepositories.get(SYSTEM_ID);
-			if (systemRepository != null && systemRepository.isInitialized()) {
-				return systemRepository;
-			}
-			systemRepository = createSystemRepository();
-			if (systemRepository != null) {
-				initializedRepositories.put(SYSTEM_ID, systemRepository);
-			}
-			return systemRepository;
+		return getRepository(SYSTEM_ID);
+	}
+
+	@Override
+	public void addRepositoryConfig(RepositoryConfig repoConfig) throws RepositoryException, RepositoryConfigException {
+		if (!SYSTEM_ID.equals(repoConfig.getID())) {
+			Repository systemRepository = getSystemRepository();
+			RepositoryConfigUtil.updateRepositoryConfigs(systemRepository, repoConfig);
 		}
 	}
 
 	@Override
-	public void addRepositoryConfig(RepositoryConfig config) throws RepositoryException, RepositoryConfigException {
-		Repository systemRepository = getSystemRepository();
-		if (systemRepository != null && !SYSTEM_ID.equals(config.getID())) {
-			RepositoryConfigUtil.updateRepositoryConfigs(systemRepository, config);
+	public boolean removeRepository(String repositoryID) throws RepositoryException, RepositoryConfigException {
+		boolean removed = false;
+		if (!SYSTEM_ID.equals(repositoryID)) {
+			removed = super.removeRepository(repositoryID);
+			Repository systemRepository = getSystemRepository();
+			RepositoryConfigUtil.removeRepositoryConfigs(systemRepository, repositoryID);
 		}
+		return removed;
 	}
 
 	@Override
 	public Collection<RepositoryInfo> getAllRepositoryInfos() throws RepositoryException {
-		return getAllRepositoryInfos(false);
+		List<RepositoryInfo> result = new ArrayList<>();
+		result.add(getRepositoryInfo(SYSTEM_ID));
+		for (String id : RepositoryConfigUtil.getRepositoryIDs(getSystemRepository())) {
+			RepositoryInfo repInfo = getRepositoryInfo(id);
+			result.add(repInfo);
+		}
+		Collections.sort(result);
+		return result;
 	}
 }
