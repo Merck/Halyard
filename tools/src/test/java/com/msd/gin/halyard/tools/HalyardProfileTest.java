@@ -99,6 +99,14 @@ public class HalyardProfileTest {
         runProfile("-s", "profile", "-q", "ask where {{?s <http://whatever/pred> ?o, ?o2} union {?s ?p ?o3. optional {?s ?p2 ?o4 }}}");
     }
 
+    @Test
+    public void testProfileUpdate() throws Exception {
+		try (Connection conn = HalyardTableUtils.getConnection(HBaseServerTestInstance.getInstanceConfig())) {
+			HalyardTableUtils.getTable(conn, "profile", true, -1);
+		}
+        runProfile("-s", "profile", "-q", "insert {?s a <http://whatever/Type2>} where {?s a <http://whatever/Type1>}; delete where {?s a ?o}");
+    }
+
     private static int runProfile(String ... args) throws Exception {
         return ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardProfile(), args);
     }

@@ -17,6 +17,10 @@
 package com.msd.gin.halyard.tools;
 
 import com.msd.gin.halyard.algebra.AbstractExtendedQueryModelVisitor;
+import com.msd.gin.halyard.query.BindingSetPipe;
+import com.msd.gin.halyard.query.BindingSetPipeQueryEvaluationStep;
+import com.msd.gin.halyard.repository.HBaseRepository;
+import com.msd.gin.halyard.sail.BindingSetPipeSailConnection;
 import com.msd.gin.halyard.sail.ElasticSettings;
 import com.msd.gin.halyard.sail.HBaseSail;
 import com.msd.gin.halyard.sail.HBaseSailConnection;
@@ -26,9 +30,11 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import org.apache.commons.cli.CommandLine;
+import org.apache.hadoop.hbase.KeyValue;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.EmptyIteration;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -37,15 +43,16 @@ import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.GraphQuery;
 import org.eclipse.rdf4j.query.Query;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
-import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.QueryRoot;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryEvaluationStep;
+import org.eclipse.rdf4j.query.impl.EmptyBindingSet;
+import org.eclipse.rdf4j.query.parser.QueryParserUtil;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
-import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.sail.SailException;
 
 /**
@@ -67,15 +74,23 @@ public final class HalyardProfile extends AbstractHalyardTool {
 
     @Override
     public int run(CommandLine cmd) throws Exception {
-    	String queryString = cmd.getOptionValue('q');
-    	String table = cmd.getOptionValue('s');
-        configureString(cmd, 'i', null);
-		SailRepository repo = new SailRepository(new HBaseSail(getConf(), table, false, 0, true, 0, ElasticSettings.from(getConf()), null, new HBaseSail.SailConnectionFactory() {
+		String queryString = cmd.getOptionValue('q');
+		String table = cmd.getOptionValue('s');
+		configureString(cmd, 'i', null);
+		HBaseSail sail = new HBaseSail(getConf(), table, false, 0, true, 0, ElasticSettings.from(getConf()), null, new HBaseSail.SailConnectionFactory() {
 			@Override
 			public HBaseSailConnection createConnection(HBaseSail sail) throws IOException {
 				return new HBaseSailConnection(sail) {
 					private final NumberFormat cardinalityFormatter = DecimalFormat.getNumberInstance();
 
+					@Override
+					protected void put(KeyValue kv) throws IOException {
+						// do nothing
+					}
+					@Override
+					protected void delete(KeyValue kv) throws IOException {
+						// do nothing
+					}
 					@Override
 		            public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, boolean includeInferred) throws SailException {
 		                System.out.println(toMessage("Original query:", tupleExpr));
@@ -86,6 +101,15 @@ public final class HalyardProfile extends AbstractHalyardTool {
 		                System.out.println(toMessage("Optimized query:", optimizedTupleExpr));
 		                return new EmptyIteration<>();
 		            }
+					@Override
+					public void evaluate(BindingSetPipe handler, final TupleExpr tupleExpr, final Dataset dataset, final BindingSet bindings, final boolean includeInferred) {
+		                System.out.println(toMessage("Original query:", tupleExpr));
+		                super.evaluate(handler, tupleExpr, dataset, bindings, includeInferred);
+					}
+					protected void evaluateInternal(BindingSetPipe handler, TupleExpr optimizedTupleExpr, EvaluationStrategy strategy) throws QueryEvaluationException {
+		                System.out.println(toMessage("Optimized query:", optimizedTupleExpr));
+		                handler.close();
+					}
 		            private String toMessage(String msg, TupleExpr expr) {
 		                final Map<TupleExpr, Double> cardMap = new HashMap<>();
 		                if (expr instanceof QueryRoot) {
@@ -138,20 +162,28 @@ public final class HalyardProfile extends AbstractHalyardTool {
 				};
 			}
 
-		}));
+		});
+        sail.getFunctionRegistry().add(new ParallelSplitFunction(0));
+		HBaseRepository repo = new HBaseRepository(sail);
         repo.init();
         try {
         	try(RepositoryConnection conn = repo.getConnection()) {
-	            Query q = conn.prepareQuery(QueryLanguage.SPARQL, queryString, null);
 	        	System.out.println(queryString);
 	        	System.out.println();
-	            if (q instanceof BooleanQuery) {
-	                ((BooleanQuery)q).evaluate();
-	            } else if (q instanceof TupleQuery) {
-	                ((TupleQuery)q).evaluate();
-	            } else if (q instanceof GraphQuery) {
-	                ((GraphQuery)q).evaluate();
-	            }
+	        	String strippedQuery = QueryParserUtil.removeSPARQLQueryProlog(queryString).toUpperCase(Locale.ROOT);
+				if (strippedQuery.startsWith("SELECT") || strippedQuery.startsWith("CONSTRUCT")
+						|| strippedQuery.startsWith("DESCRIBE") || strippedQuery.startsWith("ASK")) {
+					Query q = conn.prepareQuery(queryString);
+					if (q instanceof BooleanQuery) {
+					    ((BooleanQuery)q).evaluate();
+					} else if (q instanceof TupleQuery) {
+					    ((TupleQuery)q).evaluate();
+					} else if (q instanceof GraphQuery) {
+					    ((GraphQuery)q).evaluate();
+					}
+				} else {
+					conn.prepareUpdate(queryString).execute();
+				}
         	}
         } finally {
             repo.shutDown();
