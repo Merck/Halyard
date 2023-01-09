@@ -108,9 +108,11 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 	private static final Logger LOGGER = LoggerFactory.getLogger(HBaseSailConnection.class);
 
 	public static final String SOURCE_STRING_BINDING = "__source__";
+	public static final String UPDATE_PART_BINDING = "__update_part__";
 	public static final String QUERY_CONTEXT_KEYSPACE_ATTRIBUTE = KeyspaceConnection.class.getName();
 	public static final String QUERY_CONTEXT_INDICES_ATTRIBUTE = StatementIndices.class.getName();
 	public static final String QUERY_CONTEXT_SEARCH_ATTRIBUTE = SearchClient.class.getName();
+	private static final int NO_UPDATE_PARTS = -1;
 
 	private final Cache<PreparedQueryKey, PreparedQuery> queryCache;
 
@@ -235,11 +237,11 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 		return tupleExpr;
 	}
 
-	private TupleExpr getOptimizedQuery(String sourceString, TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred, TripleSource tripleSource, EvaluationStrategy strategy) {
+	private TupleExpr getOptimizedQuery(String sourceString, int updatePart, TupleExpr tupleExpr, Dataset dataset, BindingSet bindings, final boolean includeInferred, TripleSource tripleSource, EvaluationStrategy strategy) {
 		LOGGER.debug("Query tree before optimization:\n{}", tupleExpr);
 		TupleExpr optimizedTree;
 		if (sourceString != null && cloneTupleExpression) {
-			PreparedQueryKey pqkey = new PreparedQueryKey(sourceString, dataset, bindings, includeInferred);
+			PreparedQueryKey pqkey = new PreparedQueryKey(sourceString, updatePart, dataset, bindings, includeInferred);
 			PreparedQuery preparedQuery;
 			try {
 				preparedQuery = queryCache.get(pqkey, () -> {
@@ -268,6 +270,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 		flush();
 
 		String sourceString = Literals.getLabel(bindings.getValue(SOURCE_STRING_BINDING), null);
+		int updatePart = Literals.getIntValue(bindings.getValue(UPDATE_PART_BINDING), NO_UPDATE_PARTS);
 		BindingSet queryBindings = removeImplicitBindings(bindings);
 
 		RDFStarTripleSource tripleSource = createTripleSource();
@@ -277,7 +280,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 		queryContext.begin();
 		try {
 			initQueryContext(queryContext);
-			TupleExpr optimizedTree = getOptimizedQuery(sourceString, tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy);
+			TupleExpr optimizedTree = getOptimizedQuery(sourceString, updatePart, tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy);
 			sail.trackQuery(sourceString, tupleExpr, optimizedTree);
 			try {
 				CloseableIteration<BindingSet, QueryEvaluationException> iter = evaluateInternal(optimizedTree, strategy);
@@ -310,6 +313,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 		flush();
 
 		String sourceString = Literals.getLabel(bindings.getValue(SOURCE_STRING_BINDING), null);
+		int updatePart = Literals.getIntValue(bindings.getValue(UPDATE_PART_BINDING), NO_UPDATE_PARTS);
 		BindingSet queryBindings = removeImplicitBindings(bindings);
 
 		RDFStarTripleSource tripleSource = createTripleSource();
@@ -319,7 +323,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 		queryContext.begin();
 		try {
 			initQueryContext(queryContext);
-			TupleExpr optimizedTree = getOptimizedQuery(sourceString, tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy);
+			TupleExpr optimizedTree = getOptimizedQuery(sourceString, updatePart, tupleExpr, dataset, queryBindings, includeInferred, tripleSource, strategy);
 			sail.trackQuery(sourceString, tupleExpr, optimizedTree);
 			handler = TimeLimitBindingSetPipe.apply(handler, sail.evaluationTimeoutSecs);
 			try {
@@ -801,6 +805,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 		private static final long serialVersionUID = -8673870599435959092L;
 
 		final String sourceString;
+		final Integer updatePart;
 		final Set<IRI> datasetGraphs;
 		final Set<IRI> datasetNamedGraphs;
 		final IRI datasetInsertGraph;
@@ -819,8 +824,9 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 			}
 		}
 
-		PreparedQueryKey(String sourceString, Dataset dataset, BindingSet bindings, boolean includeInferred) {
+		PreparedQueryKey(String sourceString, int updatePart, Dataset dataset, BindingSet bindings, boolean includeInferred) {
 			this.sourceString = sourceString;
+			this.updatePart = Integer.valueOf(updatePart);
 			this.datasetGraphs = dataset != null ? copy(dataset.getDefaultGraphs()) : null;
 			this.datasetNamedGraphs = dataset != null ? copy(dataset.getNamedGraphs()) : null;
 			this.datasetInsertGraph = dataset != null ? dataset.getDefaultInsertGraph() : null;
@@ -830,7 +836,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 		}
 
 		private Object[] toArray() {
-			return new Object[] { sourceString, bindingNames, includeInferred, datasetGraphs, datasetNamedGraphs, datasetInsertGraph, datasetRemoveGraphs };
+			return new Object[] { sourceString, updatePart, bindingNames, includeInferred, datasetGraphs, datasetNamedGraphs, datasetInsertGraph, datasetRemoveGraphs };
 		}
 
 		@Override

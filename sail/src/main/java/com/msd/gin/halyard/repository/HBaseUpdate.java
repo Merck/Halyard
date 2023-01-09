@@ -46,6 +46,7 @@ import org.eclipse.rdf4j.query.algebra.TupleFunctionCall;
 import org.eclipse.rdf4j.query.algebra.UpdateExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
+import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.eclipse.rdf4j.query.algebra.evaluation.function.TupleFunctionRegistry;
 import org.eclipse.rdf4j.query.algebra.helpers.collectors.StatementPatternCollector;
@@ -78,7 +79,8 @@ public class HBaseUpdate extends SailUpdate {
 		Map<UpdateExpr, Dataset> datasetMapping = parsedUpdate.getDatasetMapping();
 
 		SailRepositoryConnection con = getConnection();
-		HBaseUpdateExecutor executor = new HBaseUpdateExecutor(sail, (HBaseSailConnection) con.getSailConnection(), con.getValueFactory(), con.getParserConfig());
+		ValueFactory vf = con.getValueFactory();
+		HBaseUpdateExecutor executor = new HBaseUpdateExecutor(sail, (HBaseSailConnection) con.getSailConnection(), vf, con.getParserConfig());
 
 		boolean localTransaction = false;
 		try {
@@ -86,12 +88,14 @@ public class HBaseUpdate extends SailUpdate {
 				localTransaction = true;
 				beginLocalTransaction();
 			}
-			for (UpdateExpr updateExpr : updateExprs) {
-
+			for (int i = 0; i < updateExprs.size(); i++) {
+				UpdateExpr updateExpr = updateExprs.get(i);
 				Dataset activeDataset = getMergedDataset(datasetMapping.get(updateExpr));
 
+				QueryBindingSet updateBindings = new QueryBindingSet(getBindings());
+				updateBindings.addBinding(HBaseSailConnection.UPDATE_PART_BINDING, vf.createLiteral(i));
 				try {
-					executor.executeUpdate(updateExpr, activeDataset, getBindings(), getIncludeInferred(), getMaxExecutionTime());
+					executor.executeUpdate(updateExpr, activeDataset, updateBindings, getIncludeInferred(), getMaxExecutionTime());
 				} catch (RDF4JException | IOException e) {
 					LOGGER.warn("exception during update execution: ", e);
 					if (!updateExpr.isSilent()) {

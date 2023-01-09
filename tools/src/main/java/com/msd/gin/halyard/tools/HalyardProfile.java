@@ -106,6 +106,7 @@ public final class HalyardProfile extends AbstractHalyardTool {
 		                System.out.println(toMessage("Original query:", tupleExpr));
 		                super.evaluate(handler, tupleExpr, dataset, bindings, includeInferred);
 					}
+					@Override
 					protected void evaluateInternal(BindingSetPipe handler, TupleExpr optimizedTupleExpr, EvaluationStrategy strategy) throws QueryEvaluationException {
 		                System.out.println(toMessage("Optimized query:", optimizedTupleExpr));
 		                handler.close();
