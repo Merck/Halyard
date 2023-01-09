@@ -254,7 +254,68 @@ public class HBaseSailTest {
         }
     }
 
+	@Test
+	public void testHasDefaultGraphStatement() throws Exception {
+		ValueFactory vf = SimpleValueFactory.getInstance();
+		Resource subj = vf.createIRI("http://whatever/subj/");
+		IRI pred = vf.createIRI("http://whatever/pred/");
+		Value obj = vf.createLiteral("whatever");
+		IRI ctx = vf.createIRI("http://whatever/context/");
+		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertablehasstmt"), true, 0, usePushStrategy, 10, null, null);
+		sail.init();
+		try (SailConnection conn = sail.getConnection()) {
+			conn.addStatement(subj, pred, obj);
+			assertTrue(conn.hasStatement(subj, pred, obj, true));
+			assertTrue(conn.hasStatement(subj, null, null, true));
+			assertTrue(conn.hasStatement(subj, pred, null, true));
+			assertTrue(conn.hasStatement(null, pred, null, true));
+			assertTrue(conn.hasStatement(null, pred, obj, true));
+			assertTrue(conn.hasStatement(null, null, obj, true));
+			assertTrue(conn.hasStatement(subj, null, obj, true));
+			assertTrue(conn.hasStatement(null, null, null, true));
+			assertTrue(conn.hasStatement(subj, pred, obj, true, new Resource[] { null }));
+			assertTrue(conn.hasStatement(subj, pred, obj, true, new Resource[] { null, ctx }));
+			assertFalse(conn.hasStatement(subj, pred, obj, true, new Resource[] { ctx }));
+		} finally {
+			sail.shutDown();
+		}
+	}
+
     @Test
+	public void testHasContextStatement() throws Exception {
+		ValueFactory vf = SimpleValueFactory.getInstance();
+		Resource subj = vf.createIRI("http://whatever/subj/");
+		IRI pred = vf.createIRI("http://whatever/pred/");
+		Value obj = vf.createLiteral("whatever");
+		IRI ctx = vf.createIRI("http://whatever/context/");
+		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertablehasctxstmt"), true, 0, usePushStrategy, 10, null, null);
+		sail.init();
+		try (SailConnection conn = sail.getConnection()) {
+			conn.addStatement(subj, pred, obj, ctx);
+			assertTrue(conn.hasStatement(subj, pred, obj, true, ctx));
+			assertTrue(conn.hasStatement(subj, null, null, true, ctx));
+			assertTrue(conn.hasStatement(subj, pred, null, true, ctx));
+			assertTrue(conn.hasStatement(null, pred, null, true, ctx));
+			assertTrue(conn.hasStatement(null, pred, obj, true, ctx));
+			assertTrue(conn.hasStatement(null, null, obj, true, ctx));
+			assertTrue(conn.hasStatement(subj, null, obj, true, ctx));
+			assertTrue(conn.hasStatement(null, null, null, true, ctx));
+			assertTrue(conn.hasStatement(subj, pred, obj, true));
+			assertTrue(conn.hasStatement(subj, null, null, true));
+			assertTrue(conn.hasStatement(subj, pred, null, true));
+			assertTrue(conn.hasStatement(null, pred, null, true));
+			assertTrue(conn.hasStatement(null, pred, obj, true));
+			assertTrue(conn.hasStatement(null, null, obj, true));
+			assertTrue(conn.hasStatement(subj, null, obj, true));
+			assertTrue(conn.hasStatement(null, null, null, true));
+			assertFalse(conn.hasStatement(subj, pred, obj, true, new Resource[] { null }));
+			assertTrue(conn.hasStatement(subj, pred, obj, true, new Resource[] { null, ctx }));
+		} finally {
+			sail.shutDown();
+		}
+	}
+
+	@Test
     public void testSize() throws Exception {
         ValueFactory vf = SimpleValueFactory.getInstance();
 		HBaseSail sail = new HBaseSail(hconn, useTable("whatevertablesize"), true, 0, usePushStrategy,

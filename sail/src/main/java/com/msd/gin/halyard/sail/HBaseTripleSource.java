@@ -16,6 +16,8 @@
  */
 package com.msd.gin.halyard.sail;
 
+import com.msd.gin.halyard.algebra.evaluation.ConstrainedTripleSourceFactory;
+import com.msd.gin.halyard.algebra.evaluation.ExtendedTripleSource;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFContext;
@@ -27,7 +29,6 @@ import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.common.TimestampedValueFactory;
 import com.msd.gin.halyard.common.ValueConstraint;
 import com.msd.gin.halyard.common.ValueIO;
-import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
 import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.io.Closeable;
@@ -64,7 +65,7 @@ import org.eclipse.rdf4j.query.algebra.evaluation.TripleSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTripleSourceFactory, Closeable {
+public class HBaseTripleSource implements ExtendedTripleSource, RDFStarTripleSource, ConstrainedTripleSourceFactory, Closeable {
 	private static final Logger LOG = LoggerFactory.getLogger(HBaseTripleSource.class);
 
 	protected final KeyspaceConnection keyspaceConn;
@@ -100,6 +101,16 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 			return new EmptyIteration<>();
 		} else {
 			return getStatementsInternal(subj, pred, obj, contexts, valueReader);
+		}
+	}
+
+	@Override
+	public final boolean hasStatement(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
+		if (RDF.TYPE.equals(pred) && SPIN.MAGIC_PROPERTY_CLASS.equals(obj)) {
+			// cache magic property definitions here
+			return false;
+		} else {
+			return hasStatementsInternal(subj, pred, obj, contexts);
 		}
 	}
 
@@ -151,6 +162,12 @@ public class HBaseTripleSource implements RDFStarTripleSource, ConstrainedTriple
 
 	protected CloseableIteration<? extends Statement, IOException> createStatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contexts, ValueIO.Reader reader) {
 		return new StatementScanner(subj, pred, obj, contexts, reader);
+	}
+
+	private boolean hasStatementsInternal(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
+		try (CloseableIteration<? extends Statement, QueryEvaluationException> iter = getStatements(subj, pred, obj, contexts)) {
+			return iter.hasNext();
+		}
 	}
 
 	protected Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, StatementIndices indices) {

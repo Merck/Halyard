@@ -61,6 +61,7 @@ public class SearchTest extends AbstractSearchTest {
 					iter.next();
 					assertFalse(iter.hasNext());
 				}
+				assertTrue(conn.hasStatement(null, null, vf.createLiteral("what", HALYARD.SEARCH), true));
 			}
 			hbaseRepo.shutDown();
 		}

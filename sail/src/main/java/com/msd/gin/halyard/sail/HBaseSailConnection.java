@@ -19,6 +19,7 @@ package com.msd.gin.halyard.sail;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.msd.gin.halyard.algebra.Algebra;
+import com.msd.gin.halyard.algebra.evaluation.ExtendedTripleSource;
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.KeyspaceConnection;
 import com.msd.gin.halyard.common.RDFFactory;
@@ -180,7 +181,7 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
 		}
     }
 
-	private RDFStarTripleSource createTripleSource() {
+	private HBaseTripleSource createTripleSource() {
 		return new HBaseSearchTripleSource(keyspaceConn, sail.getValueFactory(), sail.getStatementIndices(), sail.evaluationTimeoutSecs, sail.getScanSettings(), searchClient, sail.ticker);
 	}
 
@@ -457,13 +458,13 @@ public class HBaseSailConnection extends AbstractSailConnection implements Bindi
     @Override
 	public boolean hasStatement(Resource subj, IRI pred, Value obj, boolean includeInferred, Resource... contexts) throws SailException {
 		for (Resource ctx : contexts) {
-			if (ctx.isTriple()) {
+			if (ctx != null && ctx.isTriple()) {
 				return false;
 			}
 		}
-		try (CloseableIteration<? extends Statement, SailException> stIter = getStatements(subj, pred, obj, includeInferred, contexts)) {
-			return stIter.hasNext();
-		}
+		flush();
+		ExtendedTripleSource tripleSource = createTripleSource();
+		return tripleSource.hasStatement(subj, pred, obj, contexts);
 	}
 
 	@Override

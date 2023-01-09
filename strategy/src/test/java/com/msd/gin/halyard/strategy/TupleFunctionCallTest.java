@@ -2,9 +2,9 @@ package com.msd.gin.halyard.strategy;
 
 import com.google.common.collect.Sets;
 import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
+import com.msd.gin.halyard.algebra.evaluation.EmptyTripleSource;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.SimpleStatementPatternCardinalityCalculator;
-import com.msd.gin.halyard.query.EmptyTripleSource;
 
 import java.util.Arrays;
 import java.util.HashSet;

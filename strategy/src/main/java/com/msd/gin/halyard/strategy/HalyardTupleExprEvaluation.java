@@ -22,6 +22,7 @@ import com.msd.gin.halyard.algebra.Algorithms;
 import com.msd.gin.halyard.algebra.ConstrainedStatementPattern;
 import com.msd.gin.halyard.algebra.ExtendedTupleFunctionCall;
 import com.msd.gin.halyard.algebra.StarJoin;
+import com.msd.gin.halyard.algebra.evaluation.ConstrainedTripleSourceFactory;
 import com.msd.gin.halyard.common.LiteralConstraint;
 import com.msd.gin.halyard.common.ValueConstraint;
 import com.msd.gin.halyard.common.ValueType;
@@ -29,7 +30,6 @@ import com.msd.gin.halyard.federation.BindingSetPipeFederatedService;
 import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.query.BindingSetPipe;
 import com.msd.gin.halyard.query.BindingSetPipeQueryEvaluationStep;
-import com.msd.gin.halyard.query.ConstrainedTripleSourceFactory;
 import com.msd.gin.halyard.query.ValuePipe;
 import com.msd.gin.halyard.query.ValuePipeQueryValueEvaluationStep;
 import com.msd.gin.halyard.strategy.aggregators.AvgAggregateFunction;
@@ -278,15 +278,7 @@ final class HalyardTupleExprEvaluation {
     	return (parent, bindings) -> evaluateStatementPattern(parent, sp, bindings);
     }
 
-    /**
-     * Evaluate the statement pattern using the supplied bindings
-     * @param parent to push or enqueue evaluation results
-     * @param sp the {@code StatementPattern} to evaluate
-     * @param bindings the set of names to which values are bound. For example, select ?s, ?p, ?o has the names s, p and o and the values bound to them are the
-     * results of the evaluation of this statement pattern
-     */
-    private void evaluateStatementPattern(final BindingSetPipe parent, final StatementPattern sp, final BindingSet bindings) {
-    	TripleSource ts = null;
+    private TripleSource getTripleSource(StatementPattern sp, BindingSet bindings) {
     	if ((sp instanceof ConstrainedStatementPattern) && (tripleSource instanceof ConstrainedTripleSourceFactory)) {
     		ConstrainedStatementPattern csp = (ConstrainedStatementPattern) sp;
     		ValueConstraint subjConstraint = null;
@@ -310,15 +302,13 @@ final class HalyardTupleExprEvaluation {
 						if (v != null) {
 							if (constraintFunc instanceof Datatype) {
 								if (!v.isIRI()) {
-									parent.close(); // nothing to push
-									return;
+									return null; // nothing to push
 								}
 								IRI dt = (IRI) v;
 				    			objConstraint = new LiteralConstraint(dt);
 							} else if (constraintFunc instanceof Lang) {
 								if (!v.isLiteral()) {
-									parent.close(); // nothing to push
-									return;
+									return null; // nothing to push
 								}
 								Literal langValue = (Literal) v;
 								String lang = langValue.getLabel();
@@ -338,10 +328,22 @@ final class HalyardTupleExprEvaluation {
 	    			objConstraint = new ValueConstraint(csp.getObjectType());
 	    		}
     		}
-			ts = ((ConstrainedTripleSourceFactory)tripleSource).getTripleSource(subjConstraint, objConstraint);
+			return ((ConstrainedTripleSourceFactory)tripleSource).getTripleSource(subjConstraint, objConstraint);
     	}
+    	return tripleSource;
+    }
+
+    /**
+     * Evaluate the statement pattern using the supplied bindings
+     * @param parent to push or enqueue evaluation results
+     * @param sp the {@code StatementPattern} to evaluate
+     * @param bindings the set of names to which values are bound. For example, select ?s, ?p, ?o has the names s, p and o and the values bound to them are the
+     * results of the evaluation of this statement pattern
+     */
+    private void evaluateStatementPattern(final BindingSetPipe parent, final StatementPattern sp, final BindingSet bindings) {
+		TripleSource ts = getTripleSource(sp, bindings);
 		if (ts == null) {
-			ts = tripleSource;
+			parent.close(); // nothing to push
 		}
 
 		try {
@@ -356,7 +358,21 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
-    private QueryEvaluationStep evaluateStatementPattern(final StatementPattern sp, final BindingSet bindings, TripleSource tripleSource) {
+    static final class NamedQuads {
+    	final Resource subj;
+    	final IRI pred;
+    	final Value obj;
+    	final Resource[] ctxs;
+
+    	public NamedQuads(Resource subj, IRI pred, Value obj, Resource[] ctxs) {
+			this.subj = subj;
+			this.pred = pred;
+			this.obj = obj;
+			this.ctxs = ctxs;
+		}
+    }
+
+    private NamedQuads getNamedQuads(StatementPattern sp, BindingSet bindings) {
         final Var subjVar = sp.getSubjectVar(); //subject
         final Var predVar = sp.getPredicateVar(); //predicate
         final Var objVar = sp.getObjectVar(); //object
@@ -443,11 +459,25 @@ final class HalyardTupleExprEvaluation {
         	return null;
         }
 
+        return new NamedQuads(subjValue, predValue, objValue, contexts);
+    }
+
+    private QueryEvaluationStep evaluateStatementPattern(final StatementPattern sp, final BindingSet bindings, TripleSource tripleSource) {
+        final Var subjVar = sp.getSubjectVar(); //subject
+        final Var predVar = sp.getPredicateVar(); //predicate
+        final Var objVar = sp.getObjectVar(); //object
+        final Var conVar = sp.getContextVar(); //graph or target context
+
+        NamedQuads nq = getNamedQuads(sp, bindings);
+        if (nq == null) {
+        	return null;
+        }
+
         return bs -> {
 	        //get an iterator over all triple statements that match the s, p, o specification in the contexts
-	        CloseableIteration<? extends Statement, QueryEvaluationException> stIter = tripleSource.getStatements(subjValue, predValue, objValue, contexts);
+	        CloseableIteration<? extends Statement, QueryEvaluationException> stIter = tripleSource.getStatements(nq.subj, nq.pred, nq.obj, nq.ctxs);
 	
-	        if (contexts.length == 0 && sp.getScope() == StatementPattern.Scope.NAMED_CONTEXTS) {
+	        if (nq.ctxs.length == 0 && sp.getScope() == StatementPattern.Scope.NAMED_CONTEXTS) {
 	            // Named contexts are matched by retrieving all statements from
 	            // the store and filtering out the statements that do not have a context.
 	            stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
@@ -474,7 +504,7 @@ final class HalyardTupleExprEvaluation {
 		                Value obj = st.getObject();
 		                Resource context = st.getContext();
 		
-		                if (subjVar != null && subjValue == null) {
+		                if (subjVar != null && nq.subj == null) {
 		                    if (subjVar.equals(predVar) && !subj.equals(pred)) {
 		                        return false;
 		                    }
@@ -486,7 +516,7 @@ final class HalyardTupleExprEvaluation {
 		                    }
 		                }
 		
-		                if (predVar != null && predValue == null) {
+		                if (predVar != null && nq.pred == null) {
 		                    if (predVar.equals(objVar) && !pred.equals(obj)) {
 		                        return false;
 		                    }
@@ -495,7 +525,7 @@ final class HalyardTupleExprEvaluation {
 		                    }
 		                }
 		
-		                if (objVar != null && objValue == null) {
+		                if (objVar != null && nq.obj == null) {
 		                    if (objVar.equals(conVar) && !obj.equals(context)) {
 		                        return false;
 		                    }

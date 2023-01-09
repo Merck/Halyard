@@ -1,4 +1,4 @@
-package com.msd.gin.halyard.query;
+package com.msd.gin.halyard.algebra.evaluation;
 
 import com.msd.gin.halyard.common.ValueConstraint;
 

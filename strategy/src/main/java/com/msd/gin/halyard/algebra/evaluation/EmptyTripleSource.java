@@ -1,4 +1,4 @@
-package com.msd.gin.halyard.query;
+package com.msd.gin.halyard.algebra.evaluation;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.EmptyIteration;
