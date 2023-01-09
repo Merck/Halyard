@@ -49,30 +49,26 @@ import org.eclipse.rdf4j.query.algebra.helpers.collectors.VarNameCollector;
  * @author Adam Sotona (MSD)
  */
 public final class HalyardFilterOptimizer implements QueryOptimizer {
-    @Override
+	public static final QueryOptimizer PRE = new QueryOptimizer() {
+	    @Override
+	    public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
+	    	decomposeFilters(tupleExpr);
+	    	pushDownFilters(tupleExpr);
+	    }
+	};
+
+	public static final QueryOptimizer POST = new QueryOptimizer() {
+	    @Override
+	    public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
+	    	mergeFilters(tupleExpr);
+	    }
+	};
+
+	@Override
     public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
     	decomposeFilters(tupleExpr);
     	pushDownFilters(tupleExpr);
     	mergeFilters(tupleExpr);
-    }
-
-    public static QueryOptimizer newPreFilterOptimizer() {
-    	return new QueryOptimizer() {
-    	    @Override
-    	    public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-    	    	decomposeFilters(tupleExpr);
-    	    	pushDownFilters(tupleExpr);
-    	    }
-    	};
-    }
-
-    public static QueryOptimizer newPostFilterOptimizer() {
-    	return new QueryOptimizer() {
-    	    @Override
-    	    public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-    	    	mergeFilters(tupleExpr);
-    	    }
-    	};
     }
 
     private static void decomposeFilters(TupleExpr tupleExpr) {

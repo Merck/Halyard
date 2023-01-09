@@ -11,19 +11,10 @@ import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizerPipeline;
-import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.BindingAssignerOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.BindingSetAssignmentInlinerOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.CompareOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.ConjunctiveConstraintSplitterOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.ConstantOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.DisjunctiveConstraintOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.IterativeEvaluationOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.OrderLimitOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.ParentReferenceCleaner;
-import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.QueryModelNormalizerOptimizer;
 import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.RegexAsStringFunctionOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.SameTermFilterOptimizer;
-import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.UnionScopeChangeOptimizer;
+import org.eclipse.rdf4j.query.algebra.evaluation.optimizer.StandardQueryOptimizerPipeline;
 
 public class ExtendedQueryOptimizerPipeline implements QueryOptimizerPipeline {
 	private final ExtendedEvaluationStatistics statistics;
@@ -39,23 +30,23 @@ public class ExtendedQueryOptimizerPipeline implements QueryOptimizerPipeline {
 	@Override
 	public Iterable<QueryOptimizer> getOptimizers() {
 		return Arrays.asList(
-			new BindingAssignerOptimizer(),
-			new BindingSetAssignmentInlinerOptimizer(),
+			StandardQueryOptimizerPipeline.BINDING_ASSIGNER,
+			StandardQueryOptimizerPipeline.BINDING_SET_ASSIGNMENT_INLINER,
 			new ConstantOptimizer(strategy),
 			new RegexAsStringFunctionOptimizer(valueFactory),
-			new CompareOptimizer(),
-			new ConjunctiveConstraintSplitterOptimizer(),
-			new DisjunctiveConstraintOptimizer(),
-			new SameTermFilterOptimizer(),
-			new UnionScopeChangeOptimizer(),
-			new QueryModelNormalizerOptimizer(),
+			StandardQueryOptimizerPipeline.COMPARE_OPTIMIZER,
+			StandardQueryOptimizerPipeline.CONJUNCTIVE_CONSTRAINT_SPLITTER,
+			StandardQueryOptimizerPipeline.DISJUNCTIVE_CONSTRAINT_OPTIMIZER,
+			StandardQueryOptimizerPipeline.SAME_TERM_FILTER_OPTIMIZER,
+			StandardQueryOptimizerPipeline.UNION_SCOPE_CHANGE_OPTIMIZER,
+			StandardQueryOptimizerPipeline.QUERY_MODEL_NORMALIZER,
+			StandardQueryOptimizerPipeline.PROJECTION_REMOVAL_OPTIMIZER, // Make sure this is after the UnionScopeChangeOptimizer
 			new QueryJoinOptimizer(statistics),
-			// new SubSelectJoinOptimizer(),
-			new IterativeEvaluationOptimizer(),
-			HalyardFilterOptimizer.newPreFilterOptimizer(),
+			StandardQueryOptimizerPipeline.ITERATIVE_EVALUATION_OPTIMIZER,
+			HalyardFilterOptimizer.PRE,
 			new ConstrainedValueOptimizer(),
-			HalyardFilterOptimizer.newPostFilterOptimizer(),
-			new OrderLimitOptimizer(),
+			HalyardFilterOptimizer.POST,
+			StandardQueryOptimizerPipeline.ORDER_LIMIT_OPTIMIZER,
 			new ParentReferenceCleaner()
 		);
 	}
