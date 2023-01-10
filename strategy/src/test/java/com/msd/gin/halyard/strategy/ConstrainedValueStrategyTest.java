@@ -11,25 +11,25 @@ import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ConstrainedValueStrategyTest {
 
     private Repository repo;
     private RepositoryConnection con;
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         repo = new SailRepository(new MemoryStoreWithConstraintsStrategy());
         repo.init();
         con = repo.getConnection();
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws Exception {
         con.close();
         repo.shutDown();

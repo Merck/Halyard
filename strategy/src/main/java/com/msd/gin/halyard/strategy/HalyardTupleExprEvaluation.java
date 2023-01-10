@@ -129,7 +129,6 @@ import org.eclipse.rdf4j.query.algebra.Service;
 import org.eclipse.rdf4j.query.algebra.SingletonSet;
 import org.eclipse.rdf4j.query.algebra.Slice;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
-import org.eclipse.rdf4j.query.algebra.StatementPattern.Scope;
 import org.eclipse.rdf4j.query.algebra.SubQueryValueOperator;
 import org.eclipse.rdf4j.query.algebra.Sum;
 import org.eclipse.rdf4j.query.algebra.TripleRef;
@@ -278,7 +277,7 @@ final class HalyardTupleExprEvaluation {
     	return (parent, bindings) -> evaluateStatementPattern(parent, sp, bindings);
     }
 
-    private TripleSource getTripleSource(StatementPattern sp, BindingSet bindings) {
+    TripleSource getTripleSource(StatementPattern sp, BindingSet bindings) {
     	if ((sp instanceof ConstrainedStatementPattern) && (tripleSource instanceof ConstrainedTripleSourceFactory)) {
     		ConstrainedStatementPattern csp = (ConstrainedStatementPattern) sp;
     		ValueConstraint subjConstraint = null;
@@ -358,25 +357,33 @@ final class HalyardTupleExprEvaluation {
         }
     }
 
-    static final class NamedQuads {
+    static final class QuadPattern {
+    	static final Resource[] ALL_CONTEXTS = new Resource[0];
     	final Resource subj;
     	final IRI pred;
     	final Value obj;
     	final Resource[] ctxs;
+    	final StatementPattern.Scope scope;
 
-    	public NamedQuads(Resource subj, IRI pred, Value obj, Resource[] ctxs) {
+    	public QuadPattern(Resource subj, IRI pred, Value obj, Resource[] ctxs, StatementPattern.Scope scope) {
 			this.subj = subj;
 			this.pred = pred;
 			this.obj = obj;
 			this.ctxs = ctxs;
+			this.scope = scope;
 		}
+
+    	boolean isAllNamedContexts() {
+    		return (scope == StatementPattern.Scope.NAMED_CONTEXTS) && (ctxs.length == 0);
+    	}
     }
 
-    private NamedQuads getNamedQuads(StatementPattern sp, BindingSet bindings) {
+    QuadPattern getQuadPattern(StatementPattern sp, BindingSet bindings) {
         final Var subjVar = sp.getSubjectVar(); //subject
         final Var predVar = sp.getPredicateVar(); //predicate
         final Var objVar = sp.getObjectVar(); //object
         final Var conVar = sp.getContextVar(); //graph or target context
+        final StatementPattern.Scope scope = sp.getScope();
 
         final Resource subjValue;
         final IRI predValue;
@@ -400,7 +407,7 @@ final class HalyardTupleExprEvaluation {
         final Set<IRI> graphs;
         final boolean emptyGraph;
         if (dataset != null) {
-            if (sp.getScope() == StatementPattern.Scope.DEFAULT_CONTEXTS) { //evaluate against the default graph(s)
+            if (scope == StatementPattern.Scope.DEFAULT_CONTEXTS) { //evaluate against the default graph(s)
                 graphs = dataset.getDefaultGraphs();
                 emptyGraph = graphs.isEmpty() && !dataset.getNamedGraphs().isEmpty();
             } else { //evaluate against the named graphs
@@ -427,11 +434,11 @@ final class HalyardTupleExprEvaluation {
             }
 			/*
 			 * TODO activate this to have an exclusive (rather than inclusive) interpretation of the default
-			 * graph in SPARQL querying. else if (statementPattern.getScope() == Scope.DEFAULT_CONTEXTS ) {
+			 * graph in SPARQL querying. else if (scope == StatementPattern.Scope.DEFAULT_CONTEXTS ) {
 			 * contexts = new Resource[] { null }; }
 			 */
 			else {
-				contexts = new Resource[0];
+				contexts = QuadPattern.ALL_CONTEXTS;
 			}
         } else if (contextValue != null) {
             if (graphs.contains(contextValue)) {
@@ -459,7 +466,24 @@ final class HalyardTupleExprEvaluation {
         	return null;
         }
 
-        return new NamedQuads(subjValue, predValue, objValue, contexts);
+        return new QuadPattern(subjValue, predValue, objValue, contexts, scope);
+    }
+
+    CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(QuadPattern nq, TripleSource tripleSource) {
+    	CloseableIteration<? extends Statement, QueryEvaluationException> stIter = tripleSource.getStatements(nq.subj, nq.pred, nq.obj, nq.ctxs);
+        if (nq.isAllNamedContexts()) {
+            // Named contexts are matched by retrieving all statements from
+            // the store and filtering out the statements that do not have a context.
+            stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
+
+                @Override
+                protected boolean accept(Statement st) {
+                    return st.getContext() != null;
+                }
+
+            };
+        }
+    	return stIter;
     }
 
     private QueryEvaluationStep evaluateStatementPattern(final StatementPattern sp, final BindingSet bindings, TripleSource tripleSource) {
@@ -468,27 +492,14 @@ final class HalyardTupleExprEvaluation {
         final Var objVar = sp.getObjectVar(); //object
         final Var conVar = sp.getContextVar(); //graph or target context
 
-        NamedQuads nq = getNamedQuads(sp, bindings);
+        QuadPattern nq = getQuadPattern(sp, bindings);
         if (nq == null) {
         	return null;
         }
 
         return bs -> {
 	        //get an iterator over all triple statements that match the s, p, o specification in the contexts
-	        CloseableIteration<? extends Statement, QueryEvaluationException> stIter = tripleSource.getStatements(nq.subj, nq.pred, nq.obj, nq.ctxs);
-	
-	        if (nq.ctxs.length == 0 && sp.getScope() == StatementPattern.Scope.NAMED_CONTEXTS) {
-	            // Named contexts are matched by retrieving all statements from
-	            // the store and filtering out the statements that do not have a context.
-	            stIter = new FilterIteration<Statement, QueryEvaluationException>(stIter) {
-	
-	                @Override
-	                protected boolean accept(Statement st) {
-	                    return st.getContext() != null;
-	                }
-	
-	            }; // end anonymous class
-	        }
+	        CloseableIteration<? extends Statement, QueryEvaluationException> stIter = getStatements(nq, tripleSource);
 	
 	        // The same variable might have been used multiple times in this
 	        // StatementPattern, verify value equality in those cases.
@@ -538,26 +549,34 @@ final class HalyardTupleExprEvaluation {
 	
 	        // Return an iterator that converts the RDF statements (triples) to var bindings
 	        return new ConvertingIteration<Statement, BindingSet, QueryEvaluationException>(stIter) {
+	        	final String subjName = subjVar.getName();
+	        	final String predName = predVar.getName();
+	        	final String objName = objVar.getName();
+	        	final String conName = (conVar != null) ? conVar.getName() : null;
 	
 	            @Override
 	            protected BindingSet convert(Statement st) {
 	                QueryBindingSet result = new QueryBindingSet(bs);
-	                if (subjVar != null && !subjVar.isConstant() && !result.hasBinding(subjVar.getName())) {
-	                    result.addBinding(subjVar.getName(), st.getSubject());
+	                if (subjVar != null && !subjVar.isConstant() && !result.hasBinding(subjName)) {
+	                    result.addBinding(subjName, st.getSubject());
 	                }
-	                if (predVar != null && !predVar.isConstant() && !result.hasBinding(predVar.getName())) {
-	                    result.addBinding(predVar.getName(), st.getPredicate());
+	                if (predVar != null && !predVar.isConstant() && !result.hasBinding(predName)) {
+	                    result.addBinding(predName, st.getPredicate());
 	                }
 	                if (objVar != null && !objVar.isConstant()) {
-	                    Value val = result.getValue(objVar.getName());
-	                    // override Halyard search type object literals with real object value from the statement
-	                    if (!result.hasBinding(objVar.getName()) || ((val instanceof Literal) && HALYARD.SEARCH.equals(((Literal)val).getDatatype()))) {
-	                        result.setBinding(objVar.getName(), st.getObject());
+	                    if (!result.hasBinding(objName)) {
+	                        result.addBinding(objVar.getName(), st.getObject());
+	                    } else {
+		                    Value val = result.getValue(objName);
+	                        if ((val instanceof Literal) && HALYARD.SEARCH.equals(((Literal)val).getDatatype())) {
+			                    // override Halyard search type object literals with real object value from the statement
+		                        result.setBinding(objName, st.getObject());
+	                        }
 	                    }
 	                }
-	                if (conVar != null && !conVar.isConstant() && !result.hasBinding(conVar.getName())
+	                if (conVar != null && !conVar.isConstant() && !result.hasBinding(conName)
 	                        && st.getContext() != null) {
-	                    result.addBinding(conVar.getName(), st.getContext());
+	                    result.addBinding(conName, st.getContext());
 	                }
 	
 	                return result;
@@ -2455,7 +2474,7 @@ final class HalyardTupleExprEvaluation {
 				Var allObjVar = Algebra.createAnonVar(ANON_OBJECT_VAR);
 				StatementPattern sp;
 				if (contextVar != null) {
-					sp = new StatementPattern(Scope.NAMED_CONTEXTS, allSubjVar, allPredVar, allObjVar, contextVar.clone());
+					sp = new StatementPattern(StatementPattern.Scope.NAMED_CONTEXTS, allSubjVar, allPredVar, allObjVar, contextVar.clone());
 				} else {
 					sp = new StatementPattern(allSubjVar, allPredVar, allObjVar);
 				}

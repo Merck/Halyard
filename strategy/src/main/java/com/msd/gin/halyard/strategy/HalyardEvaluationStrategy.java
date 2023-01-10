@@ -17,11 +17,13 @@
 package com.msd.gin.halyard.strategy;
 
 import com.google.common.base.Stopwatch;
+import com.msd.gin.halyard.algebra.evaluation.ExtendedTripleSource;
 import com.msd.gin.halyard.optimizers.HalyardEvaluationStatistics;
 import com.msd.gin.halyard.optimizers.JoinAlgorithmOptimizer;
 import com.msd.gin.halyard.query.BindingSetPipe;
 import com.msd.gin.halyard.query.BindingSetPipeQueryEvaluationStep;
 import com.msd.gin.halyard.query.ValuePipeQueryValueEvaluationStep;
+import com.msd.gin.halyard.strategy.HalyardTupleExprEvaluation.QuadPattern;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +37,7 @@ import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.Service;
+import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
@@ -144,6 +147,10 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 
 	Configuration getConfiguration() {
 		return conf;
+	}
+
+	TripleSource getTripleSource() {
+		return tripleSource;
 	}
 
 	String getSourceString() {
@@ -272,7 +279,24 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
 		return QueryEvaluationUtility.getEffectiveBooleanValue(value).orElse(false);
 	}
 
-    @Override
+	boolean hasStatement(StatementPattern sp, BindingSet bindings) throws QueryEvaluationException {
+		QuadPattern nq = tupleEval.getQuadPattern(sp, bindings);
+		if (nq != null) {
+			ExtendedTripleSource tripleSource = (ExtendedTripleSource) tupleEval.getTripleSource(sp, bindings);
+			if (nq.isAllNamedContexts()) {
+				// can't optimize for this
+			    try (CloseableIteration<?, QueryEvaluationException> stmtIter = tupleEval.getStatements(nq, tripleSource)) {
+			    	return stmtIter.hasNext();
+			    }
+			} else {
+				return tripleSource.hasStatement(nq.subj, nq.pred, nq.obj, nq.ctxs);
+			}
+        } else {
+        	return false;
+        }
+	}
+
+	@Override
     public String toString() {
         return super.toString() + "[sourceString = " + getSourceString() + ", tripleSource = " + tripleSource + "]";
     }

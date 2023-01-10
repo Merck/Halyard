@@ -18,6 +18,7 @@ package com.msd.gin.halyard.strategy;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.msd.gin.halyard.algebra.evaluation.ExtendedTripleSource;
 import com.msd.gin.halyard.common.InternalObjectLiteral;
 import com.msd.gin.halyard.query.BindingSetPipe;
 import com.msd.gin.halyard.query.BindingSetPipeQueryEvaluationStep;
@@ -88,7 +89,9 @@ import org.eclipse.rdf4j.query.algebra.Not;
 import org.eclipse.rdf4j.query.algebra.Or;
 import org.eclipse.rdf4j.query.algebra.Regex;
 import org.eclipse.rdf4j.query.algebra.SameTerm;
+import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.Str;
+import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.UnaryValueOperator;
 import org.eclipse.rdf4j.query.algebra.ValueConstant;
 import org.eclipse.rdf4j.query.algebra.ValueExpr;
@@ -1369,9 +1372,23 @@ class HalyardValueExprEvaluation {
      * @throws QueryEvaluationException
      */
     private ValuePipeEvaluationStep precompileExists(Exists node) throws ValueExprEvaluationException, QueryEvaluationException {
-		BindingSetPipeQueryEvaluationStep step = parentStrategy.precompile(node.getSubQuery());
+    	TupleExpr subQuery = node.getSubQuery();
+    	if ((parentStrategy.getTripleSource() instanceof ExtendedTripleSource) && (subQuery instanceof StatementPattern)) {
+    		StatementPattern sp = (StatementPattern) subQuery;
+            final Var conVar = sp.getContextVar(); //graph or target context
+	        int distinctVarCount = sp.getBindingNames().size();
+	        boolean allVarsDistinct = (conVar != null && distinctVarCount == 4) || (conVar == null && distinctVarCount == 3);
+	        if (allVarsDistinct) {
+	        	return (valuePipe, bindings) -> {
+					boolean hasStmt = parentStrategy.hasStatement(sp, bindings);
+			    	valuePipe.push(hasStmt ? TRUE : FALSE);
+				};
+			}
+		}
+
+		BindingSetPipeQueryEvaluationStep bsStep = parentStrategy.precompile(subQuery);
 		return (valuePipe, bindings) -> {
-			step.evaluate(new ValueBindingSetPipe(valuePipe) {
+			bsStep.evaluate(new ValueBindingSetPipe(valuePipe) {
 				volatile Value hasResult = FALSE;
 				@Override
 				protected boolean next(BindingSet bs) {
@@ -1384,7 +1401,7 @@ class HalyardValueExprEvaluation {
 				}
 			}, bindings);
 		};
-    }
+	}
 
 	private ValuePipeEvaluationStep precompileValueExprTripleRef(ValueExprTripleRef node) throws QueryEvaluationException {
 		ValuePipeEvaluationStep subjStep = precompileVar(node.getSubjectVar());

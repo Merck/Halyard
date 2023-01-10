@@ -110,7 +110,7 @@ public class HBaseTripleSource implements ExtendedTripleSource, RDFStarTripleSou
 			// cache magic property definitions here
 			return false;
 		} else {
-			return hasStatementsInternal(subj, pred, obj, contexts);
+			return hasStatementInternal(subj, pred, obj, contexts);
 		}
 	}
 
@@ -164,7 +164,7 @@ public class HBaseTripleSource implements ExtendedTripleSource, RDFStarTripleSou
 		return new StatementScanner(subj, pred, obj, contexts, reader);
 	}
 
-	private boolean hasStatementsInternal(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
+	private boolean hasStatementInternal(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
 		try (CloseableIteration<? extends Statement, QueryEvaluationException> iter = getStatements(subj, pred, obj, contexts)) {
 			return iter.hasNext();
 		}
