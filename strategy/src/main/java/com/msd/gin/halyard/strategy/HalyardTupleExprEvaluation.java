@@ -1044,6 +1044,9 @@ final class HalyardTupleExprEvaluation {
 	    			final GroupValue aggregators = createGroupValue(group, opArgSteps, bindings);
 					@Override
 					protected boolean next(BindingSet bs) {
+						if (parent.isClosed()) {
+							return false;
+						}
 						aggregators.addValues(bs);
 						return true;
 					}
@@ -1951,6 +1954,9 @@ final class HalyardTupleExprEvaluation {
 		    	HashJoinTable hashTable = createHashTable();
 	            @Override
 	            protected boolean next(BindingSet buildBs) {
+					if (parent.isClosed()) {
+						return false;
+					}
 	            	HashJoinTable partition;
 	            	synchronized (this) {
 	                	if (hashTable.entryCount() >= hashTableLimit) {
@@ -2251,6 +2257,9 @@ final class HalyardTupleExprEvaluation {
 	            }
 	            @Override
 	            protected boolean next(BindingSet bs) {
+					if (parent.isClosed()) {
+						return false;
+					}
 	                try {
 	                    secondSet.add(bs);
 	                    return true;
@@ -2305,6 +2314,9 @@ final class HalyardTupleExprEvaluation {
 	            }
 	            @Override
 	            protected boolean next(BindingSet bs) {
+					if (parent.isClosed()) {
+						return false;
+					}
 	                try {
 	                    excludeSet.add(bs);
 	                    return true;
