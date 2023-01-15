@@ -94,13 +94,36 @@ public class HBaseTripleSource implements ExtendedTripleSource, RDFStarTripleSou
 		this.ticker = ticker;
 	}
 
+	static final class QueryContexts {
+		final List<Resource> contextsToScan;
+		final Set<Resource> contextsToFilter;
+
+		QueryContexts(Resource... contexts) {
+			if (contexts == null || contexts.length == 0) {
+				// if all contexts then scan the default context
+				contextsToScan = Collections.singletonList(null);
+				contextsToFilter = null;
+			} else if (Arrays.stream(contexts).anyMatch(Objects::isNull)) {
+				// if any context is the default context then just scan the default context (everything)
+				contextsToScan = Collections.singletonList(null);
+				// filter out any scan that includes the default context (everything) to the specified contexts
+				contextsToFilter = new HashSet<>();
+				Collections.addAll(contextsToFilter, contexts);
+			} else {
+				contextsToScan = Arrays.asList(contexts);
+				contextsToFilter = null;
+			}
+		}
+	}
+
 	@Override
 	public final CloseableIteration<? extends Statement, QueryEvaluationException> getStatements(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
 		if (RDF.TYPE.equals(pred) && SPIN.MAGIC_PROPERTY_CLASS.equals(obj)) {
 			// cache magic property definitions here
 			return new EmptyIteration<>();
 		} else {
-			return getStatementsInternal(subj, pred, obj, contexts, valueReader);
+			QueryContexts queryContexts = new QueryContexts(contexts);
+			return getStatementsInternal(subj, pred, obj, queryContexts);
 		}
 	}
 
@@ -110,8 +133,68 @@ public class HBaseTripleSource implements ExtendedTripleSource, RDFStarTripleSou
 			// cache magic property definitions here
 			return false;
 		} else {
-			return hasStatementInternal(subj, pred, obj, contexts);
+			QueryContexts queryContexts = new QueryContexts(contexts);
+			return hasStatementInternal(subj, pred, obj, queryContexts);
 		}
+	}
+
+	private CloseableIteration<? extends Statement, QueryEvaluationException> getStatementsInternal(Resource subj, IRI pred, Value obj, QueryContexts queryContexts) {
+		CloseableIteration<? extends Statement, QueryEvaluationException> iter = timeLimit(
+				new ExceptionConvertingIteration<Statement, QueryEvaluationException>(createStatementScanner(subj, pred, obj, queryContexts.contextsToScan, valueReader)) {
+			@Override
+			protected QueryEvaluationException convert(Exception e) {
+				return new QueryEvaluationException(e);
+			}
+		}, timeoutSecs);
+		if (queryContexts.contextsToFilter != null) {
+			iter = new FilterIteration<Statement, QueryEvaluationException>(iter) {
+				@Override
+				protected boolean accept(Statement st) {
+					return queryContexts.contextsToFilter.contains(st.getContext());
+				}
+			};
+		}
+		return iter;
+	}
+
+	protected CloseableIteration<? extends Statement, IOException> createStatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contexts, ValueIO.Reader reader) {
+		return new StatementScanner(subj, pred, obj, contexts, reader);
+	}
+
+	protected boolean hasStatementInternal(Resource subj, IRI pred, Value obj, QueryContexts queryContexts) throws QueryEvaluationException {
+		if (queryContexts.contextsToFilter != null) {
+			// not possible to optimise
+			return hasStatementFallback(subj, pred, obj, queryContexts);
+		} else {
+			RDFSubject subject = rdfFactory.createSubject(subj);
+			RDFPredicate predicate = rdfFactory.createPredicate(pred);
+			RDFObject object = rdfFactory.createObject(obj);
+			for (Resource ctx : queryContexts.contextsToScan) {
+				RDFContext context = rdfFactory.createContext(ctx);
+				try {
+					Scan scan = scan(subject, predicate, object, context, stmtIndices);
+					return HalyardTableUtils.exists(keyspaceConn, scan);
+				} catch (IOException e) {
+					throw new QueryEvaluationException(e);
+				}
+			}
+			throw new AssertionError();
+		}
+	}
+
+	protected final boolean hasStatementFallback(Resource subj, IRI pred, Value obj, QueryContexts queryContexts) {
+		try (CloseableIteration<? extends Statement, QueryEvaluationException> iter = getStatementsInternal(subj, pred, obj, queryContexts)) {
+			return iter.hasNext();
+		}
+	}
+
+	protected Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, StatementIndices indices) throws IOException {
+		Scan scan = HalyardTableUtils.scan(subj, pred, obj, ctx, indices);
+		if (settings != null) {
+			scan.setTimeRange(settings.minTimestamp, settings.maxTimestamp);
+			scan.readVersions(settings.maxVersions);
+		}
+		return scan;
 	}
 
 	public TripleSource getTimestampedTripleSource() {
@@ -127,51 +210,6 @@ public class HBaseTripleSource implements ExtendedTripleSource, RDFStarTripleSou
 				return HalyardTableUtils.scanWithConstraints(subj, subjConstraint, pred, obj, objConstraints, ctx, indices);
 			}
 		};
-	}
-
-	private CloseableIteration<? extends Statement, QueryEvaluationException> getStatementsInternal(Resource subj, IRI pred, Value obj, Resource[] contexts, ValueIO.Reader reader) {
-		List<Resource> contextsToScan;
-		if (contexts == null || contexts.length == 0) {
-			// if all contexts then scan the default context
-			contextsToScan = Collections.singletonList(null);
-		} else if (Arrays.stream(contexts).anyMatch(Objects::isNull)) {
-			// if any context is the default context then just scan the default context (everything)
-			contextsToScan = Collections.singletonList(null);
-		} else {
-			contextsToScan = Arrays.asList(contexts);
-		}
-		CloseableIteration<? extends Statement, QueryEvaluationException> iter = timeLimit(new ExceptionConvertingIteration<Statement, QueryEvaluationException>(createStatementScanner(subj, pred, obj, contextsToScan, reader)) {
-			@Override
-			protected QueryEvaluationException convert(Exception e) {
-				return new QueryEvaluationException(e);
-			}
-		}, timeoutSecs);
-		if (contexts != null && Arrays.stream(contexts).anyMatch(Objects::isNull)) {
-			// filter out any scan that includes the default context (everything) to the specified contexts
-			final Set<Resource> ctxSet = new HashSet<>();
-			Collections.addAll(ctxSet, contexts);
-			iter = new FilterIteration<Statement, QueryEvaluationException>(iter) {
-				@Override
-				protected boolean accept(Statement st) {
-					return ctxSet.contains(st.getContext());
-				}
-			};
-		}
-		return iter;
-	}
-
-	protected CloseableIteration<? extends Statement, IOException> createStatementScanner(Resource subj, IRI pred, Value obj, List<Resource> contexts, ValueIO.Reader reader) {
-		return new StatementScanner(subj, pred, obj, contexts, reader);
-	}
-
-	private boolean hasStatementInternal(Resource subj, IRI pred, Value obj, Resource... contexts) throws QueryEvaluationException {
-		try (CloseableIteration<? extends Statement, QueryEvaluationException> iter = getStatements(subj, pred, obj, contexts)) {
-			return iter.hasNext();
-		}
-	}
-
-	protected Scan scan(RDFSubject subj, RDFPredicate pred, RDFObject obj, RDFContext ctx, StatementIndices indices) {
-		return HalyardTableUtils.scan(subj, pred, obj, ctx, indices);
 	}
 
 	@Override
@@ -213,10 +251,6 @@ public class HBaseTripleSource implements ExtendedTripleSource, RDFStarTripleSou
 						// build a ResultScanner from an HBase Scan that finds potential matches
 						ctx = rdfFactory.createContext(contexts.next());
 						Scan scan = scan(subj, pred, obj, ctx, stmtIndices);
-						if (settings != null) {
-							scan.setTimeRange(settings.minTimestamp, settings.maxTimestamp);
-							scan.readVersions(settings.maxVersions);
-						}
 						rs = keyspaceConn.getScanner(scan);
 					} else {
 						return null;

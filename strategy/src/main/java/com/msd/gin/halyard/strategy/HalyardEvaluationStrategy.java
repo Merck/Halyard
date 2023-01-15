@@ -24,6 +24,7 @@ import com.msd.gin.halyard.query.BindingSetPipe;
 import com.msd.gin.halyard.query.BindingSetPipeQueryEvaluationStep;
 import com.msd.gin.halyard.query.ValuePipeQueryValueEvaluationStep;
 import com.msd.gin.halyard.strategy.HalyardTupleExprEvaluation.QuadPattern;
+import com.msd.gin.halyard.vocab.HALYARD;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.IterationWrapper;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
@@ -300,6 +302,11 @@ public class HalyardEvaluationStrategy implements EvaluationStrategy {
     public String toString() {
         return super.toString() + "[sourceString = " + getSourceString() + ", tripleSource = " + tripleSource + "]";
     }
+
+
+	public static boolean isSearchStatement(Value obj) {
+		return (obj != null) && obj.isLiteral() && HALYARD.SEARCH.equals(((Literal) obj).getDatatype());
+	}
 
 
 	/**

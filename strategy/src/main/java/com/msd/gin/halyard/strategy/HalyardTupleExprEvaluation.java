@@ -568,7 +568,7 @@ final class HalyardTupleExprEvaluation {
 	                        result.addBinding(objVar.getName(), st.getObject());
 	                    } else {
 		                    Value val = result.getValue(objName);
-	                        if ((val instanceof Literal) && HALYARD.SEARCH.equals(((Literal)val).getDatatype())) {
+	                        if (HalyardEvaluationStrategy.isSearchStatement(val)) {
 			                    // override Halyard search type object literals with real object value from the statement
 		                        result.setBinding(objName, st.getObject());
 	                        }

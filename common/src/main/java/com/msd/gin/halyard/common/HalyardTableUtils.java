@@ -55,6 +55,7 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.client.TableDescriptor;
 import org.apache.hadoop.hbase.client.TableDescriptorBuilder;
+import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.io.compress.Compression;
@@ -595,24 +596,20 @@ public final class HalyardTableUtils {
 
 	public static boolean hasSubject(KeyspaceConnection kc, Resource subj, StatementIndices indices) throws IOException {
 		RDFFactory rdfFactory = indices.getRDFFactory();
-		Scan scan = scanSingle(indices.getSPOIndex().scan(rdfFactory.createSubject(subj)));
-		return exists(kc, scan);
+		return exists(kc, indices.getSPOIndex().scan(rdfFactory.createSubject(subj)));
 	}
 	public static boolean hasSubject(KeyspaceConnection kc, Resource subj, Resource ctx, StatementIndices indices) throws IOException {
 		RDFFactory rdfFactory = indices.getRDFFactory();
-		Scan scan = scanSingle(indices.getCSPOIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createSubject(subj)));
-		return exists(kc, scan);
+		return exists(kc, indices.getCSPOIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createSubject(subj)));
 	}
 
 	public static boolean hasObject(KeyspaceConnection kc, Value obj, StatementIndices indices) throws IOException {
 		RDFFactory rdfFactory = indices.getRDFFactory();
-		Scan scan = scanSingle(indices.getOSPIndex().scan(rdfFactory.createObject(obj)));
-		return exists(kc, scan);
+		return exists(kc, indices.getOSPIndex().scan(rdfFactory.createObject(obj)));
 	}
 	public static boolean hasObject(KeyspaceConnection kc, Value obj, Resource ctx, StatementIndices indices) throws IOException {
 		RDFFactory rdfFactory = indices.getRDFFactory();
-		Scan scan = scanSingle(indices.getCOSPIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createObject(obj)));
-		return exists(kc, scan);
+		return exists(kc, indices.getCOSPIndex().scan(rdfFactory.createContext(ctx), rdfFactory.createObject(obj)));
 	}
 
 	public static Resource getSubject(KeyspaceConnection kc, ValueIdentifier id, ValueFactory vf, StatementIndices indices) throws IOException {
@@ -661,13 +658,18 @@ public final class HalyardTableUtils {
 	}
 
 	static Scan scanSingle(Scan scanAll) {
-		return scanAll.setCaching(1).setCacheBlocks(true)
-			.setFilter(new FilterList(scanAll.getFilter(), new FirstKeyOnlyFilter()))
-			.setOneRowLimit();
+		scanAll.setCaching(1).setCacheBlocks(true).setOneRowLimit();
+		Filter filter = scanAll.getFilter();
+		if (filter != null) {
+			scanAll.setFilter(new FilterList(filter, new FirstKeyOnlyFilter()));
+		} else {
+			scanAll.setFilter(new FirstKeyOnlyFilter());
+		}
+		return scanAll;
 	}
 
-	private static boolean exists(KeyspaceConnection kc, Scan scan) throws IOException {
-		try (ResultScanner scanner = kc.getScanner(scan)) {
+	public static boolean exists(KeyspaceConnection kc, Scan scan) throws IOException {
+		try (ResultScanner scanner = kc.getScanner(scanSingle(scan))) {
 			for (Result result : scanner) {
 				if(!result.isEmpty()) {
 					return true;
