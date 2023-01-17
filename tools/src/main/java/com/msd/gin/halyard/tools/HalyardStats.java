@@ -98,6 +98,7 @@ public final class HalyardStats extends AbstractHalyardTool {
     private static final long DEFAULT_THRESHOLD = 1000;
 
     static final class StatsMapper extends RdfTableMapper<ImmutableBytesWritable, LongWritable>  {
+        private static final long STATUS_UPDATE_INTERVAL = 100000L;
 
         final ImmutableBytesWritable outputKey = new ImmutableBytesWritable();
         final LongWritable outputValue = new LongWritable();
@@ -322,7 +323,7 @@ public final class HalyardStats extends AbstractHalyardTool {
             lastIndex = index;
             lastGraph = graph;
             output.progress();
-            if ((counter++ % 100000) == 0) {
+            if ((counter++ % STATUS_UPDATE_INTERVAL) == 0) {
                 output.setStatus(MessageFormat.format("reg:{0} {1} t:{2} s:{3} p:{4} o:{5} c:{6} r:{7}", index, counter, triples, distinctSubjects, properties, distinctObjects, classes, removed));
             }
         }
@@ -413,6 +414,7 @@ public final class HalyardStats extends AbstractHalyardTool {
     }
 
     static final class StatsReducer extends RdfReducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
+        private static final long STATUS_UPDATE_INTERVAL = 1000L;
 
         OutputStream out;
         RDFWriter writer;
@@ -512,7 +514,7 @@ public final class HalyardStats extends AbstractHalyardTool {
                 } else {
                     writeStatement(statsNode, predicate, countLiteral);
                 }
-                if ((added % 1000) == 0) {
+                if ((added % STATUS_UPDATE_INTERVAL) == 0) {
                     context.setStatus(MessageFormat.format("statements removed: {0} added: {1}", removed, added));
                 }
             }

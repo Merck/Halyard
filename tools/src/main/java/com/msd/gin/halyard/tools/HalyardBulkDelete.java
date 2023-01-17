@@ -83,6 +83,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
     private static final String PREDICATE = "halyard.delete.predicate";
     private static final String OBJECT = "halyard.delete.object";
     private static final String CONTEXTS = "halyard.delete.contexts";
+    private static final long STATUS_UPDATE_INTERVAL = 10000L;
 
     enum Counters {
 		REMOVED_KVS,
@@ -144,7 +145,7 @@ public final class HalyardBulkDelete extends AbstractHalyardTool {
                 } else {
                     output.progress();
                 }
-                if (totalKvs++ % 10000L == 0) {
+                if (totalKvs++ % STATUS_UPDATE_INTERVAL == 0) {
                     String msg = MessageFormat.format("{0} / {1} cells deleted", deletedKvs, totalKvs);
                     output.setStatus(msg);
                     LOG.info(msg);

@@ -44,6 +44,7 @@ public final class HalyardKeys extends AbstractHalyardTool {
 	private static final String DECIMATION_FACTOR_PROPERTY = confProperty(TOOL_NAME, "decimation-factor");
 	
 	private static final int DEFAULT_DECIMATION_FACTOR = 0;
+    private static final long STATUS_UPDATE_INTERVAL = 10000L;
 
 	public HalyardKeys() {
 		super(
@@ -75,7 +76,7 @@ public final class HalyardKeys extends AbstractHalyardTool {
 			if (decimationFactor == 0 || random.nextInt(decimationFactor) == 0) {
 				report(output, key, value.size());
 			}
-			if (++counter % 10000 == 0) {
+			if (++counter % STATUS_UPDATE_INTERVAL == 0) {
 				output.setStatus(MessageFormat.format("{0}", counter));
 			}
 		}

@@ -38,6 +38,7 @@ public final class HalyardHash extends AbstractHalyardTool {
 	private static final String DECIMATION_FACTOR_PROPERTY = confProperty(TOOL_NAME, "decimation-factor");
 	
 	private static final int DEFAULT_DECIMATION_FACTOR = 0;
+    private static final long STATUS_UPDATE_INTERVAL = 10000L;
 
 	enum Counters {
 		ID_COLLISIONS
@@ -82,7 +83,7 @@ public final class HalyardHash extends AbstractHalyardTool {
 					report(output, stmt.getContext());
 				}
 			}
-			if (++counter % 10000 == 0) {
+			if (++counter % STATUS_UPDATE_INTERVAL == 0) {
 				output.setStatus(MessageFormat.format("{0}", counter));
 			}
 		}

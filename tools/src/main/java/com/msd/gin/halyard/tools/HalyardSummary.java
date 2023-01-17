@@ -105,6 +105,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
 	private static final String TARGET_GRAPH_PROPERTY = confProperty(TOOL_NAME, "target-graph");
     private static final String DECIMATION_FACTOR = "halyard.summary.decimation";
     private static final int DEFAULT_DECIMATION_FACTOR = 100;
+    private static final long STATUS_UPDATE_INTERVAL = 10000L;
 
     static int toCardinality(long count) {
         return (63 - Long.numberOfLeadingZeros(count));
@@ -257,7 +258,7 @@ public final class HalyardSummary extends AbstractHalyardTool {
             if (decimationFactor == 0 || random.nextInt(decimationFactor) == 0) {
                 statementChange(output, HalyardTableUtils.parseStatement(null, null, null, null, value.rawCells()[0], valueReader, stmtIndices));
             }
-            if (++counter % 10000 == 0) {
+            if (++counter % STATUS_UPDATE_INTERVAL == 0) {
                 output.setStatus(MessageFormat.format("{0} cc:{1} pc:{2} pd:{3} pr:{4} pdr:{5}", counter, ccCounter, pcCounter, pdCounter, prCounter, pdrCounter));
             }
         }

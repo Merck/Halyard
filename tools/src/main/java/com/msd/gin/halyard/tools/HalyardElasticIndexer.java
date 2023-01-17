@@ -88,6 +88,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 	private static final String PREDICATE_PROPERTY = confProperty(TOOL_NAME, "property");
 	private static final String NAMED_GRAPH_PROPERTY = confProperty(TOOL_NAME, "named-graph");
 	private static final String ALIAS_PROPERTY = confProperty(TOOL_NAME, "alias");
+    private static final long STATUS_UPDATE_INTERVAL = 100000L;
 
 	enum Counters {
 		INDEXED_LITERALS
@@ -114,7 +115,7 @@ public final class HalyardElasticIndexer extends AbstractHalyardTool {
 
         @Override
         protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
-            if ((counter++ % 100000) == 0) {
+            if ((counter++ % STATUS_UPDATE_INTERVAL) == 0) {
                 output.setStatus(MessageFormat.format("{0} st:{1} exp:{2} ", counter, statements, exports));
             }
 

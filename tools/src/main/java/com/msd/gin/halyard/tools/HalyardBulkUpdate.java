@@ -85,6 +85,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
     public static final String DECIMATE_FUNCTION_URI = HALYARD.NAMESPACE + DECIMATE_FUNCTION_NAME;
     static final String TABLE_NAME_PROPERTY = "halyard.table.name";
     static final String STAGE_PROPERTY = "halyard.update.stage";
+    private static final long STATUS_UPDATE_INTERVAL = 10000L;
 
     enum Counters {
 		ADDED_KVS,
@@ -144,7 +145,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 									throw new IOException(ex);
 								}
 								long added = addedKvs.incrementAndGet();
-								if (added % 1000l == 0) {
+								if (added % STATUS_UPDATE_INTERVAL == 0) {
 									context.getCounter(Counters.ADDED_KVS).setValue(added);
 									long removed = removedKvs.get();
 									context.setStatus(name + " - " + added + " added " + removed + " removed");
@@ -161,7 +162,7 @@ public final class HalyardBulkUpdate extends AbstractHalyardTool {
 									throw new IOException(ex);
 								}
 								long removed = removedKvs.incrementAndGet();
-								if (removed % 1000l == 0) {
+								if (removed % STATUS_UPDATE_INTERVAL == 0) {
 									context.getCounter(Counters.REMOVED_KVS).setValue(removed);
 									long added = addedKvs.get();
 									context.setStatus(name + " - " + added + " added " + removed + " removed");
