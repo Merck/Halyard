@@ -14,6 +14,7 @@ public interface TrackingThreadPoolExecutorMXBean {
 	int getActiveCount();
 	long getCompletedTaskCount();
 	long getTaskCount();
+	int getQueueSize();
 	ThreadInfo[] getThreadDump();
 	QueueInfo[] getQueueDump();
 

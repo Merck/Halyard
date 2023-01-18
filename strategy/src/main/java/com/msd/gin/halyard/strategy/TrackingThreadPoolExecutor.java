@@ -34,6 +34,11 @@ public final class TrackingThreadPoolExecutor extends ThreadPoolExecutor impleme
 	}
 
 	@Override
+	public int getQueueSize() {
+		return getQueue().size();
+	}
+
+	@Override
 	public ThreadInfo[] getThreadDump() {
 		// NB: the size is only approximate as the contents of the map is under constant change!!!
 		List<ThreadInfo> dump = new ArrayList<>(runningTasks.size());
