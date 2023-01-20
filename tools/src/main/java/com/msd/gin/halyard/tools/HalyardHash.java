@@ -37,7 +37,7 @@ public final class HalyardHash extends AbstractHalyardTool {
 
 	private static final String DECIMATION_FACTOR_PROPERTY = confProperty(TOOL_NAME, "decimation-factor");
 	
-	private static final int DEFAULT_DECIMATION_FACTOR = 0;
+	private static final int DEFAULT_DECIMATION_FACTOR = 1;
     private static final long STATUS_UPDATE_INTERVAL = 10000L;
 
 	enum Counters {
@@ -51,7 +51,7 @@ public final class HalyardHash extends AbstractHalyardTool {
 			"Example: halyard hash -s hdfs://my_RDF_files"
 		);
         addOption("s", "source", "source_paths", SOURCE_PATHS_PROPERTY, "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
-		addOption("d", "decimation-factor", "decimation_factor", DECIMATION_FACTOR_PROPERTY, "Optionally overide random decimation factor (default is 0)", false, true);
+		addOption("d", "decimation-factor", "decimation_factor", DECIMATION_FACTOR_PROPERTY, "Optionally overide random decimation factor (default is 1)", false, true);
 	}
 
 	static final class HashMapper extends Mapper<LongWritable, Statement, ImmutableBytesWritable, ImmutableBytesWritable> {
@@ -75,7 +75,7 @@ public final class HalyardHash extends AbstractHalyardTool {
 
 		@Override
 		protected void map(LongWritable key, Statement stmt, Context output) throws IOException, InterruptedException {
-			if (decimationFactor == 0 || random.nextInt(decimationFactor) == 0) {
+			if (decimationFactor == 1 || random.nextInt(decimationFactor) == 0) {
 				report(output, stmt.getSubject());
 				report(output, stmt.getPredicate());
 				report(output, stmt.getObject());
@@ -156,7 +156,11 @@ public final class HalyardHash extends AbstractHalyardTool {
 	@Override
 	public int run(CommandLine cmd) throws Exception {
     	configureString(cmd, 's', null);
-        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
+        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR, v -> {
+            if (v <= 0) {
+            	throw new IllegalArgumentException("Decimation factor must be greater than zero");
+            }
+        });
 		getConf().setBoolean(HalyardBulkLoad.ALLOW_INVALID_IRIS_PROPERTY, true);
         String sourcePaths = getConf().get(SOURCE_PATHS_PROPERTY);
 		TableMapReduceUtil.addDependencyJarsForClasses(getConf(),

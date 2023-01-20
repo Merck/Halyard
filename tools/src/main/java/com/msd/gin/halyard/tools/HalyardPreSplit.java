@@ -20,13 +20,11 @@ import static com.msd.gin.halyard.tools.HalyardBulkLoad.*;
 
 import com.msd.gin.halyard.common.HalyardTableUtils;
 import com.msd.gin.halyard.common.RDFFactory;
-import com.msd.gin.halyard.common.StatementIndex;
 import com.msd.gin.halyard.common.StatementIndices;
 import com.msd.gin.halyard.tools.HalyardBulkLoad.RioFileInputFormat;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.SplittableRandom;
 
@@ -40,6 +38,7 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
@@ -53,6 +52,8 @@ import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 import org.eclipse.rdf4j.rio.helpers.NTriplesUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Apache Hadoop MapReduce Tool for calculating pre-splits of an HBase table before a large dataset bulk-load.
@@ -72,8 +73,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
     private static final int DEFAULT_MAX_VERSIONS = 1;
 
     enum Counters {
-    	SAMPLED_KEYS,
-    	TOTAL_KEYS,
+    	SAMPLED_STATEMENTS,
     	TOTAL_STATEMENTS,
     	TOTAL_SPLITS
     }
@@ -88,9 +88,9 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         private final SplittableRandom random = new SplittableRandom(0);
         private StatementIndices stmtIndices;
         private int decimationFactor;
-        private long sampleCount = 0L;
-        private long totalKeys = 0L;
+        private long sampledStmts = 0L;
         private long totalStmts = 0L;
+        private long nextStmtToSample = 0L;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -98,41 +98,44 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
             RDFFactory rdfFactory = RDFFactory.create(conf);
             stmtIndices = new StatementIndices(conf, rdfFactory);
             decimationFactor = conf.getInt(DECIMATION_FACTOR_PROPERTY, DEFAULT_DECIMATION_FACTOR);
-            // prefix splits
-            for (byte b = 1; b < StatementIndex.Name.values().length; b++) {
-                context.write(new ImmutableBytesWritable(new byte[] {b}), new LongWritable(1));
-            }
         }
 
         @Override
         protected void map(LongWritable key, Statement value, final Context context) throws IOException, InterruptedException {
-            List<? extends KeyValue> kvs = HalyardTableUtils.insertKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), 0, stmtIndices);
-            for (KeyValue keyValue: kvs) {
-            	if (decimationFactor == 0 || random.nextInt(decimationFactor) == 0) {
+        	if (totalStmts % decimationFactor == 0) {
+        		// pick a random representative from the next decimationFactor worth of statements
+       			nextStmtToSample = totalStmts + random.nextInt(decimationFactor);
+        	}
+        	if (totalStmts == nextStmtToSample) {
+                List<? extends KeyValue> kvs = HalyardTableUtils.insertKeyValues(value.getSubject(), value.getPredicate(), value.getObject(), value.getContext(), 0, stmtIndices);
+        		for (KeyValue keyValue: kvs) {
                     rowKey.set(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
                     keyValueLength.set(keyValue.getLength());
                     context.write(rowKey, keyValueLength);
-                    sampleCount++;
                 }
+        		sampledStmts++;
             }
-            totalKeys += kvs.size();
             totalStmts++;
         }
 
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
-        	context.getCounter(Counters.SAMPLED_KEYS).increment(sampleCount);
-        	context.getCounter(Counters.TOTAL_KEYS).increment(totalKeys);
+        	context.getCounter(Counters.SAMPLED_STATEMENTS).increment(sampledStmts);
         	context.getCounter(Counters.TOTAL_STATEMENTS).increment(totalStmts);
         }
     }
 
     static final class PreSplitReducer extends Reducer<ImmutableBytesWritable, LongWritable, NullWritable, NullWritable>  {
-
+    	private static final Logger logger = LoggerFactory.getLogger(PreSplitReducer.class);
         private final List<byte[]> splits = new ArrayList<>();
-        private long splitSize = 0, splitLimit;
+        private long splitLimit;
         private int decimationFactor;
         private byte lastRegion = 0;
+        private int keyCount = 0;
+        private int valueCount = 0;
+        private long valueSize = 0;
+        private int maxValueCount = 0;
+        private long maxValueSize = 0;
 
         @Override
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -142,20 +145,34 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 
         @Override
         public void reduce(ImmutableBytesWritable key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
-            byte region = key.get()[key.getOffset()];
+            final byte region = key.get()[key.getOffset()];
             boolean isNewRegion = (lastRegion != region);
+            final long splitSize = valueSize * decimationFactor;
             if (isNewRegion || splitSize > splitLimit) {
-                byte[] split = isNewRegion ? new byte[]{region} : key.copyBytes();
-                splits.add(split);
-                context.setStatus("#" + splits.size() + " " + Arrays.toString(split));
-                lastRegion = key.get()[key.getOffset()];
-                splitSize = 0;
+                byte[] splitBytes = isNewRegion ? new byte[]{region} : key.copyBytes();
+                splits.add(splitBytes);
+                int splitNum = splits.size();
+                String splitString = Bytes.toHex(splitBytes);
+                context.setStatus("#" + splitNum + " " + splitString);
+                logger.info("Split {} ({}): size {}, sampled keys {}, mean value count {}, mean value size {}, max value count {}, max value size {}", splitNum, splitString, splitSize, keyCount, valueCount/keyCount, valueSize/keyCount, maxValueCount, maxValueSize);
+                lastRegion = region;
+                keyCount = 0;
+                valueCount = 0;
+                valueSize = 0;
+                maxValueCount = 0;
+                maxValueSize = 0;
             }
-            long sampledSize = 0L;
+            int sampleCount = 0;
+            int sampledSize = 0;
             for (LongWritable val : values) {
+            	sampleCount++;
             	sampledSize += val.get();
             }
-            splitSize += sampledSize * decimationFactor;
+            keyCount++;
+            valueCount += sampleCount;
+            valueSize += sampledSize;
+            maxValueCount = Math.max(sampleCount, maxValueCount);
+            maxValueSize = Math.max(sampledSize, maxValueSize);
         }
 
         @Override
@@ -192,7 +209,7 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
         addOption("s", "source", "source_paths", SOURCE_PATHS_PROPERTY, "Source path(s) with RDF files, more paths can be delimited by comma, the paths are recursively searched for the supported files", true, true);
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, optional HBase namespace of the target table must already exist", true, true);
         addOption("i", "allow-invalid-iris", null, ALLOW_INVALID_IRIS_PROPERTY, "Optionally allow invalid IRI values (less overhead)", false, false);
-        addOption("l", "skip-invalid-lines", null, SKIP_INVALID_LINES_PROPERTY, "Optionally skip invalid lines", false, false);
+        addOption("k", "skip-invalid-lines", null, SKIP_INVALID_LINES_PROPERTY, "Optionally skip invalid lines", false, false);
         addOption("g", "default-named-graph", "named_graph", DEFAULT_CONTEXT_PROPERTY, "Optionally specify default target named graph", false, true);
         addOption("o", "named-graph-override", null, OVERRIDE_CONTEXT_PROPERTY, "Optionally override named graph also for quads, named graph is stripped from quads if --default-named-graph option is not specified", false, false);
         addOption("d", "decimation-factor", "decimation_factor", DECIMATION_FACTOR_PROPERTY, String.format("Optionally overide pre-split random decimation factor (default is %d)", DEFAULT_DECIMATION_FACTOR), false, true);
@@ -217,10 +234,14 @@ public final class HalyardPreSplit extends AbstractHalyardTool {
 	        }
         }
         configureBoolean(cmd, 'i');
-        configureBoolean(cmd, 'l');
+        configureBoolean(cmd, 'k');
         configureIRIPattern(cmd, 'g', null);
         configureBoolean(cmd, 'o');
-        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
+        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR, v -> {
+            if (v <= 0) {
+            	throw new IllegalArgumentException("Decimation factor must be greater than zero");
+            }
+        });
         configureLong(cmd, 'l', DEFAULT_SPLIT_LIMIT);
         String sourcePaths = getConf().get(SOURCE_PATHS_PROPERTY);
         TableMapReduceUtil.addDependencyJarsForClasses(getConf(),

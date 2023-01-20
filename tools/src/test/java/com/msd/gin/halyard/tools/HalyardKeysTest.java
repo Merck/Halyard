@@ -73,7 +73,7 @@ public class HalyardKeysTest extends AbstractHalyardToolTest {
     public void testKeyStats() throws Exception {
         File root = createTempDir("test_key_stats");
 
-        assertEquals(0, run(new String[]{"-s", TABLE_NAME, "-t", root.toURI().toURL().toString() + "key-stats.csv", "-d", "0"}));
+        assertEquals(0, run(new String[]{"-s", TABLE_NAME, "-t", root.toURI().toURL().toString() + "key-stats.csv", "-d", "1"}));
 
         Path stats = root.toPath().resolve("key-stats.csv");
         assertStatsFile(stats);
@@ -91,7 +91,7 @@ public class HalyardKeysTest extends AbstractHalyardToolTest {
 
     	File root = createTempDir("test_key_stats_snapshot");
         File restoredSnapshot = getTempSnapshotDir("restored_snapshot");
-        assertEquals(0, run(new String[]{"-s", snapshot, "-u", restoredSnapshot.toURI().toURL().toString(), "-t", root.toURI().toURL().toString() + "key-stats.csv", "-d", "0"}));
+        assertEquals(0, run(new String[]{"-s", snapshot, "-u", restoredSnapshot.toURI().toURL().toString(), "-t", root.toURI().toURL().toString() + "key-stats.csv", "-d", "1"}));
 
         Path stats = root.toPath().resolve("key-stats.csv");
         assertStatsFile(stats);

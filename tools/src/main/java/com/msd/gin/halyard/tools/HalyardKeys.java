@@ -43,7 +43,7 @@ public final class HalyardKeys extends AbstractHalyardTool {
 	private static final String TARGET_PROPERTY = confProperty(TOOL_NAME, "target");
 	private static final String DECIMATION_FACTOR_PROPERTY = confProperty(TOOL_NAME, "decimation-factor");
 	
-	private static final int DEFAULT_DECIMATION_FACTOR = 0;
+	private static final int DEFAULT_DECIMATION_FACTOR = 1;
     private static final long STATUS_UPDATE_INTERVAL = 10000L;
 
 	public HalyardKeys() {
@@ -54,7 +54,7 @@ public final class HalyardKeys extends AbstractHalyardTool {
 		);
         addOption("s", "source-dataset", "dataset_table", SOURCE_NAME_PROPERTY, "Source HBase table with Halyard RDF store", true, true);
         addOption("t", "target-file", "target_url", TARGET_PROPERTY, "Target file to export the statistics to.", true, true);
-		addOption("d", "decimation-factor", "decimation_factor", DECIMATION_FACTOR_PROPERTY, "Optionally overide random decimation factor (default is 0)", false, true);
+		addOption("d", "decimation-factor", "decimation_factor", DECIMATION_FACTOR_PROPERTY, "Optionally overide random decimation factor (default is 1)", false, true);
         addOption("u", "restore-dir", "restore_folder", SNAPSHOT_PATH_PROPERTY, "If specified then -s is a snapshot name and this is the folder to restore to on HDFS", false, true);
 	}
 
@@ -73,7 +73,7 @@ public final class HalyardKeys extends AbstractHalyardTool {
 
 		@Override
 		protected void map(ImmutableBytesWritable key, Result value, Context output) throws IOException, InterruptedException {
-			if (decimationFactor == 0 || random.nextInt(decimationFactor) == 0) {
+			if (decimationFactor == 1 || random.nextInt(decimationFactor) == 0) {
 				report(output, key, value.size());
 			}
 			if (++counter % STATUS_UPDATE_INTERVAL == 0) {
@@ -192,7 +192,11 @@ public final class HalyardKeys extends AbstractHalyardTool {
     	configureString(cmd, 's', null);
     	configureString(cmd, 't', null);
     	configureString(cmd, 'u', null);
-        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR);
+        configureInt(cmd, 'd', DEFAULT_DECIMATION_FACTOR, v -> {
+            if (v <= 0) {
+            	throw new IllegalArgumentException("Decimation factor must be greater than zero");
+            }
+        });
         String source = getConf().get(SOURCE_NAME_PROPERTY);
         String snapshotPath = getConf().get(SNAPSHOT_PATH_PROPERTY);
         if (snapshotPath != null) {

@@ -670,7 +670,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         addOption("t", "target", "dataset_table", "Target HBase table with Halyard RDF store, target table is created if it does not exist, however optional HBase namespace of the target table must already exist", true, true);
         addOption("i", "allow-invalid-iris", null, ALLOW_INVALID_IRIS_PROPERTY, "Optionally allow invalid IRI values (less overhead)", false, false);
         addOption("d", "verify-data-types", null, VERIFY_DATATYPE_VALUES_PROPERTY, "Optionally verify RDF data type values while parsing", false, false);
-        addOption("l", "skip-invalid-lines", null, SKIP_INVALID_LINES_PROPERTY, "Optionally skip invalid lines", false, false);
+        addOption("k", "skip-invalid-lines", null, SKIP_INVALID_LINES_PROPERTY, "Optionally skip invalid lines", false, false);
         addOption("r", "truncate-target", null, TRUNCATE_PROPERTY, "Optionally truncate target table just before the loading the new data", false, false);
         addOption("b", "pre-split-bits", "bits", SPLIT_BITS_PROPERTY, "Optionally specify bit depth of region pre-splits for a case when target table does not exist (default is 3)", false, true);
         addOption("g", "default-named-graph", "named_graph", DEFAULT_CONTEXT_PROPERTY, "Optionally specify default target named graph", false, true);
@@ -686,7 +686,7 @@ public final class HalyardBulkLoad extends AbstractHalyardTool {
         String target = cmd.getOptionValue('t');
         configureBoolean(cmd, 'i');
         configureBoolean(cmd, 'd');
-        configureBoolean(cmd, 'l');
+        configureBoolean(cmd, 'k');
         configureBoolean(cmd, 'r');
         configureInt(cmd, 'b', DEFAULT_SPLIT_BITS);
         configureIRIPattern(cmd, 'g', null);

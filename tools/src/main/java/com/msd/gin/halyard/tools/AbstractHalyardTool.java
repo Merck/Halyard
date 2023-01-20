@@ -33,6 +33,8 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
@@ -109,38 +111,40 @@ public abstract class AbstractHalyardTool implements Tool {
         this.conf = c;
     }
 
-    protected static String[] validateIRIs(String... iris) throws ParseException {
+    protected static String[] validateIRIs(String... iris) {
     	for (String iri : iris) {
     		try {
 				new URI(iri).isAbsolute();
 			} catch (URISyntaxException e) {
-				throw (ParseException) new ParseException("Invalid IRI: "+iri).initCause(e);
+				throw new IllegalArgumentException("Invalid IRI: "+iri, e);
 			}
     	}
     	return iris;
     }
 
-    protected void configureIRI(CommandLine cmd, char opt, String defaultValue) throws ParseException {
-    	OrderedOption option = (OrderedOption) options.getOption(Character.toString(opt));
-    	// command line args always override
-    	if (cmd.hasOption(opt)) {
-    		String value = cmd.getOptionValue(opt);
-    		validateIRIs(value);
-    		conf.set(option.confProperty, value);
-    	} else if (defaultValue != null) {
-    		conf.setIfUnset(option.confProperty, String.valueOf(defaultValue));
-    	}
+    protected void configureIRI(CommandLine cmd, char opt, String defaultValue) {
+    	configureString(cmd, opt, defaultValue, v -> {
+    		validateIRIs(v);
+    	});
     }
 
-    protected void configureIRIPattern(CommandLine cmd, char opt, String defaultValue) throws ParseException {
+    protected void configureIRIPattern(CommandLine cmd, char opt, String defaultValue) {
     	configureString(cmd, opt, defaultValue);
     }
 
     protected void configureString(CommandLine cmd, char opt, String defaultValue) {
+    	configureString(cmd, opt, defaultValue, null);
+    }
+
+    protected void configureString(CommandLine cmd, char opt, String defaultValue, Consumer<String> valueChecker) {
     	OrderedOption option = (OrderedOption) options.getOption(Character.toString(opt));
     	// command line args always override
     	if (cmd.hasOption(opt)) {
-    		conf.set(option.confProperty, cmd.getOptionValue(opt));
+    		String value = cmd.getOptionValue(opt);
+    		if (valueChecker != null) {
+    			valueChecker.accept(value);
+    		}
+    		conf.set(option.confProperty, value);
     	} else if (defaultValue != null) {
     		conf.setIfUnset(option.confProperty, String.valueOf(defaultValue));
     	}
@@ -155,10 +159,18 @@ public abstract class AbstractHalyardTool implements Tool {
     }
 
     protected void configureInt(CommandLine cmd, char opt, int defaultValue) {
+    	configureInt(cmd, opt, defaultValue, null);
+    }
+
+    protected void configureInt(CommandLine cmd, char opt, int defaultValue, IntConsumer valueChecker) {
     	OrderedOption option = (OrderedOption) options.getOption(Character.toString(opt));
     	// command line args always override
     	if (cmd.hasOption(opt)) {
-    		conf.setInt(option.confProperty, Integer.parseInt(cmd.getOptionValue(opt)));
+    		int value = Integer.parseInt(cmd.getOptionValue(opt));
+    		if (valueChecker != null) {
+    			valueChecker.accept(value);
+    		}
+    		conf.setInt(option.confProperty, value);
     	} else {
     		conf.setIfUnset(option.confProperty, String.valueOf(defaultValue));
     	}

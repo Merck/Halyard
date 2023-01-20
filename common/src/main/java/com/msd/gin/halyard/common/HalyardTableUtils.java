@@ -99,7 +99,7 @@ public final class HalyardTableUtils {
 	 * @param conn Connection to the cluster running HBase
 	 * @param tableName String table name
 	 * @param create boolean option to create the table if does not exist
-	 * @param splitBits int number of bits used for calculation of Table region pre-splits (applies for new tables only). Must be between 0 and 16. Higher values generate more
+	 * @param splitBits int number of bits used for calculation of Table region pre-splits (applies for new tables only). Must be between 0 and 16 (or -1 for no splits). Higher values generate more
 	 * splits.
 	 * @throws IOException throws IOException in case of any HBase IO problems
 	 * @return the org.apache.hadoop.hbase.client.Table

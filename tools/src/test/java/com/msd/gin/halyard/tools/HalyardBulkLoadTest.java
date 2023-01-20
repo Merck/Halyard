@@ -44,6 +44,7 @@ import static org.junit.Assert.*;
  * @author Adam Sotona (MSD)
  */
 public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
+	private static final String NO_SPLITS = "-1";
 
 	@Override
 	protected AbstractHalyardTool createTool() {
@@ -90,7 +91,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         File htableDir = getTempHTableDir("test_htable");
 
         //load with override of the graph context, however with no default graph context
-        assertEquals(0, run(new String[]{"-b", "-1", "-d", "-l", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o", "-m", "1000"}));
+        assertEquals(0, run(new String[]{"-b", NO_SPLITS, "-d", "-k", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o", "-m", "1000"}));
 
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         SailRepository rep = new SailRepository(sail);
@@ -103,7 +104,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         htableDir = getTempHTableDir("test_htable");
 
         //default load
-        assertEquals(0, run(new String[]{"-b", "-1", "-d", "-l", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-g", "{0}"}));
+        assertEquals(0, run(new String[]{"-b", NO_SPLITS, "-d", "-k", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-g", "{0}"}));
 
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         rep = new SailRepository(sail);
@@ -115,7 +116,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         htableDir = getTempHTableDir("test_htable");
 
         //load with default graph context containing full URI pattern
-        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkLoad(), new String[]{"-b", "-1", "-d", "-l", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-g", "{0}"}));
+        assertEquals(0, ToolRunner.run(HBaseServerTestInstance.getInstanceConfig(), new HalyardBulkLoad(), new String[]{"-b", NO_SPLITS, "-d", "-k", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-g", "{0}"}));
 
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         rep = new SailRepository(sail);
@@ -129,7 +130,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         htableDir = getTempHTableDir("test_htable");
 
         //load with graph context override containing URI path pattern
-        assertEquals(0, run(new String[]{"-b", "-1", "-d", "-l", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o", "-g", "http://what{1}"}));
+        assertEquals(0, run(new String[]{"-b", NO_SPLITS, "-d", "-k", "-s", root.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable", "-o", "-g", "http://what{1}"}));
 
         sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable", false, 0, true, 0, null, null);
         rep = new SailRepository(sail);
@@ -158,7 +159,7 @@ public class HalyardBulkLoadTest extends AbstractHalyardToolTest {
         File htableDir = getTempHTableDir("test_htable");
 
         //load with override of the graph context, however with no default graph context
-        assertEquals(0, run(new String[]{"-b", "-1", "-i", "-s", file.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable2"}));
+        assertEquals(0, run(new String[]{"-b", NO_SPLITS, "-i", "-s", file.toURI().toURL().toString(), "-w", htableDir.toURI().toURL().toString(), "-t", "bulkLoadTable2"}));
 
         HBaseSail sail = new HBaseSail(HBaseServerTestInstance.getInstanceConfig(), "bulkLoadTable2", false, 0, true, 30, null, null);
         sail.init();

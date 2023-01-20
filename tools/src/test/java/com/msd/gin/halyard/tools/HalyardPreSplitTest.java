@@ -55,7 +55,7 @@ public class HalyardPreSplitTest extends AbstractHalyardToolTest {
 		try (Connection conn = HalyardTableUtils.getConnection(HBaseServerTestInstance.getInstanceConfig())) {
 			try (Table t = HalyardTableUtils.getTable(conn, "preSplitTable", false, 0)) {
 				try (RegionLocator locator = conn.getRegionLocator(t.getName())) {
-					assertEquals(17, locator.getStartKeys().length);
+					assertEquals(12, locator.getStartKeys().length);
 				}
 			}
 		}
