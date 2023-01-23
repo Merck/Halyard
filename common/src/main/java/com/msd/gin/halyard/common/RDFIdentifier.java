@@ -32,11 +32,11 @@ public class RDFIdentifier<T extends SPOC<?>> {
 	}
 
 	public final byte[] getKeyHash(StatementIndex<?,?,?,?> index) {
-		return role.keyHash(index, getId());
+		return index.keyHash(role, getId());
 	}
 
 	final byte[] getEndKeyHash(StatementIndex<?,?,?,?> index) {
-		return role.endKeyHash(index, getId());
+		return index.endKeyHash(role, getId());
 	}
 
 	final ByteBuffer writeQualifierHashTo(ByteBuffer bb) {

@@ -152,6 +152,19 @@ public final class ValueIdentifier implements ByteSequence, Serializable {
 			return (idBytes[typeIndex] & typeNibble.datatypeMask);
 		}
 
+		byte[] unrotate(byte[] src, int offset, int len, int shift, byte[] dest) {
+			byte[] rotated = rotateLeft(src, offset, len, shift, dest);
+			if (shift != 0) {
+				// preserve position of type byte
+				int shiftedTypeIndex = (typeIndex + len - shift) % len;
+				byte typeByte = rotated[shiftedTypeIndex];
+				byte tmp = rotated[typeIndex];
+				rotated[typeIndex] = typeByte;
+				rotated[shiftedTypeIndex] = tmp;
+			}
+			return rotated;
+		}
+
 		byte[] writeType(ValueType type, IRI datatype, byte[] arr, int offset) {
 			int typeBits;
 			int dtBits = 0;
@@ -183,6 +196,32 @@ public final class ValueIdentifier implements ByteSequence, Serializable {
 		private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
 			in.defaultReadObject();
 			initHashProvider();
+		}
+
+		static byte[] rotateLeft(byte[] src, int offset, int len, int shift, byte[] dest) {
+			if(shift > len) {
+				shift = shift % len;
+			}
+			if (shift != 0) {
+				System.arraycopy(src, offset+shift, dest, 0, len-shift);
+				System.arraycopy(src, offset, dest, len-shift, shift);
+			} else {
+				System.arraycopy(src, offset, dest, 0, len);
+			}
+			return dest;
+		}
+
+		static byte[] rotateRight(byte[] src, int offset, int len, int shift, byte[] dest) {
+			if(shift > len) {
+				shift = shift % len;
+			}
+			if (shift != 0) {
+				System.arraycopy(src, offset+len-shift, dest, 0, shift);
+				System.arraycopy(src, offset, dest, shift, len-shift);
+			} else {
+				System.arraycopy(src, offset, dest, 0, len);
+			}
+			return dest;
 		}
 	}
 
@@ -237,7 +276,7 @@ public final class ValueIdentifier implements ByteSequence, Serializable {
 	}
 
 	byte[] rotate(int len, int shift, byte[] dest) {
-		byte[] rotated = RDFRole.rotateRight(idBytes, 0, len, shift, dest);
+		byte[] rotated = Format.rotateRight(idBytes, 0, len, shift, dest);
 		if (shift != 0) {
 			// preserve position of type byte
 			int shiftedTypeIndex = (format.typeIndex + shift) % len;

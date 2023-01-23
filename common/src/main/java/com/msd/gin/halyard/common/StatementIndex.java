@@ -9,6 +9,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.filter.ColumnPrefixFilter;
 import org.apache.hadoop.hbase.filter.Filter;
@@ -116,7 +117,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	private final int[] argIndices;
 	private final int[] spocIndices;
 	private final RDFFactory rdfFactory;
-	private final Configuration conf;
+	private final int maxCaching;
 
 	StatementIndex(Name name, int prefix, boolean isQuadIndex, RDFRole<T1> role1, RDFRole<T2> role2, RDFRole<T3> role3, RDFRole<T4> role4, RDFFactory rdfFactory, Configuration conf) {
 		this.name = name;
@@ -127,7 +128,7 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 		this.role3 = role3;
 		this.role4 = role4;
 		this.rdfFactory = rdfFactory;
-		this.conf = conf;
+        this.maxCaching = conf.getInt(HConstants.HBASE_CLIENT_SCANNER_CACHING, HConstants.DEFAULT_HBASE_CLIENT_SCANNER_CACHING);
 
 		this.argIndices = new int[4];
 		this.spocIndices = new int[4];
@@ -158,6 +159,17 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 	}
 	private <T extends SPOC<?>> byte[] get3KeyHash(StatementIndex<?,?,T,?> index, RDFIdentifier<? extends T> k) {
 		return isQuadIndex ? k.getKeyHash(index) : k.getEndKeyHash(index);
+	}
+	byte[] keyHash(RDFRole<?> role, ValueIdentifier id) {
+		int len = role.keyHashSize();
+		// rotate key so ordering is different for different prefixes
+		// this gives better load distribution when traversing between prefixes
+		return id.rotate(len, role.toShift(this), new byte[len]);
+	}
+
+	byte[] endKeyHash(RDFRole<?> role, ValueIdentifier id) {
+		int len = role.endKeyHashSize();
+		return len > 0 ? id.rotate(len, role.toShift(this), new byte[len]) : new byte[0];
 	}
 	private int get3QualifierHashSize() {
 		return isQuadIndex ? role3.qualifierHashSize() : role3.endQualifierHashSize();
@@ -311,18 +323,19 @@ public final class StatementIndex<T1 extends SPOC<?>,T2 extends SPOC<?>,T3 exten
 
 	private ValueIdentifier parseId(RDFRole<?> role, ByteBuffer key, ByteBuffer cn, int keySize) {
 		byte[] idBytes = new byte[rdfFactory.getIdSize()];
-		role.unrotate(key.array(), key.arrayOffset() + key.position(), keySize, this, idBytes);
+		rdfFactory.idFormat.unrotate(key.array(), key.arrayOffset() + key.position(), keySize, role.toShift(this), idBytes);
 		key.position(key.position()+keySize);
 		cn.get(idBytes, keySize, idBytes.length - keySize);
 		return rdfFactory.id(idBytes);
 	}
 
 	Scan scan(ByteSequence k1Start, ByteSequence k2Start, ByteSequence k3Start, ByteSequence k4Start, ByteSequence k1Stop, ByteSequence k2Stop, ByteSequence k3Stop, ByteSequence k4Stop, int cardinality, boolean indiscriminate) {
-		return HalyardTableUtils.scan(concat(false, k1Start, k2Start, k3Start, k4Start), concat(true, k1Stop, k2Stop, k3Stop, k4Stop), cardinality, indiscriminate, conf);
+        int rowBatchSize = Math.min(maxCaching, cardinality);
+		return HalyardTableUtils.scan(concat(false, k1Start, k2Start, k3Start, k4Start), concat(true, k1Stop, k2Stop, k3Stop, k4Stop), rowBatchSize, indiscriminate);
 	}
 
 	Scan scan(ValueIdentifier id) {
-		ByteSequence kb = new ByteArray(role1.keyHash(this, id));
+		ByteSequence kb = new ByteArray(keyHash(role1, id));
 		byte[] cq = role1.qualifierHash(id);
 		int cardinality = VAR_CARDINALITY*VAR_CARDINALITY*VAR_CARDINALITY;
 		return scan(

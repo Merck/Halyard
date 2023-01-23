@@ -741,17 +741,15 @@ public final class HalyardTableUtils {
      * @param stopRow stop row key byte array (exclusive)
      * @param rowBatchSize number of rows to fetch per RPC
      * @param indiscriminate if the scan is indiscriminate (e.g. full table scan)
-     * @param conf HBase configuration
      * @return HBase Scan instance
      */
-	static Scan scan(byte[] startRow, byte[] stopRow, int rowBatchSize, boolean indiscriminate, Configuration conf) {
+	static Scan scan(byte[] startRow, byte[] stopRow, int rowBatchSize, boolean indiscriminate) {
         Scan scan = new Scan();
         scan.addFamily(CF_NAME);
 		scan.readVersions(READ_VERSIONS);
         scan.setAllowPartialResults(true);
         scan.setBatch(10);
-        int maxCaching = conf.getInt(HConstants.HBASE_CLIENT_SCANNER_CACHING, HConstants.DEFAULT_HBASE_CLIENT_SCANNER_CACHING);
-        scan.setCaching(Math.min(maxCaching, rowBatchSize));
+        scan.setCaching(rowBatchSize);
         // dont cause the block cache to be flushed when doing an indiscriminate scan
         scan.setCacheBlocks(!indiscriminate);
         if(startRow != null) {

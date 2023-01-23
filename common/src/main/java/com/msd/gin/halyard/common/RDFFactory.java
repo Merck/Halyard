@@ -36,15 +36,15 @@ public class RDFFactory {
 	public final ValueIO.Writer streamWriter;
 	public final ValueIO.Reader streamReader;
 	private final BiMap<ValueIdentifier, IRI> wellKnownIriIds = HashBiMap.create(256);
-	private final ValueIdentifier.Format idFormat;
+	final ValueIdentifier.Format idFormat;
 	final int typeSaltSize;
 
 	final ValueIO valueIO;
 
-	final RDFRole<SPOC.S> subject;
-	final RDFRole<SPOC.P> predicate;
-	final RDFRole<SPOC.O> object;
-	final RDFRole<SPOC.C> context;
+	private final RDFRole<SPOC.S> subject;
+	private final RDFRole<SPOC.P> predicate;
+	private final RDFRole<SPOC.O> object;
+	private final RDFRole<SPOC.C> context;
 
 	public static RDFFactory create(Configuration config) {
 		HalyardTableConfiguration halyardConfig = new HalyardTableConfiguration(config);
@@ -132,25 +132,25 @@ public class RDFFactory {
 			RDFRole.Name.SUBJECT,
 			idSize,
 			subjectKeySize, subjectEndKeySize,
-			0, 2, 1, typeIndex, Short.BYTES
+			0, 2, 1, Short.BYTES
 		);
 		this.predicate = new RDFRole<>(
 			RDFRole.Name.PREDICATE,
 			idSize,
 			predicateKeySize, predicateEndKeySize,
-			1, 0, 2, typeIndex, Short.BYTES
+			1, 0, 2, Short.BYTES
 		);
 		this.object = new RDFRole<>(
 			RDFRole.Name.OBJECT,
 			idSize,
 			objectKeySize, objectEndKeySize,
-			2, 1, 0, typeIndex, Integer.BYTES
+			2, 1, 0, Integer.BYTES
 		);
 		this.context = new RDFRole<>(
 			RDFRole.Name.CONTEXT,
 			idSize,
 			contextKeySize, contextEndKeySize,
-			0, 0, 0, typeIndex, Short.BYTES
+			0, 0, 0, Short.BYTES
 		);
 	}
 

@@ -18,10 +18,9 @@ public final class RDFRole<T extends SPOC<?>> {
 	private final int sshift;
 	private final int pshift;
 	private final int oshift;
-	private final int typeIndex;
 	private final int sizeLength;
 
-	public RDFRole(Name name, int idSize, int keyHashSize, int endKeyHashSize, int sshift, int pshift, int oshift, int typeIndex, int sizeLength) {
+	public RDFRole(Name name, int idSize, int keyHashSize, int endKeyHashSize, int sshift, int pshift, int oshift, int sizeLength) {
 		this.name = name;
 		this.idSize = idSize;
 		this.keyHashSize = keyHashSize;
@@ -33,7 +32,6 @@ public final class RDFRole<T extends SPOC<?>> {
 		this.sshift = sshift;
 		this.pshift = pshift;
 		this.oshift = oshift;
-		this.typeIndex = typeIndex;
 		this.sizeLength = sizeLength;
 	}
 
@@ -63,18 +61,6 @@ public final class RDFRole<T extends SPOC<?>> {
 
 	int sizeLength() {
 		return sizeLength;
-	}
-
-	byte[] keyHash(StatementIndex<?,?,?,?> index, ValueIdentifier id) {
-		int len = keyHashSize();
-		// rotate key so ordering is different for different prefixes
-		// this gives better load distribution when traversing between prefixes
-		return id.rotate(len, toShift(index), new byte[len]);
-	}
-
-	byte[] endKeyHash(StatementIndex<?,?,?,?> index, ValueIdentifier id) {
-		int len = endKeyHashSize();
-		return len > 0 ? id.rotate(len, toShift(index), new byte[len]) : new byte[0];
 	}
 
 	byte[] qualifierHash(ValueIdentifier id) {
@@ -107,7 +93,7 @@ public final class RDFRole<T extends SPOC<?>> {
 		return endStopKey;
 	}
 
-	private int toShift(StatementIndex<?,?,?,?> index) {
+	int toShift(StatementIndex<?,?,?,?> index) {
 		switch(index.getName()) {
 			case SPO:
 			case CSPO:
@@ -123,48 +109,8 @@ public final class RDFRole<T extends SPOC<?>> {
 		}
 	}
 
-	byte[] unrotate(byte[] src, int offset, int len, StatementIndex<?,?,?,?> index, byte[] dest) {
-		int shift = toShift(index);
-		byte[] rotated = rotateLeft(src, offset, len, shift, dest);
-		if (shift != 0) {
-			// preserve position of type byte
-			int shiftedTypeIndex = (typeIndex + len - shift) % len;
-			byte typeByte = rotated[shiftedTypeIndex];
-			byte tmp = rotated[typeIndex];
-			rotated[typeIndex] = typeByte;
-			rotated[shiftedTypeIndex] = tmp;
-		}
-		return rotated;
-	}
-
 	@Override
 	public String toString() {
 		return name.toString();
-	}
-
-	static byte[] rotateLeft(byte[] src, int offset, int len, int shift, byte[] dest) {
-		if(shift > len) {
-			shift = shift % len;
-		}
-		if (shift != 0) {
-			System.arraycopy(src, offset+shift, dest, 0, len-shift);
-			System.arraycopy(src, offset, dest, len-shift, shift);
-		} else {
-			System.arraycopy(src, offset, dest, 0, len);
-		}
-		return dest;
-	}
-
-	static byte[] rotateRight(byte[] src, int offset, int len, int shift, byte[] dest) {
-		if(shift > len) {
-			shift = shift % len;
-		}
-		if (shift != 0) {
-			System.arraycopy(src, offset+len-shift, dest, 0, shift);
-			System.arraycopy(src, offset, dest, shift, len-shift);
-		} else {
-			System.arraycopy(src, offset, dest, 0, len);
-		}
-		return dest;
 	}
 }
